@@ -9,3 +9,5 @@ coverage/
 .tsbuildinfo
 mage/**/artifacts/
 mage/.learnings/
+# repo-root Obsidian UI state (the tracked KB vault config lives at mage/.obsidian/)
+/.obsidian/
