@@ -1,0 +1,68 @@
+{
+  "name": "mage-memory",
+  "version": "0.0.1",
+  "description": "mage — a portable, self-maintaining knowledge base for software systems: durable git-backed notes navigable as an Obsidian graph, usable by any AI coding agent. CLI: init, index, link, verify, unlink, list, status, doctor.",
+  "type": "module",
+  "bin": {
+    "mage": "dist/cli.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "pnpm build"
+  },
+  "keywords": [
+    "knowledge-base",
+    "memory",
+    "ai-agents",
+    "agents",
+    "obsidian",
+    "notes",
+    "documentation",
+    "claude-code"
+  ],
+  "author": "Sumit Patel",
+  "license": "MIT",
+  "homepage": "https://github.com/Sumit1993/mage-memory",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sumit1993/mage-memory.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Sumit1993/mage-memory/issues"
+  },
+  "dependencies": {
+    "@inquirer/prompts": "^7.2.1",
+    "commander": "^12.1.0",
+    "gray-matter": "^4.0.3",
+    "ora": "^8.1.1",
+    "picocolors": "^1.1.1",
+    "tar": "^7.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "@types/tar": "^6.1.13",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}

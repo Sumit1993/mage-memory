@@ -1,0 +1,152 @@
+import { logger } from "../logger.js";
+import {
+  METADATA_SCHEMA,
+  absolutePath,
+  codeRepoDocsRoot,
+  exists,
+  hubProjectDocsRoot,
+  readMetadata,
+} from "../paths.js";
+
+export interface StatusOptions {
+  /** Code repos to check. Required (status doesn't auto-discover). */
+  codeRepos: string[];
+}
+
+export interface RepoStatus {
+  codeRepo: string;
+  metadata: { ok: boolean; detail?: string };
+  docsRoot: { ok: boolean; detail?: string };
+  hubReachable: { ok: boolean; detail?: string };
+  schemaCurrent: { ok: boolean; detail?: string };
+  overall: "ok" | "warning" | "error";
+}
+
+export interface StatusResult {
+  passed: boolean;
+  repos: RepoStatus[];
+}
+
+/**
+ * Per-machine health check for each linked code repo. Checks metadata
+ * presence + parse, docs-root reachability (depends on mode), hub reachability
+ * (external mode), and schema version.
+ */
+export async function status(opts: StatusOptions): Promise<StatusResult> {
+  const result: StatusResult = { passed: true, repos: [] };
+
+  for (const repoInput of opts.codeRepos) {
+    const repo = absolutePath(repoInput);
+    const rs = await statusOne(repo);
+    result.repos.push(rs);
+    if (rs.overall === "error") result.passed = false;
+  }
+
+  for (const r of result.repos) {
+    logger.blank();
+    logger.info(r.codeRepo);
+    renderCheck("metadata", r.metadata);
+    renderCheck("docs root", r.docsRoot);
+    renderCheck("hub reachable", r.hubReachable);
+    renderCheck("schema current", r.schemaCurrent);
+    const overallSym = r.overall === "ok" ? "✓" : r.overall === "warning" ? "⚠" : "✗";
+    logger.detail(`  → overall: ${overallSym} ${r.overall}`);
+  }
+
+  logger.blank();
+  if (result.passed) logger.success("All repos OK.");
+  else logger.error("Some repos have issues.");
+  return result;
+}
+
+async function statusOne(repo: string): Promise<RepoStatus> {
+  const rs: RepoStatus = {
+    codeRepo: repo,
+    metadata: { ok: false },
+    docsRoot: { ok: false },
+    hubReachable: { ok: false },
+    schemaCurrent: { ok: false },
+    overall: "error",
+  };
+
+  // 1. Metadata
+  let meta: Awaited<ReturnType<typeof readMetadata>>;
+  try {
+    meta = await readMetadata(repo);
+  } catch (err) {
+    rs.metadata = { ok: false, detail: (err as Error).message };
+    return rs;
+  }
+  if (!meta) {
+    rs.metadata = { ok: false, detail: "missing mage/metadata.json" };
+    return rs;
+  }
+  rs.metadata = {
+    ok: true,
+    detail: `mode=${meta.mode}, project=${meta.project}${meta.hub_refs.length > 0 ? `, hub_refs=${meta.hub_refs.length}` : ""}`,
+  };
+
+  // 2. Docs root reachability
+  if (meta.mode === "in-repo") {
+    const dr = codeRepoDocsRoot(repo);
+    if (await exists(dr)) rs.docsRoot = { ok: true, detail: `in-repo at ${dr}` };
+    else rs.docsRoot = { ok: false, detail: `expected ${dr} but missing` };
+  } else if (meta.mode === "external") {
+    if (!meta.hub_path) {
+      rs.docsRoot = { ok: false, detail: "mode=external but hub_path is null" };
+    } else {
+      const dr = hubProjectDocsRoot(meta.hub_path, meta.project);
+      if (await exists(dr)) rs.docsRoot = { ok: true, detail: `hub-owned at ${dr}` };
+      else rs.docsRoot = { ok: false, detail: `expected ${dr} but missing` };
+    }
+  }
+
+  // 3. Hub reachability (external mode AND/OR each hub_ref)
+  const hubsToCheck: { path: string; label: string }[] = [];
+  if (meta.mode === "external" && meta.hub_path) {
+    hubsToCheck.push({ path: meta.hub_path, label: "primary" });
+  }
+  for (const ref of meta.hub_refs) {
+    hubsToCheck.push({ path: ref.hub_path, label: `hub_ref:${ref.project}` });
+  }
+  if (hubsToCheck.length === 0) {
+    rs.hubReachable = { ok: true, detail: "(no hubs — pure in-repo)" };
+  } else {
+    const missing: string[] = [];
+    for (const h of hubsToCheck) {
+      if (!(await exists(h.path))) missing.push(`${h.label}=${h.path}`);
+    }
+    if (missing.length === 0) {
+      rs.hubReachable = {
+        ok: true,
+        detail: hubsToCheck.map((h) => `${h.label}=${h.path}`).join(", "),
+      };
+    } else {
+      rs.hubReachable = { ok: false, detail: `missing on this machine: ${missing.join(", ")}` };
+    }
+  }
+
+  // 4. Schema current
+  if (meta.schema === METADATA_SCHEMA) {
+    rs.schemaCurrent = { ok: true, detail: meta.schema };
+  } else {
+    rs.schemaCurrent = {
+      ok: false,
+      detail: `schema is ${meta.schema}; current is ${METADATA_SCHEMA}`,
+    };
+  }
+
+  // Overall
+  if (rs.metadata.ok && rs.docsRoot.ok && rs.hubReachable.ok) {
+    rs.overall = rs.schemaCurrent.ok ? "ok" : "warning";
+  } else {
+    rs.overall = "error";
+  }
+  return rs;
+}
+
+function renderCheck(label: string, check: { ok: boolean; detail?: string }): void {
+  const sym = check.ok ? "✓" : "✗";
+  const padded = `${label}:`.padEnd(18);
+  logger.detail(`  ${sym} ${padded} ${check.detail ?? ""}`);
+}

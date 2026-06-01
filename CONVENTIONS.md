@@ -1,0 +1,278 @@
+# mage conventions
+
+The schema layer for **mage** notes. This is the shared reference for humans and
+AI agents writing into a mage knowledge base. mage stores durable, git-backed
+markdown **notes** — distilled insight, procedure, and pointers to canonical
+sources — navigable as an Obsidian graph and usable by any coding agent.
+
+**Guiding rule: every field is optional.** A note is valid as plain markdown
+with no frontmatter at all (graceful degradation). The conventions below make a
+note *richer* — better indexed, better linked, better grouped — but mage never
+rejects a note for omitting them.
+
+---
+
+## 1. Note frontmatter schema
+
+Optional YAML frontmatter at the top of any `.md` note. Unknown keys are
+preserved verbatim across read/write, so you can add your own.
+
+```yaml
+---
+type: gotcha                       # open vocab; default "note" (see §6)
+tags: [billing/payments]           # #wing/room scoping, stored WITHOUT the '#'
+created: 2026-06-01                # ISO date
+updated: 2026-06-01                # ISO date
+last_reviewed: 2026-06-01          # cheap staleness signal
+status: active                     # active | stale-suspect | superseded | archived
+provenance:                        # where this note was distilled from
+  repo: my-api
+  commit: 0ad0e99
+  work: stripe-webhook-retries     # the work/<slug> this came from
+sources:                           # POINTERS to canonical sources — never copies
+  - https://stripe.com/docs/webhooks#retry-logic
+  - JIRA-4821
+  - src/billing/webhook.ts:142
+keywords: [webhook, idempotency, retry, stripe]   # optional; index falls back to title+headers+tags
+---
+```
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `type` | string | Note category from the open vocabulary (§6). Default `note`. Never enforced. |
+| `tags` | string[] | `wing/room` scoping (§4). Stored without leading `#`. First tag drives wing/room derivation. |
+| `created` / `updated` | ISO date | Lifecycle timestamps. |
+| `last_reviewed` | ISO date | When a human/agent last confirmed the note still holds. Drives staleness review. |
+| `status` | enum | `active` (default if absent), `stale-suspect`, `superseded`, `archived`. |
+| `provenance` | object | `{ repo, commit, work }` — the context this note was distilled from, for re-verification. |
+| `sources` | string[] | Pointers to canonical sources: `url`, `ticket`, or `file:line`. The heart of capture-by-pointer (§5). |
+| `keywords` | string[] | Optional search hints. When present, used verbatim by the index; otherwise the index derives keywords from title + headers + tag rooms. |
+
+**`status` tracks lifecycle, not implementation.** For a `decision` (ADR),
+`status: active` means the decision is *in force* — **not** that the work it
+implies is done; track outstanding work in the roadmap / work units and link to
+it. A decision stays `active` until a later one **supersedes** it: when you add
+a `supersedes` / `superseded_by` relation (§3), flip the superseded note's
+`status: superseded` in the **same edit** — or annotate inline for a *partial*
+supersession, where only one claim is replaced and the note otherwise stands.
+
+Graceful degradation in practice: omit everything and the note still indexes
+(by H1 title, headers, and tags), still links, and still renders in Obsidian.
+Add fields only where they earn their keep.
+
+---
+
+## 2. Portable links (the most important rule)
+
+Link between notes with **standard relative markdown links only**:
+
+```markdown
+See [payments webhook flow](billing/payments.md) for the retry contract.
+```
+
+**Never use `[[wikilinks]]`.** Two reasons:
+
+1. **Obsidian graph edges** — relative markdown links render as real edges in
+   the Obsidian graph, so the knowledge base is navigable visually.
+2. **Cross-agent portability** — `[text](path.md)` is plain markdown that every
+   agent (Claude, Cursor, Codex, plain `grep`) and every renderer understands.
+   `[[wikilinks]]` are Obsidian-proprietary and break the moment the vault
+   leaves Obsidian.
+
+Link hygiene:
+
+- Paths are **relative to the linking note**, e.g. `../decisions/adr-0004.md`.
+- **URL-encode spaces** as `%20`: `[old note](legacy%20billing.md)`. Better:
+  avoid spaces in filenames entirely — prefer `kebab-case.md`.
+- **Avoid `#`, `|`, `^`, `:` in filenames** — they collide with markdown
+  anchors, table syntax, Obsidian block refs, and Windows path rules.
+
+---
+
+## 3. Typed relations (`## Relations`)
+
+Plain inline links say "these are related". For *typed* edges (this note
+**depends on** that one), add a `## Relations` section of typed bullet links:
+
+```markdown
+## Relations
+
+- depends_on [payments service](billing/payments.md)
+- breaks_on [stripe API v2 migration](../decisions/adr-0012-stripe-v2.md)
+- calls [webhook verifier](billing/webhook-verify.md)
+- owns [retry queue topology](infra/retry-queue.md)
+```
+
+Convention: `- <relation> [text](relative/path.md)`. Relation verbs are open
+vocabulary — common ones: `depends_on`, `breaks_on`, `calls`, `owns`,
+`supersedes`, `superseded_by`, `see_also`. The links are ordinary markdown, so
+they still appear as Obsidian graph edges; the verb adds machine-readable intent.
+
+---
+
+## 4. `#wing/room` nested tags
+
+Tags use a two-level scope that drives grouping everywhere in mage:
+
+- **WING** = the top-level scope = first tag segment. A project, repo, service,
+  or person. e.g. `billing`.
+- **ROOM** = a topic within that wing = second segment. e.g. `payments`.
+
+```yaml
+tags: [billing/payments]    # wing = "billing", room = "payments"
+```
+
+The **first tag** determines a note's primary wing and room (mage derives these
+deterministically). What this drives:
+
+- **Index grouping** — `mage index` groups notes by wing in `INDEX.md`, and in
+  hierarchical mode emits per-wing `_index.<wing>.md` files.
+- **Per-wing skills** — `mage skills` generates a `mage-wing-<x>` awareness
+  skill per wing, so an agent entering a wing gets that wing's context.
+- **Obsidian color groups** — each wing gets a stable, distinct graph color via
+  a `tag:#<wing>` query (which also matches nested `#<wing>/<room>` tags).
+
+Tags are stored **without** the leading `#` in frontmatter (`billing/payments`,
+not `#billing/payments`). The `#` form is how they read inside Obsidian.
+
+**Folders are conventions, not constraints.** A note's wing and room come from
+its **first tag, not its file path** — a note can live anywhere under the
+scanned dirs and still group correctly. `mage index` and `mage skills` scan
+`notes/`, `decisions/`, and `work/`; `archive/` is intentionally **not**
+indexed. The directory layout is a convenience for humans, not a rule the
+tooling enforces.
+
+---
+
+## 5. Capture-by-pointer (core principle)
+
+A mage note is **not** a copy of what you read. It is the *residue* of doing
+work — the part worth keeping so the next run is faster and makes fewer
+mistakes. Three ingredients:
+
+1. **Insight** — the reusable understanding, captured **verbatim**, don't
+   oversimplify. The non-obvious thing you learned (e.g. "Stripe retries
+   webhooks with the *same* event id for 3 days, so the handler must be
+   idempotent on `event.id`, not request time").
+2. **Procedure** — how to do it faster next time. Include the **bad commands /
+   dead ends to avoid and *why*** (e.g. "don't dedupe on `created` — clock skew
+   across retries breaks it").
+3. **Pointers** (`sources:`) — *where* the canonical source lives and *when* to
+   go back to it: `url`, `ticket`, or `file:line`. The note points at truth; it
+   does not duplicate truth.
+
+> **Never copy a source into a note.** Link to it. The only exception: when a
+> source is **fragile** (a flaky URL, a doc that will be deleted, generated
+> output you can't regenerate cheaply), snapshot it into the owning work unit's
+> `work/<slug>/artifacts/` directory and point `sources:` at the snapshot.
+
+Litmus test before saving: *"Does this help me do it faster or avoid a mistake
+next time?"* If it's just an archive of what you read, it doesn't belong.
+
+---
+
+## 6. Note-type vocabulary
+
+`type` is open vocabulary — invent your own where it helps. Suggested set:
+
+| `type` | One-liner |
+|--------|-----------|
+| `interface` | The shape/contract of an API, module, or boundary. |
+| `tooling` | How to run/configure a tool, command, or dev workflow. |
+| `topology` | How systems, services, or data are laid out and connected. |
+| `relationship` | How two or more things interact or depend on each other. |
+| `playbook` | A repeatable procedure to accomplish a recurring task. |
+| `gotcha` | A trap, footgun, or surprising behavior and how to avoid it. |
+| `pointer` | A thin note whose value is mostly its `sources:` links. |
+| `trail` | A breadcrumb/navigation note that routes to other notes. |
+| `decision` | An ADR-style record of a choice and its rationale. |
+| `spec` | A specification of intended behavior. |
+| `plan` | A forward-looking plan of work. |
+| `tasks` | A concrete task list / checklist. |
+| `principle` | A durable rule or value the system holds to. |
+| `note` | Default — anything that doesn't fit a sharper type. |
+
+---
+
+## 7. Work units (`work/<slug>/`)
+
+A work unit is a task-scoped **lab notebook** under `mage/work/<slug>/`, with a
+frontmatter `type` such as `spec`, `investigation`, `incident`, or `spike`. It's
+where messy, in-progress thinking lives during a task. When the work settles,
+the durable insight gets **distilled** into one or more notes under
+`mage/notes/` (and `provenance.work` points back at the slug).
+
+- `work/<slug>/artifacts/` is **git-ignored** and is the durable home for
+  generated or downloaded material — snapshots, dumps, captures, scratch output.
+- **Never use `/tmp`** for material you might need later; it does not survive.
+  `artifacts/` is the correct scratch home and travels with the work unit.
+
+---
+
+## 8. How `mage index` and `mage skills` consume this
+
+- **`mage index`** scans every note, reads frontmatter, and emits a generated,
+  always-loaded `INDEX.md` (and per-wing `_index.<wing>.md` in hierarchical
+  mode). It groups by **wing** (first tag), surfaces each note's title, type,
+  status, and **keywords** — using `keywords:` verbatim when present, otherwise
+  deriving them from the H1 title + `##` headers + tag rooms. Generated files
+  are **never hand-edited**; re-run `mage index`.
+- **`mage skills`** generates a `mage-wing-<x>` awareness skill per wing, so an
+  agent working in that wing automatically loads the right slice of the base.
+- **Obsidian** colors the graph one hue per wing via a `tag:#<wing>` query, and
+  relative-markdown links (inline + `## Relations`) become the graph's edges.
+
+Good frontmatter + portable links + `#wing/room` tags = a base that indexes
+itself, colors itself, and routes agents to the right context for free.
+
+---
+
+## Example note
+
+Path: `mage/notes/billing/stripe-webhook-idempotency.md`
+
+```markdown
+---
+type: gotcha
+tags: [billing/payments]
+created: 2026-06-01
+updated: 2026-06-01
+last_reviewed: 2026-06-01
+status: active
+provenance:
+  repo: my-api
+  commit: 0ad0e99
+  work: stripe-webhook-retries
+sources:
+  - https://stripe.com/docs/webhooks#retry-logic
+  - JIRA-4821
+  - src/billing/webhook.ts:142
+keywords: [webhook, idempotency, retry, stripe, event-id]
+---
+
+# Stripe webhook idempotency
+
+## Insight
+Stripe retries a failed webhook with the **same `event.id`** for up to 3 days
+(exponential backoff). The handler MUST be idempotent keyed on `event.id` —
+treat a duplicate `event.id` as already-processed and return 200.
+
+## Procedure
+- Persist processed `event.id`s; short-circuit duplicates before any side effect.
+- Return 2xx fast; do real work async. A slow 200 still triggers retries.
+
+### Avoid
+- ❌ Dedupe on `event.created` or request arrival time — clock skew across
+  retries makes the same logical event look new. Use `event.id` only.
+- ❌ Returning 500 on an already-handled event — it re-queues the retry storm.
+
+## Relations
+- depends_on [webhook signature verify](webhook-verify.md)
+- breaks_on [stripe API v2 migration](../decisions/adr-0012-stripe-v2.md)
+- owns [retry queue topology](../infra/retry-queue.md)
+
+## Sources
+Canonical retry semantics: see `sources:` above. Go back to the Stripe docs
+when the backoff window or `event` shape changes; check `webhook.ts:142` for
+the current idempotency guard.
+```
