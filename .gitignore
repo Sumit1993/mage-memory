@@ -7,3 +7,5 @@ dist/
 coverage/
 .vitest-cache/
 .tsbuildinfo
+mage/**/artifacts/
+mage/.learnings/
