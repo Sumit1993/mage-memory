@@ -141,6 +141,7 @@ Typed relations between notes go in a `## Relations` section, e.g.
 | `mage init [--in-repo \| --external]` | Create a knowledge base in-repo (`mage/`) or as an external hub. |
 | `mage index` | Regenerate the always-loaded index (and per-wing indexes in hierarchical mode). Never hand-edit the output. |
 | `mage skills` | (Re)generate the per-wing `mage-wing-<x>` skills so agents discover this knowledge base. |
+| `mage dream` | Report knowledge-base health, read-only: stale, superseded-but-active, dangling links, orphan notes. |
 | `mage link <hub>` | Register this repo's knowledge base with an external hub (hybrid). |
 | `mage unlink` | Remove a hub linkage. |
 | `mage verify` | Sanity-check structure, frontmatter, and links. |

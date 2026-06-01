@@ -26,6 +26,13 @@ export {
 } from "./commands/doctor.js";
 export { index, type IndexOptions, type IndexResult } from "./commands/index-cmd.js";
 export { skills, type SkillsOptions, type SkillsResult } from "./commands/skills-cmd.js";
+export { dream, type DreamCmdOptions, type DreamResult } from "./commands/dream-cmd.js";
+export {
+  analyzeDream,
+  type DreamOptions,
+  type DreamReport,
+  type DreamFinding,
+} from "./dream.js";
 export { scanNotes, type ScannedNote } from "./scan.js";
 
 export {

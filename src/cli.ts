@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import { doctor } from "./commands/doctor.js";
+import { dream } from "./commands/dream-cmd.js";
 import { type InitMode, type InitVisibility, init } from "./commands/init.js";
 import { index } from "./commands/index-cmd.js";
 import { link, type Storage } from "./commands/link.js";
@@ -68,6 +69,24 @@ program
   .option("-d, --dir <path>", "where to look for the knowledge base (default: cwd; walks up for in-repo)")
   .action(async (opts) => {
     await skills({ dir: opts.dir });
+  });
+
+// ─── dream ───────────────────────────────────────────────────────────────────
+program
+  .command("dream")
+  .description(
+    "Report knowledge-base health, read-only: stale, superseded-but-active, dangling links, orphans",
+  )
+  .option("-d, --dir <path>", "where to look for the knowledge base (default: cwd; walks up for in-repo)")
+  .option(
+    "--stale-days <n>",
+    "flag notes whose last_reviewed is older than N days (default 180)",
+    (v) => Number.parseInt(v, 10),
+  )
+  .option("--strict", "exit non-zero if any findings (for hooks/CI)")
+  .action(async (opts) => {
+    const result = await dream({ dir: opts.dir, staleDays: opts.staleDays });
+    if (opts.strict && result.findingCount > 0) process.exit(1);
   });
 
 // ─── link ──────────────────────────────────────────────────────────────────

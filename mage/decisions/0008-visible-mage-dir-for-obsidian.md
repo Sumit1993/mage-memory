@@ -31,6 +31,6 @@ v0.1 LOCKS #2 set the in-repo data dir to `.mage/` (hidden, tooling-like, groupe
 
 ## Relations
 
-- supersedes [mage v0.1 locks — data-dir name](../notes/plan-v0.1-locks.md)
+- revises [mage v0.1 locks — data-dir name](../notes/plan-v0.1-locks.md)
 - realizes [mage — context & glossary](../notes/context.md)
 - see_also [ADR-0003 — track work, ignore artifacts](0003-track-work-ignore-artifacts.md)
