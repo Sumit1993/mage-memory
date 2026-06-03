@@ -2,8 +2,8 @@
 type: plan
 tags: [mage/roadmap]
 created: "2026-05-29"
-updated: "2026-06-01"
-last_reviewed: "2026-06-01"
+updated: "2026-06-02"
+last_reviewed: "2026-06-02"
 status: active
 provenance:
   repo: mage-memory
@@ -28,10 +28,13 @@ keywords: [roadmap, v0.1, v0.2, dream, scope, deferred, release, mcp, hub]
 ## v0.2+ — deferred
 - Full **`/dream` batch sweep** (decay / supersede / re-verify / consolidate / prune) — only the cheap read-time + on-write parts ship in v0.1. Mines agentmemory's design (decay/consolidation/connect/bridge) without depending on it [ADR-0007].
 - **Opt-in auto-capture** — runtime-less, via host hooks: `mage connect <agent>` installs per-harness hooks → `mage observe` stages to `.learnings/` (deterministic) → agent distills via `/learn` → promote on recurrence ≥2× [ADR-0009]. Plus **note↔skill promotion engine** + **homunculus-algorithm harvest** [ADR-0005/0006].
-- **`/learn --from <transcript>`** — agent-driven import-harvest of session transcripts (e.g. `~/.claude/projects/*.jsonl`) into distilled notes; the feeder path [ADR-0005]. (Distillation is judgment ⇒ a skill, never a deterministic `mage import`.)
+- **`/learn --from <transcript>`** — agent-driven import-harvest of session transcripts (e.g. `~/.claude/projects/*.jsonl`) into distilled notes; the feeder path [ADR-0005]. (Distillation is judgment ⇒ a skill, never a deterministic `mage import`.) The first external migrations field-tested a `--from <dir>` prose-doc variant + a byte-safe bulk recipe — see [field notes](migration-field-notes.md).
 - **MCP** search/recall accelerator — standardizes *recall* across agents, **not** capture [ADR-0009].
 - **Obsidian dashboards** via Dataview/Bases plugins (the graph + wing colors already ship; richer dashboards are plugin-rendered, not mage-generated markdown).
 - **Multi-repo hub graph aggregation + cross-repo `/dream`** (basic hub mode carries from specshub; the cross-repo graph/sync waits).
+- **Index hub-owned projects** — `mage index`/`dream` skip `projects/` and run on one docs root, so a hub's index covers only hub-level notes; hub-owned project notes are registered (`list`/`verify`) but not indexed. Workaround today: a per-project `metadata.json` anchor. Recurse `projects/` (or `mage index --all`) so the anchor isn't needed. [field notes](migration-field-notes.md) · **design locked: [ADR-0011](../decisions/0011-recursive-scan-hub-projects.md)**
+- **`mage link` writes external awareness** — `link` writes the code repo's `metadata.json` but no `AGENTS.md`/`CLAUDE.md`, so external code repos don't auto-route agents to the hub. Add an `external` kind to `writeAgentsMd`. [field notes](migration-field-notes.md) · **decided: [ADR-0011](../decisions/0011-recursive-scan-hub-projects.md)**
+- **Generalize hubs beyond developers (ADR-0012)** — one detection-first `mage init` (in-repo vs `--hub <name>`; name = location; **suggest-only** commit; retire the `--external` word); **standalone-hub** creation for non-devs; hub index lists `storage:in-repo` members as **pointers** (visible, never silently empty); **multi-home by tags** (a note indexes under *every* wing it's tagged with); a `dream` nudge for untagged notes. Principle: **a wing is an optional convention, never required.** **decided: [ADR-0012](../decisions/0012-wings-optional-convention-standalone-hubs.md)**
 
 ## Out of scope (the sharp "no")
 - **Multi-agent coordination** — leases / signals / actions / routines / task queues. mage is durable memory, not an orchestration layer [ADR-0010].
@@ -49,3 +52,5 @@ keywords: [roadmap, v0.1, v0.2, dream, scope, deferred, release, mcp, hub]
 - bounded_by [ADR-0010 — durable memory, not a coordination layer](../decisions/0010-durable-memory-not-coordination-layer.md)
 - mining_map [agentmemory mining map](agentmemory-mining-map.md)
 - detailed_by [mage v0.1 implementation plan](plan-v0.1.md)
+- field_tested_by [migration field notes](migration-field-notes.md)
+- decided_by [ADR-0011 — recursive scan; hub projects are wings](../decisions/0011-recursive-scan-hub-projects.md)

@@ -28,7 +28,7 @@ The atomic unit — one verbatim markdown file about one thing, with frontmatter
 _Avoid_: drawer, doc, memory (as a noun), entry
 
 **Wing**:
-The top-level scope a note belongs to — typically a project, repo, service, or person. Realized as a nested tag (`#wing/<name>`) and/or a MOC, **not** a mandatory folder.
+The top-level scope a note belongs to — typically a project, repo, service, or person. Realized as a nested tag (`#wing/<name>`) and/or a MOC, **not** a mandatory folder. A wing is an **optional convention, never a necessity**: untagged notes are valid (they index as *Cross-cutting*) — reach for a wing only when a base spans more than one top-level scope. The **first** tag is a note's *primary* wing (drives color + ownership); a note may carry more tags and is indexed under **each** of them (multi-home). In a hub, the whole system is itself a wing (named after the hub). See [ADR-0011](../decisions/0011-recursive-scan-hub-projects.md), [ADR-0012](../decisions/0012-wings-optional-convention-standalone-hubs.md).
 _Avoid_: section, bucket
 
 **Room**:
@@ -86,7 +86,7 @@ A pointer to canonical external knowledge (URL, ticket, `file:line`) carried in 
 
 ## Flagged ambiguities
 
-- **Wing vs Project**: in a multi-repo hub a wing usually *is* a project/repo — but a wing can also be a non-repo scope (a person, an external service). Wing = the memory-scope; Project = the registry entry. Often coincide, not always.
+- **Wing vs Project** *(resolved, [ADR-0011](../decisions/0011-recursive-scan-hub-projects.md))*: a **hub is one vault**; a **project** is a sub-scope of it whose notes live under `projects/<name>/` and surface as a **wing** (`<name>/room`), plus a **registry entry** in the hub `metadata.json` recording its code repo. So a project *is* a wing (how it groups + indexes — tag-derived) **and** a registry entry (how it's labelled/linked). A wing need not be a project — it can be a non-repo scope (a person, an external service) or hub-level cross-cutting notes.
 - **"Memory" the quality vs the noun**: knowledge has *durable memory*; we don't call a note "a memory."
 
 ## Example dialogue

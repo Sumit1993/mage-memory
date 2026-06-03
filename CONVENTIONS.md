@@ -136,11 +136,24 @@ Tags are stored **without** the leading `#` in frontmatter (`billing/payments`,
 not `#billing/payments`). The `#` form is how they read inside Obsidian.
 
 **Folders are conventions, not constraints.** A note's wing and room come from
-its **first tag, not its file path** — a note can live anywhere under the
-scanned dirs and still group correctly. `mage index` and `mage skills` scan
-`notes/`, `decisions/`, and `work/`; `archive/` is intentionally **not**
-indexed. The directory layout is a convenience for humans, not a rule the
-tooling enforces.
+its **first tag, not its file path** — a note can live **anywhere** in the
+knowledge base and still group correctly. `mage index`, `mage skills`, and
+`mage dream` **recurse the whole tree** and index every `.md` except a fixed
+skip-set: `.obsidian/`, `.git/`, `node_modules/`, `artifacts/`, `.learnings/`,
+`archive/`, and generated index files (`INDEX.md`, `_index.*.md`). So `notes/`,
+`decisions/`, and `work/` are *recommended* homes, not magic — a note in a
+custom dir, or in a hub's `projects/<name>/`, indexes just the same. `archive/`
+is intentionally skipped (use `status: archived` to retire a note in place); the
+rest of the directory layout is a human convenience, not a rule the tooling
+enforces. Hub layout + projects-as-wings: see ADR-0011
+(`mage/decisions/0011-recursive-scan-hub-projects.md`).
+
+**Wings are optional, and a note can have several.** Tagging is never required —
+an untagged note is valid and indexes under *Cross-cutting* (reach for a wing only
+when a base spans more than one scope). The **first** tag is the primary wing
+(drives color + ownership); a note is indexed under **every** wing it is tagged
+with (multi-home, matching Obsidian's own tag semantics). See ADR-0012
+(`mage/decisions/0012-wings-optional-convention-standalone-hubs.md`).
 
 ---
 
@@ -211,12 +224,16 @@ the durable insight gets **distilled** into one or more notes under
 
 ## 8. How `mage index` and `mage skills` consume this
 
-- **`mage index`** scans every note, reads frontmatter, and emits a generated,
-  always-loaded `INDEX.md` (and per-wing `_index.<wing>.md` in hierarchical
-  mode). It groups by **wing** (first tag), surfaces each note's title, type,
-  status, and **keywords** — using `keywords:` verbatim when present, otherwise
-  deriving them from the H1 title + `##` headers + tag rooms. Generated files
-  are **never hand-edited**; re-run `mage index`.
+- **`mage index`** recursively scans every note (skipping the skip-set in §4),
+  reads frontmatter, and emits a generated, always-loaded `INDEX.md` (and
+  per-wing `_index.<wing>.md` in hierarchical mode). It groups by **wing** (first
+  tag), surfaces each note's title, type, status, and **keywords** — using
+  `keywords:` verbatim when present, otherwise deriving them from the H1 title +
+  `##` headers + tag rooms. Generated files are **never hand-edited**; re-run
+  `mage index`. In a **hub**, a project's notes live in `projects/<name>/` and
+  index as the `<name>` **wing**; its per-project index is the hub-root
+  `_index.<name>.md`, decorated from the registry with the code-repo pointer
+  (ADR-0011).
 - **`mage skills`** generates a `mage-wing-<x>` awareness skill per wing, so an
   agent working in that wing automatically loads the right slice of the base.
 - **Obsidian** colors the graph one hue per wing via a `tag:#<wing>` query, and
