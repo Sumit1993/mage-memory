@@ -5,32 +5,60 @@ import {
   type Note,
   type NoteFrontmatter,
   deriveKeywords,
-  noteRoom,
   noteTitle,
-  noteWing,
+  noteWings,
   readNote,
 } from "./note.js";
-import { DECISIONS_DIR, INDEX_FILE, NOTES_DIR, WORK_DIR } from "./paths.js";
+import {
+  AGENTS_FILE,
+  ARCHIVE_DIR,
+  ARTIFACTS_DIRNAME,
+  CLAUDE_FILE,
+  GIT_DIR,
+  IDENTITY_FILE,
+  INDEX_FILE,
+  LEARNINGS_DIR,
+  NODE_MODULES_DIR,
+  OBSIDIAN_DIR,
+} from "./paths.js";
 
 /** Sentinel wing key for untagged / cross-cutting notes. */
 export const CROSS = "";
 
-const SCAN_DIRS = [NOTES_DIR, DECISIONS_DIR, WORK_DIR];
-const SKIP_DIRS = new Set([
-  "artifacts",
-  ".learnings",
-  ".obsidian",
-  ".git",
-  "node_modules",
-  "projects",
+/**
+ * Directories the scanner never descends into — the correctness boundary
+ * (ADR-0011 §2). Sourced from paths.ts so the boundary has a single home.
+ * NOTE: `projects/` is deliberately ABSENT — a hub's project notes ARE indexed.
+ */
+const SKIP_DIRS = new Set<string>([
+  OBSIDIAN_DIR,
+  GIT_DIR,
+  NODE_MODULES_DIR,
+  ARTIFACTS_DIRNAME,
+  LEARNINGS_DIR,
+  ARCHIVE_DIR,
 ]);
+
+/**
+ * mage-authored `.md` files that are NOT knowledge notes. Skipped everywhere so
+ * a recursive walk from the docs root never ingests its own generated index or
+ * a hub's scaffolding (which live AT the root). `_index.<wing>.md` is matched by
+ * pattern; the rest by exact name. This namespace is reserved.
+ */
+const RESERVED_MD = new Set<string>([INDEX_FILE, IDENTITY_FILE, AGENTS_FILE, CLAUDE_FILE]);
+const GEN_INDEX_RE = /^_index\..+\.md$/;
 
 export interface ScannedNote {
   /** posix path relative to the docs root */
   relPath: string;
-  /** "" => cross-cutting (untagged, or an unsafe wing name reclassified) */
+  /**
+   * Every wing this note is tagged under (multi-home, ADR-0012 §5), de-duped,
+   * primary first. Empty => cross-cutting. Unsafe segments are dropped.
+   */
+  wings: Array<{ wing: string; room: string }>;
+  /** Primary wing — `wings[0]?.wing` or "" (cross-cutting). Kept for convenience. */
   wing: string;
-  /** "" => no room */
+  /** Primary room — `wings[0]?.room` or "". */
   room: string;
   title: string;
   type: string;
@@ -51,17 +79,16 @@ export function safeSegment(s: string): boolean {
 }
 
 /**
- * Walk a docs root's notes/, decisions/, and work/ trees and return one
- * ScannedNote per markdown note, sorted deterministically by path. Skips
- * artifacts/, scratch, Obsidian config, and nested projects. An unparseable
- * note is skipped with a warning rather than crashing the scan. Shared by
- * `mage index` and `mage skills`.
+ * Walk the WHOLE docs root (ADR-0011 §2) and return one ScannedNote per
+ * markdown note, sorted deterministically by path. "Folders are conventions":
+ * every dir is indexed EXCEPT the deny-list ({@link SKIP_DIRS}), and every
+ * generated/scaffolding `.md` ({@link RESERVED_MD} + `_index.*.md`) is skipped
+ * everywhere. An unparseable note is skipped with a warning rather than crashing
+ * the scan. Shared by `mage index`, `mage skills`, and `mage dream`.
  */
 export async function scanNotes(root: string): Promise<ScannedNote[]> {
   const out: ScannedNote[] = [];
-  for (const top of SCAN_DIRS) {
-    await walk(join(root, top), root, out);
-  }
+  await walk(root, root, out);
   out.sort((a, b) => (a.relPath < b.relPath ? -1 : a.relPath > b.relPath ? 1 : 0));
   return out;
 }
@@ -80,9 +107,8 @@ async function walk(dir: string, root: string, out: ScannedNote[]): Promise<void
       continue;
     }
     if (!e.name.endsWith(".md")) continue;
-    // Generated index files live at the docs root (never inside these dirs), so a
-    // note named `_index.*.md` here is a real user note and IS indexed.
-    if (e.name === INDEX_FILE) continue;
+    // Skip mage's own generated indexes + scaffolding anywhere (reserved namespace).
+    if (RESERVED_MD.has(e.name) || GEN_INDEX_RE.test(e.name)) continue;
     const abs = join(dir, e.name);
     const relPath = toPosix(relative(root, abs));
     let note: Note;
@@ -97,11 +123,15 @@ async function walk(dir: string, root: string, out: ScannedNote[]): Promise<void
 }
 
 function toScanned(fm: NoteFrontmatter, body: string, abs: string, relPath: string): ScannedNote {
-  const w = noteWing(fm);
+  // Multi-home: every tag-wing, primary first, with unsafe segments dropped so a
+  // crafted tag like `../x` can never drive file creation or deletion.
+  const wings = noteWings(fm).filter((w) => safeSegment(w.wing));
+  const primary = wings[0];
   return {
     relPath,
-    wing: w && safeSegment(w) ? w : CROSS,
-    room: noteRoom(fm) ?? "",
+    wings,
+    wing: primary ? primary.wing : CROSS,
+    room: primary ? primary.room : "",
     title: noteTitle(body, abs),
     type: typeof fm.type === "string" && fm.type.trim() ? fm.type.trim() : "note",
     keywords: deriveKeywords(fm, body, abs),

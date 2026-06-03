@@ -106,12 +106,18 @@ describe("mage index", () => {
     expect(idx).not.toContain("(notes/weird (v2) #1.md)");
   });
 
-  it("indexes a user note literally named _index.*.md (not silently dropped)", async () => {
+  it("treats _index.*.md as a reserved generated name (excluded everywhere)", async () => {
+    // ADR-0011 §2: the recursive walk now visits the docs root, where generated
+    // `_index.<wing>.md` live — so the `_index.*.md` namespace is reserved for
+    // mage's own output and never indexed as a user note.
     const dir = await vault();
     await note(dir, "_index.architecture.md", "---\ntags: [sys/arch]\n---\n# Architecture\n");
+    await note(dir, "real.md", "---\ntags: [sys/arch]\n---\n# Real\n");
     const r = await index({ dir });
-    expect(r.noteCount).toBe(1);
-    expect(await readFile(join(dir, "mage", "INDEX.md"), "utf8")).toContain("Architecture");
+    expect(r.noteCount).toBe(1); // only real.md; the _index.* file is reserved
+    const idx = await readFile(join(dir, "mage", "INDEX.md"), "utf8");
+    expect(idx).not.toContain("Architecture");
+    expect(idx).toContain("Real");
   });
 
   it("reclassifies an unsafe wing tag to cross-cutting (no traversal filename)", async () => {

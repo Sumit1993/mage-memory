@@ -20,6 +20,10 @@ export const LEARNINGS_DIR = ".learnings";
 export const ARTIFACTS_DIRNAME = "artifacts";
 /** Obsidian vault config dir. */
 export const OBSIDIAN_DIR = ".obsidian";
+/** Git metadata dir (skipped by the scanner). */
+export const GIT_DIR = ".git";
+/** Dependency dir (skipped by the scanner). */
+export const NODE_MODULES_DIR = "node_modules";
 
 export const AGENTS_FILE = "AGENTS.md";
 export const CLAUDE_FILE = "CLAUDE.md";
