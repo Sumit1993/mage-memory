@@ -91,7 +91,12 @@ export async function analyzeDream(root: string, opts: DreamOptions = {}): Promi
   const now = opts.now ?? new Date();
   const staleDays = opts.staleDays ?? 180;
 
-  const scanned = await scanNotes(root);
+  // dream works by relPath, not by wing. Multi-home (ADR-0012 §5) keys a note's
+  // wings on one ScannedNote row, so there is no duplication today — but de-dup
+  // defensively by relPath so the by-relPath model holds regardless of how the
+  // scanner represents wings.
+  const raw = await scanNotes(root);
+  const scanned = [...new Map(raw.map((s) => [s.relPath, s])).values()];
   const noteSet = new Set(scanned.map((s) => s.relPath));
   const statusOf = new Map(scanned.map((s) => [s.relPath, s.status]));
 

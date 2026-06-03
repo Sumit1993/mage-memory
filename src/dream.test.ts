@@ -21,6 +21,12 @@ async function note(dir: string, rel: string, content: string): Promise<void> {
   await mkdir(join(p, ".."), { recursive: true });
   await writeFile(p, content);
 }
+/** Write a note at an arbitrary path under the docs root (e.g. projects/...). */
+async function putRaw(dir: string, relUnderRoot: string, content: string): Promise<void> {
+  const p = join(dir, "mage", relUnderRoot);
+  await mkdir(join(p, ".."), { recursive: true });
+  await writeFile(p, content);
+}
 const root = (dir: string) => join(dir, "mage");
 const FRESH = "2026-06-01";
 const NOW = new Date("2026-06-10");
@@ -99,5 +105,22 @@ describe("mage dream (read-only health report)", () => {
     const r = await analyzeDream(root(dir), { now: NOW });
     const orphans = r.orphans.map((f) => f.note);
     expect(orphans).toEqual([...orphans].sort());
+  });
+
+  // ADR-0011 §2 propagated the recursive scan here; ADR-0012 §5 multi-home must
+  // never make dream double-count a note (it works by relPath, not by wing).
+  it("counts a projects/ note exactly once (recursion, no duplication)", async () => {
+    const dir = await vault();
+    await putRaw(dir, "projects/p/notes/n.md", `---\ntags: [eng/api]\nlast_reviewed: "${FRESH}"\n---\n# N\n`);
+    const r = await analyzeDream(root(dir), { now: NOW });
+    expect(r.noteCount).toBe(1);
+  });
+
+  it("counts a multi-homed note once and yields at most one orphan finding", async () => {
+    const dir = await vault();
+    await note(dir, "multi.md", `---\ntags: [a/x, b/y]\nlast_reviewed: "${FRESH}"\n---\n# Multi\n`);
+    const r = await analyzeDream(root(dir), { now: NOW });
+    expect(r.noteCount).toBe(1);
+    expect(r.orphans.filter((f) => f.note === "notes/multi.md")).toHaveLength(1);
   });
 });
