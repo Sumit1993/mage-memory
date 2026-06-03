@@ -38,7 +38,7 @@ export const METADATA_SCHEMA = "mage.v1";
  * Two modes:
  *   - "in-repo":  the knowledge base lives at `<code-repo>/mage/`. hub_path/hub_repo are null.
  *                 Hybrid mode = in-repo + non-empty hub_refs[].
- *   - "external": the knowledge base lives at `<hub_path>/projects/<project>/mage/`.
+ *   - "external": the knowledge base lives at `<hub_path>/projects/<project>/`.
  *                 hub_path/hub_repo are populated.
  */
 export interface MageMetadata {
@@ -77,7 +77,7 @@ export interface HubMetadata {
 export interface HubProject {
   name: string;
   /**
-   * "hub-owned" — the project's notes live at `<hub>/projects/<name>/mage/`
+   * "hub-owned" — the project's notes live at `<hub>/projects/<name>/`
    * (the hub has the actual files). Used when the code repo was linked via the
    * external-only flow (no in-repo notes at link time).
    *
@@ -125,12 +125,13 @@ export function hubProjectPath(hubRoot: string, projectName: string): string {
 }
 
 /**
- * Hub-owned project's docs root — where a project's notes land for hub-owned
- * projects. The `mage/` nesting here keeps the structure inside the docs root
- * symmetric with the code-repo-side `mage/`.
+ * Hub-owned project's docs root — where a project's notes land. FLAT (ADR-0011
+ * §6): `projects/<name>/{notes,decisions,…}`, no `mage/` nesting. A project
+ * looks like the hub it lives in, not like a code-repo `mage/`. (Identical to
+ * {@link hubProjectPath}; kept as a distinct name for call-site intent.)
  */
 export function hubProjectDocsRoot(hubRoot: string, projectName: string): string {
-  return join(hubProjectPath(hubRoot, projectName), META_DIR);
+  return hubProjectPath(hubRoot, projectName);
 }
 
 // ─── reading ─────────────────────────────────────────────────────────────

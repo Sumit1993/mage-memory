@@ -2,7 +2,14 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { META_DIR, METADATA_SCHEMA, looksLikeHub, resolveDocsRoot } from "./paths.js";
+import {
+  META_DIR,
+  METADATA_SCHEMA,
+  hubProjectDocsRoot,
+  hubProjectPath,
+  looksLikeHub,
+  resolveDocsRoot,
+} from "./paths.js";
 
 const made: string[] = [];
 afterEach(async () => {
@@ -46,5 +53,17 @@ describe("paths", () => {
     const dir = await mkdtemp(join(tmpdir(), "mage-none-"));
     made.push(dir);
     expect(await resolveDocsRoot(dir)).toBeNull();
+  });
+
+  it("hubProjectDocsRoot is flat — projects/<name>/ with no mage/ nesting (ADR-0011 §6)", () => {
+    const hub = "/hub";
+    expect(hubProjectDocsRoot(hub, "engine")).toBe(join(hub, "projects", "engine"));
+    expect(hubProjectDocsRoot(hub, "engine")).toBe(hubProjectPath(hub, "engine"));
+    expect(hubProjectDocsRoot(hub, "engine").endsWith(`${"projects"}/engine/${META_DIR}`)).toBe(false);
+  });
+
+  it("hubProjectDocsRoot rejects unsafe project names", () => {
+    expect(() => hubProjectDocsRoot("/hub", "..")).toThrow();
+    expect(() => hubProjectDocsRoot("/hub", "a/b")).toThrow();
   });
 });
