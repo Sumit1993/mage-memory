@@ -55,6 +55,17 @@ describe("scanNotes — recursive deny-list walk (ADR-0011 §2)", () => {
     expect(out.map((n) => n.relPath)).toEqual(["notes/real.md"]);
   });
 
+  it("excludes agent skill dirs (.claude, .agents) — where `mage skills` writes", async () => {
+    // At a hub root these dirs sit beside the notes; their generated SKILL.md
+    // must never be ingested as knowledge notes (caught while migrating a hub).
+    const root = await mkVault();
+    await put(root, ".claude/skills/mage-wing-x/SKILL.md", note([]));
+    await put(root, ".agents/skills/mage-wing-x/SKILL.md", note([]));
+    await put(root, "notes/real.md", note(["x/y"]));
+    const out = await scanNotes(root);
+    expect(out.map((n) => n.relPath)).toEqual(["notes/real.md"]);
+  });
+
   it("excludes generated index files ANYWHERE (INDEX.md + _index.*.md)", async () => {
     const root = await mkVault();
     await put(root, "INDEX.md", "# generated\n");

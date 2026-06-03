@@ -11,8 +11,10 @@ import {
 } from "./note.js";
 import {
   AGENTS_FILE,
+  AGENTS_SKILLS_DIR,
   ARCHIVE_DIR,
   ARTIFACTS_DIRNAME,
+  CLAUDE_DIR,
   CLAUDE_FILE,
   GIT_DIR,
   IDENTITY_FILE,
@@ -37,6 +39,8 @@ const SKIP_DIRS = new Set<string>([
   ARTIFACTS_DIRNAME,
   LEARNINGS_DIR,
   ARCHIVE_DIR,
+  CLAUDE_DIR,
+  AGENTS_SKILLS_DIR,
 ]);
 
 /**
