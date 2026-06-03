@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { init } from "./commands/init.js";
 import { analyzeDream } from "./dream.js";
+import type { HubMetadata, HubProject } from "./paths.js";
 
 const made: string[] = [];
 afterEach(async () => {
@@ -122,5 +123,85 @@ describe("mage dream (read-only health report)", () => {
     const r = await analyzeDream(root(dir), { now: NOW });
     expect(r.noteCount).toBe(1);
     expect(r.orphans.filter((f) => f.note === "notes/multi.md")).toHaveLength(1);
+  });
+});
+
+describe("mage dream — info-tier drift signals (never failures)", () => {
+  async function hubFixture(): Promise<string> {
+    const dir = await mkdtemp(join(tmpdir(), "mage-dreamhub-"));
+    made.push(dir);
+    await mkdir(join(dir, "projects"), { recursive: true });
+    return dir;
+  }
+  async function writeAt(rootDir: string, rel: string, content: string): Promise<void> {
+    const p = join(rootDir, rel);
+    await mkdir(join(p, ".."), { recursive: true });
+    await writeFile(p, content);
+  }
+  const project = (name: string, storage: HubProject["storage"]): HubProject => ({
+    name,
+    storage,
+    code_repo_path: "/code",
+    code_repo_url: "/code",
+  });
+  const hubMeta = (projects: HubProject[]): HubMetadata => ({
+    schema: "mage.v1",
+    name: "h",
+    created_at: "2026-06-03",
+    projects,
+  });
+
+  it("flags a registered hub-owned project with 0 indexed notes (info)", async () => {
+    const dir = await hubFixture();
+    await mkdir(join(dir, "projects", "p1"), { recursive: true }); // empty
+    const r = await analyzeDream(dir, { now: NOW, hubMeta: hubMeta([project("p1", "hub-owned")]) });
+    expect(r.emptyProjects).toContain("p1");
+  });
+
+  it("does not flag a hub-owned project that has notes", async () => {
+    const dir = await hubFixture();
+    await writeAt(dir, "projects/p1/notes/n.md", `---\ntags: [p1/x]\nlast_reviewed: "${FRESH}"\n---\n# N\n`);
+    const r = await analyzeDream(dir, { now: NOW, hubMeta: hubMeta([project("p1", "hub-owned")]) });
+    expect(r.emptyProjects).not.toContain("p1");
+  });
+
+  it("flags a projects/ dir not in the registry (info)", async () => {
+    const dir = await hubFixture();
+    await mkdir(join(dir, "projects", "ghost"), { recursive: true });
+    const r = await analyzeDream(dir, { now: NOW, hubMeta: hubMeta([]) });
+    expect(r.unregisteredProjectDirs).toContain("ghost");
+  });
+
+  it("info drift never flips clean", async () => {
+    const dir = await hubFixture();
+    await mkdir(join(dir, "projects", "p1"), { recursive: true });
+    const r = await analyzeDream(dir, { now: NOW, hubMeta: hubMeta([project("p1", "hub-owned")]) });
+    expect(r.clean).toBe(true); // 0 notes, no rot
+    expect(r.emptyProjects).toContain("p1"); // …yet the info signal still fires
+  });
+
+  it("an in-repo base (no registry) reports no project drift", async () => {
+    const dir = await vault();
+    await note(dir, "a.md", `---\ntags: [w/r]\nlast_reviewed: "${FRESH}"\n---\n# A\n`);
+    const r = await analyzeDream(root(dir), { now: NOW });
+    expect(r.emptyProjects).toEqual([]);
+    expect(r.unregisteredProjectDirs).toEqual([]);
+  });
+
+  it("nudges when a base is mostly untagged, and stays quiet when tagged (ADR-0012 §7)", async () => {
+    const untaggedHub = await hubFixture();
+    for (let i = 0; i < 6; i++) {
+      await writeAt(untaggedHub, `notes/u${i}.md`, `---\nlast_reviewed: "${FRESH}"\n---\n# U${i}\n`);
+    }
+    const r1 = await analyzeDream(untaggedHub, { now: NOW });
+    expect(r1.untaggedNudge.length).toBeGreaterThan(0);
+    expect(r1.untaggedNudge[0]).toMatch(/consider/i);
+
+    const taggedHub = await hubFixture();
+    for (let i = 0; i < 6; i++) {
+      await writeAt(taggedHub, `notes/t${i}.md`, `---\ntags: [w/r]\nlast_reviewed: "${FRESH}"\n---\n# T${i}\n`);
+    }
+    const r2 = await analyzeDream(taggedHub, { now: NOW });
+    expect(r2.untaggedNudge).toEqual([]);
   });
 });

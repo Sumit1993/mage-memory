@@ -1,7 +1,8 @@
+import { readdir } from "node:fs/promises";
 import { join, posix } from "node:path";
 import { readNote } from "./note.js";
-import { exists } from "./paths.js";
-import { scanNotes } from "./scan.js";
+import { type HubMetadata, PROJECTS_DIR, exists } from "./paths.js";
+import { type ScannedNote, scanNotes } from "./scan.js";
 
 /**
  * `mage dream` — read-only knowledge-base health.
@@ -18,7 +19,12 @@ export interface DreamOptions {
   now?: Date;
   /** Flag notes whose `last_reviewed` is older than this many days. */
   staleDays?: number;
+  /** Hub registry, when scanning a hub — enables the project drift signals. */
+  hubMeta?: HubMetadata | null;
 }
+
+/** A base needs at least this many untagged notes (and ≥25% of the total) to earn a nudge. */
+const UNTAGGED_NUDGE_MIN = 5;
 
 export interface DreamFinding {
   /** Note relpath (relative to the docs root). */
@@ -37,8 +43,15 @@ export interface DreamReport {
   orphans: DreamFinding[];
   /** Missing, unparseable, or older-than-threshold `last_reviewed`. */
   stale: DreamFinding[];
-  /** True iff every finding list is empty. */
+  /** True iff every (failure-tier) finding list is empty. INFO drift below is excluded. */
   clean: boolean;
+  // ─── info-tier drift (advisory, NEVER affects `clean`; ADR-0011 §7, ADR-0012 §7) ───
+  /** Registered hub-owned projects with zero indexed notes (the silent-empty trap). */
+  emptyProjects: string[];
+  /** On-disk `projects/<name>/` dirs absent from the hub registry. */
+  unregisteredProjectDirs: string[];
+  /** A gentle suggestion when many notes are untagged (wings are optional). */
+  untaggedNudge: string[];
 }
 
 const MS_PER_DAY = 86_400_000;
@@ -183,6 +196,14 @@ export async function analyzeDream(root: string, opts: DreamOptions = {}): Promi
     orphans.length === 0 &&
     stale.length === 0;
 
+  // Info-tier drift — advisory only, excluded from `clean` (ADR-0011 §7, ADR-0012 §7).
+  const { emptyProjects, unregisteredProjectDirs } = await projectDrift(
+    root,
+    scanned,
+    opts.hubMeta ?? null,
+  );
+  const untaggedNudge = untaggedNudgeFor(scanned);
+
   return {
     root,
     noteCount: scanned.length,
@@ -191,7 +212,57 @@ export async function analyzeDream(root: string, opts: DreamOptions = {}): Promi
     orphans,
     stale,
     clean,
+    emptyProjects,
+    unregisteredProjectDirs,
+    untaggedNudge,
   };
+}
+
+/**
+ * Drift between the hub registry and what's on disk (info-tier, never a failure):
+ *   - a registered hub-owned project with zero indexed notes, and
+ *   - a `projects/<name>/` dir that isn't registered.
+ * No-op (empty) for an in-repo base (no registry).
+ */
+async function projectDrift(
+  root: string,
+  scanned: ScannedNote[],
+  hubMeta: HubMetadata | null,
+): Promise<{ emptyProjects: string[]; unregisteredProjectDirs: string[] }> {
+  if (!hubMeta) return { emptyProjects: [], unregisteredProjectDirs: [] };
+
+  const emptyProjects: string[] = [];
+  for (const p of hubMeta.projects) {
+    if (p.storage !== "hub-owned") continue; // in-repo members keep notes in their own repo
+    const prefix = `${PROJECTS_DIR}/${p.name}/`;
+    if (!scanned.some((s) => s.relPath.startsWith(prefix))) emptyProjects.push(p.name);
+  }
+  emptyProjects.sort();
+
+  const registered = new Set(hubMeta.projects.map((p) => p.name));
+  const unregisteredProjectDirs: string[] = [];
+  try {
+    for (const e of await readdir(join(root, PROJECTS_DIR), { withFileTypes: true })) {
+      if (e.isDirectory() && !registered.has(e.name)) unregisteredProjectDirs.push(e.name);
+    }
+  } catch {
+    /* no projects/ dir */
+  }
+  unregisteredProjectDirs.sort();
+
+  return { emptyProjects, unregisteredProjectDirs };
+}
+
+/** A gentle nudge when a base is mostly untagged — wings are optional (ADR-0012 §7). */
+function untaggedNudgeFor(scanned: ScannedNote[]): string[] {
+  const untagged = scanned.filter((s) => s.wings.length === 0).length;
+  if (untagged >= UNTAGGED_NUDGE_MIN && untagged >= scanned.length * 0.25) {
+    return [
+      `${untagged} of ${scanned.length} notes are untagged — consider a #wing/room tag so they ` +
+        "group in the index (optional; untagged notes stay valid as Cross-cutting).",
+    ];
+  }
+  return [];
 }
 
 function dedupe(findings: DreamFinding[]): DreamFinding[] {

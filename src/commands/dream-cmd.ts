@@ -1,6 +1,6 @@
 import { type DreamFinding, type DreamReport, analyzeDream } from "../dream.js";
 import { logger } from "../logger.js";
-import { absolutePath, resolveDocsRoot } from "../paths.js";
+import { absolutePath, readHubMetadata, resolveDocsRoot } from "../paths.js";
 
 export interface DreamCmdOptions {
   /** Where to look for the knowledge base (default cwd; walks up for in-repo). */
@@ -24,8 +24,11 @@ export async function dream(opts: DreamCmdOptions = {}): Promise<DreamResult> {
   if (!resolved) {
     throw new Error(`No mage knowledge base found at or above ${start}. Run \`mage init\` first.`);
   }
-  const report = await analyzeDream(resolved.root, { staleDays: opts.staleDays });
+  // Hub registry enables the project drift signals (info-tier, never failures).
+  const hubMeta = resolved.kind === "hub" ? await readHubMetadata(resolved.root) : null;
+  const report = await analyzeDream(resolved.root, { staleDays: opts.staleDays, hubMeta });
   renderReport(report);
+  // findingCount counts ONLY failure-tier rot — the info drift is advisory.
   const findingCount =
     report.supersededButActive.length +
     report.danglingLinks.length +
@@ -39,17 +42,32 @@ function renderReport(r: DreamReport): void {
   logger.blank();
   if (r.clean) {
     logger.success(`${r.noteCount} note(s) scanned — no rot found. Memory is healthy.`);
-    return;
+  } else {
+    logger.detail(`${r.noteCount} note(s) scanned`);
+    logger.blank();
+    section("superseded but still active", r.supersededButActive);
+    section("dangling links", r.danglingLinks);
+    section("orphan notes", r.orphans);
+    section("stale / unreviewed", r.stale);
+    logger.detail(
+      "Read-only (v0.1). The healing sweep — decay/consolidate/re-verify/prune — is `/dream` (v0.2).",
+    );
   }
-  logger.detail(`${r.noteCount} note(s) scanned`);
+  renderDriftInfo(r);
+}
+
+/** Advisory drift — printed even when clean; never counted as a finding/failure. */
+function renderDriftInfo(r: DreamReport): void {
+  if (!r.emptyProjects.length && !r.unregisteredProjectDirs.length && !r.untaggedNudge.length) return;
   logger.blank();
-  section("superseded but still active", r.supersededButActive);
-  section("dangling links", r.danglingLinks);
-  section("orphan notes", r.orphans);
-  section("stale / unreviewed", r.stale);
-  logger.detail(
-    "Read-only (v0.1). The healing sweep — decay/consolidate/re-verify/prune — is `/dream` (v0.2).",
-  );
+  logger.info("info (advisory — never failures):");
+  if (r.emptyProjects.length > 0) {
+    logger.detail(`registered project(s) with 0 indexed notes: ${r.emptyProjects.join(", ")}`);
+  }
+  if (r.unregisteredProjectDirs.length > 0) {
+    logger.detail(`projects/ dir(s) not in the registry: ${r.unregisteredProjectDirs.join(", ")}`);
+  }
+  for (const m of r.untaggedNudge) logger.detail(m);
 }
 
 function section(title: string, findings: DreamFinding[]): void {

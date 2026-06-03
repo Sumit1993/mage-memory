@@ -182,18 +182,15 @@ async function verifyProjectsAgainstRegistry(
 ): Promise<void> {
   for (const p of hubMeta.projects) {
     if (p.storage === "hub-owned") {
-      const docsRoot = hubProjectDocsRoot(hub, p.name);
-      if (await exists(docsRoot)) {
-        result.projectChecks.push({ project: p.name, ok: true, detail: "hub-owned, dir exists" });
-        logger.success(`${p.name}  (hub-owned)`);
+      // ADR-0011 §7a: a registered project with 0 indexed notes is INFO, never a
+      // failure (the silent-empty-index trap). Count notes rather than mere existence.
+      const noteCount = await countFiles(hubProjectDocsRoot(hub, p.name));
+      if (noteCount > 0) {
+        result.projectChecks.push({ project: p.name, ok: true, detail: `hub-owned, ${noteCount} file(s)` });
+        logger.success(`${p.name}  (hub-owned, ${noteCount} file(s))`);
       } else {
-        result.projectChecks.push({
-          project: p.name,
-          ok: false,
-          detail: `hub-owned but ${docsRoot} missing`,
-        });
-        logger.error(`${p.name}  (hub-owned) — ${docsRoot} MISSING`);
-        result.passed = false;
+        result.projectChecks.push({ project: p.name, ok: true, detail: "hub-owned, 0 notes (info)" });
+        logger.warn(`${p.name}  (hub-owned) — 0 notes (info — add notes or re-run \`mage link\`)`);
       }
     } else {
       // in-repo storage — notes aren't here; metadata says they're at code_repo_path.
@@ -210,6 +207,18 @@ async function verifyProjectsAgainstRegistry(
         logger.warn(`${p.name}  (in-repo at ${p.code_repo_path}) — path not reachable here`);
       }
     }
+  }
+
+  // ADR-0011 §7b: a projects/<name>/ dir not in the registry is INFO, never a failure.
+  const registered = new Set(hubMeta.projects.map((p) => p.name));
+  try {
+    for (const e of await readdir(join(hub, PROJECTS_DIR), { withFileTypes: true })) {
+      if (!e.isDirectory() || registered.has(e.name)) continue;
+      result.projectChecks.push({ project: e.name, ok: true, detail: "on disk, not registered (info)" });
+      logger.warn(`${e.name}  on disk but not registered (info — \`mage link\` to register)`);
+    }
+  } catch {
+    /* no projects/ dir */
   }
 }
 
