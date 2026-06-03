@@ -96,6 +96,25 @@ export function noteWing(fm: NoteFrontmatter): string | null {
   return first ? first.split("/")[0] ?? null : null;
 }
 
+/**
+ * Every tag's `{wing, room}`, de-duped by wing preserving order (first wins).
+ * `noteWings(fm)[0]` is the *primary* wing — equals `noteWing(fm)` for tagged
+ * notes. Empty for untagged notes. This is the primitive multi-home rides on
+ * (ADR-0012 §5): a note is indexed under every wing it is tagged with.
+ */
+export function noteWings(fm: NoteFrontmatter): Array<{ wing: string; room: string }> {
+  const out: Array<{ wing: string; room: string }> = [];
+  const seen = new Set<string>();
+  for (const tag of normalizeTags(fm.tags)) {
+    const parts = tag.split("/");
+    const wing = parts[0];
+    if (!wing || seen.has(wing)) continue;
+    seen.add(wing);
+    out.push({ wing, room: parts.slice(1).join("/") });
+  }
+  return out;
+}
+
 /** Second-segment of the first tag: `billing/payments` -> `payments`. Null if none. */
 export function noteRoom(fm: NoteFrontmatter): string | null {
   const first = normalizeTags(fm.tags)[0];

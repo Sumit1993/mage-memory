@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveKeywords, noteRoom, noteWing, normalizeTags, parseNote, stringifyNote } from "./note.js";
+import { deriveKeywords, noteRoom, noteWing, noteWings, normalizeTags, parseNote, stringifyNote } from "./note.js";
 
 describe("note frontmatter", () => {
   it("round-trips frontmatter and body", () => {
@@ -31,6 +31,47 @@ describe("note frontmatter", () => {
 
   it("normalizes tags (strips leading #)", () => {
     expect(normalizeTags(["#billing/payments", "web"])).toEqual(["billing/payments", "web"]);
+  });
+});
+
+describe("noteWings (multi-home by tags, ADR-0012 §5)", () => {
+  it("returns every tag's wing/room in order", () => {
+    expect(noteWings({ tags: ["a/x", "b/y"] })).toEqual([
+      { wing: "a", room: "x" },
+      { wing: "b", room: "y" },
+    ]);
+  });
+
+  it("de-dupes by wing, first occurrence wins (keeps its room)", () => {
+    expect(noteWings({ tags: ["a/x", "a/z"] })).toEqual([{ wing: "a", room: "x" }]);
+  });
+
+  it("is empty for untagged notes", () => {
+    expect(noteWings({ tags: [] })).toEqual([]);
+    expect(noteWings({})).toEqual([]);
+  });
+
+  it("yields an empty room for a wing-only tag", () => {
+    expect(noteWings({ tags: ["a", "b/y"] })).toEqual([
+      { wing: "a", room: "" },
+      { wing: "b", room: "y" },
+    ]);
+  });
+
+  it("nested rooms keep the full path", () => {
+    expect(noteWings({ tags: ["a/x/deep"] })).toEqual([{ wing: "a", room: "x/deep" }]);
+  });
+
+  it("primary wing equals noteWing(fm) for any tagged note", () => {
+    const fm = { tags: ["billing/payments", "web/api"] };
+    expect(noteWings(fm)[0]?.wing).toBe(noteWing(fm));
+  });
+
+  it("strips leading '#' and trims via normalizeTags", () => {
+    expect(noteWings({ tags: ["#a/x", " b/y "] })).toEqual([
+      { wing: "a", room: "x" },
+      { wing: "b", room: "y" },
+    ]);
   });
 });
 

@@ -45,6 +45,7 @@ export {
   parseNote,
   stringifyNote,
   noteWing,
+  noteWings,
   noteRoom,
   normalizeTags,
   noteTitle,
