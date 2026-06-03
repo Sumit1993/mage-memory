@@ -96,7 +96,7 @@ agents.
 |------|---------|
 | **knowledge base** | The `mage/` tree: notes, work units, decisions, archive, and the generated index. |
 | **note** | A durable markdown file (with optional YAML frontmatter) recording insight + procedure + pointers on one topic. |
-| **wing** | A top-level scope — a project, repo, service, or person. The first segment of a tag (`billing/payments` → wing `billing`). |
+| **wing** | A top-level scope — a project, repo, service, or person. The first tag segment (`billing/payments` → wing `billing`). **Optional**: untagged notes are valid (they index as *Cross-cutting*). A note can carry several tags and is indexed under **each** wing (multi-home); the first is its primary wing. |
 | **room** | A topic within a wing. The second tag segment (`billing/payments` → room `payments`). |
 | **index** | The generated, always-loaded map of the knowledge base (`mage/INDEX.md`). Run `mage index`; never hand-edit. |
 | **work unit** | A task-scoped "lab notebook" under `mage/work/<slug>/` with a `type` (spec, investigation, incident, spike, ...). |
@@ -113,10 +113,16 @@ mage/
 ├── decisions/          ADR-style decision notes
 ├── archive/            retired notes
 ├── INDEX.md            GENERATED always-loaded index (run `mage index`)
-├── _index.<wing>.md    GENERATED per-wing index (hierarchical mode)
+├── _index.<wing>.md    GENERATED per-wing index (hierarchical mode) — reserved name
 ├── .obsidian/          Obsidian vault config
 └── metadata.json       schema "mage.v1"; mode "in-repo" | "external"
 ```
+
+The scanner recurses the **whole** vault and indexes every note except a fixed
+skip-set (`.obsidian/`, `.git/`, `node_modules/`, `artifacts/`, `.learnings/`,
+`archive/`) and mage's own generated/scaffolding files (`INDEX.md`,
+`_index.*.md`, `AGENTS.md`, `CLAUDE.md`, `IDENTITY.md`) — so "folders are
+conventions" is literal. A hub's `projects/<name>/` notes are indexed for free.
 
 ### Note frontmatter (all optional)
 
@@ -138,7 +144,7 @@ Typed relations between notes go in a `## Relations` section, e.g.
 
 | Command | Purpose |
 |---------|---------|
-| `mage init [--in-repo \| --external]` | Create a knowledge base in-repo (`mage/`) or as an external hub. |
+| `mage init [name]` | Create a knowledge base. No name → detect: in a git repo, an in-repo `mage/`; otherwise a standalone hub in the current dir. A `name`/path → a hub there (like `git init`). Force with `--in-repo` / `--hub`. |
 | `mage index` | Regenerate the always-loaded index (and per-wing indexes in hierarchical mode). Never hand-edit the output. |
 | `mage skills` | (Re)generate the per-wing `mage-wing-<x>` skills so agents discover this knowledge base. |
 | `mage dream` | Report knowledge-base health, read-only: stale, superseded-but-active, dangling links, orphan notes. |
@@ -156,12 +162,17 @@ Run `mage <command> --help` for per-command flags.
 - **in-repo** — the knowledge base lives in `mage/` inside the code repo,
   committed alongside the code it describes. `metadata.json` has
   `mode: "in-repo"`.
-- **external hub** — a standalone hub repo *is* the Obsidian vault; per-project
-  notes live at `<hub>/projects/<name>/mage/`. `metadata.json` has
-  `mode: "external"`.
-- **hybrid** — an in-repo knowledge base that also registers with one or more
-  external hubs via `hub_refs[]` (run `mage init --in-repo`, then
-  `mage link <hub>`). Notes stay with the code; the hub knows about them.
+- **hub** — a standalone repo *is* one Obsidian vault spanning several projects.
+  Create it with `mage init <name>` (no code repo required), then `mage link`
+  code repos into it. A hub-owned project's notes live **flat** at
+  `<hub>/projects/<name>/`, surfaced as a wing; the code repo's `AGENTS.md`
+  routes agents to `<hub>/_index.<project>.md`.
+- **hybrid** (in-repo member) — an in-repo knowledge base that also registers
+  with a hub (`mage init --in-repo`, then `mage link <hub>`). Notes stay with the
+  code; the hub lists the member as a **pointer** to its repo's `INDEX`
+  (`storage: in-repo`), never silently empty.
+
+> `--external` is a deprecated alias of `--hub`.
 
 ## Skills
 
@@ -194,8 +205,11 @@ awareness skill teaches agents the same rule.
 
 ## Status
 
-v0.1. Early and evolving — the note model, command surface, and skill bundle are
-documented here and reflect the actual CLI. Expect refinement.
+v0.0.2. Early and evolving — the note model, command surface, and skill bundle
+are documented here and reflect the actual CLI. 0.0.2 makes the scanner recurse
+the whole vault (hub `projects/` are indexed), generalizes wings (optional,
+multi-home), and adds a detection-first `mage init` with standalone hubs. Expect
+refinement.
 
 ## License
 

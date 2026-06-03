@@ -1,6 +1,6 @@
 {
   "name": "mage-memory",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "mage — a portable, self-maintaining knowledge base for software systems: durable git-backed notes navigable as an Obsidian graph, usable by any AI coding agent. CLI: init, index, skills, dream, link, verify, unlink, list, status, doctor.",
   "type": "module",
   "bin": {

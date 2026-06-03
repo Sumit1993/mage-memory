@@ -18,7 +18,7 @@ program
   .description(
     "A portable, self-maintaining knowledge base for software systems — notes navigable as an Obsidian graph, usable by any AI coding agent",
   )
-  .version("0.0.1");
+  .version("0.0.2");
 
 // ─── init ──────────────────────────────────────────────────────────────────
 program
