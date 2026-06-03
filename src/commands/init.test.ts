@@ -2,7 +2,8 @@ import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { METADATA_SCHEMA } from "../paths.js";
+import { gitInit } from "../git.js";
+import { METADATA_SCHEMA, exists, readHubMetadata } from "../paths.js";
 import { init } from "./init.js";
 
 const made: string[] = [];
@@ -51,5 +52,52 @@ describe("mage init --in-repo", () => {
     await expect(
       init({ mode: "in-repo", yes: true, codeRepo: dir, project: "demo" }),
     ).rejects.toThrow(/already/);
+  });
+});
+
+describe("mage init — detection-first + standalone hub (ADR-0012 §3)", () => {
+  it("no-name -y inside a git repo → in-repo (detection)", async () => {
+    const dir = await fresh();
+    await gitInit(dir);
+    const r = await init({ codeRepo: dir, yes: true });
+    expect(r.mode).toBe("in-repo");
+    expect(await exists(join(dir, "mage", "metadata.json"))).toBe(true);
+  });
+
+  it("no-name -y in a non-git dir → standalone hub in place (projects: [])", async () => {
+    const dir = await fresh();
+    const r = await init({ codeRepo: dir, yes: true });
+    expect(r.mode).toBe("hub");
+    expect(r.hubDir).toBe(dir);
+    const meta = await readHubMetadata(dir);
+    expect(meta?.projects).toEqual([]); // standalone: no first project
+    expect(await exists(join(dir, "projects"))).toBe(true);
+    expect(await exists(join(dir, "AGENTS.md"))).toBe(true);
+    expect(await exists(join(dir, "mage", "metadata.json"))).toBe(false); // no code-repo metadata
+  });
+
+  it("a name/path → a hub at that location (like git init <path>)", async () => {
+    const parent = await fresh();
+    const hubPath = join(parent, "myhub");
+    const r = await init({ codeRepo: parent, name: hubPath, yes: true });
+    expect(r.mode).toBe("hub");
+    expect(r.hubDir).toBe(hubPath);
+    const meta = await readHubMetadata(hubPath);
+    expect(meta?.name).toBe("myhub");
+    expect(meta?.projects).toEqual([]);
+  });
+
+  it("--hub inside a git repo proceeds (nesting warns, never blocks)", async () => {
+    const dir = await fresh();
+    await gitInit(dir);
+    const r = await init({ codeRepo: dir, mode: "hub", yes: true });
+    expect(r.mode).toBe("hub");
+    expect((await readHubMetadata(dir))?.projects).toEqual([]);
+  });
+
+  it("refuses to re-init an existing hub", async () => {
+    const dir = await fresh();
+    await init({ codeRepo: dir, yes: true }); // standalone hub
+    await expect(init({ codeRepo: dir, yes: true })).rejects.toThrow(/already a mage hub/);
   });
 });

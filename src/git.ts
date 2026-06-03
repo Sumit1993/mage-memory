@@ -18,6 +18,16 @@ export async function gitInit(path: string): Promise<void> {
 }
 
 /**
+ * True iff `dir` is inside a git work tree. Read-only (never mutates); returns
+ * false gracefully when git is missing or `dir` is not a repo. Used by
+ * `mage init` to detect in-repo vs standalone-hub (ADR-0012 §3).
+ */
+export async function isGitRepo(dir: string): Promise<boolean> {
+  const r = await run("git", ["-C", dir, "rev-parse", "--is-inside-work-tree"]);
+  return r.code === 0 && r.stdout.trim() === "true";
+}
+
+/**
  * Check whether `gh` CLI is installed.
  */
 export async function hasGh(): Promise<boolean> {

@@ -1,4 +1,4 @@
-import { Command } from "commander";
+import { Command, Option } from "commander";
 import { doctor } from "./commands/doctor.js";
 import { dream } from "./commands/dream-cmd.js";
 import { type InitMode, type InitVisibility, init } from "./commands/init.js";
@@ -23,32 +23,32 @@ program
 // ─── init ──────────────────────────────────────────────────────────────────
 program
   .command("init")
-  .description("Initialize mage for this code repo (in-repo or external hub)")
-  .option("--in-repo", "scenario 1: scaffold docs inside this code repo's mage/")
-  .option("--external", "scenario 2: create a sibling external hub and link this repo as its first project")
-  .option("--name <name>", "external mode: hub name (default <repo-name>-mage)")
-  .option("-d, --dir <path>", "external mode: hub directory (default sibling of code repo)")
-  .option("--private", "external mode: create as private GitHub repo (requires gh)")
-  .option("--public", "external mode: create as public GitHub repo (requires gh)")
-  .option("--local", "external mode: skip GitHub — local-only hub")
-  .option("--owner <user>", "external mode: GitHub owner (auto-detected via `gh api user`)")
-  .option("--project <name>", "project name (default: basename of code repo)")
-  .option(
-    "--no-suggest",
-    "external mode: don't prompt to append `-mage` to the hub name (e.g. accept `my-team` instead of suggesting `my-team-mage`)",
-  )
-  .option("-y, --yes", "non-interactive: use defaults")
-  .action(async (opts) => {
+  .description("Initialize mage: an in-repo knowledge base, or a standalone hub")
+  .argument("[name]", "hub name or path — creates a hub there (bare name → ./<name>, like `git init`)")
+  .option("--in-repo", "scaffold the knowledge base inside this code repo's mage/")
+  .option("--hub", "create a standalone hub (vs an in-repo KB) at the current dir or <name>")
+  .addOption(new Option("--external", "deprecated alias of --hub").hideHelp())
+  .option("--name <name>", "deprecated: pass the hub name as the positional argument instead")
+  .option("-d, --dir <path>", "hub mode: explicit hub directory (overrides <name>)")
+  .option("--private", "hub mode: create as private GitHub repo (requires gh)")
+  .option("--public", "hub mode: create as public GitHub repo (requires gh)")
+  .option("--local", "hub mode: skip GitHub — local-only hub")
+  .option("--owner <user>", "hub mode: GitHub owner (auto-detected via `gh api user`)")
+  .option("--project <name>", "in-repo mode: project name (default: basename of code repo)")
+  .option("-y, --yes", "non-interactive: use defaults (detect in-repo vs hub from the cwd)")
+  .action(async (name: string | undefined, opts) => {
     const mode = modeFromOpts(opts);
+    if (name && opts.inRepo) {
+      throw new Error("A hub name/path implies a hub — drop --in-repo or the name argument.");
+    }
     const visibility = visibilityFromOpts(opts);
     await init({
       mode,
-      name: opts.name,
+      name: name ?? opts.name,
       dir: opts.dir,
       visibility,
       owner: opts.owner,
       project: opts.project,
-      noSuggest: opts.suggest === false,
       yes: opts.yes,
     });
   });
@@ -180,12 +180,17 @@ try {
 
 function modeFromOpts(opts: {
   inRepo?: boolean;
+  hub?: boolean;
   external?: boolean;
 }): InitMode | undefined {
-  const picked = [opts.inRepo && "in-repo", opts.external && "external"].filter(Boolean) as InitMode[];
+  if (opts.external && !opts.hub) {
+    logger.warn("`--external` is deprecated; use `--hub`.");
+  }
+  const wantsHub = opts.hub || opts.external;
+  const picked = [opts.inRepo && "in-repo", wantsHub && "hub"].filter(Boolean) as InitMode[];
   if (picked.length === 0) return undefined;
   if (picked.length > 1) {
-    throw new Error("Pick exactly one of --in-repo or --external");
+    throw new Error("Pick exactly one of --in-repo or --hub");
   }
   return picked[0];
 }
