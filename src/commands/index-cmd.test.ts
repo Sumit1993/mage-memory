@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import type { HubProject } from "../paths.js";
 import { index } from "./index-cmd.js";
 import { init } from "./init.js";
 
@@ -22,6 +23,24 @@ async function note(dir: string, rel: string, content: string): Promise<void> {
   await mkdir(join(p, ".."), { recursive: true });
   await writeFile(p, content);
 }
+
+/** A hub root (kind=hub): projects/ dir + a top-level metadata.json registry. */
+async function hub(projects: HubProject[] = []): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), "mage-hub-"));
+  made.push(dir);
+  await mkdir(join(dir, "projects"), { recursive: true });
+  const meta = { schema: "mage.v1", name: "myhub", created_at: "2026-06-03", projects };
+  await writeFile(join(dir, "metadata.json"), `${JSON.stringify(meta, null, 2)}\n`);
+  return dir;
+}
+
+/** Write a note at an arbitrary path under a docs root (hub-relative). */
+async function put(root: string, relUnderRoot: string, content: string): Promise<void> {
+  const p = join(root, relUnderRoot);
+  await mkdir(join(p, ".."), { recursive: true });
+  await writeFile(p, content);
+}
+const readIndex = (root: string) => readFile(join(root, "INDEX.md"), "utf8");
 
 describe("mage index", () => {
   it("produces a flat index grouped by wing, with a cross-cutting section", async () => {
@@ -126,5 +145,90 @@ describe("mage index", () => {
     const r = await index({ dir });
     expect(r.wings).toEqual([]); // ".." wing rejected
     expect(r.noteCount).toBe(1); // still indexed, as cross-cutting
+  });
+
+  it("cross-lists a multi-homed note under every tagged wing (per-wing room)", async () => {
+    const dir = await vault();
+    await note(dir, "rel.md", "---\ntype: relationship\ntags: [a/x, b/y]\n---\n# My Rel\n");
+    const r = await index({ dir });
+    expect(r.wings).toEqual(["a", "b"]);
+    expect(r.noteCount).toBe(1); // counted once, listed twice
+    const idx = await readFile(join(dir, "mage", "INDEX.md"), "utf8");
+    expect(idx).toContain("## a");
+    expect(idx).toContain("## b");
+    expect(idx).toContain("### x"); // room under primary wing a
+    expect(idx).toContain("### y"); // room under secondary wing b
+    expect((idx.match(/My Rel/g) ?? []).length).toBe(2); // appears in both wings
+    expect(idx).not.toContain("## Cross-cutting"); // multi-homed ≠ cross-cutting
+  });
+});
+
+describe("mage index — hub projects + registry (ADR-0011/0012)", () => {
+  it("indexes hub-owned project notes and excludes their archive/", async () => {
+    const root = await hub([
+      { name: "engine", storage: "hub-owned", code_repo_path: "/code/engine", code_repo_url: "git@github.com:me/engine.git" },
+    ]);
+    await put(root, "projects/engine/notes/api.md", "---\ntags: [engine/api]\n---\n# Engine API\n");
+    await put(root, "projects/engine/archive/old.md", "---\ntags: [engine/api]\n---\n# Old\n");
+    const r = await index({ dir: root });
+    expect(r.wings).toContain("engine");
+    expect(r.noteCount).toBe(1); // archived note excluded
+    const idx = await readIndex(root);
+    expect(idx).toContain("Engine API");
+    expect(idx).not.toContain("# Old");
+  });
+
+  it("decorates a wing that matches a registered project with its code-repo pointer", async () => {
+    const root = await hub([
+      { name: "engine", storage: "hub-owned", code_repo_path: "/code/engine", code_repo_url: "git@github.com:me/engine.git" },
+    ]);
+    await put(root, "projects/engine/notes/api.md", "---\ntags: [engine/api]\n---\n# Engine API\n");
+    const idx = await (async () => {
+      await index({ dir: root });
+      return readIndex(root);
+    })();
+    expect(idx).toContain("git@github.com:me/engine.git"); // code-repo decoration
+  });
+
+  it("does not decorate when there is no registry (registry-enriched, never -dependent)", async () => {
+    const dir = await vault(); // in-repo: no hub metadata
+    await note(dir, "api.md", "---\ntags: [engine/api]\n---\n# Engine API\n");
+    const r = await index({ dir });
+    expect(r.wings).toEqual(["engine"]);
+    const idx = await readFile(join(dir, "mage", "INDEX.md"), "utf8");
+    expect(idx).not.toContain("code repo:");
+  });
+
+  it("renders an in-repo member as a visible pointer, even with zero hub-owned notes", async () => {
+    const root = await hub([
+      { name: "web", storage: "in-repo", code_repo_path: "/code/web", code_repo_url: "git@github.com:me/web.git" },
+    ]);
+    const r = await index({ dir: root });
+    expect(r.noteCount).toBe(0);
+    const idx = await readIndex(root);
+    expect(idx).toContain("Linked repositories");
+    expect(idx).toContain("/code/web"); // pointer to where its notes live
+    expect(idx).toContain("INDEX"); // → open its INDEX
+  });
+
+  it("is idempotent on a hub (re-run byte-identical; no self-ingestion)", async () => {
+    const root = await hub([]);
+    for (const w of ["a", "b", "c", "d", "e"]) {
+      await put(root, `projects/p/notes/${w}.md`, `---\ntags: [${w}/r]\n---\n# ${w}\n`);
+    }
+    await index({ dir: root });
+    const first = await readIndex(root);
+    const r = await index({ dir: root });
+    const second = await readIndex(root);
+    expect(second).toBe(first);
+    expect(r.hierarchical).toBe(true); // 5 wings
+  });
+
+  it("flips hierarchical when one note carries >4 distinct tag-wings", async () => {
+    const dir = await vault();
+    await note(dir, "wide.md", "---\ntags: [a/1, b/2, c/3, d/4, e/5]\n---\n# Wide\n");
+    const r = await index({ dir });
+    expect(r.wings.length).toBe(5);
+    expect(r.hierarchical).toBe(true);
   });
 });
