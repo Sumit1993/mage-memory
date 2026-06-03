@@ -1,6 +1,7 @@
 import { confirm, select } from "@inquirer/prompts";
 import { mkdir, readdir, writeFile } from "node:fs/promises";
 import { basename, dirname } from "node:path";
+import { writeAgentsMd } from "../agents-md.js";
 import { getRemoteOriginUrl } from "../git.js";
 import { logger } from "../logger.js";
 import {
@@ -70,7 +71,7 @@ export async function link(hubPathInput: string, opts: LinkOptions = {}): Promis
     throw new Error(
       `Not a mage hub: ${hub}\n` +
         "  (a hub directory has a projects/ dir and a top-level metadata.json registry)\n" +
-        "  Run `mage init --external` to create one.",
+        "  Run `mage init --hub <name>` to create one.",
     );
   }
 
@@ -128,7 +129,10 @@ export async function link(hubPathInput: string, opts: LinkOptions = {}): Promis
   // ─── create hub-side stub dir for hub-owned storage ────────────────────
   if (storage === "hub-owned") {
     await mkdir(hubProjectDocsRoot(hub, project), { recursive: true });
-    logger.success(`Created empty stub: projects/${project}/mage/`);
+    logger.success(`Created empty stub: projects/${project}/`);
+    // Route this code repo's agents to the hub's per-project entry (ADR-0011 §6).
+    await writeAgentsMd(codeRepo, { kind: "external", docsRel: "mage", hubPath: hub, project });
+    logger.detail(`Wrote ${codeRepo}/AGENTS.md (external → ${hub}/_index.${project}.md)`);
   }
 
   // ─── write/update code-repo-side metadata ──────────────────────────────
@@ -144,7 +148,9 @@ export async function link(hubPathInput: string, opts: LinkOptions = {}): Promis
   logger.success(`Linked code repo '${project}' to hub '${hubMeta.name}'.`);
   logger.blank();
   logger.info("Suggested commits (run yourself; mage never auto-commits):");
-  logger.detail(`  git -C ${codeRepo} add mage`);
+  logger.detail(
+    `  git -C ${codeRepo} add mage${storage === "hub-owned" ? " AGENTS.md CLAUDE.md" : ""}`,
+  );
   logger.detail(`  git -C ${codeRepo} commit -m "feat: link to mage '${hubMeta.name}' (project=${project}, storage=${storage})"`);
   logger.blank();
   logger.detail(`  git -C ${hub} add metadata.json${storage === "hub-owned" ? ` projects/${project}/` : ""}`);
