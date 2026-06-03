@@ -30,9 +30,10 @@ function rel(docsRel: string, child: string): string {
 
 /**
  * The block written into an EXTERNAL code repo: its durable knowledge lives in a
- * mage hub, so route agents to the hub's per-project entry `<hub>/_index.<project>.md`
- * (ADR-0011 §6 — the per-project entry is the tag-defined wing index, NOT the
- * retired `projects/<name>/mage/INDEX.md`).
+ * mage hub, so route agents to the hub index and name this repo's wing. The entry
+ * is the always-present hub `INDEX.md` (ADR-0011 §6 — NOT the retired
+ * `projects/<name>/mage/INDEX.md`); in a large/hierarchical hub the wing links
+ * out to its own `_index.<project>.md`, which only exists in that mode.
  */
 function externalBlock(opts: AgentsMdOptions): string {
   const hub = opts.hubPath ?? "";
@@ -51,11 +52,11 @@ copies of sources) — navigable as an Obsidian graph.
 
 **Before non-trivial work in this repo:**
 
-1. Read this project's entry point first: \`${projIndex}\` — the ${project} wing
-   of the hub index (one line per note: type · title · keywords · → link). Open
-   only the notes the task actually touches; don't read everything.
-2. For cross-cutting context, read the hub index \`${hubIndex}\` and skim
-   \`${hubDecisions}\` for governing decisions.
+1. Read the hub index first: \`${hubIndex}\` — find the **${project}** wing (its
+   notes are grouped there; in a large hub the wing links out to its own
+   \`${projIndex}\`). One line per note: type · title · keywords · → link. Open
+   only the notes the task touches; don't read everything.
+2. Skim \`${hubDecisions}\` for the hub's governing decisions.
 3. Treat notes as point-in-time. If a note is \`status: stale-suspect\`, or its
    \`last_reviewed\` / \`provenance.commit\` looks old, verify it against the
    current code before relying on it.

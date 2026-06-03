@@ -16,12 +16,13 @@ async function tmp(): Promise<string> {
 const readAgents = (d: string) => readFile(join(d, "AGENTS.md"), "utf8");
 
 describe("writeAgentsMd — external kind (ADR-0011/0012)", () => {
-  it("points an external code repo at <hub>/_index.<project>.md", async () => {
+  it("routes an external code repo to the hub index + names its wing (flat-safe)", async () => {
     const repo = await tmp();
     await writeAgentsMd(repo, { kind: "external", docsRel: "mage", hubPath: "/abs/hub", project: "engine" });
     const agents = await readAgents(repo);
-    expect(agents).toContain("/abs/hub/_index.engine.md");
-    expect(agents).toContain("/abs/hub"); // hub path present
+    expect(agents).toContain("/abs/hub/INDEX.md"); // always-present entry (flat or hierarchical)
+    expect(agents).toContain("/abs/hub/_index.engine.md"); // the hierarchical-mode sub-index
+    expect(agents).toContain("engine"); // names the wing
   });
 
   it("does NOT reference the retired per-project entry path", async () => {
