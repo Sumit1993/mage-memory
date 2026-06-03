@@ -52,5 +52,6 @@ keywords: [roadmap, v0.1, v0.2, dream, scope, deferred, release, mcp, hub]
 - bounded_by [ADR-0010 — durable memory, not a coordination layer](../decisions/0010-durable-memory-not-coordination-layer.md)
 - mining_map [agentmemory mining map](agentmemory-mining-map.md)
 - detailed_by [mage v0.1 implementation plan](plan-v0.1.md)
+- sequenced_by [release sequence (post-v0.1 → 1.0)](plan-release-sequence.md)
 - field_tested_by [migration field notes](migration-field-notes.md)
 - decided_by [ADR-0011 — recursive scan; hub projects are wings](../decisions/0011-recursive-scan-hub-projects.md)
