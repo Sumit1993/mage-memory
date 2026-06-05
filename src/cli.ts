@@ -2,6 +2,7 @@ import { Command, Option } from "commander";
 import { doctor } from "./commands/doctor.js";
 import { dream } from "./commands/dream-cmd.js";
 import { index } from "./commands/index-cmd.js";
+import { ingestCmd } from "./commands/ingest.js";
 import { type InitMode, type InitVisibility, init } from "./commands/init.js";
 import { link, type Storage } from "./commands/link.js";
 import { list } from "./commands/list.js";
@@ -129,6 +130,18 @@ program
   .action(async (opts) => {
     const result = await dream({ dir: opts.dir, staleDays: opts.staleDays });
     if (opts.strict && result.findingCount > 0) process.exit(1);
+  });
+
+// ─── ingest ──────────────────────────────────────────────────────────────────
+program
+  .command("ingest")
+  .description(
+    "Enumerate + classify ingestable sources under <dir> (read-only) — what `mage:learn --from` distills.",
+  )
+  .argument("<dir>", "directory to scan for ingestable sources")
+  .option("--json", "emit the manifest as JSON to stdout (machine-readable)")
+  .action(async (dir: string, opts: { json?: boolean }) => {
+    await ingestCmd(dir, { json: opts.json });
   });
 
 // ─── redact ──────────────────────────────────────────────────────────────────
