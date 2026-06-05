@@ -19,6 +19,10 @@ export {
   index,
 } from "./commands/index-cmd.js";
 export {
+  type IngestCmdOptions,
+  ingestCmd,
+} from "./commands/ingest.js";
+export {
   type InitMode,
   type InitOptions,
   type InitResult,
@@ -100,6 +104,11 @@ export {
   METADATA_SCHEMA,
   resolveDocsRoot,
 } from "./paths.js";
+export {
+  type IngestKind,
+  type IngestSource,
+  scanIngestSources,
+} from "./ingest.js";
 export {
   hasLiveSecret,
   redact,

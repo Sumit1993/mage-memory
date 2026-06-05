@@ -93,16 +93,23 @@ Backfill the knowledge base from existing material in one pass. Distill prose
 docs and transcripts into notes, **and adopt the user's own skills in place** —
 adopting an authored skill is *remembering*, not copying a source (ADR-0013 §5).
 
-1. **Inventory `<dir>`.** Split into two streams: **prose** (docs, READMEs,
-   transcripts, ticket dumps) → distill to notes via the **Steps** above; and
-   **skills** (any folder with a `SKILL.md` the user owns) → adopt in place.
+1. **Inventory `<dir>` deterministically.** FIRST run the read-only CLI
+   `mage ingest <dir> --json`. It returns a classified manifest: an array of
+   `{ relPath, kind, title, summary }` where `kind` is one of `skill` | `note` |
+   `prose` | `transcript` | `feeder-ecc` | `feeder-native`. Don't split sources
+   by hand — drive the rest of the flow per `kind`:
+   - `skill` → **adopt-in-place** (step 3).
+   - `prose` | `transcript` | `note` → **distill to notes** (step 2 / normal
+     capture via the **Steps** above).
+   - `feeder-ecc` | `feeder-native` → the lower-confidence **FEEDER** path
+     (step 4).
 
-2. **For each prose file**, run the normal capture pipeline (classify →
+2. **For each prose / transcript / note file**, run the normal capture pipeline (classify →
    overlap-check → draft insight+procedure+pointers → redaction gate → write),
    but defer the human confirm to the **bulk confirm** in step 5. Point
    `sources:` at the original file; never paste the source body in.
 
-3. **For each owned `SKILL.md`, adopt-in-place** (do NOT rewrite from scratch):
+3. **For each `kind: skill`, adopt-in-place** (do NOT rewrite from scratch):
    - **Assign a wing/room** from its topic → tag `#<wing>/<room>`.
    - **Add provenance** (`repo`, `commit`, original path) to its frontmatter.
    - **Run the redaction gate** — `mage redact <skill-file>` (ADR-0014 Gate 2).
@@ -114,11 +121,12 @@ adopting an authored skill is *remembering*, not copying a source (ADR-0013 §5)
      ADR-0013 §1). Link skill ↔ note.
    - **Re-emit** the skill as `mage-skill-<slug>` so it joins mage's catalog.
 
-4. **Feeders are lower-confidence, same path (ADR-0005).** ECC `continuous-
-   learning-v2` instincts and Claude native auto-memory enter through this same
-   `--from` flow, but as **feeders**: mark them lower-confidence, require a
-   recurrence/quality bar before promotion, and lean harder on the redaction
-   gate. They feed mage; they never rival it as canonical.
+4. **For each `kind: feeder-ecc` / `feeder-native`, take the FEEDER path —
+   lower-confidence, same pipeline (ADR-0005).** ECC `continuous-learning-v2`
+   instincts (`feeder-ecc`) and Claude native auto-memory (`feeder-native`)
+   enter through this same `--from` flow, but as **feeders**: mark them
+   lower-confidence, require a recurrence/quality bar before promotion, and lean
+   harder on the redaction gate. They feed mage; they never rival it as canonical.
 
 5. **Human-confirm in bulk.** Present the full batch — new notes, adopted
    skills, minted backing notes, and any items the redaction gate blocked — as

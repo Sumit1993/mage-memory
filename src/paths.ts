@@ -24,6 +24,8 @@ export const OBSIDIAN_DIR = ".obsidian";
 export const GIT_DIR = ".git";
 /** Dependency dir (skipped by the scanner). */
 export const NODE_MODULES_DIR = "node_modules";
+/** Build output dir (skipped by ingest enumeration). */
+export const DIST_DIR = "dist";
 /** Agent-harness skill/config dirs where `mage skills` writes — skipped by the scanner. */
 export const CLAUDE_DIR = ".claude";
 export const AGENTS_SKILLS_DIR = ".agents";
