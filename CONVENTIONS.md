@@ -245,6 +245,33 @@ itself, colors itself, and routes agents to the right context for free.
 
 ---
 
+## 9. Skill naming & distribution
+
+mage's **hand-authored static skills ship as a Claude Code plugin** (marketplace
+`mage`, manifest in `.claude-plugin/`). The plugin namespace does the grouping, so
+each skill's `name:` stays **bare** and the harness presents it as `mage:<name>` —
+clean names, no `mage-` baked into each one (see [ADR-0013](mage/decisions/0013-procedure-skills-self-grooming-loop.md)):
+
+| Installed as | Skill | Source |
+|---|---|---|
+| `mage:learn` | capture a durable note | plugin (`skills/learn/`) |
+| `mage:guide` | how to use the knowledge base | plugin (`skills/guide/`) |
+| `mage:specify` · `mage:clarify` · `mage:plan` · `mage:tasks` · `mage:implement` · `mage:analyze` · `mage:constitution` | the spec-driven-development workflow | plugin (`skills/<phase>/`) |
+| `mage-wing-<wing>` | per-wing awareness skill | **generated** by `mage skills` into `.claude/skills/` + `.agents/skills/` |
+| `mage-skill-<slug>` | **Procedure skill** (a graduated Playbook/Gotcha note) | **generated** on graduate |
+
+Install the static group with `/plugin marketplace add Sumit1993/mage-memory` then
+`/plugin install mage@mage`; `mage init` prints these (user-driven — mage never runs
+slash commands). **Generated** per-repo skills keep a `mage-wing-*` / `mage-skill-*`
+prefix because they are written into a bare skills dir with no plugin namespace to
+group them.
+
+**Portability caveat:** the `mage:` namespace is **Claude-Code-only**. Agents that
+read `.agents/skills/` directly see bare names and could collide with same-named
+skills from other tools — the namespace protects you inside Claude Code, not outside it.
+
+---
+
 ## Example note
 
 Path: `mage/notes/billing/stripe-webhook-idempotency.md`

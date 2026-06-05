@@ -1,0 +1,23 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "mage",
+  "owner": { "name": "Sumit Patel" },
+  "metadata": {
+    "description": "mage — a portable, self-maintaining knowledge base for software systems, with skills for durable note capture and spec-driven development."
+  },
+  "plugins": [
+    {
+      "name": "mage",
+      "source": "./",
+      "description": "mage skills: mage:learn (capture durable notes) + the mage:specify / mage:clarify / mage:plan / mage:tasks / mage:implement / mage:analyze / mage:constitution spec-driven workflow + mage:guide (how to use the knowledge base).",
+      "version": "0.0.3",
+      "author": { "name": "Sumit Patel" },
+      "homepage": "https://github.com/Sumit1993/mage-memory",
+      "repository": "https://github.com/Sumit1993/mage-memory",
+      "license": "MIT",
+      "keywords": ["knowledge-base", "memory", "obsidian", "ai-agents", "notes", "specs"],
+      "category": "workflow",
+      "strict": false
+    }
+  ]
+}

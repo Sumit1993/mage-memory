@@ -2,7 +2,7 @@ import { platform } from "node:os";
 import { hasGh, hasGit } from "../git.js";
 import { logger } from "../logger.js";
 import { absolutePath, exists, looksLikeHub } from "../paths.js";
-import { run, which } from "../shell.js";
+import { which } from "../shell.js";
 
 export interface DoctorOptions {
   hub?: string;
@@ -29,7 +29,7 @@ const REQUIRED_NODE_MAJOR = 18;
  *
  * Notes:
  *  - No symlinks anywhere → platform check just reports OS; junctions/symlinks irrelevant
- *  - Skill install delegated to vercel-labs/skills → check `npx skills` is reachable
+ *  - Skills ship as a Claude Code plugin (`/plugin install mage@mage`) — informational
  */
 export async function doctor(opts: DoctorOptions = {}): Promise<DoctorResult> {
   const checks: DoctorCheck[] = [];
@@ -68,9 +68,8 @@ export async function doctor(opts: DoctorOptions = {}): Promise<DoctorResult> {
     optional: true,
   });
 
-  // 4. npx skills reachable (the skill installer we delegate to)
-  const skills = await checkNpxSkills();
-  checks.push(skills);
+  // 4. Skills install method (Claude Code plugin — informational)
+  checks.push(checkSkillsInstall());
 
   // 5. Hub check (if cwd or --hub looks like one)
   const hubCandidate = opts.hub ? absolutePath(opts.hub) : process.cwd();
@@ -125,20 +124,15 @@ export async function doctor(opts: DoctorOptions = {}): Promise<DoctorResult> {
   return { passed, checks };
 }
 
-async function checkNpxSkills(): Promise<DoctorCheck> {
-  // `npx skills --help` resolves the package + prints help. If it succeeds (or
-  // exits 0/2 — some CLIs return non-zero on --help), the installer is reachable.
-  // We don't actually want to install anything; we just want to confirm npm can
-  // fetch the package.
-  const r = await run("npx", ["-y", "skills", "--help"], { });
-  if (r.code === 0 || r.stdout.length > 0) {
-    return { name: "npx skills", ok: true, detail: "reachable (vercel-labs/skills)" };
-  }
+function checkSkillsInstall(): DoctorCheck {
+  // mage's skills ship as a Claude Code plugin; install is user-driven via slash
+  // commands, so there is nothing to probe from the CLI — surface the how-to.
   return {
-    name: "npx skills",
-    ok: false,
-    detail: `not reachable (exit ${r.code}). Required for \`npx skills add github:Sumit1993/mage-memory\`. Network may be blocked or npm misconfigured.`,
-    optional: true, // mark optional so doctor doesn't fail outright — install surfaces the issue when actually invoked
+    name: "skills (Claude Code plugin)",
+    ok: true,
+    detail:
+      "install with `/plugin marketplace add Sumit1993/mage-memory` then `/plugin install mage@mage`",
+    optional: true,
   };
 }
 

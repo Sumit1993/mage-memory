@@ -26,7 +26,7 @@ sources:
 
 - The mined ideas land in **v0.2 `/dream`** (per ROADMAP), not v0.1: Ebbinghaus-style decay scoring, supersession, consolidation, prune, and re-verify against changed source.
 - v0.1's note model is already **forward-compatible**: `status` (active|stale-suspect|superseded|archived), `last_reviewed`, `provenance.{repo,commit,work}`, and `sources:` are exactly the substrate `/dream` will consume — no schema migration needed later.
-- v0.1 already ships the cheap slice of this thinking: **supersede-don't-overwrite** and **verify-don't-trust** guidance in the `mage` (awareness) and `mage-learn` skills.
+- v0.1 already ships the cheap slice of this thinking: **supersede-don't-overwrite** and **verify-don't-trust** guidance in the `mage` (awareness) and `mage:learn` skills.
 - agentmemory's always-loaded `MEMORY.md` bridge is realized natively in mage as `INDEX.md` + `AGENTS.md` + the awareness skill — no separate bridge file.
 - If mage ever adds an auto-capture observe-loop, the homunculus hooks (ADR-0005) must be disabled to avoid double-observing; the same constraint applies to any agentmemory-derived capture loop.
 

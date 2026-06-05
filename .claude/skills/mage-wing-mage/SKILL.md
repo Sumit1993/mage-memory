@@ -15,8 +15,8 @@ Procedural entry point for the **mage** wing. mage notes hold the facts; this sk
 - Open only the notes a task touches; follow their `[text](path.md)` links.
 - Treat notes as point-in-time: verify `status: stale-suspect` or stale `last_reviewed` notes against the current code before relying on them.
 
-_No playbook/gotcha/interface notes tagged `#mage` yet — capture them with `/mage-learn`._
+_No playbook/gotcha/interface notes tagged `#mage` yet — capture them with `mage:learn`._
 
 ## Capture
 
-When you learn something durable in this wing, capture it with `/mage-learn` (insight + procedure + pointers — never a copy of the source), then run `mage index` and `mage skills`.
+When you learn something durable in this wing, capture it with `mage:learn` (insight + procedure + pointers — never a copy of the source), then run `mage index` and `mage skills`.

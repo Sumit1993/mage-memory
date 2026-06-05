@@ -1,8 +1,8 @@
 ---
-name: mage-learn
+name: learn
 description: |
   Capture a durable note into the mage knowledge base from work in progress.
-  Use when the user invokes /mage-learn, asks to "remember", "capture", or
+  Use when the user invokes mage:learn, asks to "remember", "capture", or
   "save" a finding, or right after you figure out a non-obvious interface,
   gotcha, procedure, or how services connect. Drafts a note (insight +
   procedure + pointers — never a copy of the source), checks the index for
@@ -11,7 +11,7 @@ allowed-tools: Read, Grep, Glob, Write, Edit, Bash
 disable-model-invocation: true
 ---
 
-# /mage-learn — capture a note
+# mage:learn — capture a note
 
 Turn something you just learned into a durable mage note. mage stores the
 reusable **insight**, the **procedure** (how to do it faster; the bad commands
@@ -20,9 +20,11 @@ to avoid), and **pointers** to canonical sources — never a copy of the source
 
 ## Modes
 
-- `/mage-learn "<finding>"` — capture the stated finding.
-- `/mage-learn` — scan the current work unit (`mage/work/<slug>/`) and the
+- `mage:learn "<finding>"` — capture the stated finding.
+- `mage:learn` — scan the current work unit (`mage/work/<slug>/`) and the
   recent conversation for the most capture-worthy insight, then propose it.
+- `mage:learn --from <dir>` — bulk-import a directory of existing docs,
+  transcripts, and skills (see **Bulk import** below).
 
 ## Steps
 
@@ -69,14 +71,59 @@ to avoid), and **pointers** to canonical sources — never a copy of the source
    (`mage/notes/<wing>/<slug>.md`) and whether it's UPDATE or NEW. Wait for a
    yes. (Human-confirm is the default for v0.1.)
 
-7. **Write** the note under `mage/notes/` after confirmation.
+7. **Redaction gate (ADR-0014 Gate 2, BEFORE write).** Run
+   `mage redact <draft-file>` on the draft. If it reports a **LIVE** secret
+   (non-zero exit), **STOP** — strip it (`mage redact --strip <draft-file>`) or
+   remove it by hand — never write a secret into a tracked note/skill. A note is
+   tracked and shared, so this is the seam where a missed secret becomes public.
 
-8. **Suggest follow-ups (never auto-run):**
+8. **Write** the note under `mage/notes/` after confirmation and a clean
+   redaction gate.
+
+9. **Suggest follow-ups (never auto-run):**
    ```bash
    mage index          # refresh INDEX.md
    mage skills         # refresh per-wing skills (if a new wing appeared)
    git -C <repo> add mage && git -C <repo> commit -m "note: <title> (#<wing>)"
    ```
+
+## Bulk import — mage:learn --from <dir>
+
+Backfill the knowledge base from existing material in one pass. Distill prose
+docs and transcripts into notes, **and adopt the user's own skills in place** —
+adopting an authored skill is *remembering*, not copying a source (ADR-0013 §5).
+
+1. **Inventory `<dir>`.** Split into two streams: **prose** (docs, READMEs,
+   transcripts, ticket dumps) → distill to notes via the **Steps** above; and
+   **skills** (any folder with a `SKILL.md` the user owns) → adopt in place.
+
+2. **For each prose file**, run the normal capture pipeline (classify →
+   overlap-check → draft insight+procedure+pointers → redaction gate → write),
+   but defer the human confirm to the **bulk confirm** in step 5. Point
+   `sources:` at the original file; never paste the source body in.
+
+3. **For each owned `SKILL.md`, adopt-in-place** (do NOT rewrite from scratch):
+   - **Assign a wing/room** from its topic → tag `#<wing>/<room>`.
+   - **Add provenance** (`repo`, `commit`, original path) to its frontmatter.
+   - **Run the redaction gate** — `mage redact <skill-file>` (ADR-0014 Gate 2).
+     A LIVE secret (non-zero exit) STOPS adoption for that skill until it's
+     stripped (`mage redact --strip`) or removed; never adopt a skill that
+     carries a live secret.
+   - **Mint/link a backing note** under `mage/notes/<wing>/` so the skill has a
+     durable substrate (the note is the truth; the skill is its pushed form,
+     ADR-0013 §1). Link skill ↔ note.
+   - **Re-emit** the skill as `mage-skill-<slug>` so it joins mage's catalog.
+
+4. **Feeders are lower-confidence, same path (ADR-0005).** ECC `continuous-
+   learning-v2` instincts and Claude native auto-memory enter through this same
+   `--from` flow, but as **feeders**: mark them lower-confidence, require a
+   recurrence/quality bar before promotion, and lean harder on the redaction
+   gate. They feed mage; they never rival it as canonical.
+
+5. **Human-confirm in bulk.** Present the full batch — new notes, adopted
+   skills, minted backing notes, and any items the redaction gate blocked — as
+   one review. Write only after the user confirms; then suggest `mage index` /
+   `mage skills` and the `git` commands (never auto-run, never auto-commit).
 
 ## Quality bar
 
@@ -84,3 +131,10 @@ to avoid), and **pointers** to canonical sources — never a copy of the source
 - Points to canonical sources; doesn't mirror them.
 - Tagged with one `#<wing>/<room>` so it lands in the index and the wing skill.
 - Links to related notes as graph edges.
+
+## See also
+
+- **ADR-0013** (`mage/decisions/0013-procedure-skills-self-grooming-loop.md`) —
+  procedure skills, adopt-in-place, and the scratch → note → skill ladder.
+- **ADR-0014** (`mage/decisions/0014-two-gate-redaction.md`) — two-gate
+  redaction; `mage redact` is Gate 2 before any note/skill is written.

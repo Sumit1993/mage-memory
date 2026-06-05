@@ -10,9 +10,9 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash
 disable-model-invocation: true
 ---
 
-<!-- Adapted from github/spec-kit (/implement command), MIT licensed. See ATTRIBUTION.md. -->
+<!-- Adapted from github/spec-kit (mage:implement command), MIT licensed. See ATTRIBUTION.md. -->
 
-# /implement — execute tasks for a spec work unit
+# mage:implement — execute tasks for a spec work unit
 
 ## Path resolution
 
@@ -41,7 +41,7 @@ commits at meaningful boundaries.
 
 ## When to invoke
 
-After `/tasks` (and ideally `/analyze`). Before any code work for the work unit.
+After `mage:tasks` (and ideally `mage:analyze`). Before any code work for the work unit.
 
 ## Workflow
 
@@ -52,7 +52,7 @@ After `/tasks` (and ideally `/analyze`). Before any code work for the work unit.
    principle notes (e.g. `<docs-root>/notes/principles.md`).
 
 3. **Check analysis**. If `analysis.md` exists and has `BLOCKER`s, refuse to
-   implement until they're resolved. Tell the user to revise + re-run `/analyze`.
+   implement until they're resolved. Tell the user to revise + re-run `mage:analyze`.
 
 4. **Resolve docs-root vs code-repo**. mage notes live in the docs root (could
    be in the code repo or a separate hub). The code you'll write lives in the
@@ -104,7 +104,7 @@ After `/tasks` (and ideally `/analyze`). Before any code work for the work unit.
 9. **When all tasks for the work unit are done**, propose:
    - Running `mage index` to refresh `<docs-root>/INDEX.md` if new notes emerged
    - Capturing reusable INSIGHT/PROCEDURE/POINTERS as a durable note via the
-     `mage-learn` skill (capture-by-pointer — store the insight + how to do it
+     `mage:learn` skill (capture-by-pointer — store the insight + how to do it
      faster + sources, never copies of what you read)
    - Authoring an ADR in `<docs-root>/decisions/` for any non-obvious technical
      decisions made during implementation (use the `mage` skill's
@@ -114,7 +114,7 @@ After `/tasks` (and ideally `/analyze`). Before any code work for the work unit.
 
 - **Auto-committing**: never. This skill suggests, the user commits.
 - **Implementing tasks out of order**: respect dependencies. Don't start US2 work before US1 is done unless explicitly allowed by the parallel-team strategy in tasks.md.
-- **Modifying spec/plan/tasks during implementation**: don't. If the plan turns out to be wrong, STOP, surface the issue, and propose re-running `/plan` (and possibly `/analyze`) — don't silently deviate.
+- **Modifying spec/plan/tasks during implementation**: don't. If the plan turns out to be wrong, STOP, surface the issue, and propose re-running `mage:plan` (and possibly `mage:analyze`) — don't silently deviate.
 - **Adding scope**: if you notice something missing, surface it as a question. Don't quietly add it.
 - **Skipping the principle check**: every implementation choice should pass through the project's principle notes. If a task would violate a principle, surface that explicitly.
 

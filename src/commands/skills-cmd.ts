@@ -1,3 +1,4 @@
+import type { Dirent } from "node:fs";
 import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { logger } from "../logger.js";
@@ -18,6 +19,7 @@ export interface SkillsOptions {
 export interface SkillsResult {
   repo: string;
   wings: string[];
+  /** Generated `mage-wing-*` skill paths. */
   written: string[];
 }
 
@@ -95,14 +97,14 @@ function renderWingSkill(wing: string, notes: ScannedNote[], docsRel: string): s
     out.push("");
   } else {
     out.push(
-      `_No playbook/gotcha/interface notes tagged \`#${wing}\` yet — capture them with \`/mage-learn\`._`,
+      `_No playbook/gotcha/interface notes tagged \`#${wing}\` yet — capture them with \`mage:learn\`._`,
       "",
     );
   }
   out.push(
     "## Capture",
     "",
-    "When you learn something durable in this wing, capture it with `/mage-learn` (insight + procedure + pointers — never a copy of the source), then run `mage index` and `mage skills`.",
+    "When you learn something durable in this wing, capture it with `mage:learn` (insight + procedure + pointers — never a copy of the source), then run `mage index` and `mage skills`.",
     "",
   );
   return `${out.join("\n").replace(/\n+$/, "")}\n`;
@@ -110,7 +112,7 @@ function renderWingSkill(wing: string, notes: ScannedNote[], docsRel: string): s
 
 async function cleanGeneratedWingSkills(skillsRoot: string, keepWings: string[]): Promise<void> {
   const keep = new Set(keepWings.map((w) => `${WING_PREFIX}${w}`));
-  let entries: import("node:fs").Dirent[];
+  let entries: Dirent[];
   try {
     entries = await readdir(skillsRoot, { withFileTypes: true });
   } catch {

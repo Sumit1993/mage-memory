@@ -1,6 +1,6 @@
 {
   "name": "mage-memory",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "mage — a portable, self-maintaining knowledge base for software systems: durable git-backed notes navigable as an Obsidian graph, usable by any AI coding agent. CLI: init, index, skills, dream, link, verify, unlink, list, status, doctor.",
   "type": "module",
   "bin": {
@@ -16,6 +16,8 @@
   },
   "files": [
     "dist",
+    "skills",
+    ".claude-plugin",
     "README.md",
     "LICENSE"
   ],
@@ -28,6 +30,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "prepublishOnly": "pnpm build"
   },
   "keywords": [
@@ -61,6 +64,7 @@
   "devDependencies": {
     "@types/node": "^22.10.5",
     "@types/tar": "^6.1.13",
+    "@vitest/coverage-v8": "2.1.9",
     "tsup": "^8.3.5",
     "typescript": "^5.7.3",
     "vitest": "^2.1.8"

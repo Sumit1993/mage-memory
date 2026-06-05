@@ -27,24 +27,17 @@ is preserved.
 - **Sync cadence:** none. We adopted spec-kit's conventions at the moment of
   authorship once and maintain the SKILL.md files ourselves going forward.
 
-## vercel-labs/skills  *(runtime dependency for skill install)*
+## vercel-labs/skills  *(historical — install method through 0.0.2)*
 
 - **Source:** https://github.com/vercel-labs/skills
 - **License:** Apache License 2.0
-- **How we use it:** at runtime, via direct user invocation. Users install
-  the mage skill bundle with `npx skills add github:Sumit1993/mage-memory`
-  (and remove with `npx skills remove github:Sumit1993/mage-memory`). mage
-  itself does not wrap or shell out to `npx skills` — vercel-labs/skills owns
-  the per-agent installation matrix end-to-end (Claude Code, Codex CLI,
-  OpenCode, Cursor, Gemini CLI, and others). We don't ship the per-agent
-  path knowledge ourselves; their package owns it. mage's skills live in the
-  repo-root `skills/` directory so the CLI auto-discovers them.
+- **How we used it:** through 0.0.2, users installed mage's skills with
+  `npx skills add github:Sumit1993/mage-memory`. As of **0.0.3**, mage's skills
+  ship as a **Claude Code plugin** (`/plugin marketplace add Sumit1993/mage-memory`
+  then `/plugin install mage@mage`), so mage no longer depends on
+  vercel-labs/skills. mage never wrapped or shelled out to their CLI; this credit
+  is retained for the earlier releases that relied on it.
 - **Form of attribution:** this file, plus a credit in [`README.md`](README.md).
-- **Apache 2.0 § 4 compliance:** as a runtime caller (not a redistributor of
-  their source), the requirements are largely about preserving copyright
-  notices and any NOTICE file when we DO redistribute their modified source.
-  We don't redistribute their source; we invoke their published CLI via npx.
-  This file documents the dependency for transparency.
 
 ---
 
@@ -54,5 +47,5 @@ process is:
 - **spec-kit**: manual re-survey of their command bodies; update affected
   `skills/<name>/SKILL.md` files directly. Commit with a clear "sync to
   spec-kit @ <ref>" message. No automated sync.
-- **vercel-labs/skills**: zero work on our end. The next `npx skills add`
-  invocation pulls the latest from their published package.
+- **vercel-labs/skills**: no longer a dependency as of 0.0.3 (skills ship as a
+  Claude Code plugin). Retained above as historical attribution.

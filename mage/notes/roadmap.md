@@ -2,8 +2,8 @@
 type: plan
 tags: [mage/roadmap]
 created: "2026-05-29"
-updated: "2026-06-02"
-last_reviewed: "2026-06-02"
+updated: "2026-06-05"
+last_reviewed: "2026-06-05"
 status: active
 provenance:
   repo: mage-memory
@@ -13,7 +13,7 @@ keywords: [roadmap, v0.1, v0.2, dream, scope, deferred, release, mcp, hub]
 
 # mage — roadmap
 
-> Scope line set 2026-05-29 (grill-with-docs session). Decisions: [ADR-0001](../decisions/0001-memory-first-product-supersedes-specshub.md)–0010 — latest: [0008 visible mage/ dir](../decisions/0008-visible-mage-dir-for-obsidian.md), [0009 no-runtime/auto-capture](../decisions/0009-no-runtime-automation-rides-host-hooks.md), [0010 not-a-coordination-layer](../decisions/0010-durable-memory-not-coordination-layer.md). What to mine from agentmemory: [mining map](agentmemory-mining-map.md). Language: [context & glossary](context.md). Founding design research was distilled into these notes; the raw research is author-local and not version-controlled here.
+> Scope line set 2026-05-29 (grill-with-docs session). Decisions: [ADR-0001](../decisions/0001-memory-first-product-supersedes-specshub.md)–0014 — latest: [0011 recursive scan](../decisions/0011-recursive-scan-hub-projects.md), [0012 wings optional](../decisions/0012-wings-optional-convention-standalone-hubs.md), [0013 procedure skills + self-grooming loop](../decisions/0013-procedure-skills-self-grooming-loop.md), [0014 two-gate redaction](../decisions/0014-two-gate-redaction.md). What to mine from agentmemory: [mining map](agentmemory-mining-map.md). Language: [context & glossary](context.md). Founding design research was distilled into these notes; the raw research is author-local and not version-controlled here.
 
 ## v0.1 — the durable, portable, navigable knowledge base (the founding value)
 - **Fork specshub → mage**: rename `.specshub/`→`mage/`, schema, CLI/package/awareness skill; **carry** modes (in-repo/external/hybrid), metadata, hub registry, commit hygiene, SDD skills (specs = a work type) [ADR-0002].
@@ -25,16 +25,38 @@ keywords: [roadmap, v0.1, v0.2, dream, scope, deferred, release, mcp, hub]
 - **Cheap anti-staleness only**: notes carry `last_reviewed`/`provenance.commit`; awareness treats notes as point-in-time ("verify stale notes vs current code"); on-write overlap/contradiction check in `/learn`.
 - **Coexistence**: mage canonical; native auto-memory left as-is (no harvest bridge yet) [ADR-0005].
 
-## v0.2+ — deferred
-- Full **`/dream` batch sweep** (decay / supersede / re-verify / consolidate / prune) — only the cheap read-time + on-write parts ship in v0.1. Mines agentmemory's design (decay/consolidation/connect/bridge) without depending on it [ADR-0007].
-- **Opt-in auto-capture** — runtime-less, via host hooks: `mage connect <agent>` installs per-harness hooks → `mage observe` stages to `.learnings/` (deterministic) → agent distills via `/learn` → promote on recurrence ≥2× [ADR-0009]. Plus **note↔skill promotion engine** + **homunculus-algorithm harvest** [ADR-0005/0006].
-- **`/learn --from <transcript>`** — agent-driven import-harvest of session transcripts (e.g. `~/.claude/projects/*.jsonl`) into distilled notes; the feeder path [ADR-0005]. (Distillation is judgment ⇒ a skill, never a deterministic `mage import`.) The first external migrations field-tested a `--from <dir>` prose-doc variant + a byte-safe bulk recipe — see [field notes](migration-field-notes.md).
-- **MCP** search/recall accelerator — standardizes *recall* across agents, **not** capture [ADR-0009].
-- **Obsidian dashboards** via Dataview/Bases plugins (the graph + wing colors already ship; richer dashboards are plugin-rendered, not mage-generated markdown).
-- **Multi-repo hub graph aggregation + cross-repo `/dream`** (basic hub mode carries from specshub; the cross-repo graph/sync waits).
-- **Index hub-owned projects** — `mage index`/`dream` skip `projects/` and run on one docs root, so a hub's index covers only hub-level notes; hub-owned project notes are registered (`list`/`verify`) but not indexed. Workaround today: a per-project `metadata.json` anchor. Recurse `projects/` (or `mage index --all`) so the anchor isn't needed. [field notes](migration-field-notes.md) · **design locked: [ADR-0011](../decisions/0011-recursive-scan-hub-projects.md)**
-- **`mage link` writes external awareness** — `link` writes the code repo's `metadata.json` but no `AGENTS.md`/`CLAUDE.md`, so external code repos don't auto-route agents to the hub. Add an `external` kind to `writeAgentsMd`. [field notes](migration-field-notes.md) · **decided: [ADR-0011](../decisions/0011-recursive-scan-hub-projects.md)**
-- **Generalize hubs beyond developers (ADR-0012)** — one detection-first `mage init` (in-repo vs `--hub <name>`; name = location; **suggest-only** commit; retire the `--external` word); **standalone-hub** creation for non-devs; hub index lists `storage:in-repo` members as **pointers** (visible, never silently empty); **multi-home by tags** (a note indexes under *every* wing it's tagged with); a `dream` nudge for untagged notes. Principle: **a wing is an optional convention, never required.** **decided: [ADR-0012](../decisions/0012-wings-optional-convention-standalone-hubs.md)**
+## 0.0.x → 0.1.0 — the self-grooming loop (the path to the milestone)
+
+A 2026-06-05 **mega-grill** folded eight idea-clusters — automated skill creation,
+usage/context optimization (mining Microsoft **SkillOpt** + ECC's instinct loop),
+secret **redaction**, ECC-style skill **grouping**, **ingest** of existing skills, learn
+**automation**, and an **icon/visualization** — into a single horizon. **0.1.0 ships the
+full capture → graduate → optimize loop**, all human-committed; nothing is crowned 1.0.
+The dependency-ordered build is the [release sequence](plan-release-sequence.md); the
+model is [ADR-0013](../decisions/0013-procedure-skills-self-grooming-loop.md) (procedure
+skills + the loop) + [ADR-0014](../decisions/0014-two-gate-redaction.md) (two-gate redaction).
+
+- **Shipped in 0.0.2** (was "v0.2+ deferred"): recursive scan, multi-home wings,
+  hub-project indexing, `link` external awareness, hub generalization —
+  [ADR-0011](../decisions/0011-recursive-scan-hub-projects.md) /
+  [ADR-0012](../decisions/0012-wings-optional-convention-standalone-hubs.md).
+- **Carried into the 0.1.0 path** (no longer "deferred"): full `/dream` healing sweep,
+  opt-in auto-capture (observe → connect → distill → promote → **graduate**),
+  `mage:learn --from` (prose/transcripts **+ existing skills**), MCP recall, Obsidian
+  dashboards — each now slotted in the [release sequence](plan-release-sequence.md).
+- **New in this horizon**: the **Procedure skill** (a graduated note), `/mage-optimize`
+  (SkillOpt's *rails* — bounded edits, rejected-edit buffer, context-match gate —
+  human-confirmed), two-gate redaction, and Claude Code **plugin** distribution
+  (the `mage:` namespace keeps skill names clean — `mage:learn`, `mage:specify`, …).
+
+## Deferred past 0.1.0 (unplanned future 0.x — no 1.0)
+- **Literal SkillOpt bridge** — export skills+trajectories to the SkillOpt optimizer,
+  import `best_skill.md`; a real training loop (model backends, epochs, labeled splits)
+  → opt-in, **out-of-core**. mage ships SkillOpt's *rails* in-loop, not its harness
+  [ADR-0013].
+- **Multi-repo hub graph aggregation + cross-repo `/dream`** — ADR-0012 §2 rejects
+  content/graph aggregation; only registry-pointer memory aggregation survives, and it
+  needs its own grill [ADR-0010/0012].
 
 ## Out of scope (the sharp "no")
 - **Multi-agent coordination** — leases / signals / actions / routines / task queues. mage is durable memory, not an orchestration layer [ADR-0010].
@@ -55,3 +77,5 @@ keywords: [roadmap, v0.1, v0.2, dream, scope, deferred, release, mcp, hub]
 - sequenced_by [release sequence (post-v0.1 → 1.0)](plan-release-sequence.md)
 - field_tested_by [migration field notes](migration-field-notes.md)
 - decided_by [ADR-0011 — recursive scan; hub projects are wings](../decisions/0011-recursive-scan-hub-projects.md)
+- decided_by [ADR-0013 — procedure skills + the self-grooming loop](../decisions/0013-procedure-skills-self-grooming-loop.md)
+- gated_by [ADR-0014 — two-gate redaction](../decisions/0014-two-gate-redaction.md)

@@ -10,9 +10,9 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash
 disable-model-invocation: true
 ---
 
-<!-- Adapted from github/spec-kit (/constitution command), MIT licensed. See ATTRIBUTION.md. -->
+<!-- Adapted from github/spec-kit (mage:constitution command), MIT licensed. See ATTRIBUTION.md. -->
 
-# /constitution — establish or amend the project's governing principles
+# mage:constitution — establish or amend the project's governing principles
 
 ## Path resolution
 
@@ -77,7 +77,7 @@ in the knowledge base — other notes reference it by relative markdown link
 5. **Propagation check** (after writing). Re-read any spec work units under
    `<docs-root>/work/<NNN>-<name>/` and any reusable note templates the project
    keeps. Ensure none contradict the updated principles. Flag conflicts and
-   suggest re-running `/plan` or `/tasks` where they do.
+   suggest re-running `mage:plan` or `mage:tasks` where they do.
 
 6. **Suggest the commit** (mage never auto-commits — it only suggests; the user
    runs the command, in the right repo: code repo for in-repo mode, hub for

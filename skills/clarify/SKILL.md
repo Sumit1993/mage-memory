@@ -2,21 +2,21 @@
 name: clarify
 description: |
   Identify and resolve underspecified areas in a feature spec by interviewing
-  the user. Recommended before /plan — specs are routinely underspecified, and
-  /plan produces better output when ambiguities are flushed out first. Operates
+  the user. Recommended before mage:plan — specs are routinely underspecified, and
+  mage:plan produces better output when ambiguities are flushed out first. Operates
   on a spec note inside a mage work unit. Adapted from github/spec-kit (MIT) —
   see ATTRIBUTION.md.
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash
 disable-model-invocation: true
 ---
 
-<!-- Adapted from github/spec-kit (/clarify command), MIT licensed. See ATTRIBUTION.md. -->
+<!-- Adapted from github/spec-kit (mage:clarify command), MIT licensed. See ATTRIBUTION.md. -->
 
-# /clarify — interactively resolve underspecified spec areas
+# mage:clarify — interactively resolve underspecified spec areas
 
 Spec-Driven Development is one authoring path within mage, a portable file-based
 knowledge base. This skill sharpens a spec note inside its `work/<slug>/` lab
-notebook before `/plan` turns it into a plan.
+notebook before `mage:plan` turns it into a plan.
 
 ## Path resolution (added by mage)
 
@@ -42,13 +42,13 @@ to nail down the unknowns. Updates the spec in place with clarifications.
 
 ## When to invoke
 
-- After `/specify`, before `/plan`. Strongly recommended even when the spec
+- After `mage:specify`, before `mage:plan`. Strongly recommended even when the spec
   *looks* complete — there are almost always implicit assumptions to surface.
 - After significant changes to a spec, to re-validate that it's still coherent.
 
 ## Workflow
 
-1. **Identify the target spec**. If `/clarify` is invoked with a work-unit name
+1. **Identify the target spec**. If `mage:clarify` is invoked with a work-unit name
    or number, use that. Otherwise list `<docs-root>/work/*/` and prompt the
    user to pick the one to clarify.
 
@@ -75,7 +75,7 @@ to nail down the unknowns. Updates the spec in place with clarifications.
    the end.
 
 7. **Update the spec** with the resolutions. Add an "## Open questions"
-   section if any remain, marking each with `(unresolved — needs decision before /plan)`.
+   section if any remain, marking each with `(unresolved — needs decision before mage:plan)`.
 
 8. **Suggest the commit** when done — mage never auto-commits, it only suggests.
    Pick the right repo: the code repo for `in-repo`, the hub for `external`:
@@ -91,7 +91,7 @@ to nail down the unknowns. Updates the spec in place with clarifications.
 
 ## Quality bar
 
-A good `/clarify` session:
+A good `mage:clarify` session:
 - Surfaces 3-7 substantive issues, not 30 nitpicks
 - Each question is specific enough that the user can answer in 1-3 sentences
 - The updated spec has no ambiguous "etc." or "and so on" phrasings
@@ -99,7 +99,7 @@ A good `/clarify` session:
 
 ## When to stop
 
-`/clarify` is done when:
+`mage:clarify` is done when:
 - All categories scanned have been addressed
 - Remaining open questions are noted in the spec with an `(unresolved)` marker
-- The user explicitly says "good enough — move on to /plan"
+- The user explicitly says "good enough — move on to mage:plan"

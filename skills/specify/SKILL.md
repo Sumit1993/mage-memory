@@ -9,9 +9,9 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash
 disable-model-invocation: true
 ---
 
-<!-- Adapted from github/spec-kit (/specify command), MIT licensed. See ATTRIBUTION.md. -->
+<!-- Adapted from github/spec-kit (mage:specify command), MIT licensed. See ATTRIBUTION.md. -->
 
-# /specify — author a feature specification
+# mage:specify — author a feature specification
 
 Spec-Driven Development is one authoring path within mage, a portable file-based
 knowledge base. A spec is just one note type — a `work/<slug>/` lab notebook
@@ -40,12 +40,12 @@ similar relative path in this skill, resolve the docs root for the current repo:
 
 Authors a **feature specification** as a mage work unit (`work/<slug>/`, a
 task-scoped lab notebook). A spec is the human-language description of WHAT
-we're building — distinct from HOW (which is the `/plan` skill). The files it
+we're building — distinct from HOW (which is the `mage:plan` skill). The files it
 produces are mage notes; tag them so they appear in `mage index`.
 
 ## When to invoke
 
-The user types `/specify <description>` to start working on a new feature, or
+The user types `mage:specify <description>` to start working on a new feature, or
 to fully document an existing one before planning implementation.
 
 ## Workflow
@@ -139,7 +139,7 @@ does it add?>
 
 ## Open questions
 
-- <Things to clarify before /plan. Use /clarify to resolve these.>
+- <Things to clarify before mage:plan. Use mage:clarify to resolve these.>
 
 ## Assumptions
 
@@ -149,16 +149,16 @@ does it add?>
 ## Quality bar
 
 A good spec:
-- Says WHAT, not HOW. Implementation choices belong in `/plan`.
+- Says WHAT, not HOW. Implementation choices belong in `mage:plan`.
 - Has acceptance criteria you can write tests against.
 - Lists "out of scope" explicitly — bounds the design.
-- Has open questions called out at the bottom so `/clarify` can resolve them.
+- Has open questions called out at the bottom so `mage:clarify` can resolve them.
 - References the constitution by principle number where relevant.
 
 ## Common mistakes to avoid
 
 - **Conflating spec and plan**: if you find yourself naming libraries or
-  algorithms, that belongs in `/plan`. Spec is user-facing.
+  algorithms, that belongs in `mage:plan`. Spec is user-facing.
 - **Skipping out-of-scope**: agents over-deliver without it. Be explicit.
 - **Vague success criteria**: "users like it" isn't measurable. "p99 latency
   < 300ms for the /search endpoint at 1k req/s" is.

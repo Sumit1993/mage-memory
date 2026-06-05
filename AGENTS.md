@@ -20,7 +20,7 @@ procedure, and pointers (not copies of sources) — navigable as an Obsidian gra
    current code before relying on it.
 
 **After you learn something durable** — an interface detail, a gotcha, how two
-services couple, a faster path to a source — capture it with `/mage-learn`, or
+services couple, a faster path to a source — capture it with `mage:learn`, or
 add a note under `mage/notes/` and run `mage index`. Capture the reusable
 *insight + procedure + pointers*, never a copy of the source.
 

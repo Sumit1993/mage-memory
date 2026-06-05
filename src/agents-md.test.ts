@@ -64,4 +64,17 @@ describe("writeAgentsMd — external kind (ADR-0011/0012)", () => {
     expect(agents).toContain("knowledge base at `mage/`");
     expect(agents).not.toContain("_index.");
   });
+
+  it("names the capture skill `mage:learn`, not the retired `/mage-learn`", async () => {
+    for (const opts of [
+      { kind: "in-repo", docsRel: "mage" },
+      { kind: "external", docsRel: "mage", hubPath: "/abs/hub", project: "engine" },
+    ] as const) {
+      const repo = await tmp();
+      await writeAgentsMd(repo, opts);
+      const agents = await readAgents(repo);
+      expect(agents).toContain("mage:learn");
+      expect(agents).not.toContain("/mage-learn");
+    }
+  });
 });

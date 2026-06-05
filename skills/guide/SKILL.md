@@ -1,5 +1,5 @@
 ---
-name: mage
+name: guide
 description: |
   Operate inside a mage knowledge base — a portable, file-based store of notes
   (insight, procedure, and pointers) navigable as an Obsidian graph. Use when
@@ -76,14 +76,14 @@ A note records what was true when written. Before relying on one:
   current code/source before asserting it.**
 - If you confirm it's still true, you may bump `last_reviewed`. If it's wrong,
   supersede it (mark the old `status: superseded`, link the replacement) and
-  suggest `/mage-learn` to capture the correction. The danger is
+  suggest `mage:learn` to capture the correction. The danger is
   confidently-wrong memory — verify, don't blindly trust.
 
 ## E. Capture-by-pointer
 
 When you learn something durable (an interface detail, a gotcha, how services
 couple, a faster path to a source), capture the **insight + procedure +
-pointers** — not a copy of the source. Use `/mage-learn`. `sources:` holds
+pointers** — not a copy of the source. Use `mage:learn`. `sources:` holds
 URLs / tickets / `file:line`; snapshot into `work/<slug>/artifacts/` only when a
 source is fragile. Goal: do it faster / fewer mistakes next time.
 
@@ -119,11 +119,11 @@ the user runs them. Pick the right repo by where the file physically lives:
 
 After substantive work, **suggest** (don't author unless asked):
 
-- a new/updated note via `/mage-learn` if you learned something reusable;
+- a new/updated note via `mage:learn` if you learned something reusable;
 - a `decision` note if a non-obvious technical choice was made;
 - `status: stale-suspect` on a note you found to be drifting from the code.
 
-Phrase as: "Worth capturing? I'd `/mage-learn` a `<type>` note tagged
+Phrase as: "Worth capturing? I'd `mage:learn` a `<type>` note tagged
 `#<wing>/<room>`: <2–3 line summary>." Then wait for direction.
 
 ## Reference: metadata.json

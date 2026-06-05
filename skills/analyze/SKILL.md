@@ -3,16 +3,16 @@ name: analyze
 description: |
   Cross-artifact consistency + coverage analysis for a spec work unit. Reads the
   spec, plan, tasks notes (and optionally principle notes + existing code) and
-  surfaces contradictions, missing coverage, and risks BEFORE /implement runs.
+  surfaces contradictions, missing coverage, and risks BEFORE mage:implement runs.
   One authoring path within a mage knowledge base. Adapted from github/spec-kit
   (MIT) — see ATTRIBUTION.md.
 allowed-tools: Read, Glob, Grep, Bash
 disable-model-invocation: true
 ---
 
-<!-- Adapted from github/spec-kit (/analyze command), MIT licensed. See ATTRIBUTION.md. -->
+<!-- Adapted from github/spec-kit (mage:analyze command), MIT licensed. See ATTRIBUTION.md. -->
 
-# /analyze — cross-artifact consistency review
+# mage:analyze — cross-artifact consistency review
 
 ## Path resolution
 
@@ -34,7 +34,7 @@ in a work unit, resolve the docs root for the current repo:
 
 ## What this skill does
 
-Runs after `/tasks` and before `/implement`. Reads:
+Runs after `mage:tasks` and before `mage:implement`. Reads:
 - The spec, plan, tasks notes for the target work unit
 - Any relevant principle notes (e.g. `<docs-root>/notes/principles.md`)
 - (Optionally) existing source code in the code repo
@@ -49,11 +49,11 @@ Surfaces:
 Writes findings to an `analysis.md` note in the same work unit (recommend
 frontmatter `type: note` and a `tags: [<wing>]` tag so it appears in `mage
 index`). Does NOT modify the spec/plan/tasks — those updates are up to the user
-(use `/specify`, `/plan`, or `/tasks` again to revise).
+(use `mage:specify`, `mage:plan`, or `mage:tasks` again to revise).
 
 ## When to invoke
 
-- After `/tasks`, before `/implement` (recommended)
+- After `mage:tasks`, before `mage:implement` (recommended)
 - After a major spec/plan revision, to recheck coherence
 - Periodically during long-running implementations, to catch drift
 
@@ -93,8 +93,8 @@ index`). Does NOT modify the spec/plan/tasks — those updates are up to the use
      architecture? Or has it drifted?
 
 4. **Generate findings**. For each finding, classify by severity:
-   - **BLOCKER**: must fix before `/implement` (e.g., contradictory contracts)
-   - **WARNING**: should fix but `/implement` could proceed (e.g., missing test
+   - **BLOCKER**: must fix before `mage:implement` (e.g., contradictory contracts)
+   - **WARNING**: should fix but `mage:implement` could proceed (e.g., missing test
      coverage for an edge case)
    - **NOTE**: informational (e.g., a non-obvious choice worth documenting)
 
@@ -114,7 +114,7 @@ index`). Does NOT modify the spec/plan/tasks — those updates are up to the use
    ```
 
 7. **In chat output**, summarize the BLOCKER count up front. The user needs
-   to decide whether to proceed to `/implement` or revise upstream artifacts.
+   to decide whether to proceed to `mage:implement` or revise upstream artifacts.
 
 ## Analysis template
 
@@ -131,7 +131,7 @@ index`). Does NOT modify the spec/plan/tasks — those updates are up to the use
 - **Warnings**: <N>
 - **Notes**: <N>
 
-If Blockers > 0, do NOT proceed to /implement. Revise the upstream artifact.
+If Blockers > 0, do NOT proceed to mage:implement. Revise the upstream artifact.
 
 ## Blockers
 

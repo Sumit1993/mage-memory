@@ -9,9 +9,9 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash
 disable-model-invocation: true
 ---
 
-<!-- Adapted from github/spec-kit (/tasks command), MIT licensed. See ATTRIBUTION.md. -->
+<!-- Adapted from github/spec-kit (mage:tasks command), MIT licensed. See ATTRIBUTION.md. -->
 
-# /tasks — generate ordered, actionable tasks from a plan
+# mage:tasks — generate ordered, actionable tasks from a plan
 
 Spec-Driven Development is one authoring path within mage, a portable file-based
 knowledge base. The task list is a note (`type: tasks`) living in the same
@@ -40,7 +40,7 @@ needed to implement the feature, grouped by user story and execution phase.
 
 ## When to invoke
 
-After `/plan` has produced `plan.md`. Before `/implement` can run anything.
+After `mage:plan` has produced `plan.md`. Before `mage:implement` can run anything.
 
 ## Workflow
 
