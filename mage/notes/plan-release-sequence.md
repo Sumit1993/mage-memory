@@ -28,8 +28,8 @@ concrete things cheaply; don't build a grill-gated feature until its design is l
 | Release | Theme | ADRs | Dep | Grill? |
 |---|---|---|---|---|
 | **0.0.2** | Recursive hub scan + wings generalize *(shipped)* | 0011, 0012 | — | locked |
-| **0.0.3** | Skills ship as a Claude Code **plugin** (`mage:` namespace, bare names); `mage init` prints `/plugin install`; ship `skills` + `.claude-plugin` in `files[]` | 0013 | 0.0.2 | locked |
-| **0.0.4** | `mage learn --from`: bulk distill (prose/transcripts) + **ingest existing skills** (adopt-in-place) + **feeder** skeleton + **Redaction Gate 2** | 0013, 0014, 0005, 0004 | 0.0.2 | locked |
+| **0.0.3** | Skills ship as a Claude Code **plugin** (`mage:` namespace, bare names); `mage init` prints `/plugin install`; ship `skills` + `.claude-plugin` in `files[]`. **Pulled forward: Redaction Gate 2 (`mage redact`, ADR-0014) + the `mage:learn --from` skill prose** *(shipped)* | 0013, 0014 | 0.0.2 | shipped |
+| **0.0.4** | `mage learn --from` ingest **tooling**: deterministic source enumeration, adopt-in-place skill ingest, **feeder** (ECC/native) skeleton — the runtime helpers behind the skill prose already shipped in 0.0.3 | 0013, 0005, 0004 | 0.0.3 | locked |
 | **0.0.5** | Dream tuning + **context-match metrics, read-only** (flag reword/demote — no auto-edit) | 0007, 0013 | 0.0.4 | locked |
 | **0.0.6** | MCP recall accelerator *(independent track)* | 0009 | 0.0.2 | **grill** |
 | **0.0.7** | `mage observe` → `.learnings/*.jsonl` (keystone) + **skill-load events** + **Redaction Gate 1** | 0009, 0014, 0013 | 0.0.2 | **grill** |
