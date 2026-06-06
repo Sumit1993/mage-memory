@@ -76,6 +76,22 @@ files*, the human *commits the diff*. ADR-0006's "promotion deferred until wings
 proliferate" trigger is satisfied naturally: wings proliferate across the 0.0.x ladder
 before the self-grooming release (0.0.8) lands.
 
+## Release discipline — dogfood before publish
+
+Every release is **used locally before it ships.** `pnpm test` verifies logic in
+isolation, but mage's runtime surface — hook-invoked commands reading real stdin, real
+`.learnings/` writes, KB/root resolution from a real `cwd`, redaction on real payloads,
+file rotation — only reveals bugs when actually run. **Definition of done, per release:**
+
+1. `pnpm test` + `pnpm typecheck` + `pnpm build` green.
+2. **Smoke the new capability against real inputs** — e.g. pipe real Claude Code hook
+   JSON into `mage observe` and inspect the output; include a **planted secret** (confirm
+   Gate-1 redaction) and **malformed input** (confirm it never crashes the host).
+3. **Run it for real in this repo** — mage dogfoods on its own `mage/` KB. From 0.0.6
+   (`connect`) this is automatic; before that, wire one temporary hook by hand (which
+   also pre-validates connect's payload→event mapping). Remove the temp hook after.
+4. Only then tag + `npm publish`.
+
 ## Grills to run (remaining: 4 — one tiny, the rest mechanics)
 
 The 2026-06-06 observe grill ([ADR-0015](../decisions/0015-mage-observe-capture-schema.md)
@@ -86,7 +102,7 @@ every remaining grill is now scoped to *mechanics only* — what each release st
 decide, below.
 
 - **0.0.5 observe** — **GRILLED ✓ + locked** ([ADR-0015](../decisions/0015-mage-observe-capture-schema.md)/[ADR-0016](../decisions/0016-context-match-confidence-ladder-applier.md)); also landed the [ADR-0014](../decisions/0014-two-gate-redaction.md) redaction reframe + [CONVENTIONS §10](../../CONVENTIONS.md). **Build next, no grill.**
-- **0.0.6 connect** *(small)* — `.claude/settings.json` merge/uninstall contract (GEN marker, `id:"mage:*"`), per-harness event→observe mapping, homunculus disable-on-loop interlock. *(Hook-block shape + command taxonomy already locked in ADR-0015 §6 / CONVENTIONS §10; ECC `settings.json` is the template. Metrics half is locked — ADR-0016.)*
+- **0.0.6 connect** *(small)* — `.claude/settings.json` merge/uninstall contract (GEN marker, `id:"mage:*"`), per-harness event→observe mapping, homunculus disable-on-loop interlock. *(Hook-block shape + command taxonomy already locked in ADR-0015 §6 / CONVENTIONS §10; ECC `settings.json` is the template. Metrics half is locked — ADR-0016.)* **0.0.5 dogfood/review findings to carry in:** (a) the `skill_load.match.keywords` derivation (aggregated from a wing's notes) is noisy — it captures ADR ids (`0001`), section headers (`considered`, `consequences`, `relations`), and stale terms (`specshub`); clean it up (stopwords + numerics + ADR-boilerplate filter) before context-match consumes it, else matching is on garbage. (b) **Verify the `PostToolUse` vs `PostToolUseFailure` firing semantics on a real failing tool** — 0.0.5 maps both (failures were being dropped), but if Claude Code fires *both* for one failure we'd double-count; confirm when `connect` wires the real hooks and dedupe if needed.
 - **0.0.7 distill** — JSONL path layout, long-session chunking/token budget, dedup vs INDEX overlap-check, Redaction Gate 2 (commit-boundary), native-memory reconciliation policy.
 - **0.0.8 self-grooming** *(mechanics)* — the cross-cutting is locked (ADR-0016: ladder, applier, held-out gate, context-match). Residual: recurrence/confidence **thresholds** (K, M, rate-floor), the bounded-edit budget ("textual learning rate"), rejected-edit buffer storage, the note→skill graduation **trigger**, decay scoring, consolidate heuristics, prune→archive-vs-delete. *(Build may stage promote→optimize→sweep even though the plan combines them.)*
 - **0.0.9 MCP** — transport (stdio vs Streamable HTTP), tool surface (search/get over INDEX+grep), the no-vector-in-core boundary. *(Independent — grill anytime.)*

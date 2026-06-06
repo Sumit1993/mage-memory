@@ -6,12 +6,14 @@ import { ingestCmd } from "./commands/ingest.js";
 import { type InitMode, type InitVisibility, init } from "./commands/init.js";
 import { link, type Storage } from "./commands/link.js";
 import { list } from "./commands/list.js";
+import { buildObserveCommand } from "./commands/observe.js";
 import { redactCmd } from "./commands/redact.js";
 import { skills } from "./commands/skills-cmd.js";
 import { status } from "./commands/status.js";
 import { unlink } from "./commands/unlink.js";
 import { verify } from "./commands/verify.js";
 import { logger } from "./logger.js";
+import { mageVersion } from "./version.js";
 
 const program = new Command();
 
@@ -20,7 +22,7 @@ program
   .description(
     "A portable, self-maintaining knowledge base for software systems — notes navigable as an Obsidian graph, usable by any AI coding agent",
   )
-  .version("0.0.2");
+  .version(mageVersion());
 
 // ─── init ──────────────────────────────────────────────────────────────────
 program
@@ -143,6 +145,11 @@ program
   .action(async (dir: string, opts: { json?: boolean }) => {
     await ingestCmd(dir, { json: opts.json });
   });
+
+// ─── observe ─────────────────────────────────────────────────────────────────
+// Registration lives next to the handler (commands/observe.ts) so the flag list
+// and the ObserveOptions contract can't drift apart.
+program.addCommand(buildObserveCommand());
 
 // ─── redact ──────────────────────────────────────────────────────────────────
 program

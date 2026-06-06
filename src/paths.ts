@@ -16,6 +16,10 @@ export const INDEX_FILE = "INDEX.md";
 export const IDENTITY_FILE = "IDENTITY.md";
 /** Pre-promotion scratch (git-ignored). */
 export const LEARNINGS_DIR = ".learnings";
+/** Rotated `.learnings/` archives (git-ignored, lives inside LEARNINGS_DIR). */
+export const LEARNINGS_ARCHIVE_DIR = ".archive";
+/** Once-per-day age-purge throttle marker (inside LEARNINGS_DIR). */
+export const LEARNINGS_PURGE_MARKER = ".last-purge";
 /** Per-work-unit raw materials dir name (git-ignored wherever it appears). */
 export const ARTIFACTS_DIRNAME = "artifacts";
 /** Obsidian vault config dir. */

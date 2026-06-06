@@ -110,6 +110,25 @@ export {
   scanIngestSources,
 } from "./ingest.js";
 export {
+  type ObserveOptions,
+  observeCmd,
+} from "./commands/observe.js";
+// Observe schema: the runtime constant is a value export; the rest are type-only
+// (verbatimModuleSyntax requires the split).
+export { OBSERVE_SCHEMA_VERSION } from "./observe/types.js";
+export type {
+  CompactEvent,
+  ObserveEnvelope,
+  ObserveEvent,
+  ObserveEventType,
+  SessionEndEvent,
+  SessionStartEvent,
+  SkillLoadEvent,
+  SkillMatch,
+  ToolUseEvent,
+  UserPromptEvent,
+} from "./observe/types.js";
+export {
   hasLiveSecret,
   redact,
   type SecretFinding,
