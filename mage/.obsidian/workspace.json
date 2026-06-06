@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "INDEX.md",
+                "file": "notes/plan-release-sequence.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "INDEX"
+              "title": "plan-release-sequence"
             }
           }
         ]
@@ -184,5 +184,7 @@
     }
   },
   "active": "6d862d84ec746a78",
-  "lastOpenFiles": []
+  "lastOpenFiles": [
+    "INDEX.md"
+  ]
 }

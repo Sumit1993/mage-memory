@@ -15,6 +15,23 @@ sources:
 
 # 0014 — Two-gate redaction (strip secrets before write, not before display)
 
+> **Amendment (2026-06-06, observe-schema grill).** The "fast/weak Gate 1 + strong
+> Gate 2" framing below is **superseded**: the two gates were originally a hedge for a
+> possibly-poor redactor. With one strong shared `redact()` engine, the distinction is
+> **behaviour at a write boundary, not ruleset strength**. Read the model as:
+> **one redaction engine, applied at every write boundary** — *scrub-and-continue* at
+> the `mage observe` write (gitignored scratch, non-blocking, internal call), *scan +
+> **block*** at the commit write. The commit-boundary check is **not redundant even
+> with a perfect Gate 1**, for three reasons unrelated to regex strength: (a) it scans
+> **bytes Gate 1 never saw** — a note is *authored by the agent* (capture-by-pointer),
+> not a copy of `.learnings/`; (b) **blocking** is only safe at the tracked/shared
+> write; (c) **agent PII judgment** can only run there ([ADR-0009](0009-no-runtime-automation-rides-host-hooks.md)
+> forbids a reasoner in the observe hook). Delivery: the commit check is best run as a
+> **mage-installed git `pre-commit` hook** calling `mage redact --check` (auto, blocking)
+> — so the user never types it; `mage redact` is repositioned as a **plumbing seam**
+> (invoked by the hook / the graduate skill), not a daily verb. See
+> [ADR-0015 §5](0015-mage-observe-capture-schema.md) and [CONVENTIONS §10](../../CONVENTIONS.md).
+
 The self-grooming loop ([ADR-0013](0013-procedure-skills-self-grooming-loop.md))
 moves content from raw observation → tracked, *shared* notes/skills. Secrets and PII
 enter at the **earliest** point — raw transcripts and tool outputs at observe time —

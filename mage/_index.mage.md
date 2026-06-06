@@ -2,7 +2,7 @@
 
 # mage
 
-> 21 notes. Part of the [index](INDEX.md).
+> 23 notes. Part of the [index](INDEX.md).
 
 ### decisions
 
@@ -20,6 +20,8 @@
 - `decision` [0012 — A wing is an optional convention; hubs are standalone-first](decisions/0012-wings-optional-convention-standalone-hubs.md) — 0012, wing, optional, convention, hubs, standalone, first, decision, considered, options, consequences, relations _(reviewed 2026-06-03)_
 - `decision` [0013 — Procedure skills and the self-grooming loop](decisions/0013-procedure-skills-self-grooming-loop.md) — 0013, procedure, skills, self, grooming, loop, decision, considered, options, consequences, relations, mage _(reviewed 2026-06-05)_
 - `decision` [0014 — Two-gate redaction (strip secrets before write, not before display)](decisions/0014-two-gate-redaction.md) — 0014, two, gate, redaction, strip, secrets, before, write, display, decision, considered, options _(reviewed 2026-06-05)_
+- `decision` [0015 — `mage observe`: the capture schema (the keystone `.jsonl`)](decisions/0015-mage-observe-capture-schema.md) — 0015, mage, observe, capture, schema, keystone, jsonl, decision, considered, options, consequences, relations _(reviewed 2026-06-06)_
+- `decision` [0016 — Context-match, the confidence ladder, and the single applier](decisions/0016-context-match-confidence-ladder-applier.md) — 0016, context, match, confidence, ladder, single, applier, decision, considered, options, consequences, relations _(reviewed 2026-06-06)_
 
 ### design
 

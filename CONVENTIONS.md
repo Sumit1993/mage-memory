@@ -272,6 +272,36 @@ skills from other tools — the namespace protects you inside Claude Code, not o
 
 ---
 
+## 10. Command tiers (what humans type vs what machinery invokes)
+
+mage's CLI is one binary but **three tiers**, sorted by the deterministic/judgment line
+([ADR-0009](mage/decisions/0009-no-runtime-automation-rides-host-hooks.md)): a hook may
+*fire* a deterministic command or *nudge* a judgment skill, but **never reasons itself**.
+
+| Tier | Commands | Invoked by | Notes |
+|---|---|---|---|
+| **Hook-fired** (plumbing seams) | `observe`, `index --if-changed`, `skills`, `verify --check`, `redact --check` | host hooks · git pre-commit · the graduate skill | Deterministic. **Users never type these.** They are commands only because hooks/skills/git reach mage across a process boundary. |
+| **Judgment — nudged** | `learn`, `dream`, (future) `promote`, `optimize` | the agent, *nudged* by a hook | The hook prints a nudge; the **agent** reasons. Never blindly auto-run. |
+| **Human verbs** | `init`, `connect`, `doctor`, `status`, `list`, `link`, `unlink` | a person | Setup + read-only queries + judgment-invoked mutations. |
+
+**Guardrails (all tiers):**
+- **Never auto-commit.** Hook-fired `index`/`skills`/`verify` *write* files (auto-write
+  is allowed, [ADR-0013](mage/decisions/0013-procedure-skills-self-grooming-loop.md) §4);
+  the human always commits the diff.
+- **No double-observe:** if mage's observe hook is on, the host's own observer (e.g. ECC
+  homunculus) must be off — they would both capture.
+- **Batch, don't spam:** accumulate changed note-paths during a turn; run `mage index`
+  **once at `Stop`**, not after every edit.
+- **async + short timeout** on every non-blocking hook, so mage never stalls the turn.
+
+Because mage ships as an npm `bin`, hook command lines are clean one-liners
+(`mage observe …`) — no plugin-root resolution. The `mage connect` adapter (0.0.8)
+writes the hook block (host `settings.json`), `id:"mage:*"`-prefixed for clean uninstall.
+
+There is **no `mage clean`** — `.learnings/` rotation + purge are internal to `mage observe`.
+
+---
+
 ## Example note
 
 Path: `mage/notes/billing/stripe-webhook-idempotency.md`
