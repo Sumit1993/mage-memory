@@ -9,7 +9,7 @@
 ![License](https://img.shields.io/badge/License-MIT-blue?style=flat)
 ![Node](https://img.shields.io/badge/Node-%3E%3D18-339933?style=flat&logo=node.js)
 ![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey?style=flat)
-![Status](https://img.shields.io/badge/status-0.0.3-orange?style=flat)
+![Status](https://img.shields.io/badge/status-0.0.6-orange?style=flat)
 
 ## What it does
 
@@ -124,6 +124,8 @@ mage/
 ├── archive/            retired notes
 ├── INDEX.md            GENERATED always-loaded index (run `mage index`)
 ├── _index.<wing>.md    GENERATED per-wing index (hierarchical mode) — reserved name
+├── .learnings/         GENERATED capture scratch (git-ignored; `mage observe`)
+├── .metrics/           GENERATED context-match rollup (git-ignored; `mage skills --metrics`)
 ├── .obsidian/          Obsidian vault config
 └── metadata.json       schema "mage.v1"; mode "in-repo" | "external"
 ```
@@ -156,7 +158,10 @@ Typed relations between notes go in a `## Relations` section, e.g.
 |---------|---------|
 | `mage init [name]` | Create a knowledge base. No name → detect: in a git repo, an in-repo `mage/`; otherwise a standalone hub in the current dir. A `name`/path → a hub there (like `git init`). Force with `--in-repo` / `--hub`. |
 | `mage index` | Regenerate the always-loaded index (and per-wing indexes in hierarchical mode). Never hand-edit the output. |
-| `mage skills` | (Re)generate the per-wing `mage-wing-<x>` skills into `.claude/skills/` + `.agents/skills/` so agents discover this knowledge base. |
+| `mage skills` | (Re)generate the per-wing `mage-wing-<x>` skills into `.claude/skills/` + `.agents/skills/` so agents discover this knowledge base. `mage skills --metrics` prints the read-only context-match report (`--json`, `--quiet`). |
+| `mage ingest <dir>` | Enumerate + classify ingestable sources under `<dir>` (read-only) — what `mage:learn --from` distills into notes. |
+| `mage observe` | Hook-fired capture seam: read a Claude Code hook event on stdin and append one normalized event to `.learnings/` (plumbing — wired by `mage connect`, not run by hand; never blocks the host). |
+| `mage connect` / `mage disconnect` | Opt-in: wire (or remove) mage's capture hooks in `.claude/settings.local.json` (`--user` for `~/.claude/settings.json`). Idempotent, backs up to `.bak`, refuses malformed JSON. |
 | `mage redact <file>` | Scan/strip secrets from a file or stdin — redaction Gate 2 before a note/skill is written. |
 | `mage dream` | Report knowledge-base health, read-only: stale, superseded-but-active, dangling links, orphan notes. |
 | `mage link <hub>` | Register this repo's knowledge base with an external hub (hybrid). |
@@ -167,6 +172,40 @@ Typed relations between notes go in a `## Relations` section, e.g.
 | `mage doctor` | Diagnose the environment (Node, git, Obsidian config, skills install). |
 
 Run `mage <command> --help` for per-command flags.
+
+## Auto-capture (opt-in)
+
+From 0.0.5–0.0.6 mage can **learn from what agents actually do** — with no server
+and no background process. It rides the host agent's **hooks**:
+
+- **`mage observe`** is a hook-fired seam that turns one Claude Code hook event
+  into one normalized line in a git-ignored `mage/.learnings/<session>.jsonl`
+  scratch — a *salient extract* (which tool, which files, which skill loaded, the
+  prompt's intent), **never a transcript copy**. Free-text fields are scrubbed at
+  capture (redaction **Gate 1** — fail-open, it never blocks the host).
+- **`mage connect`** wires those hooks into Claude Code's gitignored, per-repo
+  `.claude/settings.local.json` (or `~/.claude/settings.json` with `--user`).
+  It's **strictly opt-in** — capture is *not* bundled with the skills plugin —
+  idempotent, `.bak`-safe, and refuses to touch malformed JSON. `mage disconnect`
+  removes exactly what it added.
+- **`mage skills --metrics`** reports **context-match**, read-only: when a skill
+  auto-loaded, did the work that followed actually touch its wing/keywords? The
+  tally lives in a git-ignored `mage/.metrics/` rollup that outlives the scratch
+  purge. It only *flags* a weak trigger — it never edits a skill.
+
+The `.learnings/` schema is harness-neutral, so other agents become additive
+capture adapters later; Claude Code ships first. **Metrics and raw capture never
+enter git** — only the human-committed notes they motivate do.
+
+### Redaction — two gates
+
+mage scrubs secrets and PII at every write that could escape the machine.
+**Gate 1** is the fast scrub at capture (`mage observe` → `.learnings/`,
+fail-open); **Gate 2** (`mage redact`) is a stronger deterministic scan at the
+commit boundary, where a miss becomes shared. The detector covers private keys,
+cloud and provider tokens (AWS, GitHub, GitLab, Stripe, Google, npm, OpenAI,
+Anthropic), JWTs, bearer tokens, `KEY=VALUE` / env-style secrets, high-entropy
+blobs, and emails.
 
 ## Modes
 
@@ -216,12 +255,22 @@ awareness skill teaches agents the same rule.
 
 ## Status
 
-v0.0.3. Early and evolving — the note model, command surface, and skills are
-documented here and reflect the actual CLI. 0.0.3 ships mage's skills as a Claude
-Code **plugin** (the `mage:` namespace keeps names clean) and adds `mage redact`
-(secret/PII scanning, ADR-0014). 0.0.2 made the scanner recurse the whole vault
-(hub `projects/` are indexed), generalized wings (optional, multi-home), and added
-a detection-first `mage init` with standalone hubs. Expect refinement.
+v0.0.6. Early and evolving — the note model, command surface, and skills here
+reflect the actual CLI. Recent releases:
+
+- **0.0.6** — `mage connect` / `mage disconnect` (opt-in host-hook adapter) +
+  read-only context-match metrics (`mage skills --metrics`, `mage/.metrics/`
+  rollup) + a dedicated Anthropic-key redaction detector.
+- **0.0.5** — `mage observe`, the hook-fired capture seam
+  (`.learnings/*.jsonl`) + redaction **Gate 1** (scrub at capture).
+- **0.0.4** — `mage ingest`: deterministic enumeration of ingestable sources
+  behind `mage:learn --from`.
+- **0.0.3** — skills ship as a Claude Code **plugin** (the `mage:` namespace) +
+  `mage redact` (Gate 2, ADR-0014).
+- **0.0.2** — the scanner recurses the whole vault (hub `projects/` indexed),
+  wings generalized (optional, multi-home), detection-first `mage init` + hubs.
+
+Expect refinement.
 
 ## License
 
