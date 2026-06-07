@@ -9,5 +9,8 @@ coverage/
 .tsbuildinfo
 mage/**/artifacts/
 mage/.learnings/
+mage/.metrics/
+# `mage connect` writes an advisory .bak beside the (already-ignored) local settings.
+.claude/settings.local.json.bak
 # repo-root Obsidian UI state (the tracked KB vault config lives at mage/.obsidian/)
 /.obsidian/

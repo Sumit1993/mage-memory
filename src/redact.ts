@@ -82,6 +82,17 @@ const DETECTORS: readonly Detector[] = [
     re: /\bglpat-[A-Za-z0-9_-]{20,255}\b/g,
   },
   {
+    // Anthropic API keys: `sk-ant-<kind>-<base64url body>` (the kind is e.g.
+    // `api03`/`admin01`). The body contains `-` and `_`, which the generic
+    // high-entropy detector splits on — leaving the `sk-ant-…` prefix and the
+    // first chunk un-redacted (a partial leak). A dedicated detector claims the
+    // WHOLE key first (specific before the generic `sk-` + high-entropy ones), so
+    // nothing leaks — the most relevant key type for a Claude-facing tool.
+    kind: "anthropic-key",
+    severity: "secret",
+    re: /\bsk-ant-[a-z0-9]{2,20}-[A-Za-z0-9_-]{20,250}/g,
+  },
+  {
     // OpenAI keys: classic `sk-…` and scoped `sk-proj-…`/`sk-svcacct-…`/`sk-admin-…`.
     // Min 32-char body matches real key lengths and skips short fabricated examples
     // (e.g. `sk-xxxxxxxxxxxxxxxxxxxx`) that would otherwise false-block doc commits.

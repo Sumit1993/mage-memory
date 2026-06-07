@@ -52,6 +52,12 @@ const POSITIVES: ReadonlyArray<{ kind: string; text: string }> = [
     text: "github_pat_11ABCDE0000aaaaBBBBcc_0123456789abcdefghijABCDEFGH",
   },
   {
+    // Anthropic key: sk-ant-<kind>-<body with - and _>. Whole key must redact,
+    // not just the high-entropy tail (regression guard for the prefix leak).
+    kind: "anthropic-key",
+    text: "sk-ant-api03-a8Kd2Bf9xQ7zR1mN4pL6vW3cY5tH0jG-_uE8sA2dF1bC9nM7kP3qX6wZ4yT5rV0oI2eU4hB1lJ_QQAA",
+  },
+  {
     kind: "slack-token",
     text: tok("xox", "b-0000000000-0000000000-abcdefghijklmnopqrstuvwx"),
   },
@@ -89,6 +95,7 @@ const RAW_SECRETS: ReadonlyArray<string> = [
   "abcdefghijklmnopqrstuvwxyz0123456789ABCD",
   "ghp_0123456789abcdefghijklmnopqrstuvwxyzABCD",
   "github_pat_11ABCDE0000aaaaBBBBcc_0123456789abcdefghijABCDEFGH",
+  "sk-ant-api03-a8Kd2Bf9xQ7zR1mN4pL6vW3cY5tH0jG-_uE8sA2dF1bC9nM7kP3qX6wZ4yT5rV0oI2eU4hB1lJ_QQAA",
   tok("xox", "b-0000000000-0000000000-abcdefghijklmnopqrstuvwx"),
   tok("sk_", "live_0123456789abcdefABCDEFGH"),
   "AIzaSyA0123456789abcdefghijklmnopqrstuv",
@@ -128,6 +135,17 @@ describe("scanSecrets — one positive per detector kind (real-shaped fakes)", (
 });
 
 // ─── env-secret family + a documented detector gap ───────────────────────────
+
+describe("redact — Anthropic keys (regression: no prefix leak)", () => {
+  it("redacts the WHOLE sk-ant- key including the sk-ant-api03- prefix", () => {
+    const key =
+      "sk-ant-api03-a8Kd2Bf9xQ7zR1mN4pL6vW3cY5tH0jG-_uE8sA2dF1bC9nM7kP3qX6wZ4yT5rV0oI2eU4hB1lJ_QQAA";
+    const { text } = redact(`my token is ${key} ok`);
+    expect(text).toContain("[REDACTED:anthropic-key]");
+    expect(text).not.toContain("sk-ant-api03-");
+    expect(text).not.toContain(key.slice(0, 40));
+  });
+});
 
 describe("scanSecrets — env-style assignments", () => {
   it("flags OPENAI_KEY= as env-secret", () => {

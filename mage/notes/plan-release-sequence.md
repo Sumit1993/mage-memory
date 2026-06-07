@@ -34,15 +34,16 @@ splits collapsed). **Status** tracks where each release stands.
 | **0.0.2** | Recursive hub scan + wings generalize | 0011, 0012 | — | locked | **shipped** |
 | **0.0.3** | Skills ship as a Claude Code **plugin** (`mage:` namespace, bare names); `mage init` prints `/plugin install`; ship `skills` + `.claude-plugin` in `files[]`. **Pulled forward: Redaction Gate 2 (`mage redact`, ADR-0014) + the `mage:learn --from` skill prose** | 0013, 0014 | 0.0.2 | locked | **shipped** |
 | **0.0.4** | `mage learn --from` ingest **tooling**: deterministic source enumeration, adopt-in-place skill ingest, **feeder** (ECC/native) skeleton — the runtime helpers behind the skill prose already shipped in 0.0.3 | 0013, 0005, 0004 | 0.0.3 | locked | **shipped¹** |
-| **0.0.5** | **`mage observe`** → `.learnings/*.jsonl` (keystone) + **skill-load events** + **Redaction Gate 1** | 0009, 0014, 0013, 0015 | 0.0.4 | locked | **next** |
-| **0.0.6** | **connect/disconnect** (hook adapter → `settings.local.json`, `id:"mage:*"`) + **context-match metrics, read-only** via `mage skills --metrics` + `mage/.metrics/` rollup (per-turn fold) + keyword-derivation fix | 0009, 0005, 0015, 0016, **0017** | 0.0.5 | locked | next |
+| **0.0.5** | **`mage observe`** → `.learnings/*.jsonl` (keystone) + **skill-load events** + **Redaction Gate 1** | 0009, 0014, 0013, 0015 | 0.0.4 | locked | **shipped** |
+| **0.0.6** | **connect/disconnect** (hook adapter → `settings.local.json`, `id:"mage:*"`) + **context-match metrics, read-only** via `mage skills --metrics` + `mage/.metrics/` rollup (per-turn fold) + keyword-derivation fix | 0009, 0005, 0015, 0016, **0017** | 0.0.5 | locked | **built²** |
 | **0.0.7** | **distill**: `mage:learn` ingest `.learnings/` + native/ECC feeders | 0005, 0009, 0004, 0015 | 0.0.6 | **grill** | planned |
 | **0.0.8** | **self-grooming**: promote-on-recurrence + **note→skill graduation** + `/mage-optimize` auto-reword + full `/dream` healing sweep (**dream applies** graduation/demotion) | 0006, 0013, 0005, 0016 | 0.0.7 | **grill** *(mechanics)* | planned |
 | **0.0.9** | **MCP recall** accelerator *(independent track)* | 0009 | 0.0.2 | **grill** | planned |
 | **0.0.10** | **polish**: Obsidian dashboards + **icon/visualization** + pre-release chores | 0010, 0013 | — | locked | planned |
 | **→ 0.1.0** | **Milestone: portable, self-grooming memory — the cut** | — | all | — | — |
 
-¹ tagged + GitHub-released; npm still at 0.0.3. · *Status legend:* **shipped · next · planned** (add `building`/`grilled` in flight).
+¹ tagged + GitHub-released; npm still at 0.0.3. · *Status legend:* **shipped · next · planned** (add `building`/`grilled`/`built` in flight).
+² 0.0.6 **built + dogfooded 2026-06-07** (383 tests; connect/disconnect, read-only context-match metrics via `mage skills --metrics` + `mage/.metrics/` rollup, keyword-derivation fix). Dogfood pulled in a **redaction hardening**: a dedicated `anthropic-key` detector — `sk-ant-` keys were partially leaking past the generic high-entropy detector ([gotcha](redaction-anthropic-key-detector.md)). **Live-connected + real-hook dogfooded 2026-06-07**: the wired hooks auto-fired in a real session — `user_prompt`, `tool_use` (incl. a real `ok:false` Read failure), and a real `skill_load` (wing=mage, trigger_hash + keyword snapshot) all captured correctly; the metrics fold correctly held the `skill_load` until its forward window closes. **Carry-in RESOLVED:** a single tool failure yields exactly **one** event — Claude Code does not double-fire `PostToolUse` + `PostToolUseFailure`, so no dedup is needed. **Pending tag + npm publish.**
 
 ## Critical path (what gates everything)
 

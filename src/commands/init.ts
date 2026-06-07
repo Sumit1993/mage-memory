@@ -168,7 +168,11 @@ async function initInRepo(codeRepo: string, project: string): Promise<void> {
   logger.success(`Wrote ${metadataPath(codeRepo)}`);
 
   // Git-ignore raw artifacts + pre-promotion scratch; track everything else (ADR-0003).
-  const added = await ensureGitignored(codeRepo, ["mage/**/artifacts/", "mage/.learnings/"]);
+  const added = await ensureGitignored(codeRepo, [
+    "mage/**/artifacts/",
+    "mage/.learnings/",
+    "mage/.metrics/",
+  ]);
   if (added.length > 0) logger.detail(`Added .gitignore patterns: ${added.join(", ")}`);
 
   // Portable navigation contract for any agent (AGENTS.md + CLAUDE.md shim).
@@ -287,7 +291,13 @@ async function initStandaloneHub(args: HubArgs): Promise<string> {
   await writeFile(hubMetadataPath(hubDir), `${JSON.stringify(hubMeta, null, 2)}\n`);
   logger.success(`Wrote ${hubMetadataPath(hubDir)}`);
 
-  const added = await ensureGitignored(hubDir, ["**/artifacts/", ".learnings/", "**/.learnings/"]);
+  const added = await ensureGitignored(hubDir, [
+    "**/artifacts/",
+    ".learnings/",
+    "**/.learnings/",
+    ".metrics/",
+    "**/.metrics/",
+  ]);
   if (added.length > 0) logger.detail(`Added .gitignore patterns: ${added.join(", ")}`);
 
   await writeAgentsMd(hubDir, { docsRel: ".", kind: "hub" });

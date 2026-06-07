@@ -2,7 +2,7 @@
 
 # mage
 
-> 24 notes. Part of the [index](INDEX.md).
+> 25 notes. Part of the [index](INDEX.md).
 
 ### decisions
 
@@ -32,6 +32,10 @@
 
 - `principle` [mage v0.1 — finalized locks (read alongside PLAN-v0.1.md)](notes/plan-v0.1-locks.md) — naming, brand, mage, npm, package, mage-memory, bin, locks, authority, schema _(reviewed 2026-06-01)_
 - `plan` [mage v0.1 — detailed implementation plan](notes/plan-v0.1.md) — plan, milestones, fork, vault, note-model, index, skills, v0.1, build _(archived · reviewed 2026-06-01)_
+
+### redaction
+
+- `gotcha` [Gotcha — key bodies with `-`/`_` partially leak past the high-entropy detector](notes/redaction-anthropic-key-detector.md) — gotcha, key, bodies, partially, leak, past, high, entropy, detector, mage, redaction _(reviewed 2026-06-07)_
 
 ### roadmap
 

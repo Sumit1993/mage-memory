@@ -1,0 +1,303 @@
+import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+import {
+  type ClaudeSettings,
+  MAGE_HOOKS,
+  MAGE_ID_PREFIX,
+  readClaudeSettings,
+  removeMageHooks,
+  resolveSettingsTarget,
+  upsertMageHooks,
+  writeClaudeSettings,
+} from "./claude-settings.js";
+
+const made: string[] = [];
+afterEach(async () => {
+  for (const d of made.splice(0)) await rm(d, { recursive: true, force: true });
+});
+
+async function tmp(): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), "mage-settings-"));
+  made.push(dir);
+  return dir;
+}
+
+describe("MAGE_HOOKS table", () => {
+  it("wires exactly the seven expected event/id/command rows", () => {
+    expect(MAGE_HOOKS).toEqual([
+      { event: "SessionStart", id: "mage:observe:SessionStart", command: "mage observe" },
+      { event: "UserPromptSubmit", id: "mage:observe:UserPromptSubmit", command: "mage observe" },
+      { event: "PostToolUse", id: "mage:observe:PostToolUse", command: "mage observe" },
+      {
+        event: "PostToolUseFailure",
+        id: "mage:observe:PostToolUseFailure",
+        command: "mage observe",
+      },
+      { event: "PreCompact", id: "mage:observe:PreCompact", command: "mage observe" },
+      { event: "SessionEnd", id: "mage:observe:SessionEnd", command: "mage observe" },
+      { event: "Stop", id: "mage:metrics:Stop", command: "mage skills --metrics --quiet" },
+    ]);
+  });
+
+  it("every id begins with the mage prefix", () => {
+    for (const h of MAGE_HOOKS) expect(h.id.startsWith(MAGE_ID_PREFIX)).toBe(true);
+  });
+});
+
+describe("resolveSettingsTarget", () => {
+  it("user scope targets ~/.claude/settings.json", () => {
+    const t = resolveSettingsTarget({ user: true });
+    expect(t.scope).toBe("user");
+    expect(t.path.endsWith(join(".claude", "settings.json"))).toBe(true);
+  });
+
+  it("local scope targets <cwd>/.claude/settings.local.json", () => {
+    const t = resolveSettingsTarget({ cwd: "/some/repo" });
+    expect(t.scope).toBe("local");
+    expect(t.path).toBe(join("/some/repo", ".claude", "settings.local.json"));
+  });
+
+  it("local scope defaults cwd to process.cwd()", () => {
+    const t = resolveSettingsTarget({});
+    expect(t.scope).toBe("local");
+    expect(t.path).toBe(join(process.cwd(), ".claude", "settings.local.json"));
+  });
+});
+
+describe("readClaudeSettings", () => {
+  it("ENOENT -> {null, existed:false, malformed:false}", async () => {
+    const dir = await tmp();
+    const r = await readClaudeSettings(join(dir, "nope.json"));
+    expect(r).toEqual({ settings: null, existed: false, malformed: false });
+  });
+
+  it("malformed JSON -> {null, existed:true, malformed:true}", async () => {
+    const dir = await tmp();
+    const p = join(dir, "settings.json");
+    await writeFile(p, "{ not json");
+    const r = await readClaudeSettings(p);
+    expect(r).toEqual({ settings: null, existed: true, malformed: true });
+  });
+
+  it("valid JSON -> {parsed, existed:true, malformed:false}", async () => {
+    const dir = await tmp();
+    const p = join(dir, "settings.json");
+    await writeFile(p, JSON.stringify({ permissions: { allow: ["X"] } }));
+    const r = await readClaudeSettings(p);
+    expect(r.existed).toBe(true);
+    expect(r.malformed).toBe(false);
+    expect(r.settings).toEqual({ permissions: { allow: ["X"] } });
+  });
+});
+
+describe("upsertMageHooks", () => {
+  it("creates hooks from absent and preserves unknown top-level keys", () => {
+    const original: ClaudeSettings = { permissions: { allow: ["Read(/x)"] } };
+    const merged = upsertMageHooks(original);
+
+    // unknown top-level key survives untouched
+    expect(merged.permissions).toEqual({ allow: ["Read(/x)"] });
+    // hooks created
+    expect(merged.hooks).toBeDefined();
+    for (const h of MAGE_HOOKS) {
+      const groups = merged.hooks?.[h.event] ?? [];
+      const mine = groups.find((g) => g.id === h.id);
+      expect(mine).toBeDefined();
+      expect(mine?.matcher).toBeUndefined();
+      expect(mine?.hooks).toEqual([{ type: "command", command: h.command }]);
+    }
+  });
+
+  it("is pure — does not mutate the input", () => {
+    const original: ClaudeSettings = { permissions: { allow: ["Read(/x)"] } };
+    const snapshot = structuredClone(original);
+    upsertMageHooks(original);
+    expect(original).toEqual(snapshot);
+    expect(original.hooks).toBeUndefined();
+  });
+
+  it("accepts null and produces a settings object with hooks", () => {
+    const merged = upsertMageHooks(null);
+    expect(merged.hooks).toBeDefined();
+    expect(merged.hooks?.SessionStart?.[0]?.id).toBe("mage:observe:SessionStart");
+  });
+
+  it("preserves non-mage groups and other events on the same event key", () => {
+    const original: ClaudeSettings = {
+      hooks: {
+        SessionStart: [{ matcher: "*", hooks: [{ type: "command", command: "user-tool" }] }],
+        UserPromptSubmit: [{ hooks: [{ type: "command", command: "other" }] }],
+      },
+    };
+    const merged = upsertMageHooks(original);
+
+    const ss = merged.hooks?.SessionStart ?? [];
+    // the user's non-mage group survives
+    expect(ss.find((g) => g.command === undefined && g.hooks[0]?.command === "user-tool")).toBeTruthy();
+    // mage group appended
+    expect(ss.find((g) => g.id === "mage:observe:SessionStart")).toBeTruthy();
+    expect(ss.length).toBe(2);
+  });
+
+  it("is idempotent — re-upsert produces no duplicate mage groups", () => {
+    const once = upsertMageHooks(null);
+    const twice = upsertMageHooks(once);
+    for (const h of MAGE_HOOKS) {
+      const groups = twice.hooks?.[h.event] ?? [];
+      const mine = groups.filter((g) => g.id === h.id);
+      expect(mine.length).toBe(1);
+    }
+    expect(twice).toEqual(once);
+  });
+
+  it("replace-by-id updates a changed command (no stale dupe)", () => {
+    // simulate a previously-wired settings whose stored command drifted
+    const stale: ClaudeSettings = {
+      hooks: {
+        SessionStart: [
+          {
+            id: "mage:observe:SessionStart",
+            hooks: [{ type: "command", command: "mage observe --old" }],
+          },
+        ],
+      },
+    };
+    const merged = upsertMageHooks(stale);
+    const groups = merged.hooks?.SessionStart ?? [];
+    const mine = groups.filter((g) => g.id === "mage:observe:SessionStart");
+    expect(mine.length).toBe(1);
+    expect(mine[0]?.hooks).toEqual([{ type: "command", command: "mage observe" }]);
+  });
+});
+
+describe("removeMageHooks", () => {
+  it("strips only mage groups, prunes empties, and counts removed", () => {
+    const wired = upsertMageHooks({
+      hooks: {
+        SessionStart: [{ matcher: "*", hooks: [{ type: "command", command: "user-tool" }] }],
+      },
+    });
+    const { settings, removed } = removeMageHooks(wired);
+
+    expect(removed).toBe(MAGE_HOOKS.length);
+    // the user's non-mage group survives
+    const ss = settings.hooks?.SessionStart ?? [];
+    expect(ss.length).toBe(1);
+    expect(ss[0]?.hooks[0]?.command).toBe("user-tool");
+    // events that held only mage groups are pruned entirely
+    expect(settings.hooks?.Stop).toBeUndefined();
+    expect(settings.hooks?.PostToolUse).toBeUndefined();
+  });
+
+  it("prunes the hooks{} key entirely when it becomes empty", () => {
+    const wired = upsertMageHooks({ permissions: { allow: ["X"] } });
+    const { settings, removed } = removeMageHooks(wired);
+    expect(removed).toBe(MAGE_HOOKS.length);
+    expect(settings.hooks).toBeUndefined();
+    // other top-level keys preserved
+    expect(settings.permissions).toEqual({ allow: ["X"] });
+  });
+
+  it("is pure — does not mutate the input", () => {
+    const wired = upsertMageHooks(null);
+    const snapshot = structuredClone(wired);
+    removeMageHooks(wired);
+    expect(wired).toEqual(snapshot);
+  });
+
+  it("null input yields an empty settings and zero removed", () => {
+    const { settings, removed } = removeMageHooks(null);
+    expect(removed).toBe(0);
+    expect(settings).toEqual({});
+  });
+
+  it("ignores groups whose id is not a string or not mage-prefixed", () => {
+    const original: ClaudeSettings = {
+      hooks: {
+        SessionStart: [
+          { id: "other:thing", hooks: [{ type: "command", command: "x" }] },
+          { hooks: [{ type: "command", command: "no-id" }] },
+        ],
+      },
+    };
+    const { settings, removed } = removeMageHooks(original);
+    expect(removed).toBe(0);
+    expect(settings.hooks?.SessionStart?.length).toBe(2);
+  });
+});
+
+describe("round-trip", () => {
+  it("upsert then remove yields the original (minus mage)", () => {
+    const original: ClaudeSettings = {
+      permissions: { allow: ["Read(/x)"] },
+      hooks: {
+        SessionStart: [{ matcher: "*", hooks: [{ type: "command", command: "user-tool" }] }],
+      },
+    };
+    const wired = upsertMageHooks(original);
+    const { settings } = removeMageHooks(wired);
+    expect(settings).toEqual(original);
+  });
+
+  it("upsert then remove on a hooks-less settings restores the bare object", () => {
+    const original: ClaudeSettings = { permissions: { allow: ["X"] } };
+    const wired = upsertMageHooks(original);
+    const { settings } = removeMageHooks(wired);
+    expect(settings).toEqual(original);
+  });
+});
+
+describe("writeClaudeSettings", () => {
+  it("creates parent dirs (mkdir -p) and writes pretty JSON with trailing newline", async () => {
+    const dir = await tmp();
+    const p = join(dir, "nested", "deep", "settings.json");
+    const { backedUp } = await writeClaudeSettings(p, { permissions: { allow: ["X"] } });
+    expect(backedUp).toBe(false);
+    const text = await readFile(p, "utf8");
+    expect(text.endsWith("\n")).toBe(true);
+    expect(JSON.parse(text)).toEqual({ permissions: { allow: ["X"] } });
+    // pretty printed (2-space indent)
+    expect(text).toContain('\n  "permissions"');
+  });
+
+  it("creates a .bak when the file pre-exists, before overwriting", async () => {
+    const dir = await tmp();
+    await mkdir(join(dir, ".claude"), { recursive: true });
+    const p = join(dir, ".claude", "settings.json");
+    await writeFile(p, JSON.stringify({ original: true }));
+
+    const { backedUp } = await writeClaudeSettings(p, { replaced: true });
+    expect(backedUp).toBe(true);
+
+    // .bak holds the PRE-write content
+    const bak = await readFile(`${p}.bak`, "utf8");
+    expect(JSON.parse(bak)).toEqual({ original: true });
+    // the live file holds the new content
+    const live = await readFile(p, "utf8");
+    expect(JSON.parse(live)).toEqual({ replaced: true });
+  });
+});
+
+describe("integration: wire then unwire a real-shaped file", () => {
+  it("merges into a permissions-only file then fully reverts", async () => {
+    const dir = await tmp();
+    await mkdir(join(dir, ".claude"), { recursive: true });
+    const p = join(dir, ".claude", "settings.local.json");
+    const live = { permissions: { allow: ["Read(//home/x/**)"] } };
+    await writeFile(p, `${JSON.stringify(live, null, 2)}\n`);
+
+    const r = await readClaudeSettings(p);
+    expect(r.existed).toBe(true);
+    const merged = upsertMageHooks(r.settings);
+    await writeClaudeSettings(p, merged);
+
+    const after = await readClaudeSettings(p);
+    expect(after.settings?.permissions).toEqual({ allow: ["Read(//home/x/**)"] });
+    expect(after.settings?.hooks?.Stop?.[0]?.id).toBe("mage:metrics:Stop");
+
+    const { settings: reverted } = removeMageHooks(after.settings);
+    expect(reverted).toEqual(live);
+  });
+});

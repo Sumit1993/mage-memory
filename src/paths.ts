@@ -16,6 +16,8 @@ export const INDEX_FILE = "INDEX.md";
 export const IDENTITY_FILE = "IDENTITY.md";
 /** Pre-promotion scratch (git-ignored). */
 export const LEARNINGS_DIR = ".learnings";
+/** Read-only context-match rollup dir (git-ignored, sibling of LEARNINGS_DIR). */
+export const METRICS_DIR = ".metrics";
 /** Rotated `.learnings/` archives (git-ignored, lives inside LEARNINGS_DIR). */
 export const LEARNINGS_ARCHIVE_DIR = ".archive";
 /** Once-per-day age-purge throttle marker (inside LEARNINGS_DIR). */

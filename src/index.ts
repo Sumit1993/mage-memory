@@ -3,6 +3,28 @@
 
 export { type AgentsMdOptions, writeAgentsMd } from "./agents-md.js";
 export {
+  type ClaudeSettings,
+  type HookCommand,
+  type HookGroup,
+  MAGE_HOOKS,
+  MAGE_ID_PREFIX,
+  readClaudeSettings,
+  removeMageHooks,
+  resolveSettingsTarget,
+  upsertMageHooks,
+  writeClaudeSettings,
+} from "./claude-settings.js";
+export {
+  type ConnectOptions,
+  type ConnectResult,
+  connect,
+} from "./commands/connect.js";
+export {
+  type DisconnectOptions,
+  type DisconnectResult,
+  disconnect,
+} from "./commands/disconnect.js";
+export {
   type DoctorCheck,
   type DoctorOptions,
   type DoctorResult,
@@ -113,6 +135,34 @@ export {
   type ObserveOptions,
   observeCmd,
 } from "./commands/observe.js";
+export {
+  isInteractive,
+  type ResolveDecisionArgs,
+  resolveDecision,
+} from "./interactive.js";
+export {
+  computeSessionMatches,
+  DEMOTE_MATCH_RATE,
+  type LoadOutcome,
+  loadMatches,
+  LOW_MATCH_RATE,
+  MATCH_WINDOW,
+  type MatchDimension,
+  MIN_LOADS_FOR_SUGGESTION,
+} from "./metrics/context-match.js";
+export {
+  foldRollup,
+  readRollup,
+  type Rollup,
+  ROLLUP_FILE,
+  rollupPath,
+  ROLLUP_VERSION,
+  type SkillMetricRow,
+  type SkillStat,
+  summarize,
+  writeRollup,
+  METRICS_DIR as ROLLUP_METRICS_DIR,
+} from "./metrics/rollup.js";
 // Observe schema: the runtime constant is a value export; the rest are type-only
 // (verbatimModuleSyntax requires the split).
 export { OBSERVE_SCHEMA_VERSION } from "./observe/types.js";

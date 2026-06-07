@@ -32,6 +32,51 @@ const SKILL_PREFIX = "mage-skill-";
 const MAX_KEYWORDS = 12;
 
 /**
+ * ADR/frontmatter boilerplate words that pollute the context-match keyword signal
+ * (ADR-0017 §8). A note's frontmatter `keywords:` is passed through verbatim by
+ * deriveKeywords (note.ts), so structural words like "adr"/"decision"/"status"
+ * leak into match.keywords and match nothing useful. Dropped at snapshot time.
+ */
+export const KEYWORD_STOPLIST: ReadonlySet<string> = new Set<string>([
+  "adr",
+  "decision",
+  "decisions",
+  "considered",
+  "options",
+  "consequences",
+  "relations",
+  "relation",
+  "status",
+  "active",
+  "note",
+  "notes",
+  "tags",
+  "created",
+  "updated",
+  "provenance",
+  "sources",
+  "source",
+  "todo",
+  "see",
+  "also",
+  "depends",
+  "builds",
+]);
+
+/**
+ * True iff `k` is a usable context-match keyword (ADR-0017 §8). Rejects pure
+ * numerics ("0017", "2026" — ADR numbers and years), sub-3-char tokens, and
+ * ADR/frontmatter boilerplate in KEYWORD_STOPLIST. Applied where wingKeywords
+ * accumulates so numerics/short/boilerplate never reach match.keywords;
+ * deriveKeywords is deliberately left untouched (INDEX.md keywords must not churn).
+ */
+export function isUsableKeyword(k: string): boolean {
+  if (/^\d+$/.test(k)) return false;
+  if (k.length < 3) return false;
+  return !KEYWORD_STOPLIST.has(k);
+}
+
+/**
  * True iff `skillName` is one of mage's OWN skills: a `mage:`-namespaced plugin
  * skill (mage:learn, …) OR a generated `mage-wing-*` / `mage-skill-*` skill.
  * Foreign (third-party) skills → false (recorded skill-only).
@@ -131,6 +176,9 @@ async function wingKeywords(repoRoot: string, wing: string): Promise<string[]> {
     for (const n of notes) {
       if (!n.wings.some((w) => w.wing === wing)) continue;
       for (const k of n.keywords) {
+        // Filter BEFORE the cap so numerics/short/boilerplate (ADR-0017 §8) never
+        // consume one of the MAX_KEYWORDS slots — only usable terms count.
+        if (!isUsableKeyword(k)) continue;
         if (seen.has(k)) continue;
         seen.add(k);
         out.push(k.slice(0, PATH_MAX));

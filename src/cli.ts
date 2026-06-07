@@ -1,4 +1,6 @@
 import { Command, Option } from "commander";
+import { connect } from "./commands/connect.js";
+import { disconnect } from "./commands/disconnect.js";
 import { doctor } from "./commands/doctor.js";
 import { dream } from "./commands/dream-cmd.js";
 import { index } from "./commands/index-cmd.js";
@@ -109,8 +111,19 @@ program
     "-d, --dir <path>",
     "where to look for the knowledge base (default: cwd; walks up for in-repo)",
   )
+  .option(
+    "--metrics",
+    "read-only: fold the context-match rollup and report skill-load match rates (never regenerates skills)",
+  )
+  .option("--json", "metrics mode: emit the rows as JSON instead of a table")
+  .option("--quiet", "metrics mode: fold + write the rollup silently (the Stop-hook path)")
   .action(async (opts) => {
-    await skills({ dir: opts.dir });
+    await skills({
+      dir: opts.dir,
+      metrics: opts.metrics,
+      json: opts.json,
+      quiet: opts.quiet,
+    });
   });
 
 // ─── dream ───────────────────────────────────────────────────────────────────
@@ -268,6 +281,28 @@ program
   .action(async (opts) => {
     const result = await doctor({ hub: opts.hub });
     if (!result.passed) process.exit(1);
+  });
+
+// ─── connect ──────────────────────────────────────────────────────────────
+program
+  .command("connect")
+  .description(
+    "Wire mage capture hooks into this repo's Claude Code settings (.claude/settings.local.json; personal + gitignored)",
+  )
+  .option("--user", "target the personal ~/.claude/settings.json instead of the repo-local file")
+  .option("-y, --yes", "non-interactive: skip the confirmation prompt")
+  .action(async (opts) => {
+    await connect({ user: opts.user, yes: opts.yes });
+  });
+
+// ─── disconnect ───────────────────────────────────────────────────────────
+program
+  .command("disconnect")
+  .description("Remove mage's capture hooks from this repo's Claude Code settings (leaves host hooks intact)")
+  .option("--user", "target the personal ~/.claude/settings.json instead of the repo-local file")
+  .option("-y, --yes", "non-interactive: accepted for symmetry (no destructive prompt)")
+  .action(async (opts) => {
+    await disconnect({ user: opts.user, yes: opts.yes });
   });
 
 // Top-level error handling
