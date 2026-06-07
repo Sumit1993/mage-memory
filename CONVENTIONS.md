@@ -280,23 +280,35 @@ mage's CLI is one binary but **three tiers**, sorted by the deterministic/judgme
 
 | Tier | Commands | Invoked by | Notes |
 |---|---|---|---|
-| **Hook-fired** (plumbing seams) | `observe`, `index --if-changed`, `skills`, `verify --check`, `redact --check` | host hooks · git pre-commit · the graduate skill | Deterministic. **Users never type these.** They are commands only because hooks/skills/git reach mage across a process boundary. |
+| **Hook-fired** (plumbing seams) | `observe`, `skills --metrics --quiet` (Stop rollup fold), `index --if-changed`, `skills`, `verify --check`, `redact --check` | host hooks · git pre-commit · the graduate skill | Deterministic. **Users never type these.** They are commands only because hooks/skills/git reach mage across a process boundary. |
 | **Judgment — nudged** | `learn`, `dream`, (future) `promote`, `optimize` | the agent, *nudged* by a hook | The hook prints a nudge; the **agent** reasons. Never blindly auto-run. |
-| **Human verbs** | `init`, `connect`, `doctor`, `status`, `list`, `link`, `unlink` | a person | Setup + read-only queries + judgment-invoked mutations. |
+| **Human verbs** | `init`, `connect`, `disconnect`, `skills --metrics` (read-only report), `doctor`, `status`, `list`, `link`, `unlink` | a person | Setup + read-only queries + judgment-invoked mutations. |
 
 **Guardrails (all tiers):**
 - **Never auto-commit.** Hook-fired `index`/`skills`/`verify` *write* files (auto-write
   is allowed, [ADR-0013](mage/decisions/0013-procedure-skills-self-grooming-loop.md) §4);
-  the human always commits the diff.
-- **No double-observe:** if mage's observe hook is on, the host's own observer (e.g. ECC
-  homunculus) must be off — they would both capture.
+  the human always commits the diff. The `Stop` metrics fold writes only the gitignored
+  `mage/.metrics/` cache (ADR-0016 §2) — never the catalog, never a commit.
+- **Double-observe is tolerated, not policed** *(amended, [ADR-0017](mage/decisions/0017-mage-connect-host-hook-adapter.md) §5)*:
+  mage and a host's own observer (e.g. ECC homunculus) may coexist — separate files,
+  separate consumers, zero added cost. Consolidate via the feeder path (ingest ECC), not
+  by disabling it. `mage connect` fully ignores it.
 - **Batch, don't spam:** accumulate changed note-paths during a turn; run `mage index`
   **once at `Stop`**, not after every edit.
 - **async + short timeout** on every non-blocking hook, so mage never stalls the turn.
 
-Because mage ships as an npm `bin`, hook command lines are clean one-liners
-(`mage observe …`) — no plugin-root resolution. The `mage connect` adapter (0.0.8)
-writes the hook block (host `settings.json`), `id:"mage:*"`-prefixed for clean uninstall.
+**Interactivity (all human verbs):** dual-mode via a shared `resolveInteractive(opts)`.
+**Non-TTY ⇒ non-interactive**; each decision resolves to an explicit flag or a documented
+safe default, else **fail with a message naming the flag** — never hang, never silently
+guess a consequential choice. So `mage connect --yes` runs in one go (agents); bare
+`mage connect` prompts (humans). Applies to `init`/`link`/`unlink`/`connect`/`disconnect`.
+
+**`mage connect` / `mage disconnect`** ([ADR-0017](mage/decisions/0017-mage-connect-host-hook-adapter.md), 0.0.6):
+because mage ships as an npm `bin`, the wired hook lines are clean one-liners (`mage observe`)
+— no plugin-root resolution. connect writes the hook block to **`.claude/settings.local.json`**
+(per-repo, gitignored; `--user` for `~/.claude/settings.json`), `id:"mage:*"`-prefixed;
+re-running is idempotent (replace-by-id), malformed JSON is refused (never clobbered), and
+a `.bak` is written first. `mage disconnect` removes only the `mage:*` entries.
 
 There is **no `mage clean`** — `.learnings/` rotation + purge are internal to `mage observe`.
 

@@ -48,7 +48,7 @@ Tier 3  auto-capture hooks           mage connect <agent>, per host (the bespoke
 ## Consequences
 
 - Automation is **host-specific** (per-harness adapters); the *notes* stay portable, the *capture* does not. An honest, deliberate split — agents without an adapter fall back to manual `/learn`, losing nothing durable.
-- **No double-observe:** if mage's loop is enabled, the homunculus PreToolUse/PostToolUse hooks must be disabled ([ADR-0005](0005-one-canonical-memory-others-are-feeders.md) / [ADR-0007](0007-mine-agentmemory-design-not-depend.md)).
+- **Double-observe is tolerated, not policed** *(amended 2026-06-06, [ADR-0017](0017-mage-connect-host-hook-adapter.md) §5)*: the original stance — "if mage's loop is enabled, the homunculus PreToolUse/PostToolUse hooks must be disabled" — is **softened**. mage and ECC's observer may **coexist**: separate files, separate formats, separate consumers, and mage adds zero cost to ECC. The durable-layer redundancy is resolved by the **feeder model** ([ADR-0005](0005-one-canonical-memory-others-are-feeders.md): ingest ECC via `mage learn --from`), which beats presuming to disable another tool. `mage connect` therefore **fully ignores ECC** — no detection, no interlock.
 - The deterministic/judgment line is now load-bearing: it governs `/learn`, `/dream`, and auto-capture alike — it is *the* thing that makes mage not agentmemory.
 - Unblocks the roadmap's opt-in auto-capture observe-loop, scheduled `/dream`, and capture-before-compaction — all as host-hook applications, not new runtimes.
 
