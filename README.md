@@ -154,22 +154,32 @@ Typed relations between notes go in a `## Relations` section, e.g.
 
 ## Commands
 
+mage's CLI is one binary but two audiences: **verbs you run**, and **plumbing
+seams the hooks / skills / git invoke for you** (you never type these — they're
+listed for transparency). The deterministic/judgment split behind this is
+[CONVENTIONS §10](CONVENTIONS.md).
+
+### Commands you run
+
 | Command | Purpose |
 |---------|---------|
 | `mage init [name]` | Create a knowledge base. No name → detect: in a git repo, an in-repo `mage/`; otherwise a standalone hub in the current dir. A `name`/path → a hub there (like `git init`). Force with `--in-repo` / `--hub`. |
-| `mage index` | Regenerate the always-loaded index (and per-wing indexes in hierarchical mode). Never hand-edit the output. |
-| `mage skills` | (Re)generate the per-wing `mage-wing-<x>` skills into `.claude/skills/` + `.agents/skills/` so agents discover this knowledge base. `mage skills --metrics` prints the read-only context-match report (`--json`, `--quiet`). |
-| `mage ingest <dir>` | Enumerate + classify ingestable sources under `<dir>` (read-only) — what `mage:learn --from` distills into notes. |
-| `mage observe` | Hook-fired capture seam: read a Claude Code hook event on stdin and append one normalized event to `.learnings/` (plumbing — wired by `mage connect`, not run by hand; never blocks the host). |
 | `mage connect` / `mage disconnect` | Opt-in: wire (or remove) mage's capture hooks in `.claude/settings.local.json` (`--user` for `~/.claude/settings.json`). Idempotent, backs up to `.bak`, refuses malformed JSON. |
-| `mage redact <file>` | Scan/strip secrets from a file or stdin — redaction Gate 2 before a note/skill is written. |
-| `mage dream` | Report knowledge-base health, read-only: stale, superseded-but-active, dangling links, orphan notes. |
-| `mage link <hub>` | Register this repo's knowledge base with an external hub (hybrid). |
-| `mage unlink` | Remove a hub linkage. |
-| `mage verify` | Sanity-check structure, frontmatter, and links. |
-| `mage list` | List notes / work units in the knowledge base. |
-| `mage status` | Report knowledge-base health and pending changes. |
+| `mage link <hub>` / `mage unlink` | Register (or remove) this repo's knowledge base with an external hub (hybrid). |
+| `mage skills --metrics` | Read-only context-match report (`--json` for machine output). |
+| `mage status` / `mage list` / `mage verify` | Read-only: pending changes, note/work-unit listing, structure + frontmatter + link sanity-check. |
 | `mage doctor` | Diagnose the environment (Node, git, Obsidian config, skills install). |
+| `mage dream` | Report knowledge-base health (stale, superseded-but-active, dangling links, orphans). The agent runs this after a nudge; safe to run read-only yourself. |
+
+### Plumbing seams (machinery runs these for you)
+
+| Command | Invoked by | Purpose |
+|---------|-----------|---------|
+| `mage observe` | capture hooks (`mage connect`) | Read a Claude Code hook event on stdin, append one normalized event to `.learnings/`. Never blocks the host. |
+| `mage index` | `Stop` hook · after `mage:learn` | Regenerate the always-loaded `INDEX.md` (+ per-wing indexes). Never hand-edit the output. |
+| `mage skills` | after a new wing appears | Regenerate the per-wing `mage-wing-<x>` skills into `.claude/skills/` + `.agents/skills/`. `--metrics --quiet` folds the metrics rollup at `Stop`. |
+| `mage ingest <dir>` | `mage:learn --from` | Enumerate + classify ingestable sources under a foreign `<dir>` (read-only) — what bulk-import distills into notes. |
+| `mage redact <file>` | `mage:learn` / graduate skill · git pre-commit | Scan/strip secrets from a file or stdin — redaction Gate 2 before a tracked note/skill is written. |
 
 Run `mage <command> --help` for per-command flags.
 
