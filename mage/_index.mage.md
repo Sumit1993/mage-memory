@@ -2,7 +2,7 @@
 
 # mage
 
-> 27 notes. Part of the [index](INDEX.md).
+> 28 notes. Part of the [index](INDEX.md).
 
 ### decisions
 
@@ -24,6 +24,7 @@
 - `decision` [0016 — Context-match, the confidence ladder, and the single applier](decisions/0016-context-match-confidence-ladder-applier.md) — 0016, context, match, confidence, ladder, single, applier, decision, considered, options, consequences, relations _(reviewed 2026-06-06)_
 - `decision` [0017 — `mage connect`: the host hook adapter (capture is opt-in)](decisions/0017-mage-connect-host-hook-adapter.md) — 0017, mage, connect, host, hook, adapter, capture, opt, decision, considered, options, consequences _(reviewed 2026-06-06)_
 - `decision` [0018 — `mage distill`: the observed-scratch reader (capture, on first sight)](decisions/0018-mage-distill-observed-scratch-reader.md) — 0018, mage, distill, observed, scratch, reader, capture, first, sight, decision, considered, options _(reviewed 2026-06-08)_
+- `decision` [0019 — `mage promote`: self-grooming (recurrence, graduation, merge/split)](decisions/0019-mage-promote-self-grooming.md) — 0019, mage, promote, self, grooming, recurrence, graduation, merge, split, decision, considered, options _(reviewed 2026-06-08)_
 
 ### design
 

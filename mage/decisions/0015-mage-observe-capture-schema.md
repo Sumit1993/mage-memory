@@ -61,6 +61,20 @@ is [ADR-0016](0016-context-match-confidence-ladder-applier.md).
    stage, never a deterministic hook), and **add `session_start` + `user_prompt`**
    (context-match needs them).
 
+   > **Amendment (2026-06-08, [ADR-0019](0019-mage-promote-self-grooming.md)).** Add a
+   > seventh event type, **`assistant_msg`** — the agent's **final reply per turn**,
+   > captured at the end-of-turn (`Stop`) hook, `text` redacted+truncated by Gate-1 like
+   > `user_prompt.text`. This is a non-breaking additive type under §1's evolution rule
+   > (no `v` bump; older consumers ignore it). **Why:** a user *correction* ("no, do it
+   > this way") is the highest-signal durable knowledge (ADR-0018 §4), but it only makes
+   > sense against the claim it reacts to — the agent's preceding reply. Capturing that
+   > reply sharpens the correction lens for distill and the recurrence bucket for promote.
+   > **Bounded on purpose:** the *final* reply only (not intermediate reasoning), to cap
+   > scratch size and the redaction surface. **Build-time check:** confirm the `Stop` hook
+   > actually surfaces the final reply (read it from `transcript_path` if not in the
+   > payload) — the same real-session verification that resolved the `PostToolUseFailure`
+   > carry-in.
+
 3. **`skill_load` is a specialization of `tool_use`, needing no new hook.** Modern
    Claude Code loads every skill through the **`Skill` tool**
    (`{"name":"Skill","input":{"skill":"…"}}`) — user-typed *or* model-auto-selected —
