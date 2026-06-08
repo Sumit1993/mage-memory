@@ -79,11 +79,19 @@ interface Seg {
 }
 
 /**
- * Derive a segment's wing from its tool_use paths: the FIRST path segment, under
- * `repoRoot` when the path is absolute+under it, that names a wing directory — i.e.
- * the first non-empty segment after the repo prefix. "" when no tool touched a path.
- * Mirrors context-match's path-segment logic (an absolute path under repoRoot is made
- * relative first, so the repo prefix's own dirs don't masquerade as a wing).
+ * Derive a segment's wing from its tool_use paths: the FIRST *directory* segment,
+ * under `repoRoot` when the path is absolute+under it. "" when no tool touched a path
+ * with a directory component. Mirrors context-match's path-segment logic (an absolute
+ * path under repoRoot is made relative first, so the repo prefix's own dirs don't
+ * masquerade as a wing).
+ *
+ * A wing is a DIRECTORY scope, NEVER a bare leaf filename — the path must have at least
+ * one directory segment before the leaf (segs.length >= 2). A single-segment path (a
+ * repo-root file, or a bare relative filename) names no wing: otherwise every distinct
+ * file becomes its own "wing", which fragments recurrence (the same lesson reached via
+ * different files → different keys, so it never accumulates across sessions) and never
+ * matches a tag-derived note wing → spurious proposals. (Surfaced by the 0.0.8 dogfood:
+ * a `*.md` filename leaked in as the top signature's wing.)
  */
 export function wingFromSegment(
   events: ObserveEvent[],
@@ -95,8 +103,10 @@ export function wingFromSegment(
     if (e === undefined || e.type !== "tool_use") continue;
     for (const p of e.paths) {
       const segs = pathSegments(p, repoRoot);
-      const first = segs[0];
-      if (first !== undefined && first.length > 0) return first;
+      // Require a directory segment before the leaf — a bare filename names no wing.
+      if (segs.length >= 2 && segs[0] !== undefined && segs[0].length > 0) {
+        return segs[0];
+      }
     }
   }
   return "";

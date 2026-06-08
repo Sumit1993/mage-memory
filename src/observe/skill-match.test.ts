@@ -22,6 +22,24 @@ async function putWingSkill(repo: string, name: string, description: string): Pr
   await writeFile(join(dir, "SKILL.md"), `---\nname: ${name}\ndescription: ${description}\n---\n\n# ${name}\n`);
 }
 
+/**
+ * Write a generated graduated (`mage-skill-*`) SKILL.md. Unlike a wing skill, its wing
+ * lives in the frontmatter `wing:` (graduate.ts writes it there) — the name is the slug.
+ */
+async function putGraduatedSkill(
+  repo: string,
+  name: string,
+  wing: string,
+  description: string,
+): Promise<void> {
+  const dir = join(repo, ".claude", "skills", name);
+  await mkdir(dir, { recursive: true });
+  await writeFile(
+    join(dir, "SKILL.md"),
+    `---\nname: ${name}\ndescription: ${description}\nwing: ${wing}\n---\n\n# ${name}\n`,
+  );
+}
+
 /** Seed a real wing note so keyword derivation has a non-boilerplate source. */
 async function putWingNote(repo: string, wing: string): Promise<void> {
   const dir = join(repo, "mage", "notes");
@@ -119,6 +137,45 @@ describe("snapshotSkillMatch — wing/keywords sourced correctly (ADR-0016 §1)"
     const snap = await snapshotSkillMatch(repo, "mage-wing-lonely");
     expect(snap?.match.wing).toBe("lonely");
     expect(snap?.match.keywords).toEqual([]);
+  });
+});
+
+describe("snapshotSkillMatch — graduated mage-skill-* gap (ADR-0016 §3, 0.0.8)", () => {
+  it("reads the wing from a graduated skill's frontmatter and aggregates the wing's keywords", async () => {
+    const repo = await mkTmp();
+    // The wing's notes live under `bar`; the graduated skill is named by its slug, with
+    // `wing: bar` in frontmatter (the field graduate.ts writes).
+    await putWingNote(repo, "bar");
+    await putGraduatedSkill(repo, "mage-skill-foo", "bar", "Foo procedure. Load when foo-ing.");
+
+    const snap = await snapshotSkillMatch(repo, "mage-skill-foo");
+    expect(snap).not.toBeNull();
+    // wing comes from the SKILL.md frontmatter, NOT the name (the name is the slug).
+    expect(snap?.match.wing).toBe("bar");
+    // keywords are aggregated from the wing's real notes, exactly like a wing skill.
+    expect(snap?.match.keywords).toContain("webhook");
+    expect(snap?.match.paths).toEqual([]);
+    expect(snap?.trigger_hash).toBe(triggerHash("Foo procedure. Load when foo-ing."));
+  });
+
+  it("returns null for a graduated skill whose frontmatter has no wing (no notes mapping)", async () => {
+    const repo = await mkTmp();
+    await writeFile(
+      join(await ensureMage(repo), "metadata.json"),
+      JSON.stringify({ schema: "mage.v1", mode: "in-repo" }),
+    );
+    const dir = join(repo, ".claude", "skills", "mage-skill-nowing");
+    await mkdir(dir, { recursive: true });
+    await writeFile(
+      join(dir, "SKILL.md"),
+      "---\nname: mage-skill-nowing\ndescription: no wing field\n---\n\n# x\n",
+    );
+    expect(await snapshotSkillMatch(repo, "mage-skill-nowing")).toBeNull();
+  });
+
+  it("returns null for a graduated skill whose SKILL.md is missing", async () => {
+    const repo = await mkTmp();
+    expect(await snapshotSkillMatch(repo, "mage-skill-ghost")).toBeNull();
   });
 });
 

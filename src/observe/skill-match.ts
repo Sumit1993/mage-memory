@@ -19,15 +19,12 @@ import { join } from "node:path";
 import { parseNote } from "../note.js";
 import { AGENTS_SKILLS_DIR, CLAUDE_DIR, resolveDocsRoot } from "../paths.js";
 import { safeSegment, scanNotes } from "../scan.js";
+import { SKILL_PREFIX, WING_PREFIX } from "../skills-shared.js";
 import { triggerHash } from "./events.js";
 import { PATH_MAX, type SkillMatch } from "./types.js";
 
 /** The plugin namespace mage's hand-authored skills load under (CONVENTIONS §9). */
 const MAGE_NAMESPACE = "mage:";
-/** Generated per-wing awareness skill prefix (skills-cmd.ts WING_PREFIX). */
-const WING_PREFIX = "mage-wing-";
-/** Graduated procedure-skill prefix (reserved, CONVENTIONS §9; ships 0.0.8+). */
-const SKILL_PREFIX = "mage-skill-";
 /** Max keywords to snapshot per wing (matches deriveKeywords default ergonomics). */
 const MAX_KEYWORDS = 12;
 
@@ -104,6 +101,19 @@ function wingFromSkillName(skillName: string): string | null {
 }
 
 /**
+ * The wing for a graduated `mage-skill-<slug>` skill. Unlike a wing skill, the wing
+ * is NOT in the name (the name is the slug, not the wing) — graduate.ts writes the
+ * wing into the SKILL.md frontmatter as `wing: <wing>`. Read it from there so a
+ * graduated skill aggregates the wing's keywords exactly like a wing skill, giving
+ * demote the context-match data it needs (ADR-0016 §3; the gap this closes). Returns
+ * null when the field is missing/empty/unsafe.
+ */
+function wingFromFrontmatter(fm: Record<string, unknown>): string | null {
+  const wing = typeof fm.wing === "string" ? fm.wing.trim() : "";
+  return wing.length > 0 && safeSegment(wing) ? wing : null;
+}
+
+/**
  * Snapshot the match signal + trigger_hash for a mage-recognized skill at load
  * time. Returns null when the skill's SKILL.md can't be found/parsed OR the skill
  * isn't a wing skill (a `mage:` plugin skill has no wing/notes mapping) — the
@@ -119,11 +129,21 @@ export async function snapshotSkillMatch(
   skillName: string,
 ): Promise<{ match: SkillMatch; trigger_hash: string } | null> {
   const normalized = normalizeSkillName(skillName);
-  const wing = wingFromSkillName(normalized);
-  if (wing === null) return null; // only wing skills carry a wing/notes match in 0.0.5.
+
+  // Only generated mage-wing-* / mage-skill-* skills carry a wing/notes match. A
+  // `mage:` plugin skill (stripped to its bare id here) is neither, so it snapshots
+  // trigger_hash only (match null) — same as a foreign skill (ADR-0016 §1).
+  const isWing = normalized.startsWith(WING_PREFIX);
+  const isGraduated = normalized.startsWith(SKILL_PREFIX);
+  if (!isWing && !isGraduated) return null;
 
   const fm = await readSkillFrontmatter(repoRoot, normalized);
   if (fm === null) return null;
+
+  // Wing skills encode the wing in the NAME; graduated skills carry it in the
+  // SKILL.md frontmatter `wing:` that graduate.ts writes.
+  const wing = isWing ? wingFromSkillName(normalized) : wingFromFrontmatter(fm);
+  if (wing === null) return null;
 
   const keywords = await wingKeywords(repoRoot, wing);
   const description = typeof fm.description === "string" ? fm.description : "";

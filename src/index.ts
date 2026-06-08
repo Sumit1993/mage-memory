@@ -279,3 +279,23 @@ export {
   writeRejected,
 } from "./grooming/proposals.js";
 export { buildManifest, noteProposalFor } from "./grooming/promote.js";
+// dream applier (ADR-0019 §6 / ADR-0016 §4): the single serialized writer that turns
+// a confirmed Proposal into file changes, enforcing the §3 ceilings. The executors
+// (graduate/demote/merge/split/reword) are READ-ONLY planners; the applier is the one
+// choke point. "Detection proposes, dream applies."
+export { applyProposal } from "./dream/applier.js";
+export type {
+  ApplyResult,
+  FileArchive,
+  FileWrite,
+  MutationPlan,
+} from "./dream/types.js";
+export { planGraduate, renderProcedureSkill } from "./dream/graduate.js";
+export { planDemote } from "./dream/demote.js";
+export { type MergePayload, planMerge } from "./dream/merge.js";
+export {
+  planSplit,
+  type SplitNewNote,
+  type SplitPayload,
+} from "./dream/split.js";
+export { planReword, type RewordPayload } from "./dream/reword.js";

@@ -124,6 +124,21 @@ describe("wingFromSegment — first touched-path wing", () => {
     const events = [prompt("hello"), tool({ detail: "ls" }), sessionEnd()];
     expect(wingFromSegment(events, whole(events), null)).toBe("");
   });
+
+  it("is '' for a bare leaf filename — a single-segment path names no wing (0.0.8 dogfood regression)", () => {
+    // A bare relative filename has no directory scope; it must NOT become a wing, else
+    // every distinct file is its own "wing" and recurrence fragments across files.
+    const events = [tool({ paths: ["definitely-not-a-real-file.md"] }), sessionEnd()];
+    expect(wingFromSegment(events, whole(events), null)).toBe("");
+  });
+
+  it("is '' for a repo-ROOT file (absolute → single segment after stripping repoRoot)", async () => {
+    // The exact dogfood shape: an absolute path to a file at the repo root resolves to a
+    // single segment once repoRoot is stripped → no directory → no wing.
+    const root = await tmp();
+    const events = [tool({ paths: [`${root}/toplevel-file.md`] }), sessionEnd()];
+    expect(wingFromSegment(events, whole(events), root)).toBe("");
+  });
 });
 
 // ─── segmentSignatures — the four lenses ──────────────────────────────────────

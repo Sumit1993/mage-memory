@@ -144,8 +144,15 @@ program
     (v) => Number.parseInt(v, 10),
   )
   .option("--strict", "exit non-zero if any findings (for hooks/CI)")
+  .option("--apply", "apply ONE confirmed Proposal JSON from stdin (the single writer; never commits)")
+  .option("--reject", "append ONE Proposal JSON from stdin to the rejected-edit buffer (back off)")
   .action(async (opts) => {
-    const result = await dream({ dir: opts.dir, staleDays: opts.staleDays });
+    const result = await dream({
+      dir: opts.dir,
+      staleDays: opts.staleDays,
+      apply: opts.apply,
+      reject: opts.reject,
+    });
     if (opts.strict && result.findingCount > 0) process.exit(1);
   });
 
