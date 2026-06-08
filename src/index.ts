@@ -141,6 +141,11 @@ export {
   observeCmd,
 } from "./commands/observe.js";
 export {
+  promoteCmd,
+  type PromoteOptions,
+  type PromoteResult,
+} from "./commands/promote-cmd.js";
+export {
   isInteractive,
   type ResolveDecisionArgs,
   resolveDecision,
@@ -224,3 +229,53 @@ export {
   type StagedFinding,
 } from "./staged-scan.js";
 export { type ScannedNote, scanNotes } from "./scan.js";
+// grooming core (ADR-0019): the deterministic promote pipeline — signature
+// extraction → recurrence tally → covering-note gate → manifest builder, plus the
+// thresholds seam/dial and the gitignored proposal/rejected stores.
+export type {
+  Lens,
+  LensCounts,
+  Proposal,
+  ProposalAction,
+  PromoteManifest,
+  PromoteTally,
+  SessionFold,
+  SignatureHit,
+  SignatureStat,
+} from "./grooming/types.js";
+export {
+  BASE_THRESHOLDS,
+  DEFAULT_SENSITIVITY,
+  readSensitivity,
+  type Sensitivity,
+  type Thresholds,
+  thresholdsFor,
+} from "./grooming/thresholds.js";
+export {
+  keywordsFromText,
+  segmentSignatures,
+  SIG_KEYWORDS,
+  wingFromSegment,
+} from "./grooming/signature.js";
+export {
+  foldSession,
+  foldTally,
+  PROMOTE_FILE,
+  promoteTallyPath,
+  PROMOTE_VERSION,
+  readTally,
+  writeTally,
+} from "./grooming/tally.js";
+export { coveringNote, isCovered } from "./grooming/covering-note.js";
+export {
+  isRejected,
+  PROPOSALS_FILE,
+  proposalsPath,
+  readProposals,
+  readRejected,
+  REJECTED_FILE,
+  rejectedPath,
+  writeProposals,
+  writeRejected,
+} from "./grooming/proposals.js";
+export { buildManifest, noteProposalFor } from "./grooming/promote.js";

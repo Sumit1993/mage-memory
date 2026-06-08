@@ -402,6 +402,125 @@ describe("observeCmd — fail-closed redaction inside fail-open", () => {
   });
 });
 
+describe("observeCmd — Stop → assistant_msg (ADR-0019 amendment)", () => {
+  /** Write a transcript .jsonl in the repo's tmp dir and return its path. */
+  async function writeTranscript(repo: string, name: string, body: string): Promise<string> {
+    const path = join(repo, name);
+    await writeFile(path, body);
+    return path;
+  }
+
+  it("Stop with a transcript → one assistant_msg whose text is the LAST assistant reply, scrubbed", async () => {
+    const repo = await mkRepo();
+    const transcript = await writeTranscript(
+      repo,
+      "transcript.jsonl",
+      [
+        JSON.stringify({ type: "user", message: { role: "user", content: [{ type: "text", text: "hi" }] } }),
+        JSON.stringify({
+          type: "assistant",
+          message: { role: "assistant", content: [{ type: "text", text: "first reply" }] },
+        }),
+        JSON.stringify({
+          type: "assistant",
+          message: { role: "assistant", content: [{ type: "text", text: `final reply ${SECRET}` }] },
+        }),
+      ].join("\n"),
+    );
+
+    await run(
+      JSON.stringify({ hook_event_name: "Stop", session_id: "s1", cwd: repo, transcript_path: transcript }),
+      { cwd: repo },
+    );
+
+    const [e] = await readEvents(repo, "s1");
+    expect(e?.type).toBe("assistant_msg");
+    if (e?.type === "assistant_msg") {
+      expect(e.text).toContain("final reply"); // the LAST assistant message wins.
+      expect(e.text).not.toContain("first reply");
+      expect(e.text).not.toContain(SECRET); // scrubbed before truncate.
+      expect(e.text.length).toBeLessThanOrEqual(2000);
+    }
+  });
+
+  it("concatenates multiple text parts of the final assistant message", async () => {
+    const repo = await mkRepo();
+    const transcript = await writeTranscript(
+      repo,
+      "transcript.jsonl",
+      JSON.stringify({
+        type: "assistant",
+        message: { role: "assistant", content: [{ type: "text", text: "part-a " }, { type: "text", text: "part-b" }] },
+      }),
+    );
+    await run(
+      JSON.stringify({ hook_event_name: "Stop", session_id: "s1", cwd: repo, transcript_path: transcript }),
+      { cwd: repo },
+    );
+    const [e] = await readEvents(repo, "s1");
+    if (e?.type === "assistant_msg") expect(e.text).toBe("part-a part-b");
+  });
+
+  it("a missing transcript_path → nothing written (fail open)", async () => {
+    const repo = await mkRepo();
+    await run(
+      JSON.stringify({ hook_event_name: "Stop", session_id: "s1", cwd: repo }),
+      { cwd: repo },
+    );
+    await expect(readEvents(repo, "s1")).rejects.toThrow();
+  });
+
+  it("a transcript_path pointing at a nonexistent file → nothing written (fail open)", async () => {
+    const repo = await mkRepo();
+    await run(
+      JSON.stringify({
+        hook_event_name: "Stop",
+        session_id: "s1",
+        cwd: repo,
+        transcript_path: join(repo, "does-not-exist.jsonl"),
+      }),
+      { cwd: repo },
+    );
+    await expect(readEvents(repo, "s1")).rejects.toThrow();
+  });
+
+  it("a garbage / torn transcript with no assistant text → nothing written (fail open)", async () => {
+    const repo = await mkRepo();
+    const transcript = await writeTranscript(
+      repo,
+      "garbage.jsonl",
+      ["not json at all {", JSON.stringify({ type: "user", message: { content: [{ type: "text", text: "hi" }] } })].join("\n"),
+    );
+    await run(
+      JSON.stringify({ hook_event_name: "Stop", session_id: "s1", cwd: repo, transcript_path: transcript }),
+      { cwd: repo },
+    );
+    await expect(readEvents(repo, "s1")).rejects.toThrow();
+  });
+
+  it("tolerates a torn line and still captures the last well-formed assistant message", async () => {
+    const repo = await mkRepo();
+    const transcript = await writeTranscript(
+      repo,
+      "mixed.jsonl",
+      [
+        "{ broken json",
+        JSON.stringify({
+          type: "assistant",
+          message: { role: "assistant", content: [{ type: "text", text: "survivor" }] },
+        }),
+      ].join("\n"),
+    );
+    await run(
+      JSON.stringify({ hook_event_name: "Stop", session_id: "s1", cwd: repo, transcript_path: transcript }),
+      { cwd: repo },
+    );
+    const [e] = await readEvents(repo, "s1");
+    expect(e?.type).toBe("assistant_msg");
+    if (e?.type === "assistant_msg") expect(e.text).toBe("survivor");
+  });
+});
+
 // Drives the REAL Commander wiring (buildObserveCommand), not observeCmd() directly,
 // so a flag declared on ObserveOptions but never registered (the `--cwd` regression)
 // is caught — observeCmd-only tests cannot see the parser.

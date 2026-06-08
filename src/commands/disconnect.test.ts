@@ -43,12 +43,12 @@ describe("disconnect", () => {
     };
     await writeFile(localPath(dir), `${JSON.stringify(pre, null, 2)}\n`);
 
-    // connect wires 7 mage groups in
+    // connect wires 8 mage groups in
     await connect({ cwd: dir, yes: true });
 
     const r = await disconnect({ cwd: dir, yes: true });
     expect(r.scope).toBe("local");
-    expect(r.removed).toBe(7);
+    expect(r.removed).toBe(8);
     expect(r.backedUp).toBe(true);
 
     const settings = JSON.parse(await readFile(localPath(dir), "utf8")) as {

@@ -31,13 +31,13 @@ async function exists(p: string): Promise<boolean> {
 }
 
 describe("connect", () => {
-  it("connect into a fresh dir creates settings.local.json with all 7 mage groups", async () => {
+  it("connect into a fresh dir creates settings.local.json with all 8 mage groups", async () => {
     const dir = await freshDir();
     const r = await connect({ cwd: dir, yes: true });
 
     expect(r.scope).toBe("local");
     expect(r.path).toBe(localPath(dir));
-    expect(r.wired).toBe(7);
+    expect(r.wired).toBe(8);
 
     const settings = JSON.parse(await readFile(r.path, "utf8")) as {
       hooks: Record<string, Array<{ id?: string }>>;
@@ -46,7 +46,7 @@ describe("connect", () => {
       .flat()
       .map((g) => g.id)
       .filter((id): id is string => typeof id === "string" && id.startsWith("mage:"));
-    expect(ids).toHaveLength(7);
+    expect(ids).toHaveLength(8);
     expect(new Set(ids)).toEqual(
       new Set([
         "mage:observe:SessionStart",
@@ -56,6 +56,7 @@ describe("connect", () => {
         "mage:observe:PreCompact",
         "mage:observe:SessionEnd",
         "mage:metrics:Stop",
+        "mage:observe:Stop",
       ]),
     );
   });
@@ -72,7 +73,7 @@ describe("connect", () => {
     await writeFile(localPath(dir), `${JSON.stringify(pre, null, 2)}\n`);
 
     const r = await connect({ cwd: dir, yes: true });
-    expect(r.wired).toBe(7);
+    expect(r.wired).toBe(8);
     expect(r.backedUp).toBe(true);
 
     // .bak preserves the original verbatim
@@ -101,16 +102,16 @@ describe("connect", () => {
     const r2 = await connect({ cwd: dir, yes: true });
     const after2 = await readFile(localPath(dir), "utf8");
 
-    expect(r2.wired).toBe(7);
+    expect(r2.wired).toBe(8);
     expect(after2).toBe(after1);
 
-    // still exactly 7 mage groups (no duplication)
+    // still exactly 8 mage groups (no duplication)
     const settings = JSON.parse(after2) as { hooks: Record<string, Array<{ id?: string }>> };
     const ids = Object.values(settings.hooks)
       .flat()
       .map((g) => g.id)
       .filter((id): id is string => typeof id === "string" && id.startsWith("mage:"));
-    expect(ids).toHaveLength(7);
+    expect(ids).toHaveLength(8);
   });
 
   it("--user targets the user path", async () => {
@@ -150,7 +151,7 @@ describe("connect", () => {
   it("in a non-repo dir, connect installs no hook (result.hook reports not-a-repo)", async () => {
     const dir = await freshDir();
     const r = await connect({ cwd: dir, yes: true });
-    expect(r.wired).toBe(7);
+    expect(r.wired).toBe(8);
     expect(r.hook).toEqual({ installed: false, reason: "not-a-repo" });
   });
 
@@ -200,7 +201,7 @@ describe("connect", () => {
     await gitInit(dir);
 
     const r = await connect({ cwd: dir, yes: true, gitHook: false });
-    expect(r.wired).toBe(7);
+    expect(r.wired).toBe(8);
     expect(r.hook).toBeUndefined();
 
     const hooksDir = await resolveHooksDir(dir);

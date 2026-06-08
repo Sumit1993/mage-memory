@@ -46,6 +46,9 @@ export const MAGE_HOOKS: ReadonlyArray<{ event: string; id: string; command: str
   { event: "PreCompact", id: "mage:observe:PreCompact", command: "mage observe" },
   { event: "SessionEnd", id: "mage:observe:SessionEnd", command: "mage observe" },
   { event: "Stop", id: "mage:metrics:Stop", command: "mage skills --metrics --quiet" },
+  // Second Stop group: capture the agent's final reply (ADR-0019 amendment to
+  // ADR-0015). Distinct id from mage:metrics:Stop, so both coexist on Stop.
+  { event: "Stop", id: "mage:observe:Stop", command: "mage observe" },
 ];
 
 // ─── target resolution ───────────────────────────────────────────────────────

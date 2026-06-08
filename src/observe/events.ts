@@ -5,6 +5,7 @@
 
 import { createHash } from "node:crypto";
 import {
+  type AssistantMsgEvent,
   type CompactEvent,
   OBSERVE_SCHEMA_VERSION,
   PATH_MAX,
@@ -37,6 +38,16 @@ export function buildUserPrompt(base: EventBase, scrubbedText: string): UserProm
     ts: base.ts,
     session: base.session,
     type: "user_prompt",
+    text: scrubbedText,
+  };
+}
+
+export function buildAssistantMsg(base: EventBase, scrubbedText: string): AssistantMsgEvent {
+  return {
+    v: OBSERVE_SCHEMA_VERSION,
+    ts: base.ts,
+    session: base.session,
+    type: "assistant_msg",
     text: scrubbedText,
   };
 }

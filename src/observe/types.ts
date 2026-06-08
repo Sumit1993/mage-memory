@@ -6,19 +6,21 @@
 /** Schema version stamped on every line. `as const` pins the literal `1`. */
 export const OBSERVE_SCHEMA_VERSION = 1 as const;
 
-/** Event type discriminator (ADR-0015 §2). */
+/** Event type discriminator (ADR-0015 §2; assistant_msg added by the ADR-0019 amendment). */
 export type ObserveEventType =
   | "session_start"
   | "user_prompt"
+  | "assistant_msg"
   | "skill_load"
   | "tool_use"
   | "compact"
   | "session_end";
 
-/** The six event-type literals as a runtime set, for boundary validation. */
+/** The event-type literals as a runtime set, for boundary validation. */
 const OBSERVE_EVENT_TYPES: ReadonlySet<string> = new Set<ObserveEventType>([
   "session_start",
   "user_prompt",
+  "assistant_msg",
   "skill_load",
   "tool_use",
   "compact",
@@ -61,6 +63,18 @@ export interface SessionStartEvent extends ObserveEnvelope {
 export interface UserPromptEvent extends ObserveEnvelope {
   type: "user_prompt";
   /** Scrubbed, ≤ USER_PROMPT_MAX. */
+  text: string;
+}
+
+/**
+ * assistant_msg — the agent's final reply per turn (ADR-0019 amendment to
+ * ADR-0015 §2). Captured from the Stop hook's transcript so a correction's
+ * antecedent (the reply it reacts to) is on record. `text` is scrubbed +
+ * truncated, exactly like user_prompt.
+ */
+export interface AssistantMsgEvent extends ObserveEnvelope {
+  type: "assistant_msg";
+  /** Scrubbed, ≤ ASSISTANT_MSG_MAX. */
   text: string;
 }
 
@@ -113,6 +127,7 @@ export interface SessionEndEvent extends ObserveEnvelope {
 export type ObserveEvent =
   | SessionStartEvent
   | UserPromptEvent
+  | AssistantMsgEvent
   | SkillLoadEvent
   | ToolUseEvent
   | CompactEvent
@@ -122,6 +137,8 @@ export type ObserveEvent =
 
 /** user_prompt.text cap (§2 "~2000"). */
 export const USER_PROMPT_MAX = 2000;
+/** assistant_msg.text cap (ADR-0019 amendment; mirrors USER_PROMPT_MAX). */
+export const ASSISTANT_MSG_MAX = 2000;
 /** tool_use.detail cap (§4 "≤200"). */
 export const DETAIL_MAX = 200;
 /** tool_use.error_summary cap. */

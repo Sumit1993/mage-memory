@@ -5,9 +5,11 @@
 // (fail-open observe), and a redactor throw degrades a field to the sentinel
 // (fail-closed redaction) without leaking the raw value.
 
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { Command } from "commander";
 import {
+  buildAssistantMsg,
   buildCompact,
   buildSessionEnd,
   buildSessionStart,
@@ -23,6 +25,7 @@ import { isMageSkill, snapshotSkillMatch } from "../observe/skill-match.js";
 import { appendEvent } from "../observe/store.js";
 import {
   ARGS_MAX,
+  ASSISTANT_MSG_MAX,
   DETAIL_MAX,
   ERROR_SUMMARY_MAX,
   isObserveEventType,
@@ -154,6 +157,9 @@ async function mapEvent(
     case "user_prompt":
       return buildUserPromptEvent(payload, base);
 
+    case "assistant_msg":
+      return buildAssistantMsgEvent(payload, base);
+
     case "skill_load":
       return mapSkillLoad(payload, base, repoRoot);
 
@@ -183,6 +189,8 @@ function inferType(payload: Record<string, unknown>): ObserveEventType | null {
       return "session_start";
     case "UserPromptSubmit":
       return "user_prompt";
+    case "Stop":
+      return "assistant_msg";
     case "PreCompact":
       return "compact";
     case "SessionEnd":
@@ -198,6 +206,93 @@ function inferType(payload: Record<string, unknown>): ObserveEventType | null {
 function buildUserPromptEvent(payload: Record<string, unknown>, base: EventBase): ObserveEvent {
   const text = scrubField(str(payload.prompt) ?? "", USER_PROMPT_MAX) ?? "";
   return buildUserPrompt(base, text);
+}
+
+/**
+ * Stop → assistant_msg (ADR-0019 amendment). The Stop hook payload carries no
+ * reply text inline, only a `transcript_path`; read the LAST assistant message
+ * from that `.jsonl`. Fail-open at every gap: a missing/garbage `transcript_path`
+ * or a transcript with no assistant text → null (nothing written), so a bare Stop
+ * never parks an empty line. Scrub BEFORE truncate (the scrub-then-cap invariant).
+ */
+async function buildAssistantMsgEvent(
+  payload: Record<string, unknown>,
+  base: EventBase,
+): Promise<ObserveEvent | null> {
+  const transcriptPath = str(payload.transcript_path);
+  if (transcriptPath === undefined) return null; // no transcript → fail open.
+  const raw = await readLastAssistantText(transcriptPath);
+  if (raw === null) return null; // unreadable/garbage/no assistant text → fail open.
+  const text = scrubField(raw, ASSISTANT_MSG_MAX) ?? "";
+  return buildAssistantMsg(base, text);
+}
+
+/**
+ * Read a Claude Code transcript `.jsonl` and return the LAST assistant message's
+ * concatenated text, or null. Swallows ALL fs/parse errors (fail-open): a missing
+ * file, an unreadable path, or torn JSON yields null, never a throw. Tolerates
+ * shape variance — a line is an assistant message when its `type`/`role` is
+ * "assistant" (top-level or under `message`), and its text is the join of every
+ * `content[].text` string part. The last such non-empty text wins.
+ */
+async function readLastAssistantText(path: string): Promise<string | null> {
+  let raw: string;
+  try {
+    raw = await readFile(path, "utf8");
+  } catch {
+    return null; // unreadable transcript → fail open.
+  }
+
+  let last: string | null = null;
+  for (const line of raw.split("\n")) {
+    const trimmed = line.trim();
+    if (trimmed.length === 0) continue;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(trimmed);
+    } catch {
+      continue; // skip a torn line, never throw.
+    }
+    const text = assistantTextOf(parsed);
+    if (text !== null) last = text;
+  }
+  return last;
+}
+
+/**
+ * Extract concatenated assistant text from one parsed transcript line, or null
+ * when the line is not an assistant message with text. Tolerates the documented
+ * shape `{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"…"}]}}`
+ * plus variants where role/type live at the top level. Returns null (not "") for
+ * an empty join so a contentless assistant turn does not overwrite a real one.
+ */
+function assistantTextOf(line: unknown): string | null {
+  if (line === null || typeof line !== "object" || Array.isArray(line)) return null;
+  const rec = line as Record<string, unknown>;
+  const msg = obj(rec.message);
+  const role = str(rec.role) ?? str(rec.type) ?? str(msg.role) ?? str(msg.type);
+  if (role !== "assistant") return null;
+
+  // content may live on the line or under `message`.
+  const content = Array.isArray(rec.content)
+    ? rec.content
+    : Array.isArray(msg.content)
+      ? msg.content
+      : null;
+  const text = textFromContent(content);
+  return text.length > 0 ? text : null;
+}
+
+/** Join every string `text` part of a content array; "" when none or non-array. */
+function textFromContent(content: unknown): string {
+  if (!Array.isArray(content)) return "";
+  const parts: string[] = [];
+  for (const part of content) {
+    if (part === null || typeof part !== "object" || Array.isArray(part)) continue;
+    const t = (part as Record<string, unknown>).text;
+    if (typeof t === "string" && t.length > 0) parts.push(t);
+  }
+  return parts.join("");
 }
 
 /** PostToolUse(Failure) (non-Skill) → tool_use: structured paths + salient detail + ok. */
@@ -294,7 +389,7 @@ export function buildObserveCommand(): Command {
     .option("--session <id>", "session id (overrides the session field in the hook JSON)")
     .option(
       "--event <type>",
-      "force the event type (session_start|user_prompt|skill_load|tool_use|compact|session_end); default: inferred from the hook payload",
+      "force the event type (session_start|user_prompt|assistant_msg|skill_load|tool_use|compact|session_end); default: inferred from the hook payload",
     )
     .option(
       "--cwd <dir>",

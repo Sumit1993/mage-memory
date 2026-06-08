@@ -10,6 +10,7 @@ import { type InitMode, type InitVisibility, init } from "./commands/init.js";
 import { link, type Storage } from "./commands/link.js";
 import { list } from "./commands/list.js";
 import { buildObserveCommand } from "./commands/observe.js";
+import { promoteCmd } from "./commands/promote-cmd.js";
 import { redactCmd } from "./commands/redact.js";
 import { skills } from "./commands/skills-cmd.js";
 import { status } from "./commands/status.js";
@@ -177,6 +178,25 @@ program
   )
   .action(async (opts: { dir?: string; json?: boolean; seen?: string }) => {
     await distillCmd({ dir: opts.dir, json: opts.json, seen: opts.seen });
+  });
+
+// ─── promote ─────────────────────────────────────────────────────────────────
+program
+  .command("promote")
+  .description(
+    "Fold observed .learnings into recurring note candidates (plumbing behind the mage:promote skill)",
+  )
+  .option(
+    "-d, --dir <path>",
+    "where to look for the knowledge base (default: cwd; walks up for in-repo)",
+  )
+  .option("--json", "emit the note-candidate manifest as JSON")
+  .option(
+    "--seen <session:offset>",
+    "advance the promote offset after a batch is dispositioned",
+  )
+  .action(async (opts: { dir?: string; json?: boolean; seen?: string }) => {
+    await promoteCmd({ dir: opts.dir, json: opts.json, seen: opts.seen });
   });
 
 // ─── observe ─────────────────────────────────────────────────────────────────

@@ -60,6 +60,8 @@ export interface MageMetadata {
   hub_repo: string | null;
   hub_refs: HubRef[];
   linked_at: string;
+  /** 0.0.8 self-grooming dial (ADR-0019 §7); absent ⇒ "normal". */
+  grooming?: { sensitivity?: "low" | "normal" | "high" };
 }
 
 /**
@@ -83,6 +85,8 @@ export interface HubMetadata {
   name: string;
   created_at: string;
   projects: HubProject[];
+  /** 0.0.8 self-grooming dial (ADR-0019 §7); absent ⇒ "normal". */
+  grooming?: { sensitivity?: "low" | "normal" | "high" };
 }
 
 export interface HubProject {
