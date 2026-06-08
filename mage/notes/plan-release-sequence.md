@@ -2,8 +2,8 @@
 type: plan
 tags: [mage/roadmap]
 created: "2026-06-03"
-updated: "2026-06-06"
-last_reviewed: "2026-06-06"
+updated: "2026-06-08"
+last_reviewed: "2026-06-08"
 status: active
 provenance:
   repo: mage-memory
@@ -38,8 +38,7 @@ splits collapsed). **Status** tracks where each release stands.
 | **0.0.6** | **connect/disconnect** (hook adapter → `settings.local.json`, `id:"mage:*"`) + **context-match metrics, read-only** via `mage skills --metrics` + `mage/.metrics/` rollup (per-turn fold) + keyword-derivation fix | 0009, 0005, 0015, 0016, **0017** | 0.0.5 | locked | **shipped²** |
 | **0.0.7** | **distill**: `mage distill --json` reader + `mage:distill` skill over `.learnings/` → notes **on first sight**; feeders **cut**; Gate-2 **pre-commit hook** via `connect` | **0018**, 0015, 0014, 0009 | 0.0.6 | **built³** | planned |
 | **0.0.8** | **self-grooming**: promote-on-recurrence + **note→skill graduation** + `/mage-optimize` auto-reword + full `/dream` healing sweep (**dream applies** graduation/demotion/**split**) | **0019**, 0016, 0013, 0006 | 0.0.7 | **grilled** *(mechanics)* | planned |
-| **0.0.9** | **MCP recall** accelerator *(independent track)* | 0009 | 0.0.2 | **grill** | planned |
-| **0.0.10** | **polish**: Obsidian dashboards + **icon/visualization** + pre-release chores | 0010, 0013 | — | locked | planned |
+| **0.0.9** | **polish**: Obsidian dashboards + **icon/visualization** + pre-release chores | 0010, 0013 | — | locked | planned |
 | **→ 0.1.0** | **Milestone: portable, self-grooming memory — the cut** | — | all | — | — |
 
 ¹ tagged + GitHub-released; npm still at 0.0.3. · *Status legend:* **shipped · next · planned** (add `building`/`grilled`/`built` in flight).
@@ -59,21 +58,26 @@ load-bearing for the whole loop** (capture *and* optimization) — now locked in
 locks against the right shape. observe ships **next** (locked, no grill); `connect`
 makes it auto-fire, so it lands with the read-only metrics that read its data.
 
-`0.0.9 MCP recall` is an **independent track** (recall, not capture) — it needs only
-the stable INDEX from 0.0.2 and blocks nothing; slot it in early for cross-agent value
-or slip it later without consequence.
+**MCP recall was deferred past 0.1.0** (2026-06-08): file-based recall (the INDEX + the
+host agent's own grep/read) already covers every file-capable agent, and the
+"no-vector-in-core" boundary means an MCP `search` adds no semantic capability over that;
+the only version that *would* add reach — a queried shared-memory **service** — edges into
+the coordination layer [ADR-0010](../decisions/0010-durable-memory-not-coordination-layer.md)
+deliberately bounds mage away from. It moves to *Deferred past 0.1.0* (opt-in, out-of-core,
+own grill if real demand appears), alongside the SkillOpt bridge. This removes the **last
+grill** — the path to 0.1.0 is now pure build.
 
 The eight 2026-06-05 mega-grill ideas land as: grouping → 0.0.3; ingest skills →
 0.0.4; redaction → 0.0.5 (Gate 1) + 0.0.3 (Gate 2); context-match metrics → 0.0.6;
 note→skill graduation + optimize/reword (SkillOpt rails) → 0.0.8; automate learn = the
-0.0.5–0.0.8 chain; icon/viz → 0.0.10. Highlighting auto skill-creation (idea 2) is the
+0.0.5–0.0.8 chain; icon/viz → 0.0.9. Highlighting auto skill-creation (idea 2) is the
 graduation UX in 0.0.8 + the README.
 
 ## Where 0.1.0 cuts
 
 **0.1.0 = the full self-grooming loop, all human-committed.** Founding value (portable
-file KB · index · per-wing skills · dream · bulk migration/ingest · MCP recall) plus
-the complete capture → graduate → optimize loop ship across 0.0.3–0.0.10 and graduate
+file KB · index · per-wing skills · dream · bulk migration/ingest) plus
+the complete capture → graduate → optimize loop ship across 0.0.3–0.0.9 and graduate
 to **0.1.0**. The never-auto-commit invariant holds throughout — grooming *writes
 files*, the human *commits the diff*. ADR-0006's "promotion deferred until wings
 proliferate" trigger is satisfied naturally: wings proliferate across the 0.0.x ladder
@@ -95,7 +99,7 @@ file rotation — only reveals bugs when actually run. **Definition of done, per
    also pre-validates connect's payload→event mapping). Remove the temp hook after.
 4. Only then tag + `npm publish`.
 
-## Grills to run (remaining: 1 — 0.0.9 MCP)
+## Grills to run (remaining: 0 — all grilled; the path to 0.1.0 is pure build)
 
 The 2026-06-06 observe grill ([ADR-0015](../decisions/0015-mage-observe-capture-schema.md)
 + [ADR-0016](../decisions/0016-context-match-confidence-ladder-applier.md)) pre-resolved
@@ -108,10 +112,16 @@ decide, below.
 - **~~0.0.6 connect~~ — GRILLED 2026-06-06** → [ADR-0017](../decisions/0017-mage-connect-host-hook-adapter.md) (+ amends [ADR-0009](../decisions/0009-no-runtime-automation-rides-host-hooks.md)'s interlock; CONVENTIONS §10 updated). Locked: `mage connect`/`disconnect` write `id:"mage:*"` hooks to `settings.local.json` (per-repo, `--user` for global; idempotent, `.bak`-safe, refuse-on-malformed); **full-ignore ECC** (no interlock — coexist + feeder); dual-mode CLI via a shared `resolveInteractive` (non-TTY ⇒ non-interactive), generalized to init/link/unlink; hook block = 6 observe events (incl. PostToolUseFailure) + `Stop` `mage skills --metrics --quiet`; read-only context-match via **`mage skills --metrics`** over a persistent `mage/.metrics/` rollup (Option B, per-turn fold); keyword-derivation noise fixed at capture; "dream tuning" dropped. **Carry-in still open:** verify whether Claude Code fires *both* `PostToolUse` and `PostToolUseFailure` for one failure (dedupe if so) — confirm during the build's real-session dogfood.
 - **~~0.0.7 distill~~ — GRILLED 2026-06-08** → [ADR-0018](../decisions/0018-mage-distill-observed-scratch-reader.md) (amends [ADR-0005](../decisions/0005-one-canonical-memory-others-are-feeders.md) + [ADR-0013](../decisions/0013-procedure-skills-self-grooming-loop.md) §5). Locked: distill = deterministic `mage distill --json` reader + `mage:distill` judgment skill (separate from `learn`, shares its pipeline); **notes on first sight** (recurrence/graduation → 0.0.8); per-session **offset watermark** in `.metrics/distill.json` (CLOSED-only, explicit `--seen` advance); chunk by `compact`/session boundary; **four balanced lenses** (user-corrections **first-class**, error→fix, repeated-workflow, tool-preference); salience-filter→cap-with-logged-spill; **two-stage dedup** (deterministic keyword/wing/path pre-filter → model merge); Redaction **Gate 2 = inline `mage redact` + a blocking `pre-commit` hook** via `mage connect`; **feeders cut** (own `.learnings/` only; `--from` stays a generic importer); auto-distill is a **deferred opt-in rung** (ADR-0009 lines 45/53), not forbidden.
 - **~~0.0.8 self-grooming~~ — GRILLED 2026-06-08** → [ADR-0019](../decisions/0019-mage-promote-self-grooming.md) (amends [ADR-0015](../decisions/0015-mage-observe-capture-schema.md) + [ADR-0006](../decisions/0006-two-layer-recall-per-wing-skills.md)). Locked: promote = a **second deterministic fold** over the same scratch (distill's sibling), a per-`(wing+tags)`-**signature** recurrence tally counting **distinct sessions**, its own bookmark, purge-surviving, reusing the rollup mould (`.metrics/promote.json`); **corrections are recurrence-counted** too (coarse tag-bucket → judgment refines). **One tally, both rungs:** signature recurs ≥ K(≈3) sessions with no covering note → propose a note (the catch-net behind distill's first-sight); a Playbook/Gotcha note corroborated ≥ M(≈5) sessions → propose **graduation** (recurrence gates graduation; **context-match** gates reword/demote *after*). **merge + new `split`** are applier ops (merge-on-tag-overlap keeps it small *early*; split on too-long / slice-recurs / incoherent; small-early **emerges from the counts**, no special mode). **Thresholds = seam + dial now, auto-tuner deferred:** all constants in one module; a human **sensitivity dial** (low/normal/high, in tracked `metadata.json`) scales them; dream auto-tuning them is a deferred opt-in rung keyed on **accept/reject**, not volume/persona. **0.0.8 ships Rung A (propose-only)**; the accept/reject ladder + **`rejected.json`** buffer are the per-user adaptation. New gitignored `.metrics/` siblings: `promote.json`, `proposals.json`, `rejected.json`. **ADR-0015 amendment:** capture the agent's **final reply per turn** (redacted, `assistant_msg`) to sharpen corrections. *(Build may stage promote-tally → graduate → optimize-reword → full dream sweep; ships as one release.)*
-- **0.0.9 MCP** — transport (stdio vs Streamable HTTP), tool surface (search/get over INDEX+grep), the no-vector-in-core boundary. *(Independent — grill anytime.)*
+- ~~**0.0.9 MCP**~~ — **deferred past 0.1.0** 2026-06-08: redundant with file-based recall (and "no-vector-in-core" adds nothing over plain grep); the only value-adding form, a queried shared-memory *service*, fights [ADR-0010](../decisions/0010-durable-memory-not-coordination-layer.md). No grill. *(0.0.9 is now **polish** — locked, no grill.)*
 
 ## Deferred past 0.1.0 (unplanned future 0.x — no 1.0 crowned, own ADR/grill required)
 
+- **MCP recall accelerator** — an opt-in, out-of-core MCP server exposing search/get over
+  the INDEX to MCP-only clients. Deferred 2026-06-08: redundant with file-based recall for
+  any file-capable agent (and "no-vector-in-core" adds no semantic search over plain grep);
+  the only value-adding form — a queried shared-memory *service* — edges into the
+  coordination layer [ADR-0010](../decisions/0010-durable-memory-not-coordination-layer.md)
+  bounds mage away from. Build it (its own grill) only if a real MCP-only consumer appears.
 - **Literal SkillOpt bridge** — export skills + trajectories to Microsoft's SkillOpt
   optimizer, import `best_skill.md` back. A real training loop (two model backends,
   epochs, labeled splits) → opt-in, **out-of-core**, like the MCP accelerator. mage

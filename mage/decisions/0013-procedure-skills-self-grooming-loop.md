@@ -90,8 +90,15 @@ load-bearing invariants — *no runtime of our own* ([ADR-0009](0009-no-runtime-
    1.0 is crowned in this planning horizon. **0.1.0** = founding value +
    observe → connect → distill → promote → **graduate** → `/mage-optimize`
    auto-reword + full dream sweep, all human-committed. **Deferred past 0.1.0**
-   (unplanned future 0.x): the literal SkillOpt bridge and multi-repo hub
-   aggregation.
+   (unplanned future 0.x): the literal SkillOpt bridge, multi-repo hub
+   aggregation, and the **MCP recall accelerator**.
+   > **Amendment (2026-06-08, [ADR-0019](0019-mage-promote-self-grooming.md)).** **MCP
+   > recall is deferred past 0.1.0** (was a numbered 0.0.x release). It is redundant with
+   > file-based recall for any file-capable agent, and the only value-adding form — a
+   > queried shared-memory *service* — edges into the coordination layer
+   > [ADR-0010](0010-durable-memory-not-coordination-layer.md) bounds mage away from. It
+   > joins the out-of-core, opt-in bridges above; build it only on real demand, with its
+   > own grill. This removed the last remaining grill on the path to 0.1.0.
 
 ## Considered options
 

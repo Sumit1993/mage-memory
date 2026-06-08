@@ -44,5 +44,5 @@
 
 - `reference` [Mining agentmemory's design into mage — files-native translation map](notes/agentmemory-mining-map.md) — agentmemory, iii, server-inverse, obsidian-ui, import-harvest, consolidation, auto-capture, dream, feeder, connect, mining, roadmap _(reviewed 2026-06-01)_
 - `reference` [Field notes — first external migrations (v0.1 dogfood)](notes/migration-field-notes.md) — field-test, migration, hub-indexing, link-awareness, bulk-import, dream, onboarding, v0.2 _(reviewed 2026-06-02)_
-- `plan` [mage — release sequence (0.0.x → 0.1.0)](notes/plan-release-sequence.md) — release, sequence, backlog, 0.1.0, self-grooming, procedure-skill, redaction, skillopt, observe, optimize, promotion _(reviewed 2026-06-06)_
+- `plan` [mage — release sequence (0.0.x → 0.1.0)](notes/plan-release-sequence.md) — release, sequence, backlog, 0.1.0, self-grooming, procedure-skill, redaction, skillopt, observe, optimize, promotion _(reviewed 2026-06-08)_
 - `plan` [mage — roadmap](notes/roadmap.md) — roadmap, v0.1, v0.2, dream, scope, deferred, release, mcp, hub _(reviewed 2026-06-05)_
