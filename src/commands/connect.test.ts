@@ -1,7 +1,9 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { gitInit } from "../git.js";
+import { REDACT_HOOK_MARKER, resolveHooksDir } from "../git-hooks.js";
 import { connect } from "./connect.js";
 
 const made: string[] = [];
@@ -119,7 +121,10 @@ describe("connect", () => {
     const origHome = process.env.HOME;
     process.env.HOME = home;
     try {
-      const r = await connect({ user: true, yes: true });
+      // gitHook:false + a non-git temp cwd so this --user settings test never
+      // installs a pre-commit hook into the REAL repo via process.cwd() (the git
+      // hook target is independent of the --user settings target).
+      const r = await connect({ user: true, yes: true, cwd: dir, gitHook: false });
       expect(r.scope).toBe("user");
       expect(r.path.endsWith(join(".claude", "settings.json"))).toBe(true);
     } finally {
@@ -138,5 +143,68 @@ describe("connect", () => {
     // file is untouched and NO backup written
     expect(await readFile(localPath(dir), "utf8")).toBe("{ not json");
     expect(await exists(`${localPath(dir)}.bak`)).toBe(false);
+  });
+
+  // ─── Gate-2 redaction pre-commit hook (ADR-0018 §7) ─────────────────────────
+
+  it("in a non-repo dir, connect installs no hook (result.hook reports not-a-repo)", async () => {
+    const dir = await freshDir();
+    const r = await connect({ cwd: dir, yes: true });
+    expect(r.wired).toBe(7);
+    expect(r.hook).toEqual({ installed: false, reason: "not-a-repo" });
+  });
+
+  it("in a git repo, connect installs an executable pre-commit hook with the marker", async () => {
+    const dir = await freshDir();
+    await gitInit(dir);
+
+    const r = await connect({ cwd: dir, yes: true });
+    expect(r.hook?.installed).toBe(true);
+
+    const hooksDir = await resolveHooksDir(dir);
+    const hookPath = join(hooksDir as string, "pre-commit");
+    const body = await readFile(hookPath, "utf8");
+    expect(body).toContain(REDACT_HOOK_MARKER);
+    expect(body).toContain("mage redact --check --staged");
+
+    const st = await stat(hookPath);
+    expect(st.mode & 0o100).toBe(0o100);
+  });
+
+  it("re-connecting in a git repo reports the hook as already present", async () => {
+    const dir = await freshDir();
+    await gitInit(dir);
+
+    await connect({ cwd: dir, yes: true });
+    const r2 = await connect({ cwd: dir, yes: true });
+    expect(r2.hook).toEqual({ installed: false, reason: "already" });
+  });
+
+  it("a pre-existing foreign pre-commit hook is left untouched (exists-foreign)", async () => {
+    const dir = await freshDir();
+    await gitInit(dir);
+
+    const hooksDir = await resolveHooksDir(dir);
+    const hookPath = join(hooksDir as string, "pre-commit");
+    const foreign = "#!/bin/sh\necho host-hook\n";
+    await writeFile(hookPath, foreign);
+
+    const r = await connect({ cwd: dir, yes: true });
+    expect(r.hook).toEqual({ installed: false, reason: "exists-foreign" });
+    // foreign hook preserved verbatim
+    expect(await readFile(hookPath, "utf8")).toBe(foreign);
+  });
+
+  it("gitHook:false skips the hook entirely (no hook written, no result.hook)", async () => {
+    const dir = await freshDir();
+    await gitInit(dir);
+
+    const r = await connect({ cwd: dir, yes: true, gitHook: false });
+    expect(r.wired).toBe(7);
+    expect(r.hook).toBeUndefined();
+
+    const hooksDir = await resolveHooksDir(dir);
+    const hookPath = join(hooksDir as string, "pre-commit");
+    expect(await exists(hookPath)).toBe(false);
   });
 });

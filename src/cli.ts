@@ -1,6 +1,7 @@
 import { Command, Option } from "commander";
 import { connect } from "./commands/connect.js";
 import { disconnect } from "./commands/disconnect.js";
+import { distillCmd } from "./commands/distill-cmd.js";
 import { doctor } from "./commands/doctor.js";
 import { dream } from "./commands/dream-cmd.js";
 import { index } from "./commands/index-cmd.js";
@@ -159,6 +160,25 @@ program
     await ingestCmd(dir, { json: opts.json });
   });
 
+// ─── distill ─────────────────────────────────────────────────────────────────
+program
+  .command("distill")
+  .description(
+    "Read observed .learnings into note candidates (plumbing behind the mage:distill skill)",
+  )
+  .option(
+    "-d, --dir <path>",
+    "where to look for the knowledge base (default: cwd; walks up for in-repo)",
+  )
+  .option("--json", "emit the candidate manifest as JSON")
+  .option(
+    "--seen <session:offset>",
+    "advance the distill watermark after a batch is dispositioned",
+  )
+  .action(async (opts: { dir?: string; json?: boolean; seen?: string }) => {
+    await distillCmd({ dir: opts.dir, json: opts.json, seen: opts.seen });
+  });
+
 // ─── observe ─────────────────────────────────────────────────────────────────
 // Registration lives next to the handler (commands/observe.ts) so the flag list
 // and the ObserveOptions contract can't drift apart.
@@ -176,14 +196,18 @@ program
     "print the redacted text to stdout (secret values → [REDACTED:<kind>])",
   )
   .option("--quiet", "suppress the findings report")
+  .option("--staged", "scan staged git changes (the pre-commit gate)")
+  .option("--check", "report-only intent for hooks")
   .action(
     async (
       file: string | undefined,
-      opts: { strip?: boolean; quiet?: boolean },
+      opts: { strip?: boolean; quiet?: boolean; staged?: boolean; check?: boolean },
     ) => {
       const result = await redactCmd(file, {
         strip: opts.strip,
         quiet: opts.quiet,
+        staged: opts.staged,
+        check: opts.check,
       });
       if (result.blocked) process.exit(2);
     },
@@ -290,9 +314,10 @@ program
     "Wire mage capture hooks into this repo's Claude Code settings (.claude/settings.local.json; personal + gitignored)",
   )
   .option("--user", "target the personal ~/.claude/settings.json instead of the repo-local file")
+  .option("--no-git-hook", "skip installing the redaction pre-commit hook")
   .option("-y, --yes", "non-interactive: skip the confirmation prompt")
   .action(async (opts) => {
-    await connect({ user: opts.user, yes: opts.yes });
+    await connect({ user: opts.user, yes: opts.yes, gitHook: opts.gitHook });
   });
 
 // ─── disconnect ───────────────────────────────────────────────────────────
@@ -300,9 +325,10 @@ program
   .command("disconnect")
   .description("Remove mage's capture hooks from this repo's Claude Code settings (leaves host hooks intact)")
   .option("--user", "target the personal ~/.claude/settings.json instead of the repo-local file")
+  .option("--no-git-hook", "skip removing the redaction pre-commit hook")
   .option("-y, --yes", "non-interactive: accepted for symmetry (no destructive prompt)")
   .action(async (opts) => {
-    await disconnect({ user: opts.user, yes: opts.yes });
+    await disconnect({ user: opts.user, yes: opts.yes, gitHook: opts.gitHook });
   });
 
 // Top-level error handling

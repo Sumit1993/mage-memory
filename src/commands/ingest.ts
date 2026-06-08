@@ -9,14 +9,7 @@ export interface IngestCmdOptions {
 }
 
 /** Stable display order for the grouped human summary. */
-const KIND_ORDER: IngestKind[] = [
-  "skill",
-  "note",
-  "prose",
-  "transcript",
-  "feeder-ecc",
-  "feeder-native",
-];
+const KIND_ORDER: IngestKind[] = ["skill", "note", "prose", "transcript"];
 
 /**
  * Enumerate + classify the ingestable sources under `dir` (read-only, ADR-0013).

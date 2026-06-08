@@ -118,6 +118,18 @@ chunks and dedups, where redaction blocks, and what it deliberately leaves out. 
    (refuse-don't-clobber an existing hook, idempotent by marker, `.bak` first) and is
    **independently toggleable** (the safety net without auto-capture). This realizes
    ADR-0014's amendment (Gate 2 as a mage-installed pre-commit hook).
+   - **Gate 2 is SCOPED to the knowledge base, not the whole repo.** Per ADR-0014 §2
+     the protected surface is the tracked, *shared* KB — the notes/skills mage authors
+     under the **docs root** (`mage/` in-repo, or the hub root) — because that is the
+     only surface mage writes to and the only seam where a distilled secret becomes
+     public. So `mage redact --check --staged` scans only staged files **under the docs
+     root**; application source (`src/`, **including a redaction tool's own
+     secret-shaped test fixtures**) is out of scope by design — mage is not a general
+     repo secret-scanner ([ADR-0010](0010-durable-memory-not-coordination-layer.md);
+     that is gitleaks' job). A hub scans everything (the repo *is* the KB); a repo with
+     no mage KB is a no-op gate. This scoping is also what lets **mage run its own
+     Gate-2 hook** (it scans `mage/`, never the `src/` fixtures) — surfaced by the build
+     dogfood ([gotcha](../notes/gate2-blocks-own-redaction-fixtures.md)).
 
 8. **distill works on mage's own artifacts only — no feeders.** mage reads the
    `.learnings/` *it* created; foreign memory stores (ECC instincts, Claude `MEMORY.md`)

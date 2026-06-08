@@ -4,6 +4,7 @@ import {
   resolveSettingsTarget,
   writeClaudeSettings,
 } from "../claude-settings.js";
+import { removeRedactHook } from "../git-hooks.js";
 import { logger } from "../logger.js";
 
 /** Options for {@link disconnect}. */
@@ -14,6 +15,11 @@ export interface DisconnectOptions {
   yes?: boolean;
   /** Working directory for resolving the local settings path (default: cwd). */
   cwd?: string;
+  /**
+   * Remove the Gate-2 redaction pre-commit hook installed by connect. Symmetric
+   * with ConnectOptions.gitHook; pass `false` to leave it. Default true.
+   */
+  gitHook?: boolean;
 }
 
 /** Result of {@link disconnect}. */
@@ -22,6 +28,8 @@ export interface DisconnectResult {
   scope: "local" | "user";
   removed: number;
   backedUp: boolean;
+  /** Outcome of the pre-commit redaction hook removal (omitted when not attempted). */
+  hook?: { removed: boolean };
 }
 
 /**
@@ -36,7 +44,10 @@ export async function disconnect(opts: DisconnectOptions): Promise<DisconnectRes
 
   if (!r.existed) {
     logger.info(`No settings at ${target.path} — nothing to disconnect.`);
-    return { path: target.path, scope: target.scope, removed: 0, backedUp: false };
+    // The pre-commit hook lives independently of settings, so still attempt its
+    // removal — a connect that only installed the hook is undone by disconnect.
+    const hook = await removeHook(opts);
+    return { path: target.path, scope: target.scope, removed: 0, backedUp: false, hook };
   }
 
   if (r.malformed) {
@@ -55,5 +66,19 @@ export async function disconnect(opts: DisconnectOptions): Promise<DisconnectRes
     logger.info(`No mage hooks found in ${target.path} — nothing removed.`);
   }
 
-  return { path: target.path, scope: target.scope, removed, backedUp };
+  const hook = await removeHook(opts);
+
+  return { path: target.path, scope: target.scope, removed, backedUp, hook };
+}
+
+/**
+ * Remove the redaction pre-commit hook (only ours, by marker) and log when it
+ * was actually removed. Symmetric with connect's install; `gitHook:false` skips
+ * it entirely. A foreign/absent hook or non-repo cwd is a silent no-op.
+ */
+async function removeHook(opts: DisconnectOptions): Promise<{ removed: boolean } | undefined> {
+  if (opts.gitHook === false) return undefined;
+  const r = await removeRedactHook(opts.cwd ?? process.cwd());
+  if (r.removed) logger.detail("Removed the redaction pre-commit hook.");
+  return { removed: r.removed };
 }

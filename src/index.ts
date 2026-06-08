@@ -25,6 +25,11 @@ export {
   disconnect,
 } from "./commands/disconnect.js";
 export {
+  distillCmd,
+  type DistillOptions,
+  type DistillResult,
+} from "./commands/distill-cmd.js";
+export {
   type DoctorCheck,
   type DoctorOptions,
   type DoctorResult,
@@ -184,4 +189,38 @@ export {
   type SecretFinding,
   scanSecrets,
 } from "./redact.js";
+// distill core (ADR-0018): the deterministic reader, its candidate-cluster types,
+// and the per-session offset watermark the `--seen` write commits.
+export {
+  computeDistillClusters,
+  readDistill,
+  SALIENCE_CAP,
+} from "./distill/reader.js";
+export type {
+  DistillCluster,
+  DistillManifest,
+} from "./distill/types.js";
+export {
+  advanceWatermark,
+  DISTILL_FILE,
+  DISTILL_VERSION,
+  type DistillWatermark,
+  distillWatermarkPath,
+  readWatermark,
+  writeWatermark,
+} from "./distill/watermark.js";
+// Gate-2 redaction (ADR-0018 §7): the staged-blob scan + the pre-commit hook
+// installer/remover `mage connect`/`mage disconnect` drive.
+export {
+  installRedactHook,
+  type InstallHookResult,
+  REDACT_HOOK_MARKER,
+  removeRedactHook,
+  type RemoveHookResult,
+  resolveHooksDir,
+} from "./git-hooks.js";
+export {
+  scanStaged,
+  type StagedFinding,
+} from "./staged-scan.js";
 export { type ScannedNote, scanNotes } from "./scan.js";

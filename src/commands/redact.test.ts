@@ -1,8 +1,9 @@
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { PassThrough, type Readable } from "node:stream";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { run } from "../shell.js";
 import { redactCmd } from "./redact.js";
 
 // A real GitHub PAT shape (ghp_ + 36 chars) — matches the "github-token" detector,
@@ -145,5 +146,96 @@ describe("redactCmd — report (non-quiet) prints findings without leaking secre
     expect(blocked).toBe(false);
     expect(findings).toHaveLength(0);
     expect(logs.join("\n")).toMatch(/No secrets or PII detected/);
+  });
+});
+
+// ─── --staged (Gate-2 pre-commit scan) ───────────────────────────────────────
+//
+// `--staged` scans the git index of process.cwd(), SCOPED to the mage docs root
+// (Gate-2 protects the KB, not app source). We point cwd at a throwaway mage repo
+// via a spy (no real chdir, so tests stay isolated) and assert the gate blocks a
+// planted secret in a mage/ note with FILE-attributed, masked output, passes a
+// clean note, and fails open on a non-git dir.
+
+const stagedDirs: string[] = [];
+afterEach(async () => {
+  for (const d of stagedDirs.splice(0)) await rm(d, { recursive: true, force: true });
+});
+
+/** A throwaway git repo that is ALSO a mage in-repo KB (Gate-2 is docs-root scoped). */
+async function mkStagedRepo(): Promise<string> {
+  const d = await mkdtemp(join(tmpdir(), "mage-redact-staged-"));
+  stagedDirs.push(d);
+  await run("git", ["-C", d, "init", "--quiet"], { throwOnError: true });
+  await run("git", ["-C", d, "config", "user.email", "test@example.com"], {
+    throwOnError: true,
+  });
+  await run("git", ["-C", d, "config", "user.name", "Test"], { throwOnError: true });
+  await mkdir(join(d, "mage"), { recursive: true });
+  await writeFile(
+    join(d, "mage", "metadata.json"),
+    JSON.stringify({ schema: "mage.v1", mode: "in-repo", project: "t" }),
+  );
+  return d;
+}
+
+async function stageFile(dir: string, name: string, content: string): Promise<void> {
+  const abs = join(dir, name);
+  await mkdir(dirname(abs), { recursive: true });
+  await writeFile(abs, content);
+  await run("git", ["-C", dir, "add", name], { throwOnError: true });
+}
+
+describe("redactCmd — --staged scans the git index of cwd", () => {
+  it("blocks on a planted staged secret, file-attributed and masked", async () => {
+    const dir = await mkStagedRepo();
+    await stageFile(dir, "mage/notes/leak.md", `GITHUB_TOKEN=${SECRET}\n`);
+    vi.spyOn(process, "cwd").mockReturnValue(dir);
+
+    const { findings, blocked } = await redactCmd(undefined, { staged: true, quiet: true });
+
+    expect(blocked).toBe(true);
+    const secret = findings.find((f) => f.severity === "secret");
+    expect(secret).toBeDefined();
+    // Findings carry the owning file and never the raw secret.
+    expect((secret as { file?: string }).file).toBe("mage/notes/leak.md");
+    expect(findings.every((f) => !f.preview.includes(SECRET))).toBe(true);
+  });
+
+  it("does not block when the staged file is clean", async () => {
+    const dir = await mkStagedRepo();
+    await stageFile(dir, "mage/notes/notes.md", CLEAN);
+    vi.spyOn(process, "cwd").mockReturnValue(dir);
+
+    const { findings, blocked } = await redactCmd(undefined, { staged: true, quiet: true });
+
+    expect(blocked).toBe(false);
+    expect(findings.filter((f) => f.severity === "secret")).toHaveLength(0);
+  });
+
+  it("fails open (no throw, not blocked) for a non-git dir", async () => {
+    const dir = await mkTmp(); // never git-init'd → not a repo.
+    vi.spyOn(process, "cwd").mockReturnValue(dir);
+
+    const { findings, blocked } = await redactCmd(undefined, { staged: true, quiet: true });
+
+    expect(blocked).toBe(false);
+    expect(findings).toHaveLength(0);
+  });
+
+  it("the non-quiet staged report prints file:line detail without the raw secret", async () => {
+    const dir = await mkStagedRepo();
+    await stageFile(dir, "mage/notes/leak.md", `api_key=${SECRET}\ncontact jane.doe@example.com\n`);
+    vi.spyOn(process, "cwd").mockReturnValue(dir);
+    const logs: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((m?: unknown) => void logs.push(String(m)));
+    vi.spyOn(console, "error").mockImplementation((m?: unknown) => void logs.push(String(m)));
+
+    const { blocked } = await redactCmd(undefined, { staged: true });
+
+    expect(blocked).toBe(true);
+    const printed = logs.join("\n");
+    expect(printed).not.toContain(SECRET);
+    expect(printed).toContain("mage/notes/leak.md:line");
   });
 });

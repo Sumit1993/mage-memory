@@ -2,6 +2,8 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { gitInit } from "../git.js";
+import { resolveHooksDir } from "../git-hooks.js";
 import { connect } from "./connect.js";
 import { disconnect } from "./disconnect.js";
 
@@ -97,5 +99,50 @@ describe("disconnect", () => {
     expect(r.backedUp).toBe(false);
     // no backup written when nothing changed
     expect(await exists(`${localPath(dir)}.bak`)).toBe(false);
+  });
+
+  // ─── Gate-2 redaction pre-commit hook (ADR-0018 §7) ─────────────────────────
+
+  it("in a git repo, disconnect removes the mage-installed pre-commit hook", async () => {
+    const dir = await freshDir();
+    await gitInit(dir);
+
+    await connect({ cwd: dir, yes: true });
+    const hooksDir = await resolveHooksDir(dir);
+    const hookPath = join(hooksDir as string, "pre-commit");
+    expect(await exists(hookPath)).toBe(true);
+
+    const r = await disconnect({ cwd: dir, yes: true });
+    expect(r.hook).toEqual({ removed: true });
+    expect(await exists(hookPath)).toBe(false);
+  });
+
+  it("disconnect leaves a foreign pre-commit hook untouched", async () => {
+    const dir = await freshDir();
+    await gitInit(dir);
+
+    const hooksDir = await resolveHooksDir(dir);
+    const hookPath = join(hooksDir as string, "pre-commit");
+    const foreign = "#!/bin/sh\necho host-hook\n";
+    await writeFile(hookPath, foreign);
+
+    const r = await disconnect({ cwd: dir, yes: true });
+    expect(r.hook).toEqual({ removed: false });
+    // foreign hook preserved verbatim
+    expect(await readFile(hookPath, "utf8")).toBe(foreign);
+  });
+
+  it("gitHook:false skips hook removal entirely", async () => {
+    const dir = await freshDir();
+    await gitInit(dir);
+
+    await connect({ cwd: dir, yes: true });
+    const hooksDir = await resolveHooksDir(dir);
+    const hookPath = join(hooksDir as string, "pre-commit");
+
+    const r = await disconnect({ cwd: dir, yes: true, gitHook: false });
+    expect(r.hook).toBeUndefined();
+    // hook left in place
+    expect(await exists(hookPath)).toBe(true);
   });
 });

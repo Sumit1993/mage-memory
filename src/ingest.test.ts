@@ -19,7 +19,7 @@ function byPath(sources: IngestSource[]): Map<string, IngestSource> {
   return new Map(sources.map((s) => [s.relPath, s]));
 }
 
-describe("scanIngestSources — classification (ADR-0013, read-only)", () => {
+describe("scanIngestSources — classification (ADR-0018, no feeders, read-only)", () => {
   async function fixture(): Promise<IngestSource[]> {
     const root = await mkDir();
     // skill: SKILL.md with name + description
@@ -28,13 +28,15 @@ describe("scanIngestSources — classification (ADR-0013, read-only)", () => {
       "pack/SKILL.md",
       "---\nname: my-skill\ndescription: |\n  Does a thing.\n  More detail on a second line.\n---\n# My Skill\n",
     );
-    // feeder-ecc: instinct yaml under instincts/ with trigger + confidence
+    // skipped: instinct yaml under instincts/ — foreign memory, NOT harvested
+    // (ADR-0018 §8 feeders cut). It must be absent from the manifest entirely.
     await put(
       root,
       "instincts/inst-1.yaml",
       "id: inst-1\ntrigger: on save\nconfidence: 0.8\n",
     );
-    // feeder-native: MEMORY.md
+    // prose: MEMORY.md carries no mage frontmatter, so it is plain prose now —
+    // no native-memory special case (ADR-0018 §8).
     await put(root, "memory/MEMORY.md", "# Memory Index\n\n- a thing\n");
     // transcript: a .jsonl file
     await put(root, "logs/foo.jsonl", '{"role":"user","content":"hi"}\n');
@@ -59,16 +61,16 @@ describe("scanIngestSources — classification (ADR-0013, read-only)", () => {
     expect(s?.summary).toBe("Does a thing.");
   });
 
-  it("classifies an instincts/*.yaml with trigger+confidence as 'feeder-ecc'", async () => {
+  it("skips an instincts/*.yaml (foreign memory, not harvested)", async () => {
     const m = byPath(await fixture());
-    const s = m.get("instincts/inst-1.yaml");
-    expect(s?.kind).toBe("feeder-ecc");
-    expect(s?.title).toBe("inst-1");
+    expect(m.has("instincts/inst-1.yaml")).toBe(false);
   });
 
-  it("classifies MEMORY.md as 'feeder-native'", async () => {
+  it("classifies a frontmatter-less MEMORY.md as plain 'prose'", async () => {
     const m = byPath(await fixture());
-    expect(m.get("memory/MEMORY.md")?.kind).toBe("feeder-native");
+    const s = m.get("memory/MEMORY.md");
+    expect(s?.kind).toBe("prose");
+    expect(s?.title).toBe("Memory Index");
   });
 
   it("classifies a .jsonl file as 'transcript'", async () => {
@@ -95,12 +97,12 @@ describe("scanIngestSources — classification (ADR-0013, read-only)", () => {
     expect(paths).not.toContain("assets/pic.png");
   });
 
-  it("returns sources sorted by relPath, one per ingestable file", async () => {
+  it("returns sources sorted by relPath, one per ingestable file (no yaml)", async () => {
     const paths = (await fixture()).map((s) => s.relPath);
     expect(paths).toEqual([...paths].sort());
+    // instincts/inst-1.yaml and assets/pic.png are skipped; MEMORY.md is prose.
     expect(paths).toEqual([
       "docs/readme.md",
-      "instincts/inst-1.yaml",
       "logs/foo.jsonl",
       "memory/MEMORY.md",
       "notes/real.md",
@@ -109,19 +111,17 @@ describe("scanIngestSources — classification (ADR-0013, read-only)", () => {
   });
 });
 
-describe("scanIngestSources — feeder-ecc via frontmatter (outside instincts/)", () => {
-  it("classifies a .yml with frontmatter trigger+confidence as 'feeder-ecc'", async () => {
-    // gray-matter only reads frontmatter from a fenced block; bare YAML files are
-    // also handled. Use a .yml whose top-level YAML carries trigger+confidence.
+describe("scanIngestSources — yaml is never ingestable (feeders cut)", () => {
+  it("skips a .yml that looks like an ECC instinct (trigger+confidence)", async () => {
+    // Foreign instinct YAML carries trigger+confidence, but mage no longer
+    // harvests it — it distills only its own `.learnings/` schema (ADR-0018 §8).
     const root = await mkDir();
     await put(root, "rules/r.yml", "name: r-rule\ntrigger: edit\nconfidence: 0.5\n");
-    const m = byPath(await scanIngestSources(root));
-    const s = m.get("rules/r.yml");
-    expect(s?.kind).toBe("feeder-ecc");
-    expect(s?.title).toBe("r-rule");
+    const out = await scanIngestSources(root);
+    expect(out).toEqual([]);
   });
 
-  it("a .yaml without trigger+confidence and not under instincts/ is skipped", async () => {
+  it("skips a plain config .yaml", async () => {
     const root = await mkDir();
     await put(root, "config/app.yaml", "name: app\nport: 8080\n");
     const out = await scanIngestSources(root);
@@ -129,18 +129,35 @@ describe("scanIngestSources — feeder-ecc via frontmatter (outside instincts/)"
   });
 });
 
-describe("scanIngestSources — feeder-native via metadata.type", () => {
-  it("classifies a .md with metadata.type in the native set as 'feeder-native'", async () => {
+describe("scanIngestSources — a .md with metadata.type classifies by its real frontmatter", () => {
+  it("a .md with metadata.type but no mage type/tags is 'prose' (no native case)", async () => {
+    // What used to trip the native-feeder detector now falls through the normal
+    // .md branch: with no top-level mage `type`/`tags`, it is plain prose.
     const root = await mkDir();
     await put(
       root,
       "mem/note.md",
-      "---\nname: A User Fact\nmetadata:\n  type: user\n---\nbody\n",
+      "---\nname: A User Fact\nmetadata:\n  type: user\n---\n# A User Fact\n\nbody\n",
     );
     const m = byPath(await scanIngestSources(root));
     const s = m.get("mem/note.md");
-    expect(s?.kind).toBe("feeder-native");
+    expect(s?.kind).toBe("prose");
     expect(s?.title).toBe("A User Fact");
+  });
+
+  it("a .md with metadata.type AND a real mage type is a 'note'", async () => {
+    // Real mage frontmatter wins: a top-level `type` makes it a tracked note,
+    // regardless of any incidental `metadata.type`.
+    const root = await mkDir();
+    await put(
+      root,
+      "mem/tracked.md",
+      "---\ntype: gotcha\nmetadata:\n  type: user\n---\n# Tracked\n\nbody\n",
+    );
+    const m = byPath(await scanIngestSources(root));
+    const s = m.get("mem/tracked.md");
+    expect(s?.kind).toBe("note");
+    expect(s?.title).toBe("Tracked");
   });
 });
 
@@ -193,10 +210,10 @@ describe("scanIngestSources — walking + skips", () => {
     expect(m.get("bad.md")?.kind).toBe("prose");
   });
 
-  it("degrades an unparseable .yaml to skipped (not a transcript, no crash)", async () => {
+  it("skips a .yaml without reading it (no crash on malformed content)", async () => {
     const root = await mkDir();
     await put(root, "weird.yaml", "::: not : valid : yaml :::\n");
-    // No trigger+confidence, not under instincts/ → skipped, no throw.
+    // YAML is never ingestable now — skipped before any parse, so no throw.
     const out = await scanIngestSources(root);
     expect(out).toEqual([]);
   });
@@ -216,12 +233,10 @@ describe("scanIngestSources — priority invariants", () => {
     expect(m.get("p/SKILL.md")?.kind).toBe("skill");
   });
 
-  it("an empty instincts/*.yaml is 'feeder-ecc' with no title, without throwing", async () => {
+  it("an empty .yaml under instincts/ is skipped, without throwing", async () => {
     const root = await mkDir();
     await put(root, "instincts/empty.yaml", "");
-    const m = byPath(await scanIngestSources(root));
-    const s = m.get("instincts/empty.yaml");
-    expect(s?.kind).toBe("feeder-ecc");
-    expect(s?.title).toBeUndefined();
+    const out = await scanIngestSources(root);
+    expect(out).toEqual([]);
   });
 });

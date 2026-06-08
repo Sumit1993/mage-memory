@@ -9,7 +9,7 @@
 ![License](https://img.shields.io/badge/License-MIT-blue?style=flat)
 ![Node](https://img.shields.io/badge/Node-%3E%3D18-339933?style=flat&logo=node.js)
 ![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey?style=flat)
-![Status](https://img.shields.io/badge/status-0.0.6-orange?style=flat)
+![Status](https://img.shields.io/badge/status-0.0.7-orange?style=flat)
 
 ## What it does
 
@@ -43,7 +43,8 @@ mage's skills ship as a **Claude Code plugin** so they group under a clean
 You get `mage:learn` (capture a note), `mage:guide` (how to use the base), and the
 `mage:specify` · `mage:clarify` · `mage:plan` · `mage:tasks` · `mage:implement` ·
 `mage:analyze` · `mage:constitution` spec-driven-development workflow. `mage init`
-prints these two lines for you (it never runs slash commands). Per-wing
+prints these two lines for you (it never runs slash commands). `mage:distill`
+mines observed scratch into notes. Per-wing
 `mage-wing-*` skills are still **generated** into `.claude/skills/` + `.agents/skills/`
 by `mage skills`. Backfill existing docs/skills with `mage:learn --from <dir>`.
 
@@ -179,6 +180,7 @@ listed for transparency). The deterministic/judgment split behind this is
 | `mage index` | `Stop` hook · after `mage:learn` | Regenerate the always-loaded `INDEX.md` (+ per-wing indexes). Never hand-edit the output. |
 | `mage skills` | after a new wing appears | Regenerate the per-wing `mage-wing-<x>` skills into `.claude/skills/` + `.agents/skills/`. `--metrics --quiet` folds the metrics rollup at `Stop`. |
 | `mage ingest <dir>` | `mage:learn --from` | Enumerate + classify ingestable sources under a foreign `<dir>` (read-only) — what bulk-import distills into notes. |
+| `mage distill --json` | `mage:distill` skill | Read `.learnings/` events into note candidates. |
 | `mage redact <file>` | `mage:learn` / graduate skill · git pre-commit | Scan/strip secrets from a file or stdin — redaction Gate 2 before a tracked note/skill is written. |
 
 Run `mage <command> --help` for per-command flags.

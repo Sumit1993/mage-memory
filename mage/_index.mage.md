@@ -2,7 +2,7 @@
 
 # mage
 
-> 26 notes. Part of the [index](INDEX.md).
+> 27 notes. Part of the [index](INDEX.md).
 
 ### decisions
 
@@ -36,6 +36,7 @@
 
 ### redaction
 
+- `gotcha` [Gotcha — scope Gate-2 to the knowledge base, not the whole repo](notes/gate2-blocks-own-redaction-fixtures.md) — gate2, pre-commit, hook, redaction, scope, docs-root, fixtures, connect, dogfood _(reviewed 2026-06-08)_
 - `gotcha` [Gotcha — key bodies with `-`/`_` partially leak past the high-entropy detector](notes/redaction-anthropic-key-detector.md) — gotcha, key, bodies, partially, leak, past, high, entropy, detector, mage, redaction _(reviewed 2026-06-07)_
 
 ### roadmap

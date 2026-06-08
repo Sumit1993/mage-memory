@@ -96,17 +96,15 @@ adopting an authored skill is *remembering*, not copying a source (ADR-0013 §5)
 1. **Inventory `<dir>` deterministically.** FIRST run the read-only CLI
    `mage ingest <dir> --json`. It returns a classified manifest: an array of
    `{ relPath, kind, title, summary }` where `kind` is one of `skill` | `note` |
-   `prose` | `transcript` | `feeder-ecc` | `feeder-native`. Don't split sources
-   by hand — drive the rest of the flow per `kind`:
+   `prose` | `transcript`. Don't split sources by hand — drive the rest of the
+   flow per `kind`:
    - `skill` → **adopt-in-place** (step 3).
    - `prose` | `transcript` | `note` → **distill to notes** (step 2 / normal
      capture via the **Steps** above).
-   - `feeder-ecc` | `feeder-native` → the lower-confidence **FEEDER** path
-     (step 4).
 
 2. **For each prose / transcript / note file**, run the normal capture pipeline (classify →
    overlap-check → draft insight+procedure+pointers → redaction gate → write),
-   but defer the human confirm to the **bulk confirm** in step 5. Point
+   but defer the human confirm to the **bulk confirm** in step 4. Point
    `sources:` at the original file; never paste the source body in.
 
 3. **For each `kind: skill`, adopt-in-place** (do NOT rewrite from scratch):
@@ -121,17 +119,16 @@ adopting an authored skill is *remembering*, not copying a source (ADR-0013 §5)
      ADR-0013 §1). Link skill ↔ note.
    - **Re-emit** the skill as `mage-skill-<slug>` so it joins mage's catalog.
 
-4. **For each `kind: feeder-ecc` / `feeder-native`, take the FEEDER path —
-   lower-confidence, same pipeline (ADR-0005).** ECC `continuous-learning-v2`
-   instincts (`feeder-ecc`) and Claude native auto-memory (`feeder-native`)
-   enter through this same `--from` flow, but as **feeders**: mark them
-   lower-confidence, require a recurrence/quality bar before promotion, and lean
-   harder on the redaction gate. They feed mage; they never rival it as canonical.
-
-5. **Human-confirm in bulk.** Present the full batch — new notes, adopted
+4. **Human-confirm in bulk.** Present the full batch — new notes, adopted
    skills, minted backing notes, and any items the redaction gate blocked — as
    one review. Write only after the user confirms; then suggest `mage index` /
    `mage skills` and the `git` commands (never auto-run, never auto-commit).
+
+> **Observed scratch is a different lane.** `--from` imports *foreign* docs by
+> pointer. Distilling mage's **own** observed `.learnings/*.jsonl` into notes
+> lives in the separate **mage:distill** skill — mage reads only its own
+> artifacts; foreign memory stores (ECC instincts, Claude `MEMORY.md`) are not
+> harvested (ADR-0018).
 
 ## Quality bar
 

@@ -1,7 +1,7 @@
 {
   "name": "mage-memory",
-  "version": "0.0.6",
-  "description": "mage — a portable, self-maintaining knowledge base for software systems: durable git-backed notes navigable as an Obsidian graph, usable by any AI coding agent. CLI: init, index, skills, ingest, redact, observe, connect, dream, link, verify, unlink, list, status, doctor.",
+  "version": "0.0.7",
+  "description": "mage — a portable, self-maintaining knowledge base for software systems: durable git-backed notes navigable as an Obsidian graph, usable by any AI coding agent. CLI: init, index, skills, ingest, redact, observe, connect, dream, link, verify, unlink, list, status, doctor, distill.",
   "type": "module",
   "bin": {
     "mage": "dist/cli.js"

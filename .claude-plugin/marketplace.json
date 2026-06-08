@@ -10,7 +10,7 @@
       "name": "mage",
       "source": "./",
       "description": "mage skills: mage:learn (capture durable notes) + the mage:specify / mage:clarify / mage:plan / mage:tasks / mage:implement / mage:analyze / mage:constitution spec-driven workflow + mage:guide (how to use the knowledge base).",
-      "version": "0.0.6",
+      "version": "0.0.7",
       "author": { "name": "Sumit Patel" },
       "homepage": "https://github.com/Sumit1993/mage-memory",
       "repository": "https://github.com/Sumit1993/mage-memory",
