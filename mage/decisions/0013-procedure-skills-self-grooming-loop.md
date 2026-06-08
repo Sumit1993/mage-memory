@@ -74,6 +74,12 @@ load-bearing invariants — *no runtime of our own* ([ADR-0009](0009-no-runtime-
    human-confirmed in bulk) — adopting an authored skill is *remembering*, not
    *copying a source*. ECC instincts + native auto-memory enter the **same** `--from`
    path as lower-confidence **feeders** ([ADR-0005](0005-one-canonical-memory-others-are-feeders.md)).
+   > **Amendment (2026-06-08, [ADR-0018](0018-mage-distill-observed-scratch-reader.md)).**
+   > The **feeder half is cut**: ECC instincts + native auto-memory are **no longer
+   > harvested** — foreign stores are ignored, not fed in (the duplication / format-coupling
+   > argument, see ADR-0018 §8 + ADR-0005's amendment). **Adopt-in-place of the user's *own*
+   > skills via the *generic* `--from` importer stands** — only the ECC/native-feeder
+   > special-casing is removed.
 
 6. **Dream is the single applier of skill mutations.** Resolves ADR-0006 §27's open
    question: promote/optimize **detect** candidates; `/dream` **applies** note↔skill

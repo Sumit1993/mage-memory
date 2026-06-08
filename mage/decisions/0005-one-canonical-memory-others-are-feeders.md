@@ -12,6 +12,18 @@ provenance:
 
 # 0005 — Exactly one canonical durable memory (mage); native memories are feeders, not rivals
 
+> **Amendment (2026-06-08, distill grill — [ADR-0018](0018-mage-distill-observed-scratch-reader.md)).**
+> The **feeder mechanism is cut.** mage no longer harvests other tools' memory stores
+> (ECC instincts, Claude `MEMORY.md`): they have their own creation standards and
+> lifecycle, harvesting *duplicates* rather than consolidates, and ingesting their
+> formats couples mage to third-party schemas ([ADR-0007](0007-mine-agentmemory-design-not-depend.md)).
+> The "mage is canonical" core **stands**; what changes is its reach — mage is canonical
+> *for what mage captures*, and foreign stores are **independent neighbors, ignored**, not
+> demoted feeders to absorb. So below: clause "native auto-memory stays on as a *feeder*
+> … `/learn` harvests it", clause "homunculus's *proven algorithm is harvested*", and
+> "feeders may hold non-canonical duplicates until harvested" are **superseded** —
+> `mage:learn --from` remains only a *generic* doc importer, with no ECC/native special-casing.
+
 The environment runs several memory systems — Claude's native auto-memory (Claude-only, on by default), the ECC `continuous-learning-v2` "homunculus" (wired but inactive), and context-mode (FTS5 session memory). To avoid N competing durable stores that drift and duplicate, **mage is the single canonical, deliberate, portable, cross-agent durable memory; every other system is either disabled or demoted to an ephemeral feeder that `/learn` harvests.**
 
 ## Decision

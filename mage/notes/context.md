@@ -2,13 +2,13 @@
 type: reference
 tags: [mage/design]
 created: "2026-05-29"
-updated: "2026-06-01"
-last_reviewed: "2026-06-01"
+updated: "2026-06-08"
+last_reviewed: "2026-06-08"
 status: active
 provenance:
   repo: mage-memory
   commit: 1ec8225
-keywords: [knowledge-base, note, wing, room, index, tag, moc, skill, work-unit, artifact, note-types, glossary]
+keywords: [knowledge-base, note, wing, room, index, tag, moc, skill, work-unit, artifact, note-types, glossary, distill]
 ---
 
 # mage — context & glossary
@@ -84,6 +84,9 @@ A pointer to canonical external knowledge (URL, ticket, `file:line`) carried in 
 
 **Remember / Recall**: write to / read from the knowledge base.
 **Learn**: capture a new note from work in progress (the brownfield path) — draft → overlap-check → human-confirm → promote.
+
+**Distill**: the auto-capture sibling of Learn — read mage's *own* observed scratch (`.learnings/`) and propose durable notes from it, **on first sight** (no recurrence gate — that is 0.0.8). A deterministic `mage distill --json` reader groups un-distilled events into candidate clusters (chunked by `compact`/session boundary, salience-filtered) under a per-session **offset watermark** in `.metrics/distill.json` (advanced explicitly via `mage distill --seen` after the human dispositions a batch); the `mage:distill` judgment skill reads them through four lenses — **user corrections & nudges** (first-class), error→fix, repeated workflow, tool preference — and drafts notes through Learn's shared pipeline (overlap-check → redact Gate 2 → human-confirm → write). Reads only mage's own artifacts; foreign memory stores are **ignored, not harvested**. See [ADR-0018](../decisions/0018-mage-distill-observed-scratch-reader.md).
+
 **Dream**: the maintenance pass that keeps memory latest+correct — flags staleness, supersedes contradictions, consolidates thin notes, archives, and re-verifies notes against changed source. Nothing is hard-deleted (git history + `archive/`).
 **Promote**: move up the durability ladder, each rung gated — *scratch → note* (a draft becomes a durable note, gated by independent validation) and *note → Procedure skill* (a proven procedural note graduates to its own loadable skill).
 
@@ -100,9 +103,9 @@ _Avoid_: log line, observation (as the product noun)
 
 **Applier**: the single piece of code ("dream") that mutates the skill catalog (graduate / demote / reword) and notes (supersede / consolidate / prune / archive). Detection (promote/optimize) only *proposes*; the applier is the one serialized writer and the choke point that enforces the never-loosen ceilings (no auto-commit · no bespoke-skill edit · no hard-delete · no past-Gate-2). See [ADR-0016 §4](../decisions/0016-context-match-confidence-ladder-applier.md).
 
-**Plumbing command vs Human verb**: mage's CLI splits in two. *Plumbing seams* (`observe`, `redact --check`, `ingest --json`) are invoked by **machinery** — host hooks, the graduate skill, a git pre-commit hook — never typed by humans; they exist only because hooks/skills/git reach mage through the CLI. *Human verbs* (`init`, `index`, `skills`, `dream`, `learn`, `link`, `list`, `status`, `doctor`) are what people type. A hook may *fire* a deterministic plumbing command or *nudge* a judgment verb, but never reasons itself ([ADR-0009](../decisions/0009-no-runtime-automation-rides-host-hooks.md)). See [CONVENTIONS §10](../../CONVENTIONS.md).
+**Plumbing command vs Human verb**: mage's CLI splits in two. *Plumbing seams* (`observe`, `redact --check`, `ingest --json`, `distill --json`) are invoked by **machinery** — host hooks, the graduate skill, a git pre-commit hook — never typed by humans; they exist only because hooks/skills/git reach mage through the CLI. *Human verbs* (`init`, `index`, `skills`, `dream`, `learn`, `link`, `list`, `status`, `doctor`) are what people type. A hook may *fire* a deterministic plumbing command or *nudge* a judgment verb, but never reasons itself ([ADR-0009](../decisions/0009-no-runtime-automation-rides-host-hooks.md)). See [CONVENTIONS §10](../../CONVENTIONS.md).
 
-**Connect / Disconnect**: the opt-in act of wiring (or removing) mage's capture into a host. `mage connect` writes the `mage observe` hook block — `id:"mage:*"`-marked, idempotent — into `.claude/settings.local.json` (per-repo, gitignored; `--user` for all sessions); `mage disconnect` removes only those entries. Capture is **opt-in, never bundled with the skills plugin**, and `connect` **fully ignores** any other observer (e.g. ECC) — they coexist; consolidate via the feeder path, not by disabling. The per-harness adapter ([ADR-0009](../decisions/0009-no-runtime-automation-rides-host-hooks.md), [ADR-0017](../decisions/0017-mage-connect-host-hook-adapter.md)); the `.learnings/` schema is harness-neutral so other harnesses are additive input adapters.
+**Connect / Disconnect**: the opt-in act of wiring (or removing) mage's capture into a host. `mage connect` writes the `mage observe` hook block — `id:"mage:*"`-marked, idempotent — into `.claude/settings.local.json` (per-repo, gitignored; `--user` for all sessions); `mage disconnect` removes only those entries. Capture is **opt-in, never bundled with the skills plugin**, and `connect` **fully ignores** any other observer (e.g. ECC) — they coexist; mage reads only its **own** artifacts and ignores foreign memory stores entirely (no harvest, no feeder — [ADR-0018](../decisions/0018-mage-distill-observed-scratch-reader.md)). The per-harness adapter ([ADR-0009](../decisions/0009-no-runtime-automation-rides-host-hooks.md), [ADR-0017](../decisions/0017-mage-connect-host-hook-adapter.md)); the `.learnings/` schema is harness-neutral so other harnesses are additive input adapters.
 _Avoid_: install/uninstall (as the product noun)
 **Supersede**: replace a note's claim with a newer one, keeping the old linked + marked (never a silent overwrite).
 

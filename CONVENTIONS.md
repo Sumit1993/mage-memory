@@ -280,8 +280,8 @@ mage's CLI is one binary but **three tiers**, sorted by the deterministic/judgme
 
 | Tier | Commands | Invoked by | Notes |
 |---|---|---|---|
-| **Hook-fired** (plumbing seams) | `observe`, `skills --metrics --quiet` (Stop rollup fold), `index --if-changed`, `skills`, `verify --check`, `redact --check` | host hooks · git pre-commit · the graduate skill | Deterministic. **Users never type these.** They are commands only because hooks/skills/git reach mage across a process boundary. |
-| **Judgment — nudged** | `learn`, `dream`, (future) `promote`, `optimize` | the agent, *nudged* by a hook | The hook prints a nudge; the **agent** reasons. Never blindly auto-run. |
+| **Hook-fired** (plumbing seams) | `observe`, `skills --metrics --quiet` (Stop rollup fold), `index --if-changed`, `skills`, `verify --check`, `redact --check[ --staged]`, `ingest --json`, `distill --json` / `--seen` | host hooks · git pre-commit · the learn/distill/graduate skills | Deterministic. **Users never type these.** They are commands only because hooks/skills/git reach mage across a process boundary. |
+| **Judgment — nudged** | `learn`, `distill` (`mage:distill`), `dream`, (future) `promote`, `optimize` | the agent, *nudged* by a hook | The hook prints a nudge; the **agent** reasons. Never blindly auto-run. |
 | **Human verbs** | `init`, `connect`, `disconnect`, `skills --metrics` (read-only report), `doctor`, `status`, `list`, `link`, `unlink` | a person | Setup + read-only queries + judgment-invoked mutations. |
 
 **Guardrails (all tiers):**
@@ -291,8 +291,10 @@ mage's CLI is one binary but **three tiers**, sorted by the deterministic/judgme
   `mage/.metrics/` cache (ADR-0016 §2) — never the catalog, never a commit.
 - **Double-observe is tolerated, not policed** *(amended, [ADR-0017](mage/decisions/0017-mage-connect-host-hook-adapter.md) §5)*:
   mage and a host's own observer (e.g. ECC homunculus) may coexist — separate files,
-  separate consumers, zero added cost. Consolidate via the feeder path (ingest ECC), not
-  by disabling it. `mage connect` fully ignores it.
+  separate consumers, zero added cost. mage reads only its **own** artifacts and ignores
+  foreign memory stores entirely (no harvest — **feeders cut**,
+  [ADR-0018](mage/decisions/0018-mage-distill-observed-scratch-reader.md)). `mage connect`
+  fully ignores it.
 - **Batch, don't spam:** accumulate changed note-paths during a turn; run `mage index`
   **once at `Stop`**, not after every edit.
 - **async + short timeout** on every non-blocking hook, so mage never stalls the turn.
@@ -309,6 +311,13 @@ because mage ships as an npm `bin`, the wired hook lines are clean one-liners (`
 (per-repo, gitignored; `--user` for `~/.claude/settings.json`), `id:"mage:*"`-prefixed;
 re-running is idempotent (replace-by-id), malformed JSON is refused (never clobbered), and
 a `.bak` is written first. `mage disconnect` removes only the `mage:*` entries.
+
+**Redaction pre-commit hook** ([ADR-0018](mage/decisions/0018-mage-distill-observed-scratch-reader.md) §7, 0.0.7):
+`mage connect` *also* installs (opt-in, **independently toggleable**) a blocking git
+`pre-commit` hook → `mage redact --check --staged` — redaction Gate 2 at the tracked write
+(block a live secret, warn PII, `--no-verify` escapes). Same discipline as the settings
+block: refuse-don't-clobber an existing hook, idempotent by marker, `.bak` first. This is
+the deterministic, un-skippable backstop the skill-step `mage redact` (judgment-tier) can't be.
 
 There is **no `mage clean`** — `.learnings/` rotation + purge are internal to `mage observe`.
 

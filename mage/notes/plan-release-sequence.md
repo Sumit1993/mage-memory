@@ -36,7 +36,7 @@ splits collapsed). **Status** tracks where each release stands.
 | **0.0.4** | `mage learn --from` ingest **tooling**: deterministic source enumeration, adopt-in-place skill ingest, **feeder** (ECC/native) skeleton — the runtime helpers behind the skill prose already shipped in 0.0.3 | 0013, 0005, 0004 | 0.0.3 | locked | **shipped¹** |
 | **0.0.5** | **`mage observe`** → `.learnings/*.jsonl` (keystone) + **skill-load events** + **Redaction Gate 1** | 0009, 0014, 0013, 0015 | 0.0.4 | locked | **shipped** |
 | **0.0.6** | **connect/disconnect** (hook adapter → `settings.local.json`, `id:"mage:*"`) + **context-match metrics, read-only** via `mage skills --metrics` + `mage/.metrics/` rollup (per-turn fold) + keyword-derivation fix | 0009, 0005, 0015, 0016, **0017** | 0.0.5 | locked | **shipped²** |
-| **0.0.7** | **distill**: `mage:learn` ingest `.learnings/` + native/ECC feeders | 0005, 0009, 0004, 0015 | 0.0.6 | **grill** | planned |
+| **0.0.7** | **distill**: `mage distill --json` reader + `mage:distill` skill over `.learnings/` → notes **on first sight**; feeders **cut**; Gate-2 **pre-commit hook** via `connect` | **0018**, 0015, 0014, 0009 | 0.0.6 | **grilled** | planned |
 | **0.0.8** | **self-grooming**: promote-on-recurrence + **note→skill graduation** + `/mage-optimize` auto-reword + full `/dream` healing sweep (**dream applies** graduation/demotion) | 0006, 0013, 0005, 0016 | 0.0.7 | **grill** *(mechanics)* | planned |
 | **0.0.9** | **MCP recall** accelerator *(independent track)* | 0009 | 0.0.2 | **grill** | planned |
 | **0.0.10** | **polish**: Obsidian dashboards + **icon/visualization** + pre-release chores | 0010, 0013 | — | locked | planned |
@@ -93,7 +93,7 @@ file rotation — only reveals bugs when actually run. **Definition of done, per
    also pre-validates connect's payload→event mapping). Remove the temp hook after.
 4. Only then tag + `npm publish`.
 
-## Grills to run (remaining: 4 — one tiny, the rest mechanics)
+## Grills to run (remaining: 2 — 0.0.8 self-grooming + 0.0.9 MCP)
 
 The 2026-06-06 observe grill ([ADR-0015](../decisions/0015-mage-observe-capture-schema.md)
 + [ADR-0016](../decisions/0016-context-match-confidence-ladder-applier.md)) pre-resolved
@@ -104,7 +104,7 @@ decide, below.
 
 - **0.0.5 observe** — **GRILLED ✓ + locked** ([ADR-0015](../decisions/0015-mage-observe-capture-schema.md)/[ADR-0016](../decisions/0016-context-match-confidence-ladder-applier.md)); also landed the [ADR-0014](../decisions/0014-two-gate-redaction.md) redaction reframe + [CONVENTIONS §10](../../CONVENTIONS.md). **Build next, no grill.**
 - **~~0.0.6 connect~~ — GRILLED 2026-06-06** → [ADR-0017](../decisions/0017-mage-connect-host-hook-adapter.md) (+ amends [ADR-0009](../decisions/0009-no-runtime-automation-rides-host-hooks.md)'s interlock; CONVENTIONS §10 updated). Locked: `mage connect`/`disconnect` write `id:"mage:*"` hooks to `settings.local.json` (per-repo, `--user` for global; idempotent, `.bak`-safe, refuse-on-malformed); **full-ignore ECC** (no interlock — coexist + feeder); dual-mode CLI via a shared `resolveInteractive` (non-TTY ⇒ non-interactive), generalized to init/link/unlink; hook block = 6 observe events (incl. PostToolUseFailure) + `Stop` `mage skills --metrics --quiet`; read-only context-match via **`mage skills --metrics`** over a persistent `mage/.metrics/` rollup (Option B, per-turn fold); keyword-derivation noise fixed at capture; "dream tuning" dropped. **Carry-in still open:** verify whether Claude Code fires *both* `PostToolUse` and `PostToolUseFailure` for one failure (dedupe if so) — confirm during the build's real-session dogfood.
-- **0.0.7 distill** — JSONL path layout, long-session chunking/token budget, dedup vs INDEX overlap-check, Redaction Gate 2 (commit-boundary), native-memory reconciliation policy.
+- **~~0.0.7 distill~~ — GRILLED 2026-06-08** → [ADR-0018](../decisions/0018-mage-distill-observed-scratch-reader.md) (amends [ADR-0005](../decisions/0005-one-canonical-memory-others-are-feeders.md) + [ADR-0013](../decisions/0013-procedure-skills-self-grooming-loop.md) §5). Locked: distill = deterministic `mage distill --json` reader + `mage:distill` judgment skill (separate from `learn`, shares its pipeline); **notes on first sight** (recurrence/graduation → 0.0.8); per-session **offset watermark** in `.metrics/distill.json` (CLOSED-only, explicit `--seen` advance); chunk by `compact`/session boundary; **four balanced lenses** (user-corrections **first-class**, error→fix, repeated-workflow, tool-preference); salience-filter→cap-with-logged-spill; **two-stage dedup** (deterministic keyword/wing/path pre-filter → model merge); Redaction **Gate 2 = inline `mage redact` + a blocking `pre-commit` hook** via `mage connect`; **feeders cut** (own `.learnings/` only; `--from` stays a generic importer); auto-distill is a **deferred opt-in rung** (ADR-0009 lines 45/53), not forbidden.
 - **0.0.8 self-grooming** *(mechanics)* — the cross-cutting is locked (ADR-0016: ladder, applier, held-out gate, context-match). Residual: recurrence/confidence **thresholds** (K, M, rate-floor), the bounded-edit budget ("textual learning rate"), rejected-edit buffer storage, the note→skill graduation **trigger**, decay scoring, consolidate heuristics, prune→archive-vs-delete. *(Build may stage promote→optimize→sweep even though the plan combines them.)*
 - **0.0.9 MCP** — transport (stdio vs Streamable HTTP), tool surface (search/get over INDEX+grep), the no-vector-in-core boundary. *(Independent — grill anytime.)*
 
@@ -127,6 +127,7 @@ decide, below.
 - detailed_by [ADR-0015 — mage observe capture schema](../decisions/0015-mage-observe-capture-schema.md)
 - detailed_by [ADR-0016 — context-match, the confidence ladder, and the single applier](../decisions/0016-context-match-confidence-ladder-applier.md)
 - detailed_by [ADR-0017 — mage connect: the host hook adapter](../decisions/0017-mage-connect-host-hook-adapter.md)
+- detailed_by [ADR-0018 — mage distill: the observed-scratch reader](../decisions/0018-mage-distill-observed-scratch-reader.md)
 - detailed_by [ADR-0011 — recursive scan; hub projects are wings](../decisions/0011-recursive-scan-hub-projects.md)
 - detailed_by [ADR-0012 — wings optional; standalone hubs](../decisions/0012-wings-optional-convention-standalone-hubs.md)
 - feeders_from [ADR-0005 — one canonical memory; others are feeders](../decisions/0005-one-canonical-memory-others-are-feeders.md)
