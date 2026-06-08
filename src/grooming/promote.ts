@@ -1,23 +1,24 @@
-// The promote manifest builder (ADR-0019 §4). PURE — no fs, no model, no network.
+// The promote manifest builder (ADR-0019 §4/§5). PURE — no fs, no model, no network.
 // The final deterministic stage of the promote core: it folds a recurrence tally,
 // the repo's notes, the thresholds dial, and the rejected-edit buffer into the
-// `PromoteManifest` the `mage:promote` skill reasons over.
+// `PromoteManifest` the `mage:promote` / `mage:graduate` skills reason over.
 //
-// THE CATCH-NET GATE (ADR-0019 §2/§4): a signature becomes a fresh "note" proposal
-// iff ALL THREE hold —
-//   ① it recurred in >= thresholds.promoteSessions DISTINCT sessions (the K gate),
-//   ② no existing note already covers it (isCovered — otherwise it's a merge/graduate
-//     concern, not a NEW note), and
-//   ③ the human has not already rejected an equivalent proposal (isRejected — the
-//     back-off half of the accept/reject loop, ADR-0016 §4).
-// A signature at/above K that IS covered is counted in `covered` (info only — never
-// proposed). Stage 1 emits ONLY the "note" action; graduate/merge/split/reword/demote
-// are Stage 2/3.
+// TWO LADDER RUNGS, one tally (ADR-0019 §4):
+//   ① scratch → note (the catch-net): a signature becomes a "note" proposal iff it
+//      recurred in >= thresholds.promoteSessions DISTINCT sessions (K), NO existing note
+//      covers it, and the human has not rejected an equivalent proposal.
+//   ② note → skill (graduate): a signature that IS covered by an existing note becomes a
+//      "graduate" proposal iff it recurred in >= thresholds.graduateSessions sessions (M)
+//      AND the covering note is PROCEDURAL (playbook/gotcha — you auto-load a procedure,
+//      not a fact, ADR-0019 §5), deduped by the note's relPath, and not rejected.
+// A covered signature below M is counted in `covered` (info only). The merge/split/reword/
+// demote actions are NOT emitted here — merge/split are judgment-constructed by the skill,
+// reword/demote come from `mage skills --metrics` (context-match), not the recurrence tally.
 //
-// The proposals are emitted in a STABLE order (signature key asc) so the manifest is
+// Proposals are emitted in a STABLE order (action asc, then target asc) so the manifest is
 // deterministic across runs — the skill and any snapshot test see the same sequence.
 
-import { isCovered } from "./covering-note.js";
+import { coveringNote } from "./covering-note.js";
 import { isRejected } from "./proposals.js";
 import type { Thresholds } from "./thresholds.js";
 import type {
@@ -28,15 +29,14 @@ import type {
 } from "./types.js";
 import type { ScannedNote } from "../scan.js";
 
-// ─── noteProposalFor — the canonical "note" proposal for a signature ────────────
+// ─── proposal constructors (PURE, stable — the rejected-buffer dedupe keys on these) ─
 
 /**
  * The canonical `"note"` proposal a signature would produce: `target` is the
  * signature KEY (action "note" acts on a signature, per types.ts), `payload` carries
  * the `{wing, keywords, hint}` the `mage:promote` skill drafts a note from, and
- * `evidence` is the human-readable recurrence rationale. PURE — derived solely from the
- * stat, so the SAME signature always yields the SAME proposal (the rejected-buffer
- * dedupe keys on action+target, both stable here).
+ * `evidence` is the recurrence rationale. PURE — the SAME signature always yields the
+ * SAME proposal (the rejected-buffer dedupe keys on action+target, both stable here).
  */
 export function noteProposalFor(key: string, stat: SignatureStat): Proposal {
   return {
@@ -47,18 +47,34 @@ export function noteProposalFor(key: string, stat: SignatureStat): Proposal {
   };
 }
 
-// ─── buildManifest — the catch-net gate ─────────────────────────────────────────
+/**
+ * The canonical `"graduate"` proposal for a PROVEN procedural note: `target` is the
+ * note's relPath (action "graduate" acts on a note — the applier reads it + derives its
+ * wing). `payload` carries what the `mage:graduate` skill shows the human; `evidence`
+ * is the recurrence rationale. PURE / stable for the rejected-buffer dedupe.
+ */
+export function graduateProposalFor(note: ScannedNote, stat: SignatureStat): Proposal {
+  return {
+    action: "graduate",
+    target: note.relPath,
+    payload: { note: note.relPath, wing: note.wing, type: note.type },
+    evidence: `note recurred in ${stat.sessions} session(s) — a proven ${note.type}, ready to graduate to a skill`,
+  };
+}
+
+/** A note graduates only if it is a PROCEDURE (playbook/gotcha) — ADR-0019 §5. */
+function isProcedural(type: string): boolean {
+  return type === "playbook" || type === "gotcha";
+}
+
+// ─── buildManifest — both ladder rungs ──────────────────────────────────────────
 
 /**
  * Build the {@link PromoteManifest} from a folded tally, the repo's notes, the
- * thresholds, the rejected buffer, and the suggested per-session cursors. For each
- * signature AT/ABOVE the recurrence gate (`stat.sessions >= thresholds.promoteSessions`):
- *   - if a note already covers it → bump `covered` (info; never proposed),
- *   - else if its canonical note-proposal is NOT already rejected → emit it,
- *   - else (rejected) → suppressed silently (the back-off).
- * Signatures BELOW the gate are ignored (not yet recurrent enough). Proposals are
- * sorted by signature key asc for a deterministic manifest. PURE — the caller supplies
- * `cursors` (the read path computes them from the tally) and they pass through verbatim.
+ * thresholds, the rejected buffer, and the suggested per-session cursors. PURE — the
+ * caller supplies `cursors` (the read path computes them from the tally) and they pass
+ * through verbatim. See the file header for the two-rung gate. Proposals are sorted
+ * (action asc, target asc) for a deterministic manifest.
  */
 export function buildManifest(
   tally: PromoteTally,
@@ -68,26 +84,46 @@ export function buildManifest(
   cursors: Record<string, number>,
 ): PromoteManifest {
   const proposals: Proposal[] = [];
+  const graduateTargets = new Set<string>(); // note relPaths already proposed (dedupe).
   let covered = 0;
 
-  // Stable iteration order: signature keys ascending → a deterministic manifest.
-  const keys = Object.keys(tally.signatures).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
-
-  for (const key of keys) {
+  for (const key of Object.keys(tally.signatures)) {
     const stat = tally.signatures[key];
     if (stat === undefined) continue;
     if (stat.sessions < thresholds.promoteSessions) continue; // below K — not yet recurrent.
 
     const sig = { wing: stat.wing, keywords: stat.keywords };
-    if (isCovered(sig, notes)) {
-      covered += 1; // an existing note already covers it — info, never proposed.
+    const cover = coveringNote(sig, notes);
+
+    if (cover !== null) {
+      covered += 1; // an existing note covers it — info, never a NEW-note proposal.
+      // Rung ②: a PROVEN (>= M) procedural note earns a Procedure skill (deduped).
+      if (
+        stat.sessions >= thresholds.graduateSessions &&
+        isProcedural(cover.type) &&
+        !graduateTargets.has(cover.relPath)
+      ) {
+        const gp = graduateProposalFor(cover, stat);
+        if (!isRejected(gp, rejected)) {
+          proposals.push(gp);
+          graduateTargets.add(cover.relPath);
+        }
+      }
       continue;
     }
 
+    // Rung ①: an UNCOVERED recurring signature → a fresh "note" proposal (unless rejected).
     const proposal = noteProposalFor(key, stat);
     if (isRejected(proposal, rejected)) continue; // the human already declined — back off.
     proposals.push(proposal);
   }
+
+  // Stable order: action asc, then target asc — deterministic across runs.
+  proposals.sort(
+    (a, b) =>
+      (a.action < b.action ? -1 : a.action > b.action ? 1 : 0) ||
+      (a.target < b.target ? -1 : a.target > b.target ? 1 : 0),
+  );
 
   return { proposals, cursors: { ...cursors }, covered };
 }

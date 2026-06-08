@@ -73,9 +73,13 @@ export interface Proposal {
   evidence: string;
 }
 
-/** The manifest `mage promote --json` emits for the `mage:promote` skill. */
+/** The manifest `mage promote --json` emits for the `mage:promote` / `mage:graduate` skills. */
 export interface PromoteManifest {
-  /** Fresh note-candidate proposals (signature ≥ K sessions, no covering note). */
+  /**
+   * Both ladder rungs (ADR-0019 §4): `"note"` proposals (signature ≥ K sessions, no
+   * covering note — the scratch→note catch-net) and `"graduate"` proposals (a covered,
+   * procedural note whose signature recurs ≥ M sessions — the note→skill rung).
+   */
   proposals: Proposal[];
   /** Suggested per-session watermark offsets (NOT written by the read path; `--seen` commits). */
   cursors: Record<string, number>;

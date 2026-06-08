@@ -41,7 +41,12 @@ function tally(
   return { v: 1, signatures, sessions };
 }
 
-function note(p: { wing?: string; keywords?: string[]; relPath?: string }): ScannedNote {
+function note(p: {
+  wing?: string;
+  keywords?: string[];
+  relPath?: string;
+  type?: string;
+}): ScannedNote {
   const wing = p.wing ?? "";
   const wings = wing ? [{ wing, room: wing }] : [];
   return {
@@ -50,7 +55,7 @@ function note(p: { wing?: string; keywords?: string[]; relPath?: string }): Scan
     wing: wings[0]?.wing ?? "",
     room: wings[0]?.room ?? "",
     title: "n",
-    type: "note",
+    type: p.type ?? "note",
     keywords: p.keywords ?? [],
   };
 }
@@ -136,6 +141,61 @@ describe("buildManifest — covering-note gate (covered counts, never proposed)"
     const t = tally({ "payments::webhook": stat({ wing: "payments", keywords: ["webhook"], sessions: 1 }) });
     const notes = [note({ wing: "payments", keywords: ["webhook"] })];
     expect(buildManifest(t, notes, T, [], {}).covered).toBe(0);
+  });
+});
+
+describe("buildManifest — graduation rung (covered PROCEDURAL note >= graduateSessions)", () => {
+  it("emits a graduate proposal for a covered playbook note recurring >= M sessions", () => {
+    const t = tally({ "payments::webhook": stat({ wing: "payments", keywords: ["webhook"], sessions: 5 }) });
+    const notes = [note({ wing: "payments", keywords: ["webhook"], relPath: "notes/pay.md", type: "playbook" })];
+    const m = buildManifest(t, notes, T, [], {});
+    const grad = m.proposals.find((p) => p.action === "graduate");
+    expect(grad).toBeDefined();
+    expect(grad?.target).toBe("notes/pay.md");
+    expect(m.covered).toBe(1); // still counted as covered (info), AND graduated.
+  });
+
+  it("does NOT graduate a covered procedural note BELOW M sessions (only covered++)", () => {
+    // promoteSessions=3 is met but graduateSessions=5 is not (sessions=4).
+    const t = tally({ "payments::webhook": stat({ wing: "payments", keywords: ["webhook"], sessions: 4 }) });
+    const notes = [note({ wing: "payments", keywords: ["webhook"], type: "playbook" })];
+    const m = buildManifest(t, notes, T, [], {});
+    expect(m.proposals.filter((p) => p.action === "graduate")).toHaveLength(0);
+    expect(m.covered).toBe(1);
+  });
+
+  it("does NOT graduate a NON-procedural covered note (e.g. reference) even >= M", () => {
+    const t = tally({ "payments::webhook": stat({ wing: "payments", keywords: ["webhook"], sessions: 9 }) });
+    const notes = [note({ wing: "payments", keywords: ["webhook"], type: "reference" })];
+    const m = buildManifest(t, notes, T, [], {});
+    expect(m.proposals.filter((p) => p.action === "graduate")).toHaveLength(0);
+    expect(m.covered).toBe(1);
+  });
+
+  it("graduates a gotcha note too (the other procedural type)", () => {
+    const t = tally({ "payments::webhook": stat({ wing: "payments", keywords: ["webhook"], sessions: 6 }) });
+    const notes = [note({ wing: "payments", keywords: ["webhook"], relPath: "notes/g.md", type: "gotcha" })];
+    const grad = buildManifest(t, notes, T, [], {}).proposals.find((p) => p.action === "graduate");
+    expect(grad?.target).toBe("notes/g.md");
+  });
+
+  it("dedupes graduation by note relPath when multiple recurring signatures cover one note", () => {
+    const t = tally({
+      "payments::webhook": stat({ wing: "payments", keywords: ["webhook"], sessions: 5 }),
+      "payments::retry": stat({ wing: "payments", keywords: ["retry"], sessions: 6 }),
+    });
+    const notes = [note({ wing: "payments", keywords: ["webhook", "retry"], relPath: "notes/pay.md", type: "playbook" })];
+    const grads = buildManifest(t, notes, T, [], {}).proposals.filter((p) => p.action === "graduate");
+    expect(grads).toHaveLength(1);
+    expect(grads[0]?.target).toBe("notes/pay.md");
+  });
+
+  it("respects the rejected buffer for a graduate proposal", () => {
+    const t = tally({ "payments::webhook": stat({ wing: "payments", keywords: ["webhook"], sessions: 5 }) });
+    const notes = [note({ wing: "payments", keywords: ["webhook"], relPath: "notes/pay.md", type: "playbook" })];
+    const rejected: Proposal[] = [{ action: "graduate", target: "notes/pay.md", payload: {}, evidence: "declined" }];
+    const grads = buildManifest(t, notes, T, rejected, {}).proposals.filter((p) => p.action === "graduate");
+    expect(grads).toHaveLength(0);
   });
 });
 

@@ -280,8 +280,8 @@ mage's CLI is one binary but **three tiers**, sorted by the deterministic/judgme
 
 | Tier | Commands | Invoked by | Notes |
 |---|---|---|---|
-| **Hook-fired** (plumbing seams) | `observe`, `skills --metrics --quiet` (Stop rollup fold), `index --if-changed`, `skills`, `verify --check`, `redact --check[ --staged]`, `ingest --json`, `distill --json` / `--seen` | host hooks · git pre-commit · the learn/distill/graduate skills | Deterministic. **Users never type these.** They are commands only because hooks/skills/git reach mage across a process boundary. |
-| **Judgment — nudged** | `learn`, `distill` (`mage:distill`), `dream`, (future) `promote`, `optimize` | the agent, *nudged* by a hook | The hook prints a nudge; the **agent** reasons. Never blindly auto-run. |
+| **Hook-fired** (plumbing seams) | `observe`, `skills --metrics --quiet` (Stop rollup fold), `index --if-changed`, `skills`, `verify --check`, `redact --check[ --staged]`, `ingest --json`, `distill --json` / `--seen`, `promote --json` / `--seen`, `dream --apply` / `--reject` (the single-writer applier reading ONE Proposal JSON from stdin) | host hooks · git pre-commit · the learn/distill/promote/graduate/optimize skills | Deterministic. **Users never type these.** They are commands only because hooks/skills/git reach mage across a process boundary. |
+| **Judgment — nudged** | `learn`, `distill` (`mage:distill`), `promote` (`mage:promote`), `graduate` (`mage:graduate`), `optimize` (`mage:optimize`), `dream` | the agent, *nudged* by a hook | The hook prints a nudge; the **agent** reasons. Never blindly auto-run. `mage:graduate`/`optimize` apply by piping a Proposal JSON to `mage dream --apply` — there is no `mage graduate`/`mage optimize` verb. |
 | **Human verbs** | `init`, `connect`, `disconnect`, `skills --metrics` (read-only report), `doctor`, `status`, `list`, `link`, `unlink` | a person | Setup + read-only queries + judgment-invoked mutations. |
 
 **Guardrails (all tiers):**
