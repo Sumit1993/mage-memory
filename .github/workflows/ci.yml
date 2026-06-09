@@ -48,17 +48,23 @@ jobs:
       - name: Test
         run: pnpm test
 
-      - name: Upload built CLI for smoke test
+      - name: Pack the publishable tarball
+        if: matrix.node-version == 22
+        run: |
+          PKG=$(npm pack --silent)
+          mv "$PKG" package.tgz
+
+      - name: Upload tarball for smoke test
         if: matrix.node-version == 22
         uses: actions/upload-artifact@v4
         with:
-          name: dist
-          path: dist/
+          name: package
+          path: package.tgz
           retention-days: 1
 
-  # Verify the *shipped* bundle (tsup target: node18) actually starts on the
-  # runtime floor advertised in package.json `engines` (>=18). No pnpm here —
-  # we only run the prebuilt artifact, so older Node is fine.
+  # Install the *published* tarball (deps and all) and verify the CLI starts
+  # on the runtime floor advertised in package.json `engines` (>=18). This is
+  # what an end user gets from `npm install -g mage-memory`. No pnpm here.
   smoke:
     name: cli smoke
     needs: test
@@ -68,22 +74,24 @@ jobs:
       matrix:
         node-version: [18, 20]
     steps:
-      - name: Download built CLI
+      - name: Download tarball
         uses: actions/download-artifact@v4
         with:
-          name: dist
-          path: dist/
+          name: package
 
       - name: Setup Node ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
 
+      - name: Install the packed CLI globally
+        run: npm install -g ./package.tgz
+
       - name: CLI reports its version
-        run: node dist/cli.js --version
+        run: mage --version
 
       - name: CLI prints help
-        run: node dist/cli.js --help
+        run: mage --help
 
   # Single stable status check to require in branch protection,
   # independent of how the matrices above expand.
