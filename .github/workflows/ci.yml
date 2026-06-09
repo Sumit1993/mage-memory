@@ -1,0 +1,108 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Build, typecheck and test on the dev-toolchain floor.
+  # pnpm 11 requires Node >= 22.13 (it uses node:sqlite), so the toolchain
+  # cannot run on older Node — see the `smoke` job for the runtime floor.
+  test:
+    name: build & test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [22, 24]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Build
+        run: pnpm build
+
+      - name: Test
+        run: pnpm test
+
+      - name: Pack the publishable tarball
+        if: matrix.node-version == 22
+        run: |
+          PKG=$(npm pack --silent)
+          mv "$PKG" package.tgz
+
+      - name: Upload tarball for smoke test
+        if: matrix.node-version == 22
+        uses: actions/upload-artifact@v4
+        with:
+          name: package
+          path: package.tgz
+          retention-days: 1
+
+  # Install the *published* tarball (deps and all) and verify the CLI starts
+  # on the runtime floor advertised in package.json `engines` (>=18). This is
+  # what an end user gets from `npm install -g mage-memory`. No pnpm here.
+  smoke:
+    name: cli smoke
+    needs: test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [18, 20]
+    steps:
+      - name: Download tarball
+        uses: actions/download-artifact@v4
+        with:
+          name: package
+
+      - name: Setup Node ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Install the packed CLI globally
+        run: npm install -g ./package.tgz
+
+      - name: CLI reports its version
+        run: mage --version
+
+      - name: CLI prints help
+        run: mage --help
+
+  # Single stable status check to require in branch protection,
+  # independent of how the matrices above expand.
+  gate:
+    name: CI gate
+    if: always()
+    needs: [test, smoke]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if any required job did not succeed
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
+      - name: Pass
+        run: echo "All CI jobs succeeded."
