@@ -1,0 +1,53 @@
+name: Bug report
+description: Something in mage behaves incorrectly.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. Please do **not** paste real
+        secrets, tokens, or private content — mage redacts on capture, but issues
+        are public.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug and what you expected instead.
+      placeholder: I ran `mage distill` and ...
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: The exact commands or actions, in order.
+      placeholder: |
+        1. mage init
+        2. ...
+        3. see error
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: mage version
+      description: Output of `mage --version` (or the npm/plugin version installed).
+      placeholder: 0.0.8
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Node version (`node --version`), and how mage is installed (npm CLI / Claude Code plugin).
+      placeholder: macOS 14, Node 20.11, npm CLI
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant output
+      description: Error messages or logs. Redact anything sensitive first.
+      render: shell
+    validations:
+      required: false

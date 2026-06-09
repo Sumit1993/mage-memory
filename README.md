@@ -5,6 +5,7 @@
 > insight, procedure, and **pointers** to sources — never copies of sources —
 > navigable as an Obsidian graph and usable by any AI coding agent.
 
+[![CI](https://github.com/Sumit1993/mage-memory/actions/workflows/ci.yml/badge.svg)](https://github.com/Sumit1993/mage-memory/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/mage-memory?style=flat&logo=npm)](https://www.npmjs.com/package/mage-memory)
 ![License](https://img.shields.io/badge/License-MIT-blue?style=flat)
 ![Node](https://img.shields.io/badge/Node-%3E%3D18-339933?style=flat&logo=node.js)
