@@ -42,6 +42,16 @@ Readiness release — make the self-grooming loop observable and adoptable.
 - Reaffirmed: mage sends nothing off your machine. The only improvement signal
   is the local `.metrics/` accept-reject ladder — no telemetry, fully offline.
 
+### Fixed
+
+- Capture now routes for external/hub knowledge bases. `resolveDocsRoot`
+  (the resolver behind every capture, grooming, and dashboard run) read but
+  never *honored* a code repo's `mode: "external"` metadata, so work in a
+  member code repo never reached its hub and hub KBs silently produced no
+  `.learnings/`. It now follows `hub_path` to `<hub>/projects/<project>/`.
+  (A member repo must still be linked with `mage link` and connected with
+  `mage connect` for its sessions to capture.)
+
 ## [0.0.8] - 2026-02-XX
 
 Self-grooming — your notes can now earn their way up to skills, and stale ones

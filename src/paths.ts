@@ -224,22 +224,37 @@ export async function looksLikeHub(path: string): Promise<boolean> {
   return exists(hubMetadataPath(path));
 }
 
+/** What {@link resolveDocsRoot} resolves to: the docs root to operate on, its
+ *  kind, and the git repo the sinks live under (== root for in-repo/hub; the hub
+ *  for an external project, whose docs live inside the hub's repo). */
+export interface ResolvedDocsRoot {
+  root: string;
+  kind: "in-repo" | "hub";
+  repo: string;
+}
+
 /**
  * Resolve the mage docs root to operate on, starting from `startDir` (default cwd):
- *  - in-repo: the nearest ancestor with `mage/metadata.json` → that repo's `mage/`.
- *  - hub:     `startDir` itself looks like a hub → the hub root.
- * Returns null if neither is found.
+ *  - in-repo:  the nearest ancestor with `mage/metadata.json` (mode=in-repo) → that
+ *              repo's `mage/`.
+ *  - external: that metadata is mode=external → the HUB project it points to
+ *              (`<hub_path>/projects/<project>/`), so captures/grooming land in the
+ *              hub, not the code repo. Reported as kind "hub" (a hub-owned project
+ *              is a flat docs root living inside the hub's repo); `repo` is the hub.
+ *  - hub:      `startDir` itself looks like a hub → the hub root.
+ * Returns null if none is found. A malformed/unreadable metadata degrades to the
+ * in-repo root (never throws — this is on the capture hot path).
  */
-export async function resolveDocsRoot(
-  startDir: string,
-): Promise<{ root: string; kind: "in-repo" | "hub"; repo: string } | null> {
+export async function resolveDocsRoot(startDir: string): Promise<ResolvedDocsRoot | null> {
   const abs = absolutePath(startDir);
 
-  // Walk up looking for an in-repo `mage/metadata.json`.
+  // Walk up looking for a code-repo `mage/metadata.json`.
   let dir = abs;
   for (;;) {
     if (await exists(join(dir, META_DIR, META_FILE))) {
-      return { root: codeRepoDocsRoot(dir), kind: "in-repo", repo: dir };
+      // Honor mode=external by following hub_path; a bad read degrades to in-repo.
+      const external = await externalDocsRoot(dir).catch(() => null);
+      return external ?? { root: codeRepoDocsRoot(dir), kind: "in-repo", repo: dir };
     }
     const parent = dirname(dir);
     if (parent === dir) break;
@@ -252,6 +267,22 @@ export async function resolveDocsRoot(
   }
 
   return null;
+}
+
+/**
+ * If the code repo at `dir` is linked in external mode (its `mage/metadata.json`
+ * has mode=external with a usable hub_path + project), the hub project docs root
+ * it points to; otherwise null (caller falls back to in-repo handling). May throw
+ * on an unknown schema or unsafe project name — {@link resolveDocsRoot} catches it.
+ */
+async function externalDocsRoot(dir: string): Promise<ResolvedDocsRoot | null> {
+  const meta = await readMetadata(dir);
+  if (!meta || meta.mode !== "external" || !meta.hub_path || !meta.project) return null;
+  return {
+    root: hubProjectDocsRoot(meta.hub_path, meta.project),
+    kind: "hub",
+    repo: meta.hub_path,
+  };
 }
 
 /** Resolve a path (relative → absolute relative to cwd). */
