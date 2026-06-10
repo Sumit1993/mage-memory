@@ -58,10 +58,10 @@
     "url": "https://github.com/Sumit1993/mage-memory/issues"
   },
   "dependencies": {
-    "@inquirer/prompts": "^7.2.1",
-    "commander": "^12.1.0",
+    "@inquirer/prompts": "^8.5.2",
+    "commander": "^15.0.0",
     "gray-matter": "^4.0.3",
-    "ora": "^8.1.1",
+    "ora": "^9.4.0",
     "picocolors": "^1.1.1",
     "tar": "^7.4.3"
   },
