@@ -63,7 +63,6 @@ skills + the loop) + [ADR-0014](../decisions/0014-two-gate-redaction.md) (two-ga
 - **A server / daemon / vector DB in core** — files-as-truth; vector is at most an opt-in MCP accelerator [ADR-0001/0003/0005/0009].
 
 ## Pre-release chores
-- npm: `deprecate specshub` → mage (full `unpublish` only if still within npm's 72h window); archive the specshub GitHub repo with a pointer to mage.
 - Verify `mage-memory` at publish (npm similarity filter) — exact name + GitHub confirmed free 2026-05-29.
 
 ## Relations

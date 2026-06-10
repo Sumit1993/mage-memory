@@ -208,4 +208,94 @@ describe("connect", () => {
     const hookPath = join(hooksDir as string, "pre-commit");
     expect(await exists(hookPath)).toBe(false);
   });
+
+  // ─── Capture-sink gitignore self-heal (ADR-0021) ────────────────────────────
+
+  async function readGitignore(dir: string): Promise<string> {
+    try {
+      return await readFile(join(dir, ".gitignore"), "utf8");
+    } catch {
+      return "";
+    }
+  }
+
+  it("in-repo KB: connect gitignores the mage/-prefixed capture sinks at the repo root", async () => {
+    const dir = await freshDir();
+    // A mage/metadata.json makes resolveDocsRoot return kind 'in-repo' (repo = dir).
+    await mkdir(join(dir, "mage"), { recursive: true });
+    await writeFile(join(dir, "mage", "metadata.json"), `${JSON.stringify({ schema: "mage.v1" })}\n`);
+
+    await connect({ cwd: dir, yes: true, gitHook: false });
+
+    const gi = await readGitignore(dir);
+    const lines = gi.split(/\r?\n/);
+    expect(lines).toContain("mage/.learnings/");
+    expect(lines).toContain("mage/.metrics/");
+  });
+
+  it("in-repo KB: re-running connect is idempotent (no duplicate sink patterns)", async () => {
+    const dir = await freshDir();
+    await mkdir(join(dir, "mage"), { recursive: true });
+    await writeFile(join(dir, "mage", "metadata.json"), `${JSON.stringify({ schema: "mage.v1" })}\n`);
+
+    await connect({ cwd: dir, yes: true, gitHook: false });
+    const after1 = await readGitignore(dir);
+    await connect({ cwd: dir, yes: true, gitHook: false });
+    const after2 = await readGitignore(dir);
+
+    expect(after2).toBe(after1);
+    const count = (pat: string) =>
+      after2.split(/\r?\n/).filter((l) => l === pat).length;
+    expect(count("mage/.learnings/")).toBe(1);
+    expect(count("mage/.metrics/")).toBe(1);
+  });
+
+  it("in-repo KB under --user: sink self-heal still runs when cwd is inside the KB", async () => {
+    const dir = await freshDir();
+    // A mage/metadata.json makes resolveDocsRoot return kind 'in-repo' (repo = dir).
+    await mkdir(join(dir, "mage"), { recursive: true });
+    await writeFile(join(dir, "mage", "metadata.json"), `${JSON.stringify({ schema: "mage.v1" })}\n`);
+
+    // Isolate HOME so --user targets a throwaway settings file, not the real one.
+    const home = await mkdtemp(join(tmpdir(), "mage-home-"));
+    made.push(home);
+    const origHome = process.env.HOME;
+    process.env.HOME = home;
+    try {
+      // --user targets ~/.claude/settings.json, but the sink ignores key off cwd,
+      // which is inside the KB — so they MUST still be written at the repo root.
+      await connect({ user: true, cwd: dir, yes: true, gitHook: false });
+    } finally {
+      if (origHome === undefined) delete process.env.HOME;
+      else process.env.HOME = origHome;
+    }
+
+    const lines = (await readGitignore(dir)).split(/\r?\n/);
+    expect(lines).toContain("mage/.learnings/");
+    expect(lines).toContain("mage/.metrics/");
+  });
+
+  it("hub KB: connect gitignores the hub capture-sink patterns at the hub root", async () => {
+    const dir = await freshDir();
+    // A projects/ dir + root metadata.json makes resolveDocsRoot return kind 'hub'.
+    await mkdir(join(dir, "projects"), { recursive: true });
+    await writeFile(join(dir, "metadata.json"), `${JSON.stringify({ schema: "mage.v1" })}\n`);
+
+    await connect({ cwd: dir, yes: true, gitHook: false });
+
+    const lines = (await readGitignore(dir)).split(/\r?\n/);
+    for (const pat of [".learnings/", "**/.learnings/", ".metrics/", "**/.metrics/"]) {
+      expect(lines).toContain(pat);
+    }
+  });
+
+  it("fresh non-KB dir: connect does not crash and writes no sink gitignore rules", async () => {
+    const dir = await freshDir();
+    // No mage/, no projects/ → resolveDocsRoot returns null → self-heal skipped.
+    const r = await connect({ cwd: dir, yes: true, gitHook: false });
+    expect(r.wired).toBe(8);
+
+    // No .gitignore created for the capture sinks.
+    expect(await exists(join(dir, ".gitignore"))).toBe(false);
+  });
 });

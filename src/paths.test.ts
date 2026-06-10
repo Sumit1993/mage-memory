@@ -49,6 +49,56 @@ describe("paths", () => {
     expect((await resolveDocsRoot(dir))?.kind).toBe("hub");
   });
 
+  it("resolveDocsRoot follows an external code repo to its hub project (capture routing)", async () => {
+    // A hub that owns the project's notes.
+    const hub = await mkdtemp(join(tmpdir(), "mage-exthub-"));
+    made.push(hub);
+    await mkdir(join(hub, "projects", "engine"), { recursive: true });
+    await writeFile(
+      join(hub, "metadata.json"),
+      JSON.stringify({ schema: METADATA_SCHEMA, name: "h", created_at: "", projects: [] }),
+    );
+    // A code repo linked in external mode → the hub owns its docs (no in-repo notes).
+    const code = await mkdtemp(join(tmpdir(), "mage-extcode-"));
+    made.push(code);
+    await mkdir(join(code, "mage"), { recursive: true });
+    await writeFile(
+      join(code, "mage", "metadata.json"),
+      JSON.stringify({
+        schema: METADATA_SCHEMA,
+        mode: "external",
+        project: "engine",
+        hub_path: hub,
+        hub_repo: null,
+        hub_refs: [],
+        linked_at: "",
+      }),
+    );
+    // From the code repo AND a nested subdir, captures must resolve to the hub project
+    // (root = <hub>/projects/engine), not the code repo's own mage/ dir.
+    for (const start of [code, join(code, "src", "deep")]) {
+      await mkdir(start, { recursive: true });
+      const r = await resolveDocsRoot(start);
+      expect(r?.root).toBe(hubProjectDocsRoot(hub, "engine"));
+      expect(r?.repo).toBe(hub);
+      expect(r?.kind).toBe("hub");
+    }
+  });
+
+  it("resolveDocsRoot falls back to in-repo when external metadata is malformed", async () => {
+    // mode=external but no hub_path → degrade to the code repo's own mage/ (never null).
+    const code = await mkdtemp(join(tmpdir(), "mage-extbad-"));
+    made.push(code);
+    await mkdir(join(code, "mage"), { recursive: true });
+    await writeFile(
+      join(code, "mage", "metadata.json"),
+      JSON.stringify({ schema: METADATA_SCHEMA, mode: "external", project: "x", hub_path: null }),
+    );
+    const r = await resolveDocsRoot(code);
+    expect(r?.kind).toBe("in-repo");
+    expect(r?.root).toBe(join(code, "mage"));
+  });
+
   it("returns null when no knowledge base is found", async () => {
     const dir = await mkdtemp(join(tmpdir(), "mage-none-"));
     made.push(dir);

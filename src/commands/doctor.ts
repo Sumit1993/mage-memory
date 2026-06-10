@@ -1,11 +1,20 @@
 import { platform } from "node:os";
+import { buildReport, renderReport } from "../doctor/report.js";
+import { pushKbChecks } from "../doctor/kb-checks.js";
+import { pushLinkChecks } from "../doctor/link-checks.js";
 import { hasGh, hasGit } from "../git.js";
 import { logger } from "../logger.js";
-import { absolutePath, exists, looksLikeHub } from "../paths.js";
+import { absolutePath, exists, looksLikeHub, resolveDocsRoot } from "../paths.js";
 import { which } from "../shell.js";
 
 export interface DoctorOptions {
   hub?: string;
+  /** Self-heal: ensure the capture sinks are gitignored, then re-evaluate. */
+  fix?: boolean;
+  /** Emit a redacted, content-free support bundle instead of the normal render. */
+  report?: boolean;
+  /** Working directory for KB resolution (test isolation; default process.cwd()). */
+  cwd?: string;
 }
 
 export interface DoctorCheck {
@@ -24,16 +33,48 @@ export interface DoctorResult {
 const REQUIRED_NODE_MAJOR = 18;
 
 /**
- * Diagnostic checks. Reports environment, tool availability, network reach,
- * and (if cwd is a hub) basic hub structure.
+ * Diagnostic checks. Reports environment, tool availability, network reach, and —
+ * when run inside a mage KB — KB structure, capture-sink gitignore coverage (THE
+ * leak guard), and connection/hook-drift health (ADR-0021; setup-integrity gotcha).
  *
  * Notes:
  *  - No symlinks anywhere → platform check just reports OS; junctions/symlinks irrelevant
  *  - Skills ship as a Claude Code plugin (`/plugin install mage@mage`) — informational
+ *  - `--fix` self-heals the gitignore coverage check (calls ensureGitignored)
+ *  - `--report` prints a redacted, content-free bundle (no paths/keywords/secrets)
  */
 export async function doctor(opts: DoctorOptions = {}): Promise<DoctorResult> {
   const checks: DoctorCheck[] = [];
 
+  await pushEnvChecks(checks, opts);
+  const kb = await resolveDocsRoot(opts.cwd ?? process.cwd());
+  await pushKbChecks(checks, kb, opts);
+  // Link integrity (two-way code-repo<->hub references; `--fix` heals a stale
+  // back-reference after a move). Only meaningful inside a KB.
+  if (kb) await pushLinkChecks(checks, opts);
+
+  const passed = checks.every((c) => c.ok || c.optional);
+
+  if (opts.report) {
+    const bundle = await buildReport({
+      checks,
+      docsRoot: kb?.root ?? null,
+      repoRoot: kb?.repo ?? null,
+    });
+    process.stdout.write(`${renderReport(bundle)}\n`);
+    return { passed, checks };
+  }
+
+  renderChecks(checks, passed);
+  const me = await which("mage");
+  if (me) logger.detail("(mage itself is on PATH)");
+
+  return { passed, checks };
+}
+
+// ─── environment checks (unchanged behavior) ─────────────────────────────────
+
+async function pushEnvChecks(checks: DoctorCheck[], opts: DoctorOptions): Promise<void> {
   // 1. Node version
   const nodeMajor = parseInt(process.versions.node.split(".")[0] ?? "0", 10);
   checks.push({
@@ -43,11 +84,7 @@ export async function doctor(opts: DoctorOptions = {}): Promise<DoctorResult> {
   });
 
   // 2. Platform
-  checks.push({
-    name: "platform",
-    ok: true,
-    detail: platform(),
-  });
+  checks.push({ name: "platform", ok: true, detail: platform() });
 
   // 3. Required tools
   const git = await hasGit();
@@ -64,7 +101,9 @@ export async function doctor(opts: DoctorOptions = {}): Promise<DoctorResult> {
   checks.push({
     name: "gh (GitHub CLI)",
     ok: gh,
-    detail: gh ? "available" : "missing (optional; required for `init --external --visibility private|public`)",
+    detail: gh
+      ? "available"
+      : "missing (optional; required for `init --external --visibility private|public`)",
     optional: true,
   });
 
@@ -72,7 +111,7 @@ export async function doctor(opts: DoctorOptions = {}): Promise<DoctorResult> {
   checks.push(checkSkillsInstall());
 
   // 5. Hub check (if cwd or --hub looks like one)
-  const hubCandidate = opts.hub ? absolutePath(opts.hub) : process.cwd();
+  const hubCandidate = opts.hub ? absolutePath(opts.hub) : (opts.cwd ?? process.cwd());
   if (await exists(hubCandidate)) {
     const isHub = await looksLikeHub(hubCandidate);
     if (isHub) {
@@ -97,31 +136,32 @@ export async function doctor(opts: DoctorOptions = {}): Promise<DoctorResult> {
       optional: true,
     });
   } catch (err) {
+    // Never echo err.message: Node embeds the target address in network errors
+    // (e.g. `connect ECONNREFUSED 127.0.0.1:3128`). Surface only the error code,
+    // which is address-free. Belt-and-suspenders with report.ts scrubText.
+    const code = (err as { code?: string } | null)?.code;
     checks.push({
       name: "github reachable",
       ok: false,
-      detail: `unreachable (${(err as Error).message}) — local-only init still works`,
+      detail: `unreachable (network error${code ? `: ${code}` : ""}) — local-only init still works`,
       optional: true,
     });
   }
+}
 
-  // Render
-  logger.info("=== Environment ===");
+// ─── render ──────────────────────────────────────────────────────────────────
+
+function renderChecks(checks: DoctorCheck[], passed: boolean): void {
+  logger.info("=== Environment & KB health ===");
   for (const c of checks) {
     if (c.ok) logger.success(`${pad(c.name)}: ${c.detail}`);
     else if (c.optional) logger.warn(`${pad(c.name)}: ${c.detail}`);
     else logger.error(`${pad(c.name)}: ${c.detail}`);
   }
 
-  const passed = checks.every((c) => c.ok || c.optional);
   logger.blank();
   if (passed) logger.success("All required checks passed.");
   else logger.error("Some required checks failed.");
-
-  const me = await which("mage");
-  if (me) logger.detail("(mage itself is on PATH)");
-
-  return { passed, checks };
 }
 
 function checkSkillsInstall(): DoctorCheck {

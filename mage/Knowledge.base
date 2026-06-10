@@ -1,0 +1,41 @@
+properties:
+  "note.type":
+    displayName: "Type"
+  "note.status":
+    displayName: "Status"
+  "note.last_reviewed":
+    displayName: "Last reviewed"
+views:
+- type: "table"
+  name: "All notes"
+  groupBy:
+    property: "note.type"
+    direction: "ASC"
+  order:
+  - "file.name"
+  - "note.type"
+  - "note.status"
+  - "note.last_reviewed"
+- type: "table"
+  name: "Due for review"
+  filters:
+    or:
+    - "!note.last_reviewed"
+    - "note.last_reviewed < (now() - \"180d\")"
+  order:
+  - "file.name"
+  - "note.type"
+  - "note.last_reviewed"
+- type: "table"
+  name: "Wing · mage"
+  filters:
+    and:
+    - "file.hasTag(\"mage\")"
+  groupBy:
+    property: "note.type"
+    direction: "ASC"
+  order:
+  - "file.name"
+  - "note.type"
+  - "note.status"
+  - "note.last_reviewed"

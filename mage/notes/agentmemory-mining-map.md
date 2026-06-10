@@ -2,8 +2,8 @@
 type: reference
 tags: [mage/roadmap]
 created: "2026-06-01"
-updated: "2026-06-01"
-last_reviewed: "2026-06-01"
+updated: "2026-06-09"
+last_reviewed: "2026-06-09"
 status: active
 provenance:
   repo: mage-memory
@@ -22,7 +22,7 @@ The concrete execution of [ADR-0007](../decisions/0007-mine-agentmemory-design-n
 
 ## Insight
 
-agentmemory is mage's **architectural inverse**: a server (iii engine `:3111/:3112`, MCP server with ~53 tools, LLM-compression pipeline, vector DB, React viewer `:3113`). Every capability is *server-shaped*. So mining means adopting the **idea** in files/git/deterministic/Obsidian form — never porting the mechanism (which would re-introduce the daemon+DB ADR-0007 rejected).
+agentmemory is mage's **architectural inverse**: a server (iii engine `:3111/:3112`, MCP server with ~53 tools, LLM-compression pipeline, vector DB, React viewer `:3113`). Every capability is *server-shaped*. So mining means adopting the **idea** in files / git / deterministic / Obsidian form — never porting the mechanism (which would re-introduce the daemon+DB ADR-0007 rejected).
 
 Two findings worth keeping:
 1. **mage already has the files-native analog for most of it** — because v0.1 was itself designed by mining this repo. The genuinely *new* mineable ideas are few.
@@ -39,7 +39,8 @@ Two findings worth keeping:
 | 4-tier consolidation: Working→Episodic→Semantic→Procedural + decay | *already mage's layering*: `work/`+`artifacts/` → `notes/` → playbook/gotcha + per-wing skills; `/dream` is the decay/consolidate engine | already have; name it |
 | automatic capture (silent hooks, capture-everything, LLM-compress) | runtime-less: host hook → `mage observe` stages to `.learnings/` (deterministic) → agent distills via `/learn` (judgment) → promote on recurrence ≥2× | adopt, re-shaped → [ADR-0009](../decisions/0009-no-runtime-automation-rides-host-hooks.md) |
 | privacy filter (strip secrets pre-store) | redact secrets before writing any note (`/learn` + import + `mage observe`) | adopt — cheap |
-| complete UI (React viewer + server) | Obsidian *is* the UI: wing-colored `graph.json` (shipped, free). Richer dashboards = Obsidian plugins (Dataview/Bases) **later** — not mage-generated markdown | graph: have; dashboard: defer to Obsidian plugins |
+| complete UI (React viewer + server `:3113`) | Obsidian *is* the UI: wing-colored `graph.json` (shipped, free). The richer dashboard = a **per-KB, no-server generated `dashboard.html`** (Option D) — a curator's *cockpit* (proposal queue), not a live console; Obsidian-bridged for full interactivity | **adopt, re-shaped → [ADR-0020](../decisions/0020-no-server-tiered-dashboards.md)** (supersedes "defer to Obsidian plugins") |
+| benchmark/eval harness (`eval/` adapters + `score.ts`; LongMemEval R@K, MRR, token-cost; the "22K vs 1.9K tokens" framing) | **`mage-evals/`**: mirror the adapter-shaped harness — it already ships a `grep` baseline, and mage *is* INDEX+grep+wing-skill. Publish on the **same axes** (R@K/MRR/token-cost), **plus** the two only mage can claim (skill-fire F1 / context-match · tokens-to-answer on the real load path) + one small end-to-end A/B. Their "22K" boast is a strawman (whole-file paste) | **adopt the *shape*** → tracked roadmap item (credibility push ~0.1.0). Letta's "filesystem = 74% on LoCoMo" validates the thesis |
 | MEMORY.md bridge (bidirectional sync) | realized natively as `INDEX.md` + `AGENTS.md` + awareness skill | already have |
 | BM25+vector+graph search (RRF) | deterministic INDEX + grep + Obsidian search; vector = optional **MCP accelerator** (standardizes *recall*, not capture) | keep deterministic; vector = v0.2 MCP |
 | git snapshots / versioning | notes are git-tracked — free | already have |
@@ -52,8 +53,10 @@ Two findings worth keeping:
 
 ## Placement
 
-- **v0.1-cheap** (before first publish): privacy-redaction helper · read-only `mage dream` health report (stale / superseded-but-active / dangling / orphans). *(The dashboard rendering is deferred to Obsidian plugins.)*
-- **v0.2+**: auto-capture via host hooks ([ADR-0009](../decisions/0009-no-runtime-automation-rides-host-hooks.md): `mage connect`/`mage observe` + the stage→distill→promote loop) · `/learn --from <transcript>` import-harvest · full `/dream` (decay/consolidate/re-verify/prune) · vector/MCP recall accelerator · Obsidian dashboard via Dataview/Bases.
+- **v0.1-cheap** (before first publish): privacy-redaction helper · read-only `mage dream` health report (stale / superseded-but-active / dangling / orphans). *(The dashboard is a per-KB, no-server generated artifact — [ADR-0020](../decisions/0020-no-server-tiered-dashboards.md); telemetry is refused — [ADR-0021](../decisions/0021-offline-no-telemetry-local-signal.md).)*
+- **0.0.9**: the no-server dashboard ([ADR-0020](../decisions/0020-no-server-tiered-dashboards.md)) + setup-integrity (`connect` ensures ignores · `doctor` KB/connection health + `--report`).
+- **~0.1.0 credibility**: a `mage-evals/` recall benchmark (mine agentmemory's harness *shape*; publish honest R@K/MRR/token-cost + skill-fire F1).
+- **v0.2+ / deferred out-of-core**: `mage dashboard --serve` + a **hosted mage / online hub** (files+git is the foundation, not a blocker — own grill) · `/learn --from <transcript>` import-harvest · vector/MCP recall accelerator.
 - **Not mage**: multi-agent coordination ([ADR-0010](../decisions/0010-durable-memory-not-coordination-layer.md)); any server-of-record.
 
 ## Relations

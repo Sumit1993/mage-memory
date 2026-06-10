@@ -1,4 +1,11 @@
+<p align="center">
+  <img src="assets/mage-mark.svg" alt="mage" width="120" />
+</p>
+
 # mage
+
+> **Durable memory for AI coding agents — portable markdown notes you own,
+> navigable as an Obsidian graph.**
 
 > **M**emory for **AGE**nts. A portable, file-based, self-maintaining knowledge
 > base for software systems: durable git-backed markdown **notes** that capture
@@ -10,7 +17,45 @@
 ![License](https://img.shields.io/badge/License-MIT-blue?style=flat)
 ![Node](https://img.shields.io/badge/Node-%3E%3D18-339933?style=flat&logo=node.js)
 ![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey?style=flat)
-![Status](https://img.shields.io/badge/status-0.0.8-orange?style=flat)
+![Status](https://img.shields.io/badge/status-0.0.9-orange?style=flat)
+
+<p align="center">
+  <img src="assets/social-card.png" alt="mage — durable memory for AI coding agents" width="640" />
+</p>
+
+## Why mage
+
+- **Files you own.** Every note is plain markdown in *your* git repo. No
+  database, no lock-in, no export step — `cat`, `grep`, and `git log` all work.
+- **Obsidian-native.** `mage/` ships an `.obsidian/` vault config; cross-links
+  are relative markdown (`[text](path.md)`, never `[[wikilinks]]`), so notes
+  render as a navigable graph **and** stay portable to any agent reading raw
+  files.
+- **No server.** Nothing to host, no daemon, no background process. mage rides
+  the host agent's hooks; the dashboard is a generated artifact, not a service
+  ([ADR-0020](mage/decisions/0020-no-server-tiered-dashboards.md)).
+- **No telemetry — nothing leaves your machine.** mage never phones home. The
+  only network egress is `doctor`'s opt-in connectivity check; metrics stay
+  local and never enter git
+  ([ADR-0021](mage/decisions/0021-offline-no-telemetry-local-signal.md)).
+- **Self-grooming, human-in-the-loop.** mage *proposes* (graduate / merge /
+  reword …); **you** confirm and commit. Nothing is ever auto-committed.
+
+### How mage differs from a server-backed memory store
+
+mage was designed by mining the *idea* behind server-backed agent-memory tools
+(durable memory that outlives a session) — not their mechanism. The contrast is
+deliberate and factual:
+
+| | mage | server-backed memory store |
+|--|------|----------------------------|
+| Source of truth | **Files in your repo** (markdown + git) | A running server / database |
+| Curation | **Human-in-the-loop**: propose → confirm → *you* commit | Automatic writes / decay |
+| Network | **Offline by default**; no telemetry | Typically server-hosted |
+| Viewer | Generated `dashboard.html` + Obsidian | Live web console |
+
+Same goal — memory that survives the session — reached by *file-as-truth +
+offline + human-curated* rather than an automatic, server-shaped store.
 
 ## What it does
 
@@ -172,7 +217,8 @@ listed for transparency). The deterministic/judgment split behind this is
 | `mage link <hub>` / `mage unlink` | Register (or remove) this repo's knowledge base with an external hub (hybrid). |
 | `mage skills --metrics` | Read-only context-match report (`--json` for machine output). |
 | `mage status` / `mage list` / `mage verify` | Read-only: pending changes, note/work-unit listing, structure + frontmatter + link sanity-check. |
-| `mage doctor` | Diagnose the environment (Node, git, Obsidian config, skills install). |
+| `mage dashboard` | Generate this KB's dashboard: a portable `Dashboard.md` + an Obsidian-core `Knowledge.base`. `--html` adds a self-contained `dashboard.html` **cockpit** (inline data + CSS/SVG, opens in any browser, no plugins) whose hero is the **proposal queue**; `--open` prints the open command. No server — it's a generated artifact ([ADR-0020](mage/decisions/0020-no-server-tiered-dashboards.md)). |
+| `mage doctor` | Diagnose **env + KB & connection health** (Node, git, Obsidian config, skills install, capture-sink ignore coverage). `--fix` adds any missing capture-sink ignore rules; `--report` prints a **redacted, content-free** support bundle to attach to bug reports ([ADR-0021](mage/decisions/0021-offline-no-telemetry-local-signal.md)). |
 | `mage dream` | Report knowledge-base health (stale, superseded-but-active, dangling links, orphans), read-only. The agent runs this after a nudge; safe to run yourself. `mage dream --apply` / `--reject` (below) are the **single-writer** seams the grooming skills drive — you don't type those. |
 
 ### Plumbing seams (machinery runs these for you)
@@ -276,11 +322,47 @@ anyway. There is **no** `mage graduate`, `mage optimize`, or `mage promote
 --apply` — graduate / reword / demote / merge / split are all applied through
 `mage dream --apply`.
 
-> **Scope (0.0.8).** This release ships promote / graduate / optimize plus the
+> **Scope.** The grooming loop ships promote / graduate / optimize plus the
 > applier (graduate / demote / merge / split / reword). `mage dream`'s
 > **note-health** signals (stale, superseded-but-active, dangling links,
 > orphans) stay a **read-only detector** — auto-applying consolidate / prune /
 > supersede is a later increment.
+
+## The dashboard (no server)
+
+`mage dashboard` renders this knowledge base to a human **without a server** —
+it's a generated artifact, not a service ([ADR-0020](mage/decisions/0020-no-server-tiered-dashboards.md)).
+
+```bash
+mage dashboard          # Dashboard.md + Knowledge.base (Obsidian core)
+mage dashboard --html   # + a self-contained dashboard.html cockpit
+mage dashboard --open   # print the command to open the html
+```
+
+- **`Dashboard.md`** — a portable static view that reads in any markdown viewer
+  (carries a `last_refreshed` stamp; regenerate to refresh).
+- **`Knowledge.base`** — the frontmatter half, live in **vanilla Obsidian**
+  (core Bases, no community plugin).
+- **`dashboard.html`** (with `--html`) — a self-contained **curator's cockpit**:
+  inline data + CSS/SVG, opens in any browser, no plugins, shareable. Its hero
+  is the **proposal queue** — *Awaiting your judgment* (graduate / note / merge /
+  split / reword, each *Confirm · Skip*). It deep-links into the vault
+  (`obsidian://open?…`) for the live, editable view. **Nothing is written until
+  you confirm, and nothing is committed — ever.**
+
+The knowledge dashboard (over *tracked* notes) may be committed; the grooming
+view (over the gitignored `.metrics/`) is itself gitignored — *metrics never
+enter git*.
+
+## Reporting issues
+
+Hit a bug? Run **`mage doctor --report`** and attach the redacted bundle. It's a
+**content-free** support snapshot — mage / Node / OS versions, KB + connection
+health (including capture-sink ignore coverage), and metrics **summary numbers
+only** — run through the redaction boundary, so it **never** carries note
+content, keywords, paths, or secrets
+([ADR-0021](mage/decisions/0021-offline-no-telemetry-local-signal.md)). Open
+issues at [github.com/Sumit1993/mage-memory/issues](https://github.com/Sumit1993/mage-memory/issues).
 
 ## Modes
 
@@ -334,9 +416,16 @@ awareness skill teaches agents the same rule.
 
 ## Status
 
-v0.0.8. Early and evolving — the note model, command surface, and skills here
+v0.0.9. Early and evolving — the note model, command surface, and skills here
 reflect the actual CLI. Recent releases:
 
+- **0.0.9** — **`mage dashboard`** — a no-server, per-KB dashboard (`Dashboard.md`
+  + Obsidian-core `Knowledge.base`; `--html` adds the self-contained cockpit
+  whose hero is the proposal queue) — plus **`mage doctor`** widened to env + KB
+  & connection health, with `--fix` (repair capture-sink ignores) and `--report`
+  (a redacted, content-free support bundle for bug reports). Reaffirms the
+  positioning: **no server, no telemetry** ([ADR-0020](mage/decisions/0020-no-server-tiered-dashboards.md),
+  [ADR-0021](mage/decisions/0021-offline-no-telemetry-local-signal.md)).
 - **0.0.8** — the **self-grooming loop**: `mage:promote` (recurrence → note),
   `mage:graduate` (proven note → `mage-skill-<slug>`), and `mage:optimize`
   (reword / demote a mis-firing trigger on context-match) + the single-writer

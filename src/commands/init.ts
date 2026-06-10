@@ -167,11 +167,14 @@ async function initInRepo(codeRepo: string, project: string): Promise<void> {
   await writeFile(metadataPath(codeRepo), `${JSON.stringify(meta, null, 2)}\n`);
   logger.success(`Wrote ${metadataPath(codeRepo)}`);
 
-  // Git-ignore raw artifacts + pre-promotion scratch; track everything else (ADR-0003).
+  // Git-ignore raw artifacts + pre-promotion scratch + the cockpit (ADR-0020 §6:
+  // dashboard.html embeds `.metrics` churn, so it must never be committed); track
+  // everything else (ADR-0003).
   const added = await ensureGitignored(codeRepo, [
     "mage/**/artifacts/",
     "mage/.learnings/",
     "mage/.metrics/",
+    "mage/dashboard.html",
   ]);
   if (added.length > 0) logger.detail(`Added .gitignore patterns: ${added.join(", ")}`);
 
@@ -297,6 +300,8 @@ async function initStandaloneHub(args: HubArgs): Promise<string> {
     "**/.learnings/",
     ".metrics/",
     "**/.metrics/",
+    // The cockpit embeds `.metrics` churn (ADR-0020 §6) — never commit it.
+    "dashboard.html",
   ]);
   if (added.length > 0) logger.detail(`Added .gitignore patterns: ${added.join(", ")}`);
 
