@@ -34,6 +34,9 @@ Readiness release — make the self-grooming loop observable and adoptable.
   hub back-reference after a code repo is moved (the forward `hub_path` and the
   hub's `code_repo_path` drift independently on a move; `mage connect` never
   repaired them — only `mage link` did).
+- `mage doctor` now distinguishes a never-connected KB from one that WAS capturing
+  and is now disconnected (capture history present but no hooks wired) — so a
+  silently-dropped connection is reported instead of looking like a fresh KB.
 - Brand assets: the graph-"m" mark and a social card under `assets/`.
 
 ### Changed

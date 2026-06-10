@@ -3,6 +3,7 @@
 // Governed by ADR-0021 and the connect-doesnt-ensure-ignores gotcha. Each helper
 // pushes one or more DoctorChecks onto the shared array.
 
+import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import {
   diffMageHooks,
@@ -42,7 +43,24 @@ export async function pushKbChecks(
   // capture is actually wired (connected), and the connection check reports it.
   const conn = await resolveConnection(opts);
   await pushSinkIgnoreCheck(checks, kb, opts, conn.diff.connected);
-  pushConnectionCheck(checks, conn);
+  // Tell "never connected" (benign, fresh KB) apart from "was capturing, now
+  // disconnected" (a regression) using the sink's capture history.
+  const hadCapture = await learningsHasHistory(kb.root);
+  pushConnectionCheck(checks, conn, hadCapture);
+}
+
+/**
+ * True iff the KB's capture sink holds any session history (a `*.jsonl`) — evidence
+ * capture WAS wired at some point. Lets the connection check report a
+ * was-connected-now-disconnected KB instead of treating it like a fresh one.
+ */
+async function learningsHasHistory(root: string): Promise<boolean> {
+  try {
+    const entries = await readdir(join(root, LEARNINGS_DIR));
+    return entries.some((e) => e.endsWith(".jsonl"));
+  } catch {
+    return false; // no .learnings/ dir → never captured.
+  }
 }
 
 /** KB structure: confirm the docs root, then flag a missing INDEX.md (advisory). */
@@ -182,16 +200,29 @@ async function resolveConnection(opts: DoctorOptions): Promise<Connection> {
  *    nudge re-connect (the version-bump nudge from the gotcha's stale-hook-block).
  *  - matches → ok with the connected scope.
  */
-function pushConnectionCheck(checks: DoctorCheck[], conn: Connection): void {
+function pushConnectionCheck(checks: DoctorCheck[], conn: Connection, hadCapture: boolean): void {
   const { diff, scope } = conn;
 
   if (!diff.connected) {
-    checks.push({
-      name: "connection",
-      ok: false,
-      detail: "not connected; run `mage connect`",
-      optional: true,
-    });
+    checks.push(
+      hadCapture
+        ? {
+            name: "connection",
+            ok: false,
+            // Capture history but no hooks now → this KB WAS connected and lost it
+            // (a settings reset, a mage upgrade, or an intentional `mage disconnect`).
+            detail:
+              "DISCONNECTED — capture history exists but no mage hooks are wired now; " +
+              "run `mage connect` to resume (unless `mage disconnect` was intentional)",
+            optional: true,
+          }
+        : {
+            name: "connection",
+            ok: false,
+            detail: "not connected; run `mage connect`",
+            optional: true,
+          },
+    );
     return;
   }
 

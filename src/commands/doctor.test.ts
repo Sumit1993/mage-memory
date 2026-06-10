@@ -211,6 +211,18 @@ describe("doctor KB health", () => {
     expect(conn?.detail).toMatch(/not connected; run `mage connect`/);
   });
 
+  it("capture history but no hooks → reports DISCONNECTED (not the fresh-KB nudge)", async () => {
+    const dir = await freshDir();
+    await makeInRepoKb(dir, { gitignoreSinks: true });
+    // It WAS capturing (a session stream exists) but no hooks are wired now.
+    await mkdir(join(dir, "mage", ".learnings"), { recursive: true });
+    await writeFile(join(dir, "mage", ".learnings", "s1.jsonl"), '{"v":1,"type":"session_start"}\n');
+    const r = await doctor({ cwd: dir });
+    const conn = check(r.checks, "connection");
+    expect(conn?.ok).toBe(false);
+    expect(conn?.detail).toMatch(/DISCONNECTED/);
+  });
+
   it("fully-connected current block → connection check passes", async () => {
     const dir = await freshDir();
     await makeInRepoKb(dir, { gitignoreSinks: true });
