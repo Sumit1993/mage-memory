@@ -11,6 +11,17 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **Node 18 is no longer supported — the runtime floor is now Node 20.** Node 18
+  reached end-of-life on 2025-04-30, and the upgraded CLI dependencies
+  (commander 15, ora 9, @inquirer/prompts 8) use `node:util.styleText`, available
+  only on Node 20.12+. `engines.node` is now `>=20`.
+- Dependency modernization: commander 12 → 15, ora 8 → 9, @inquirer/prompts 7 → 8;
+  dev: TypeScript 5.7 → 6.0, @types/node 22 → 25, @types/tar 6 → 7.
+
 ## [0.0.9] - 2026-06-10
 
 Readiness release — make the self-grooming loop observable and adoptable.
