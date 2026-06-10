@@ -2,11 +2,15 @@
 
 # mage
 
-> 31 notes. Part of the [index](INDEX.md).
+> 32 notes. Part of the [index](INDEX.md).
 
 ### capture
 
 - `gotcha` [Gotcha — `mage connect` turns on capture but does not ensure the sink is gitignored](notes/connect-doesnt-ensure-ignores.md) — connect, gitignore, capture-sink, learnings, metrics, drift, migration, doctor, safe-by-default, leak, version-bump, hook-block _(reviewed 2026-06-09)_
+
+### cli
+
+- `plan` [Plan — 0.0.10 "coherence": shrink the command surface, close the external-KB friction](notes/plan-0.0.10-coherence.md) — consolidation, commands, coherence, friction, external-kb, hub, link, connect, distill, promote, dream, doctor _(reviewed 2026-06-10)_
 
 ### decisions
 
