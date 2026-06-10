@@ -44,6 +44,8 @@ describe("mage init --in-repo", () => {
     const gi = await readFile(join(dir, ".gitignore"), "utf8");
     expect(gi).toContain("mage/**/artifacts/");
     expect(gi).toContain("mage/.learnings/");
+    // Safe-by-default: the cockpit is gitignored at init, not only on first --html.
+    expect(gi).toContain("mage/dashboard.html");
   });
 
   it("refuses to re-init an already-initialized repo", async () => {

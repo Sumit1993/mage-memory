@@ -51,6 +51,63 @@ export const MAGE_HOOKS: ReadonlyArray<{ event: string; id: string; command: str
   { event: "Stop", id: "mage:observe:Stop", command: "mage observe" },
 ];
 
+// ─── drift diff (doctor) ─────────────────────────────────────────────────────
+/**
+ * Compare the mage groups installed in `settings` against {@link MAGE_HOOKS},
+ * the source of truth for the current mage's expected hook block. Pure (reads
+ * only). Drives `doctor`'s "connection health / hook drift" check — the
+ * version-bump nudge from the setup-integrity gotcha.
+ *
+ *  - `connected`  — at least one installed group carries a `mage:*` id.
+ *  - `missingIds` — every MAGE_HOOKS id with no installed group of that id.
+ *  - `staleIds`   — an installed group of that id exists but its command differs
+ *                   from the expected command (a drifted/old hook block).
+ *  - `matches`    — connected, nothing missing or stale, AND no EXTRA `mage:*`
+ *                   ids beyond MAGE_HOOKS (a leftover from a renamed hook).
+ *
+ * A group's command is read from its first `hooks[].command` (how mage writes
+ * its single-command groups), so a hand-edited multi-command group is compared
+ * on its first entry only.
+ */
+export function diffMageHooks(settings: ClaudeSettings | null): {
+  connected: boolean;
+  matches: boolean;
+  missingIds: string[];
+  staleIds: string[];
+} {
+  // Map every installed mage:* group by id → its first command (last wins on dupes).
+  const installed = new Map<string, string | undefined>();
+  const groups = settings?.hooks ? Object.values(settings.hooks).flat() : [];
+  for (const g of groups) {
+    if (typeof g.id === "string" && g.id.startsWith(MAGE_ID_PREFIX)) {
+      installed.set(g.id, g.hooks?.[0]?.command);
+    }
+  }
+
+  const connected = installed.size > 0;
+  const missingIds: string[] = [];
+  const staleIds: string[] = [];
+  const expectedIds = new Set<string>();
+
+  for (const entry of MAGE_HOOKS) {
+    expectedIds.add(entry.id);
+    if (!installed.has(entry.id)) {
+      missingIds.push(entry.id);
+    } else if (installed.get(entry.id) !== entry.command) {
+      staleIds.push(entry.id);
+    }
+  }
+
+  // An EXTRA mage:* id (installed but not in MAGE_HOOKS) is also drift — e.g. a
+  // hook that was renamed across versions and left behind. It blocks `matches`.
+  const hasExtra = [...installed.keys()].some((id) => !expectedIds.has(id));
+
+  const matches =
+    connected && missingIds.length === 0 && staleIds.length === 0 && !hasExtra;
+
+  return { connected, matches, missingIds, staleIds };
+}
+
 // ─── target resolution ───────────────────────────────────────────────────────
 /**
  * Resolve which settings file to operate on. `user` targets the personal

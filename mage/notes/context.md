@@ -2,8 +2,8 @@
 type: reference
 tags: [mage/design]
 created: "2026-05-29"
-updated: "2026-06-08"
-last_reviewed: "2026-06-08"
+updated: "2026-06-09"
+last_reviewed: "2026-06-09"
 status: active
 provenance:
   repo: mage-memory
@@ -38,6 +38,10 @@ _Avoid_: category, folder
 **Index**:
 The compact, always-available pointer layer — one line per note (topic · keywords · → link), generated from the notes. An agent loads this to know what exists and decide what to open. (The "closet" of the memory palace.)
 _Avoid_: closet, manifest, catalog
+
+**Dashboard**:
+A per-KB, **generated** human-facing view — a KB's stats (notes by type/wing, activity) and the self-grooming **proposal queue** ("what mage wants to do next; you confirm & commit"). A *curator's cockpit*, not a live console: a **no-server** artifact in three forms (portable `Dashboard.md`, an Obsidian-core `Knowledge.base`, and a standalone `dashboard.html`), interactive **client-side** and **Obsidian-bridged** (`obsidian://` deep-links). Renders only the **local** KB; a `--serve`/hosted form is deferred out-of-core ([ADR-0020](../decisions/0020-no-server-tiered-dashboards.md)).
+_Avoid_: console, viewer (as a live-server UI), admin panel
 
 **Tag**:
 A `#wing/room`-style nested label for emergent grouping. Tags carry the hierarchy; folders are avoided until a cluster is large and stable.

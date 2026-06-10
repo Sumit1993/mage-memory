@@ -27,7 +27,7 @@ Post-plan decisions that supersede the PLAN "Open implementation questions" and 
 3. **MAP.md → DROPPED** (PLAN Open Q#4): the Obsidian graph + hierarchical INDEX cover topology. Remove MAP.md scaffolding from `init`/`scaffoldHubStructure` and any awareness-skill references.
 4. **Constitution → a `principle` note** (PLAN Open Q#5): `type: principle` in `notes/`; drop `.specify/memory/`. The `/constitution` skill writes/updates a principle note; awareness read-order references principle notes instead of `constitution.md`.
 
-Build handoff = [PLAN-v0.1](plan-v0.1.md) + this file + [decisions 0001–0006](../decisions/0001-memory-first-product-supersedes-specshub.md) + [context & glossary](context.md) + specshub source at `https://github.com/Sumit1993/specshub`.
+Build handoff = [PLAN-v0.1](plan-v0.1.md) + this file + [decisions 0001–0006](../decisions/0001-memory-first-product-supersedes-specshub.md) + [context & glossary](context.md).
 
 ## Relations
 - governs [mage v0.1 implementation plan](plan-v0.1.md)

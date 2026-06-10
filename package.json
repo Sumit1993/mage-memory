@@ -1,6 +1,6 @@
 {
   "name": "mage-memory",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "packageManager": "pnpm@11.2.2",
   "description": "mage — a portable, self-maintaining knowledge base for software systems: durable git-backed notes navigable as an Obsidian graph, usable by any AI coding agent. CLI: init, index, skills, ingest, redact, observe, connect, dream, link, verify, unlink, list, status, doctor, distill.",
   "type": "module",
@@ -19,6 +19,7 @@
     "dist",
     "skills",
     ".claude-plugin",
+    "assets",
     "README.md",
     "LICENSE"
   ],
@@ -26,6 +27,8 @@
     "node": ">=18"
   },
   "scripts": {
+    "vendor:graph": "node scripts/vendor-graph.mjs",
+    "prebuild": "node scripts/vendor-graph.mjs",
     "build": "tsup",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
@@ -66,6 +69,7 @@
     "@types/node": "^22.10.5",
     "@types/tar": "^6.1.13",
     "@vitest/coverage-v8": "^4.1.8",
+    "force-graph": "^1.51.4",
     "tsup": "^8.3.5",
     "typescript": "^5.7.3",
     "vitest": "^4.1.8"

@@ -51,7 +51,16 @@ const SKIP_DIRS = new Set<string>([
  * a hub's scaffolding (which live AT the root). `_index.<wing>.md` is matched by
  * pattern; the rest by exact name. This namespace is reserved.
  */
-const RESERVED_MD = new Set<string>([INDEX_FILE, IDENTITY_FILE, AGENTS_FILE, CLAUDE_FILE]);
+const RESERVED_MD = new Set<string>([
+  INDEX_FILE,
+  IDENTITY_FILE,
+  AGENTS_FILE,
+  CLAUDE_FILE,
+  // The generated dashboard (ADR-0020 tier 0) lives AT the docs root and is not a
+  // knowledge note — never ingest it into the index. (Knowledge.base is not `.md`,
+  // so the walk skips it already.)
+  "Dashboard.md",
+]);
 const GEN_INDEX_RE = /^_index\..+\.md$/;
 
 export interface ScannedNote {

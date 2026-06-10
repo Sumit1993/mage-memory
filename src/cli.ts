@@ -1,5 +1,7 @@
 import { Command, Option } from "commander";
 import { connect } from "./commands/connect.js";
+import { dashboard } from "./commands/dashboard-cmd.js";
+import { OPEN_WITH_TARGETS } from "./dashboard/html.js";
 import { disconnect } from "./commands/disconnect.js";
 import { distillCmd } from "./commands/distill-cmd.js";
 import { doctor } from "./commands/doctor.js";
@@ -327,11 +329,39 @@ program
 // ─── doctor ────────────────────────────────────────────────────────────────
 program
   .command("doctor")
-  .description("Diagnose your environment (Node, git, gh, npx skills, network)")
+  .description("Diagnose env + KB & connection health; --fix repairs ignores; --report bundles logs")
   .option("--hub <path>", "hub root (default: cwd if it looks like a hub)")
+  .option("--fix", "add any missing capture-sink ignore rules")
+  .option("--report", "print a redacted, content-free support bundle for issues")
   .action(async (opts) => {
-    const result = await doctor({ hub: opts.hub });
+    const result = await doctor({ hub: opts.hub, fix: opts.fix, report: opts.report });
     if (!result.passed) process.exit(1);
+  });
+
+// ─── dashboard ──────────────────────────────────────────────────────────────
+program
+  .command("dashboard")
+  .description(
+    "Generate this KB's dashboard (Dashboard.md + Knowledge.base; --html adds the interactive cockpit)",
+  )
+  .option("--html", "also generate the self-contained dashboard.html cockpit")
+  .option("--hub <path>", "hub root")
+  .option("--open", "print the command to open the html")
+  .addOption(
+    new Option(
+      "--open-with <target>",
+      "where clicking a note opens it: file (relative link, works anywhere) | obsidian | vscode",
+    )
+      .choices([...OPEN_WITH_TARGETS])
+      .default("file"),
+  )
+  .action(async (opts) => {
+    await dashboard({
+      hub: opts.hub,
+      html: opts.html,
+      open: opts.open,
+      openWith: opts.openWith,
+    });
   });
 
 // ─── connect ──────────────────────────────────────────────────────────────

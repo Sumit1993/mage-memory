@@ -8,7 +8,9 @@ import {
 } from "../claude-settings.js";
 import { resolveDecision } from "../interactive.js";
 import { installRedactHook } from "../git-hooks.js";
+import { ensureGitignored } from "../gitignore.js";
 import { logger } from "../logger.js";
+import { resolveDocsRoot } from "../paths.js";
 
 /** Options for {@link connect}. */
 export interface ConnectOptions {
@@ -69,8 +71,19 @@ export async function connect(opts: ConnectOptions): Promise<ConnectResult> {
   const { backedUp } = await writeClaudeSettings(target.path, merged);
 
   const wired = MAGE_HOOKS.length;
-  logger.success(`Wired ${wired} events into ${target.path} (personal + gitignored).`);
+  // settings.local.json is itself personal + gitignored by Claude Code; the capture
+  // SINKS those hooks feed (.learnings/, .metrics/) are gitignored separately below.
+  logger.success(`Wired ${wired} events into ${target.path} (personal settings file).`);
   logger.detail("Run `mage disconnect` to remove.");
+
+  // Self-heal the capture-sink ignores so the dirs these hooks write can never be
+  // committed (ADR-0021). Resolve the LOCAL KB explicitly off opts.cwd — never a
+  // bare process.cwd() that tests can't override (the --user/cwd leak gotcha). The
+  // invariant is about the cwd, not the --user flag: when no KB is found walking up
+  // from cwd we skip (nothing to ignore here); when run from INSIDE a KB the sink
+  // ignores ARE written regardless of --user (correct — that KB's sinks must never
+  // be committable). We never create a KB here.
+  await ensureSinkIgnores(opts.cwd ?? process.cwd());
 
   // Gate 2 (ADR-0018 §7): the blocking, un-skippable redaction net at the tracked
   // write. Independently toggleable; the installer refuses to clobber a foreign
@@ -78,6 +91,45 @@ export async function connect(opts: ConnectOptions): Promise<ConnectResult> {
   const hook = opts.gitHook === false ? undefined : await installHook(opts.cwd ?? process.cwd());
 
   return { path: target.path, scope: target.scope, wired, backedUp, hook };
+}
+
+/**
+ * Gitignore the capture sinks (.learnings/, .metrics/) at the right root so they
+ * can never be committed — even on a public KB with an empty .gitignore. Mirrors
+ * the capture-sink patterns `mage init` writes (init.ts):
+ *   - in-repo: code-repo root, mage/-prefixed patterns.
+ *   - hub:     hub root, bare + glob-recursive patterns.
+ * Resolves the KB from `startDir` only. A null result means no KB was found walking
+ * up from cwd (a fresh non-KB dir, OR connect run from outside any KB) — we skip the
+ * write but emit a hint pointing at the in-KB self-heal, since that is the leak
+ * window. Running from inside a KB writes the ignores regardless of --user.
+ */
+async function ensureSinkIgnores(startDir: string): Promise<void> {
+  const kb = await resolveDocsRoot(startDir);
+  if (!kb) {
+    // Hooks were wired but no KB was found walking up from cwd — the real
+    // leak-window (e.g. `mage connect --user` from outside any KB). Point the
+    // user at the in-KB self-heal so their capture sinks still get gitignored.
+    logger.info(
+      "No mage KB found here — run `mage doctor --fix` from inside your KB so capture sinks are gitignored.",
+    );
+    return;
+  }
+
+  // in-repo: ignore at the CODE-REPO root (kb.repo, the dir containing mage/),
+  // mirroring init's `mage/`-prefixed sink patterns. hub: ignore at the hub root.
+  const { root, patterns } =
+    kb.kind === "in-repo"
+      ? { root: kb.repo, patterns: ["mage/.learnings/", "mage/.metrics/"] }
+      : {
+          root: kb.root,
+          patterns: [".learnings/", "**/.learnings/", ".metrics/", "**/.metrics/"],
+        };
+
+  const added = await ensureGitignored(root, patterns);
+  if (added.length > 0) {
+    logger.success(`Gitignored ${added.length} capture sink(s): ${added.join(", ")}`);
+  }
 }
 
 /**
