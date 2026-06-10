@@ -331,3 +331,79 @@ describe("doctor env checks still run", () => {
     expect(MAGE_HOOKS.length).toBe(8);
   });
 });
+
+// ─── link integrity (code-repo <-> hub references; --fix heals a moved repo) ────
+
+describe("doctor — link integrity", () => {
+  async function makeHub(
+    hub: string,
+    projects: Array<{ name: string; code_repo_path: string }>,
+  ): Promise<void> {
+    await mkdir(join(hub, "projects"), { recursive: true });
+    const meta = {
+      schema: METADATA_SCHEMA,
+      name: "h",
+      created_at: "",
+      projects: projects.map((p) => ({
+        name: p.name,
+        storage: "hub-owned",
+        code_repo_path: p.code_repo_path,
+        code_repo_url: "",
+      })),
+    };
+    await writeFile(join(hub, "metadata.json"), `${JSON.stringify(meta, null, 2)}\n`);
+  }
+
+  async function makeExternalRepo(repo: string, hub: string, project: string): Promise<void> {
+    await mkdir(join(repo, "mage"), { recursive: true });
+    const meta = {
+      schema: METADATA_SCHEMA,
+      mode: "external",
+      project,
+      hub_path: hub,
+      hub_repo: null,
+      hub_refs: [],
+      linked_at: "",
+    };
+    await writeFile(join(repo, "mage", "metadata.json"), `${JSON.stringify(meta, null, 2)}\n`);
+  }
+
+  it("passes when an external repo's two-way link is consistent", async () => {
+    const hub = await freshDir("mage-hub-");
+    const repo = await freshDir("mage-ext-");
+    await makeHub(hub, [{ name: "engine", code_repo_path: repo }]);
+    await makeExternalRepo(repo, hub, "engine");
+    const r = await doctor({ cwd: repo });
+    expect(check(r.checks, "link integrity")?.ok).toBe(true);
+  });
+
+  it("flags a stale hub back-reference and repairs it with --fix", async () => {
+    const hub = await freshDir("mage-hub-");
+    const repo = await freshDir("mage-ext-");
+    await makeHub(hub, [{ name: "engine", code_repo_path: "/old/moved/away" }]);
+    await makeExternalRepo(repo, hub, "engine");
+
+    expect(check((await doctor({ cwd: repo })).checks, "link integrity")?.ok).toBe(false);
+
+    const after = await doctor({ cwd: repo, fix: true });
+    expect(check(after.checks, "link integrity")?.ok).toBe(true);
+    const hubMeta = JSON.parse(await readFile(join(hub, "metadata.json"), "utf8"));
+    expect(hubMeta.projects[0].code_repo_path).toBe(repo); // healed to the real path
+  });
+
+  it("flags a moved/unreachable hub (not auto-fixable)", async () => {
+    const repo = await freshDir("mage-ext-");
+    await makeExternalRepo(repo, "/no/such/hub", "engine");
+    const c = check((await doctor({ cwd: repo })).checks, "link integrity");
+    expect(c?.ok).toBe(false);
+    expect(c?.detail).toContain("not a reachable hub");
+  });
+
+  it("from a hub, warns (advisory) about a project whose code repo is missing", async () => {
+    const hub = await freshDir("mage-hub-");
+    await makeHub(hub, [{ name: "engine", code_repo_path: "/gone/repo" }]);
+    const c = check((await doctor({ cwd: hub })).checks, "link integrity");
+    expect(c?.ok).toBe(false);
+    expect(c?.optional).toBe(true);
+  });
+});

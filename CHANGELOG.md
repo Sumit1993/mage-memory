@@ -30,6 +30,10 @@ Readiness release — make the self-grooming loop observable and adoptable.
 - `mage doctor --fix` repairs `.gitignore` entries so capture sinks stay out of
   commits, and `mage doctor --report` produces a redacted, content-free support
   bundle you can paste into an issue.
+- `mage doctor` checks code-repo<->hub link integrity, and `--fix` heals a stale
+  hub back-reference after a code repo is moved (the forward `hub_path` and the
+  hub's `code_repo_path` drift independently on a move; `mage connect` never
+  repaired them — only `mage link` did).
 - Brand assets: the graph-"m" mark and a social card under `assets/`.
 
 ### Changed

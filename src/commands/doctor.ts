@@ -1,6 +1,7 @@
 import { platform } from "node:os";
 import { buildReport, renderReport } from "../doctor/report.js";
 import { pushKbChecks } from "../doctor/kb-checks.js";
+import { pushLinkChecks } from "../doctor/link-checks.js";
 import { hasGh, hasGit } from "../git.js";
 import { logger } from "../logger.js";
 import { absolutePath, exists, looksLikeHub, resolveDocsRoot } from "../paths.js";
@@ -48,6 +49,9 @@ export async function doctor(opts: DoctorOptions = {}): Promise<DoctorResult> {
   await pushEnvChecks(checks, opts);
   const kb = await resolveDocsRoot(opts.cwd ?? process.cwd());
   await pushKbChecks(checks, kb, opts);
+  // Link integrity (two-way code-repo<->hub references; `--fix` heals a stale
+  // back-reference after a move). Only meaningful inside a KB.
+  if (kb) await pushLinkChecks(checks, opts);
 
   const passed = checks.every((c) => c.ok || c.optional);
 

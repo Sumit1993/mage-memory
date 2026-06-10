@@ -78,7 +78,10 @@ async function pushSinkIgnoreCheck(
   const prefix = kb.kind === "in-repo" ? "mage/" : "";
   const probes = [`${prefix}${LEARNINGS_DIR}/probe`, `${prefix}${METRICS_DIR}/probe`];
 
-  const added = opts.fix ? await ensureGitignored(root, patterns) : [];
+  // Guard the write on the root existing: an external repo can resolve to a hub
+  // project dir not yet materialized on disk — writing a .gitignore there would
+  // throw ENOENT, and doctor must never throw. Nothing to ignore yet anyway.
+  const added = opts.fix && (await exists(root)) ? await ensureGitignored(root, patterns) : [];
   const unignored = await unignoredProbes(root, probes);
 
   if (unignored.length === 0) {
