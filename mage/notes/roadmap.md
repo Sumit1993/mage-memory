@@ -47,7 +47,7 @@ skills + the loop) + [ADR-0014](../decisions/0014-two-gate-redaction.md) (two-ga
 - **New in this horizon**: the **Procedure skill** (a graduated note), `/mage-optimize`
   (SkillOpt's *rails* — bounded edits, rejected-edit buffer, context-match gate —
   human-confirmed), two-gate redaction, and Claude Code **plugin** distribution
-  (the `mage:` namespace keeps skill names clean — `mage:learn`, `mage:specify`, …).
+  (the `mage:` namespace keeps skill names clean — `mage:learn`, `mage:distill`, …).
 
 ## Deferred past 0.1.0 (unplanned future 0.x — no 1.0)
 - **Literal SkillOpt bridge** — export skills+trajectories to the SkillOpt optimizer,
