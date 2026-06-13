@@ -1,14 +1,14 @@
-import { access, readFile, stat } from "node:fs/promises";
+import { access, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 
 // ─── path constants ──────────────────────────────────────────────────────
-/** The knowledge-base dir nested in a code repo (in-repo mode). */
+/** The knowledge-base (KB) dir nested in a code repo (in-repo and hybrid modes). */
 export const META_DIR = "mage";
 export const META_FILE = "metadata.json";
 export const PROJECTS_DIR = "projects";
 export const ARCHIVE_DIR = "archive";
 
-// Vault layout (inside a docs root, whether in-repo `mage/` or a hub root).
+// KB layout (inside a docs root, whether a repo `mage/` or a hub root).
 export const NOTES_DIR = "notes";
 export const WORK_DIR = "work";
 export const DECISIONS_DIR = "decisions";
@@ -24,7 +24,7 @@ export const LEARNINGS_ARCHIVE_DIR = ".archive";
 export const LEARNINGS_PURGE_MARKER = ".last-purge";
 /** Per-work-unit raw materials dir name (git-ignored wherever it appears). */
 export const ARTIFACTS_DIRNAME = "artifacts";
-/** Obsidian vault config dir. */
+/** Obsidian config dir (Obsidian's own term; not a mage product noun). */
 export const OBSIDIAN_DIR = ".obsidian";
 /** Git metadata dir (skipped by the scanner). */
 export const GIT_DIR = ".git";
@@ -41,20 +41,29 @@ export const CLAUDE_FILE = "CLAUDE.md";
 export const GITIGNORE_FILE = ".gitignore";
 
 // ─── schema ──────────────────────────────────────────────────────────────
-export const METADATA_SCHEMA = "mage.v1";
+/** Current on-disk schema version — what every writer stamps. */
+export const METADATA_SCHEMA = "mage.v2";
+/**
+ * Prior schema version. Still read leniently and normalized to v2 in memory
+ * (Dec 9 migration): never throws on a v1 file. `mage migrate` rewrites eagerly.
+ */
+export const METADATA_SCHEMA_V1 = "mage.v1";
 
 /**
  * Code-repo-side metadata. Lives at `<code-repo>/mage/metadata.json`.
  *
- * Two modes:
- *   - "in-repo":  the knowledge base lives at `<code-repo>/mage/`. hub_path/hub_repo are null.
- *                 Hybrid mode = in-repo + non-empty hub_refs[].
- *   - "external": the knowledge base lives at `<hub_path>/projects/<project>/`.
- *                 hub_path/hub_repo are populated.
+ * Three modes (the canonical KB-shape axis):
+ *   - "in-repo":  the KB lives at `<code-repo>/mage/`. hub_refs is empty;
+ *                 hub_path/hub_repo are null.
+ *   - "hybrid":   the KB lives at `<code-repo>/mage/` (same docs root as in-repo)
+ *                 AND is registered with one or more external hubs. hub_refs is
+ *                 non-empty; hub_path/hub_repo remain null.
+ *   - "external": the KB is hub-owned; docs live at `<hub_path>/projects/<project>/`.
+ *                 hub_path/hub_repo are populated; hub_refs is empty.
  */
 export interface MageMetadata {
   schema: string;
-  mode: "in-repo" | "external";
+  mode: "in-repo" | "hybrid" | "external";
   project: string;
   hub_path: string | null;
   hub_repo: string | null;
@@ -65,8 +74,8 @@ export interface MageMetadata {
 }
 
 /**
- * One entry in `hub_refs[]`. Used in hybrid mode (mode=in-repo + this code repo
- * is also registered with one or more external hubs for cross-cutting context).
+ * One entry in `hub_refs[]`. Present when mode=hybrid — this code repo is
+ * registered with one or more external hubs for cross-cutting context.
  */
 export interface HubRef {
   hub_path: string;
@@ -96,10 +105,10 @@ export interface HubProject {
    * (the hub has the actual files). Used when the code repo was linked via the
    * external-only flow (no in-repo notes at link time).
    *
-   * "in-repo" — the project's notes live at `<code_repo_path>/mage/` (the code
+   * "repo-owned" — the project's notes live at `<code_repo_path>/mage/` (the code
    * repo owns the files; the hub just registers awareness). Used in hybrid mode.
    */
-  storage: "hub-owned" | "in-repo";
+  storage: "hub-owned" | "repo-owned";
   code_repo_path: string;
   code_repo_url: string;
 }
@@ -113,7 +122,7 @@ export function metadataPath(codeRepo: string): string {
 
 /**
  * Code repo's docs root — where notes/, decisions/, work/, INDEX.md land when
- * mode=in-repo or mode=in-repo+hub_refs (hybrid).
+ * mode=in-repo or mode=hybrid (both store locally in `<code-repo>/mage/`).
  */
 export function codeRepoDocsRoot(codeRepo: string): string {
   return join(codeRepo, META_DIR);
@@ -152,8 +161,12 @@ export function hubProjectDocsRoot(hubRoot: string, projectName: string): string
 // ─── reading ─────────────────────────────────────────────────────────────
 
 /**
- * Read and parse a code repo's mage metadata file, if present.
- * Returns null if the file doesn't exist. Throws if the schema is unknown.
+ * Read and parse a code repo's mage metadata file, if present. Returns null if
+ * absent. Reads BOTH schema v1 and v2 leniently: a v1 file is normalized to the
+ * v2 shape IN MEMORY (mode "in-repo" + non-empty hub_refs ⇒ "hybrid"), but the
+ * returned object's `schema` field is the ON-DISK value — so `status`/`doctor`
+ * can still report a v1 file as needing `mage migrate`. Only a genuinely foreign
+ * schema throws. On the capture hot path: kept cheap and total.
  */
 export async function readMetadata(codeRepo: string): Promise<MageMetadata | null> {
   const path = metadataPath(codeRepo);
@@ -174,17 +187,35 @@ export async function readMetadata(codeRepo: string): Promise<MageMetadata | nul
     );
   }
   const schema = String(parsed.schema ?? "");
-  if (schema !== METADATA_SCHEMA) {
+  if (schema !== METADATA_SCHEMA && schema !== METADATA_SCHEMA_V1) {
     throw new Error(
       `Unknown mage metadata schema at ${path}: ${schema || "(missing)"}. ` +
-        `Expected ${METADATA_SCHEMA}. Delete the file and run \`mage init\` or \`mage link\` to recreate.`,
+        `Expected ${METADATA_SCHEMA}. Run \`mage migrate\` to upgrade, or delete and run \`mage init\`/\`mage link\` to recreate.`,
     );
   }
-  return parsed as unknown as MageMetadata;
+  return normalizeMetadata(parsed as unknown as MageMetadata);
 }
 
 /**
- * Read and parse a hub's top-level metadata.json. Returns null if absent.
+ * v1 → v2 in-memory normalization for code-repo metadata: makes hybrid explicit
+ * (mode "in-repo" + non-empty hub_refs ⇒ "hybrid"). Idempotent on a v2 object,
+ * and immutable — returns the same object when nothing changed (cheap hot path),
+ * a new object otherwise. Leaves `schema` untouched; {@link writeMetadata} stamps
+ * the current schema on write.
+ */
+export function normalizeMetadata(meta: MageMetadata): MageMetadata {
+  const mode =
+    (meta.mode as string) === "in-repo" && (meta.hub_refs?.length ?? 0) > 0
+      ? "hybrid"
+      : meta.mode;
+  return mode === meta.mode ? meta : { ...meta, mode };
+}
+
+/**
+ * Read and parse a hub's top-level metadata.json. Returns null if absent. Reads
+ * schema v1 and v2 leniently and normalizes v1 in memory (HubProject.storage
+ * "in-repo" ⇒ "repo-owned"); the returned `schema` is the on-disk value. Only a
+ * genuinely foreign schema throws.
  */
 export async function readHubMetadata(hubRoot: string): Promise<HubMetadata | null> {
   const path = hubMetadataPath(hubRoot);
@@ -204,7 +235,51 @@ export async function readHubMetadata(hubRoot: string): Promise<HubMetadata | nu
         `Delete it and run \`mage link\` to recreate.`,
     );
   }
-  return parsed as unknown as HubMetadata;
+  const schema = String(parsed.schema ?? "");
+  if (schema !== METADATA_SCHEMA && schema !== METADATA_SCHEMA_V1) {
+    throw new Error(
+      `Unknown mage hub metadata schema at ${path}: ${schema || "(missing)"}. ` +
+        `Expected ${METADATA_SCHEMA}. Run \`mage migrate\` to upgrade, or delete and re-run \`mage link\`.`,
+    );
+  }
+  return normalizeHubMetadata(parsed as unknown as HubMetadata);
+}
+
+/**
+ * v1 → v2 in-memory normalization for hub metadata: renames each project's
+ * storage "in-repo" ⇒ "repo-owned". Idempotent and immutable (same object when
+ * nothing changed). Leaves `schema` untouched; {@link writeHubMetadata} stamps it.
+ */
+export function normalizeHubMetadata(hub: HubMetadata): HubMetadata {
+  if (!Array.isArray(hub.projects)) return hub;
+  let changed = false;
+  const projects = hub.projects.map((p) => {
+    if ((p.storage as string) === "in-repo") {
+      changed = true;
+      return { ...p, storage: "repo-owned" as const };
+    }
+    return p;
+  });
+  return changed ? { ...hub, projects } : hub;
+}
+
+// ─── writing ─────────────────────────────────────────────────────────────
+
+/**
+ * Write a code repo's metadata, ALWAYS stamping the current schema
+ * ({@link METADATA_SCHEMA}). Routing every writer through this guarantees a
+ * read-modify-write upgrades a v1 file to v2 (lazy migration) and that no spread
+ * accidentally persists a stale schema. Trailing newline for clean git diffs.
+ */
+export async function writeMetadata(codeRepo: string, meta: MageMetadata): Promise<void> {
+  const stamped: MageMetadata = { ...meta, schema: METADATA_SCHEMA };
+  await writeFile(metadataPath(codeRepo), `${JSON.stringify(stamped, null, 2)}\n`);
+}
+
+/** Write a hub's top-level metadata, always stamping {@link METADATA_SCHEMA}. */
+export async function writeHubMetadata(hubRoot: string, hub: HubMetadata): Promise<void> {
+  const stamped: HubMetadata = { ...hub, schema: METADATA_SCHEMA };
+  await writeFile(hubMetadataPath(hubRoot), `${JSON.stringify(stamped, null, 2)}\n`);
 }
 
 // ─── structural checks ──────────────────────────────────────────────────
@@ -225,25 +300,27 @@ export async function looksLikeHub(path: string): Promise<boolean> {
 }
 
 /** What {@link resolveDocsRoot} resolves to: the docs root to operate on, its
- *  kind, and the git repo the sinks live under (== root for in-repo/hub; the hub
- *  for an external project, whose docs live inside the hub's repo). */
+ *  kind, and the git repo the sinks live under (== root for a repo-KB/hub; the hub
+ *  for an external project, whose docs live inside the hub's repo). `kind` is the
+ *  2-value umbrella — "repo" covers BOTH in-repo and hybrid (both store locally);
+ *  callers that must distinguish re-read `meta.mode`. */
 export interface ResolvedDocsRoot {
   root: string;
-  kind: "in-repo" | "hub";
+  kind: "repo" | "hub";
   repo: string;
 }
 
 /**
  * Resolve the mage docs root to operate on, starting from `startDir` (default cwd):
- *  - in-repo:  the nearest ancestor with `mage/metadata.json` (mode=in-repo) → that
- *              repo's `mage/`.
+ *  - repo KB:  the nearest ancestor with `mage/metadata.json` (mode=in-repo or
+ *              mode=hybrid) → that repo's `mage/`. Reported as kind "repo".
  *  - external: that metadata is mode=external → the HUB project it points to
  *              (`<hub_path>/projects/<project>/`), so captures/grooming land in the
  *              hub, not the code repo. Reported as kind "hub" (a hub-owned project
  *              is a flat docs root living inside the hub's repo); `repo` is the hub.
- *  - hub:      `startDir` itself looks like a hub → the hub root.
+ *  - hub:      `startDir` itself looks like a hub → the hub root. Reported as kind "hub".
  * Returns null if none is found. A malformed/unreadable metadata degrades to the
- * in-repo root (never throws — this is on the capture hot path).
+ * repo KB root (never throws — this is on the capture hot path).
  */
 export async function resolveDocsRoot(startDir: string): Promise<ResolvedDocsRoot | null> {
   const abs = absolutePath(startDir);
@@ -252,9 +329,9 @@ export async function resolveDocsRoot(startDir: string): Promise<ResolvedDocsRoo
   let dir = abs;
   for (;;) {
     if (await exists(join(dir, META_DIR, META_FILE))) {
-      // Honor mode=external by following hub_path; a bad read degrades to in-repo.
+      // Honor mode=external by following hub_path; a bad read degrades to repo KB.
       const external = await externalDocsRoot(dir).catch(() => null);
-      return external ?? { root: codeRepoDocsRoot(dir), kind: "in-repo", repo: dir };
+      return external ?? { root: codeRepoDocsRoot(dir), kind: "repo", repo: dir };
     }
     const parent = dirname(dir);
     if (parent === dir) break;
@@ -272,8 +349,8 @@ export async function resolveDocsRoot(startDir: string): Promise<ResolvedDocsRoo
 /**
  * If the code repo at `dir` is linked in external mode (its `mage/metadata.json`
  * has mode=external with a usable hub_path + project), the hub project docs root
- * it points to; otherwise null (caller falls back to in-repo handling). May throw
- * on an unknown schema or unsafe project name — {@link resolveDocsRoot} catches it.
+ * it points to; otherwise null (caller falls back to repo-KB handling). May throw
+ * on an unknown/foreign schema or unsafe project name — {@link resolveDocsRoot} catches it.
  */
 async function externalDocsRoot(dir: string): Promise<ResolvedDocsRoot | null> {
   const meta = await readMetadata(dir);

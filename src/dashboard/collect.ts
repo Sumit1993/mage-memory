@@ -65,9 +65,9 @@ const MAX_GRAPH_EDGES = 600;
 
 /** The already-resolved KB the collector reads. The COMMAND resolves this. */
 export interface DashboardKb {
-  /** Absolute docs root (in-repo `mage/` or a hub root). */
+  /** Absolute docs root (a repo `mage/` or a hub root). */
   root: string;
-  kind: "in-repo" | "hub";
+  kind: "repo" | "hub";
 }
 
 /** Collector knobs — all optional; `now` is injectable for deterministic tests. */
@@ -481,10 +481,10 @@ async function buildRegistry(hubMeta: HubMetadata | null): Promise<DashboardRegi
 
 // ─── kb name ──────────────────────────────────────────────────────────────────
 
-/** Display name: the hub's metadata name, or the docs-root basename for in-repo. */
-function kbName(kind: "in-repo" | "hub", root: string, hubMeta: HubMetadata | null): string {
+/** Display name: the hub's metadata name, or the docs-root basename for a repo KB. */
+function kbName(kind: "repo" | "hub", root: string, hubMeta: HubMetadata | null): string {
   if (kind === "hub" && hubMeta?.name) return hubMeta.name;
-  // in-repo docs root is `<repo>/mage` — use the repo dir's basename as the name.
+  // a repo KB's docs root is `<repo>/mage` — use the repo dir's basename as the name.
   const base = basename(root);
   if (base === "mage") {
     const parent = basename(join(root, ".."));

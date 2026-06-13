@@ -1,10 +1,8 @@
 import { confirm } from "@inquirer/prompts";
-import { rm, writeFile } from "node:fs/promises";
+import { rm } from "node:fs/promises";
 import { logger } from "../logger.js";
 import {
   type MageMetadata,
-  type HubMetadata,
-  METADATA_SCHEMA,
   absolutePath,
   exists,
   hubMetadataPath,
@@ -12,6 +10,8 @@ import {
   metadataPath,
   readHubMetadata,
   readMetadata,
+  writeHubMetadata,
+  writeMetadata,
 } from "../paths.js";
 
 export interface UnlinkOptions {
@@ -70,12 +70,7 @@ export async function unlink(opts: UnlinkOptions = {}): Promise<UnlinkResult> {
         hubMeta.projects.find((p) => p.name === meta.project)?.storage === "hub-owned";
       const newProjects = hubMeta.projects.filter((p) => p.name !== meta.project);
       if (newProjects.length < hubMeta.projects.length) {
-        const updated: HubMetadata = {
-          ...hubMeta,
-          schema: METADATA_SCHEMA,
-          projects: newProjects,
-        };
-        await writeFile(hubMetadataPath(targetHub), `${JSON.stringify(updated, null, 2)}\n`);
+        await writeHubMetadata(targetHub, { ...hubMeta, projects: newProjects });
         logger.success(`Removed '${meta.project}' from ${hubMetadataPath(targetHub)}`);
       } else {
         logger.warn(`Project '${meta.project}' not found in hub registry. Continuing.`);
@@ -113,7 +108,7 @@ export async function unlink(opts: UnlinkOptions = {}): Promise<UnlinkResult> {
     await rm(metadataPath(codeRepo));
     logger.success(`Removed ${metadataPath(codeRepo)} (no remaining hubs)`);
   } else {
-    await writeFile(metadataPath(codeRepo), `${JSON.stringify(newMeta, null, 2)}\n`);
+    await writeMetadata(codeRepo, newMeta);
     logger.success(`Updated ${metadataPath(codeRepo)}`);
   }
 
@@ -158,19 +153,18 @@ function removeHubFromCodeRepoMetadata(
   meta: MageMetadata,
   targetHub: string,
 ): MageMetadata | null {
+  // Unlinking the external (hub-owned) link: hub_path/hub_repo clear. If hub_refs
+  // remain, the repo keeps hub registrations ⇒ hybrid; else nothing is left to
+  // point at, so the metadata is removed (null). schema is stamped by writeMetadata.
   if (meta.mode === "external" && meta.hub_path === targetHub) {
     if (meta.hub_refs.length === 0) return null;
-    return {
-      ...meta,
-      schema: METADATA_SCHEMA,
-      mode: "in-repo",
-      hub_path: null,
-      hub_repo: null,
-    };
+    return { ...meta, mode: "hybrid", hub_path: null, hub_repo: null };
   }
   const newRefs = meta.hub_refs.filter((r) => r.hub_path !== targetHub);
-  if (meta.mode === "in-repo" && newRefs.length === 0) {
-    return { ...meta, schema: METADATA_SCHEMA, hub_refs: [] };
+  // A locally-storing KB (in-repo OR hybrid) that loses its last hub_ref becomes a
+  // bare in-repo KB. (mode arrives normalized: a v1 hybrid reads back as "hybrid".)
+  if (meta.mode !== "external" && newRefs.length === 0) {
+    return { ...meta, mode: "in-repo", hub_refs: [] };
   }
-  return { ...meta, schema: METADATA_SCHEMA, hub_refs: newRefs };
+  return { ...meta, hub_refs: newRefs };
 }

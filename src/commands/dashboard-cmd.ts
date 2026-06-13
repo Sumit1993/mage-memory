@@ -124,10 +124,10 @@ export async function dashboard(opts: DashboardOptions = {}): Promise<DashboardR
 async function ignoreCockpit(kb: {
   root: string;
   repo: string;
-  kind: "in-repo" | "hub";
+  kind: "repo" | "hub";
 }): Promise<void> {
   const { root, patterns } =
-    kb.kind === "in-repo"
+    kb.kind === "repo"
       ? { root: kb.repo, patterns: [`mage/${DASHBOARD_HTML}`] }
       : { root: kb.root, patterns: [DASHBOARD_HTML] };
 

@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { exists, readHubMetadata } from "../paths.js";
+import { exists, readHubMetadata, readMetadata } from "../paths.js";
 import { init } from "./init.js";
 import { link } from "./link.js";
 
@@ -55,13 +55,16 @@ describe("mage link", () => {
     await init({ mode: "in-repo", yes: true, codeRepo: code, project: "web" });
     const r = await link(hub, { codeRepo: code, project: "web", yes: true });
 
-    expect(r.storage).toBe("in-repo");
+    expect(r.storage).toBe("repo-owned");
     expect(await exists(join(hub, "projects", "web"))).toBe(false);
     const agents = await readFile(join(code, "AGENTS.md"), "utf8");
     expect(agents).toContain("knowledge base at `mage/`"); // in-repo block kept
     expect(agents).not.toContain("_index.web.md"); // not overwritten with external block
     const meta = await readHubMetadata(hub);
-    expect(meta?.projects.find((p) => p.name === "web")?.storage).toBe("in-repo");
+    expect(meta?.projects.find((p) => p.name === "web")?.storage).toBe("repo-owned");
+    // Linking a local KB to a hub makes its mode explicitly hybrid (v2).
+    const codeMeta = await readMetadata(code);
+    expect(codeMeta?.mode).toBe("hybrid");
   });
 
   it("error for a non-hub path suggests `mage init --hub`, not the retired --external", async () => {

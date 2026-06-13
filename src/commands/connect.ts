@@ -116,10 +116,10 @@ async function ensureSinkIgnores(startDir: string): Promise<void> {
     return;
   }
 
-  // in-repo: ignore at the CODE-REPO root (kb.repo, the dir containing mage/),
+  // repo KB: ignore at the CODE-REPO root (kb.repo, the dir containing mage/),
   // mirroring init's `mage/`-prefixed sink patterns. hub: ignore at the hub root.
   const { root, patterns } =
-    kb.kind === "in-repo"
+    kb.kind === "repo"
       ? { root: kb.repo, patterns: ["mage/.learnings/", "mage/.metrics/"] }
       : {
           root: kb.root,

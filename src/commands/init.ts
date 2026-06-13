@@ -23,6 +23,8 @@ import {
   hubMetadataPath,
   looksLikeHub,
   metadataPath,
+  writeHubMetadata,
+  writeMetadata,
 } from "../paths.js";
 import { run } from "../shell.js";
 
@@ -164,7 +166,7 @@ async function initInRepo(codeRepo: string, project: string): Promise<void> {
     hub_refs: [],
     linked_at: nowIso(),
   };
-  await writeFile(metadataPath(codeRepo), `${JSON.stringify(meta, null, 2)}\n`);
+  await writeMetadata(codeRepo, meta);
   logger.success(`Wrote ${metadataPath(codeRepo)}`);
 
   // Git-ignore raw artifacts + pre-promotion scratch + the cockpit (ADR-0020 §6:
@@ -291,7 +293,7 @@ async function initStandaloneHub(args: HubArgs): Promise<string> {
     created_at: nowIso(),
     projects: [],
   };
-  await writeFile(hubMetadataPath(hubDir), `${JSON.stringify(hubMeta, null, 2)}\n`);
+  await writeHubMetadata(hubDir, hubMeta);
   logger.success(`Wrote ${hubMetadataPath(hubDir)}`);
 
   const added = await ensureGitignored(hubDir, [

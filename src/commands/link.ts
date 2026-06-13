@@ -1,5 +1,5 @@
 import { confirm, select } from "@inquirer/prompts";
-import { mkdir, readdir, writeFile } from "node:fs/promises";
+import { mkdir, readdir } from "node:fs/promises";
 import { basename, dirname } from "node:path";
 import { writeAgentsMd } from "../agents-md.js";
 import { getRemoteOriginUrl } from "../git.js";
@@ -18,8 +18,10 @@ import {
   metadataPath,
   readHubMetadata,
   readMetadata,
+  writeHubMetadata,
+  writeMetadata,
 } from "../paths.js";
-export type Storage = "in-repo" | "hub-owned";
+export type Storage = "hub-owned" | "repo-owned";
 
 export interface LinkOptions {
   /** Code repo to link (default: cwd). */
@@ -45,11 +47,11 @@ export interface LinkResult {
  *
  * Auto-detection of storage based on whether the code repo has populated
  * `mage/`:
- *   - empty/absent  → storage="hub-owned" (scenario 2): code repo has no in-repo docs;
+ *   - empty/absent  → storage="hub-owned" (scenario 2): code repo has no local docs;
  *                     the hub owns them. We create the empty stub at
  *                     `<hub>/projects/<project>/mage/`.
- *   - has content   → storage="in-repo" (scenario 4 / hybrid): code repo already has
- *                     in-repo docs; the hub just registers awareness via metadata.
+ *   - has content   → storage="repo-owned" (scenario 4 / hybrid): code repo already has
+ *                     local docs; the hub just registers awareness via metadata.
  *                     No `<hub>/projects/<project>/` directory is created.
  *
  * Either way, both metadata.json files are updated and the user is given
@@ -77,10 +79,10 @@ export async function link(hubPathInput: string, opts: LinkOptions = {}): Promis
 
   // ─── auto-detect storage ───────────────────────────────────────────────
   // Priority order for detection:
-  //   1. Existing metadata.json declares mode=in-repo → storage=in-repo (hybrid)
+  //   1. Existing metadata stores locally (mode=in-repo or hybrid) → storage=repo-owned
   //   2. Existing metadata.json declares mode=external → storage=hub-owned
   //      (the existing external linkage gets superseded by the new one)
-  //   3. No metadata.json + content in mage/ → storage=in-repo (the user
+  //   3. No metadata.json + content in mage/ → storage=repo-owned (the user
   //      created docs but didn't run init — treat as scenario-4 onboarding)
   //   4. No metadata.json + empty mage/ → storage=hub-owned (fresh link;
   //      the hub will own the docs)
@@ -89,15 +91,16 @@ export async function link(hubPathInput: string, opts: LinkOptions = {}): Promis
   const existingMeta = await readMetadata(codeRepo);
   let detectedStorage: Storage;
   let detectionReason: string;
-  if (existingMeta?.mode === "in-repo") {
-    detectedStorage = "in-repo";
-    detectionReason = "existing metadata declares mode=in-repo";
+  if (existingMeta && existingMeta.mode !== "external") {
+    // Stores locally (mode=in-repo or hybrid) ⇒ the repo keeps its docs.
+    detectedStorage = "repo-owned";
+    detectionReason = `existing metadata stores locally (mode=${existingMeta.mode})`;
   } else if (existingMeta?.mode === "external") {
     detectedStorage = "hub-owned";
     detectionReason = "existing metadata declares mode=external (new hub supersedes)";
   } else {
     const hasInRepoContent = docsRootContent.filter((n) => n !== "metadata.json").length > 0;
-    detectedStorage = hasInRepoContent ? "in-repo" : "hub-owned";
+    detectedStorage = hasInRepoContent ? "repo-owned" : "hub-owned";
     detectionReason = hasInRepoContent
       ? "mage/ contains content (no metadata yet)"
       : "no mage/ content found";
@@ -197,7 +200,7 @@ async function upsertHubProject(
       created_at: nowIso(),
       projects: [newEntry],
     };
-    await writeFile(hubMetadataPath(hub), `${JSON.stringify(hubMeta, null, 2)}\n`);
+    await writeHubMetadata(hub, hubMeta);
     logger.success(`Created ${hubMetadataPath(hub)} (bootstrapped hub registry)`);
     return { hubMeta, hubMetadataAction: "created" };
   }
@@ -206,12 +209,12 @@ async function upsertHubProject(
   const idx = existing.projects.findIndex((p) => p.name === args.project);
   if (idx >= 0) {
     existing.projects[idx] = newEntry;
-    await writeFile(hubMetadataPath(hub), `${JSON.stringify(existing, null, 2)}\n`);
+    await writeHubMetadata(hub, existing);
     logger.success(`Updated existing project '${args.project}' in ${hubMetadataPath(hub)}`);
     return { hubMeta: existing, hubMetadataAction: "updated" };
   }
   existing.projects.push(newEntry);
-  await writeFile(hubMetadataPath(hub), `${JSON.stringify(existing, null, 2)}\n`);
+  await writeHubMetadata(hub, existing);
   logger.success(`Appended project '${args.project}' to ${hubMetadataPath(hub)}`);
   return { hubMeta: existing, hubMetadataAction: "appended-project" };
 }
@@ -234,15 +237,15 @@ async function upsertCodeRepoMetadata(
 
   if (!existing) {
     // Fresh link: code repo has never been mage-initialized.
-    if (args.storage === "in-repo") {
-      // This shouldn't happen — if code repo has in-repo content, it should have been
-      // init'd already. Defensive: bootstrap as if init --in-repo had run.
+    if (args.storage === "repo-owned") {
+      // This shouldn't happen — if code repo has local content, it should have been
+      // init'd already. Defensive: bootstrap as a hybrid (local docs + this hub ref).
       logger.warn(
-        "No existing metadata but storage=in-repo. Bootstrapping code-repo metadata as in-repo mode.",
+        "No existing metadata but storage=repo-owned. Bootstrapping code-repo metadata as hybrid mode.",
       );
       meta = {
         schema: METADATA_SCHEMA,
-        mode: "in-repo",
+        mode: "hybrid",
         project: args.project,
         hub_path: null,
         hub_repo: null,
@@ -276,7 +279,8 @@ async function upsertCodeRepoMetadata(
       linked_at: nowIso(),
     };
   } else {
-    // Existing in-repo + new hub-ref = hybrid mode. Append/update the hub-ref.
+    // Existing local KB + new hub-ref = hybrid mode. Append/update the hub-ref and
+    // make the mode explicit (a v1 in-repo becomes hybrid on its first hub link).
     const refs = [...existing.hub_refs];
     const idx = refs.findIndex((r) => r.hub_path === args.hubPath);
     const newRef = { hub_path: args.hubPath, hub_repo: args.hubRepoUrl, project: args.project };
@@ -285,13 +289,14 @@ async function upsertCodeRepoMetadata(
     meta = {
       ...existing,
       schema: METADATA_SCHEMA,
+      mode: "hybrid",
       hub_refs: refs,
       linked_at: nowIso(),
     };
   }
 
   await mkdir(dirname(metadataPath(codeRepo)), { recursive: true });
-  await writeFile(metadataPath(codeRepo), `${JSON.stringify(meta, null, 2)}\n`);
+  await writeMetadata(codeRepo, meta);
   logger.success(`Wrote ${metadataPath(codeRepo)}`);
   return meta;
 }

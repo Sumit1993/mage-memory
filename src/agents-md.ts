@@ -15,12 +15,12 @@ const END = "<!-- END mage -->";
 const CLAUDE_IMPORT = "@AGENTS.md";
 
 export interface AgentsMdOptions {
-  /** Relative path (from `root`) to the knowledge base: "mage" in-repo, "." for a hub. */
+  /** Relative path (from `root`) to the knowledge base: "mage" for in-repo/hybrid, "." for a hub. */
   docsRel: string;
-  kind: "in-repo" | "hub" | "external";
-  /** external only: absolute path to the hub root this code repo is registered with. */
+  kind: "in-repo" | "hybrid" | "hub" | "external";
+  /** external/hybrid only: absolute path to the hub root this code repo is registered with. */
   hubPath?: string;
-  /** external only: the project name as registered in the hub (its wing). */
+  /** external/hybrid only: the project name as registered in the hub (its wing). */
   project?: string;
 }
 
@@ -43,9 +43,9 @@ function externalBlock(opts: AgentsMdOptions): string {
   const hubIndex = `${hub}/${INDEX_FILE}`;
   const hubDecisions = `${hub}/${DECISIONS_DIR}/`;
   return `${BEGIN}
-## mage knowledge base (external hub)
+## mage knowledge base (hub-linked)
 
-This repository's durable knowledge lives in an external **mage hub** at
+This repository's durable knowledge lives in a **mage hub** at
 \`${hub}\`, where this repo is the **${project}** project. mage is a portable,
 file-based knowledge base of notes — insight, procedure, and pointers (not
 copies of sources) — navigable as an Obsidian graph.
@@ -78,7 +78,9 @@ function mageBlock(opts: AgentsMdOptions): string {
   const kbDesc =
     opts.kind === "hub"
       ? "This repository is a **mage hub** — a multi-project knowledge base spanning several repos/services."
-      : `This repository has a **mage** knowledge base at \`${opts.docsRel}/\`.`;
+      : opts.kind === "hybrid"
+        ? `This repository has a **mage** knowledge base at \`${opts.docsRel}/\` and is also registered with one or more external hubs.`
+        : `This repository has a **mage** knowledge base at \`${opts.docsRel}/\`.`;
   return `${BEGIN}
 ## mage knowledge base
 

@@ -20,7 +20,7 @@ mage is a portable, file-based, self-maintaining knowledge base for software sys
 ### Structure
 
 **knowledge base**:
-The whole memory for a system — the graph of notes plus its index. One per repo (in-repo) or one hub spanning many repos (the system "brain").
+The whole memory for a system — the graph of notes plus its index. Exists in four shapes: **in-repo** (mage/ inside the code repo), **hybrid** (in-repo KB also registered with a hub), **external** (code repo whose knowledge lives entirely in a hub), or **hub** (a federated KB spanning many repos). All four are KBs.
 _Avoid_: docs, wiki, vault (as the product noun)
 
 **Note**:
@@ -124,7 +124,7 @@ _Avoid_: install/uninstall (as the product noun)
 
 ## Flagged ambiguities
 
-- **Wing vs Project** *(resolved, [ADR-0011](../decisions/0011-recursive-scan-hub-projects.md))*: a **hub is one vault**; a **project** is a sub-scope of it whose notes live under `projects/<name>/` and surface as a **wing** (`<name>/room`), plus a **registry entry** in the hub `metadata.json` recording its code repo. So a project *is* a wing (how it groups + indexes — tag-derived) **and** a registry entry (how it's labelled/linked). A wing need not be a project — it can be a non-repo scope (a person, an external service) or hub-level cross-cutting notes.
+- **Wing vs Project** *(resolved, [ADR-0011](../decisions/0011-recursive-scan-hub-projects.md))*: a **hub is one KB**; a **project** is a sub-scope of it whose notes live under `projects/<name>/` and surface as a **wing** (`<name>/room`), plus a **registry entry** in the hub `metadata.json` recording its code repo. So a project *is* a wing (how it groups + indexes — tag-derived) **and** a registry entry (how it's labelled/linked). A wing need not be a project — it can be a non-repo scope (a person, an external service) or hub-level cross-cutting notes.
 - **"Memory" the quality vs the noun**: knowledge has *durable memory*; we don't call a note "a memory."
 
 ## Example dialogue

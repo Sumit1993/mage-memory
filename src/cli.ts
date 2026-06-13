@@ -11,6 +11,7 @@ import { ingestCmd } from "./commands/ingest.js";
 import { type InitMode, type InitVisibility, init } from "./commands/init.js";
 import { link, type Storage } from "./commands/link.js";
 import { list } from "./commands/list.js";
+import { mageMigrate, reportMigrate } from "./commands/migrate.js";
 import { buildObserveCommand } from "./commands/observe.js";
 import { promoteCmd } from "./commands/promote-cmd.js";
 import { redactCmd } from "./commands/redact.js";
@@ -48,7 +49,7 @@ program
     "--hub",
     "create a standalone hub (vs an in-repo KB) at the current dir or <name>",
   )
-  .addOption(new Option("--external", "deprecated alias of --hub").hideHelp())
+  .addOption(new Option("--external", "removed in 0.0.10 — use --hub").hideHelp())
   .option(
     "--name <name>",
     "deprecated: pass the hub name as the positional argument instead",
@@ -255,17 +256,17 @@ program
   )
   .option(
     "--storage <kind>",
-    "override auto-detected storage: 'in-repo' (hybrid; hub references in-repo docs) or 'hub-owned' (hub owns the docs)",
+    "override auto-detected storage: 'repo-owned' (hybrid; the repo keeps its docs) or 'hub-owned' (the hub owns the docs)",
   )
   .option("-y, --yes", "non-interactive: auto-confirm prompts")
   .action(
     async (
       hubPath: string,
-      opts: { project?: string; storage?: Storage; yes?: boolean },
+      opts: { project?: string; storage?: string; yes?: boolean },
     ) => {
       await link(hubPath, {
         project: opts.project,
-        storage: opts.storage,
+        storage: coerceStorage(opts.storage),
         yes: opts.yes,
       });
     },
@@ -314,6 +315,17 @@ program
   .option("--hub <path>", "hub root (default: cwd)")
   .action(async (opts) => {
     await list({ hub: opts.hub });
+  });
+
+// ─── migrate ─────────────────────────────────────────────────────────────────
+program
+  .command("migrate")
+  .description(
+    "Upgrade this KB's metadata to the current schema (idempotent; never commits)",
+  )
+  .option("--dir <path>", "where to look for the knowledge base (default: cwd; walks up)")
+  .action(async (opts: { dir?: string }) => {
+    reportMigrate(await mageMigrate({ dir: opts.dir }));
   });
 
 // ─── status ────────────────────────────────────────────────────────────────
@@ -411,16 +423,30 @@ try {
 
 // ─── helpers ───────────────────────────────────────────────────────────────
 
+/**
+ * Coerce a user-supplied `--storage` value to the v2 vocabulary, accepting the
+ * pre-0.0.10 alias `in-repo` for `repo-owned` (mirrors the lenient metadata read).
+ */
+function coerceStorage(value: string | undefined): Storage | undefined {
+  if (value === undefined) return undefined;
+  if (value === "in-repo" || value === "repo-owned") return "repo-owned";
+  if (value === "hub-owned") return "hub-owned";
+  throw new Error(
+    `Unknown --storage '${value}'. Use 'repo-owned' (legacy 'in-repo' is accepted) or 'hub-owned'.`,
+  );
+}
+
 function modeFromOpts(opts: {
   inRepo?: boolean;
   hub?: boolean;
   external?: boolean;
 }): InitMode | undefined {
-  if (opts.external && !opts.hub) {
-    logger.warn("`--external` is deprecated; use `--hub`.");
+  if (opts.external) {
+    throw new Error(
+      "`--external` was removed in 0.0.10 — use `--hub` to create a standalone hub.",
+    );
   }
-  const wantsHub = opts.hub || opts.external;
-  const picked = [opts.inRepo && "in-repo", wantsHub && "hub"].filter(
+  const picked = [opts.inRepo && "in-repo", opts.hub && "hub"].filter(
     Boolean,
   ) as InitMode[];
   if (picked.length === 0) return undefined;

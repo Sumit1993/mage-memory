@@ -87,9 +87,9 @@ async function statusOne(repo: string): Promise<RepoStatus> {
   };
 
   // 2. Docs root reachability
-  if (meta.mode === "in-repo") {
+  if (meta.mode === "in-repo" || meta.mode === "hybrid") {
     const dr = codeRepoDocsRoot(repo);
-    if (await exists(dr)) rs.docsRoot = { ok: true, detail: `in-repo at ${dr}` };
+    if (await exists(dr)) rs.docsRoot = { ok: true, detail: `repo KB (${meta.mode}) at ${dr}` };
     else rs.docsRoot = { ok: false, detail: `expected ${dr} but missing` };
   } else if (meta.mode === "external") {
     if (!meta.hub_path) {
@@ -110,7 +110,7 @@ async function statusOne(repo: string): Promise<RepoStatus> {
     hubsToCheck.push({ path: ref.hub_path, label: `hub_ref:${ref.project}` });
   }
   if (hubsToCheck.length === 0) {
-    rs.hubReachable = { ok: true, detail: "(no hubs — pure in-repo)" };
+    rs.hubReachable = { ok: true, detail: `(no hubs — ${meta.mode})` };
   } else {
     const missing: string[] = [];
     for (const h of hubsToCheck) {

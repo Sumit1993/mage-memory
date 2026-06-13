@@ -137,7 +137,7 @@ function parseSeen(seen: string): { session: string; offset: number } {
  * then emit it as JSON (for the skill) or a human summary.
  */
 async function readAndReport(
-  resolved: { root: string; kind: "in-repo" | "hub"; repo: string },
+  resolved: { root: string; kind: "repo" | "hub"; repo: string },
   asJson: boolean,
 ): Promise<PromoteResult> {
   const { root, repo } = resolved;
