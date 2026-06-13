@@ -139,5 +139,5 @@ function reportHuman(manifest: DistillManifest): void {
     logger.detail(`${c.session} ${c.span} — ${c.hint}`);
   }
   logger.blank();
-  logger.step("Run the `mage:distill` skill to draft notes, then `mage distill --seen <session>:<offset>` to commit.");
+  logger.step("Plumbing engine (you don't normally run this): the `mage:distill` skill turns these candidates into notes, then `mage distill --seen <session>:<offset>` commits.");
 }

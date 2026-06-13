@@ -86,9 +86,7 @@ mage's skills ship as a **Claude Code plugin** so they group under a clean
 /plugin install mage@mage
 ```
 
-You get `mage:learn` (capture a note), `mage:guide` (how to use the base), and the
-`mage:specify` · `mage:clarify` · `mage:plan` · `mage:tasks` · `mage:implement` ·
-`mage:analyze` · `mage:constitution` spec-driven-development workflow. The
+You get `mage:learn` (capture a note) and `mage:guide` (how to use the base). The
 **self-grooming loop** adds `mage:distill` (mine observed scratch on first sight),
 `mage:promote` (recurrence → note), `mage:graduate` (proven note → skill), and
 `mage:optimize` (reword/demote a mis-firing trigger). `mage init` prints the two
@@ -402,7 +400,6 @@ then `/plugin install mage@mage` (`mage init` prints both lines).
 | `mage:promote` | The recurrence catch-net: a pattern that recurred across ≥ K distinct sessions with no covering note → draft (or `merge` into) one. |
 | `mage:graduate` | A proven procedural note recurring across enough sessions → its own loadable `mage-skill-<slug>` (the note stays the substrate). |
 | `mage:optimize` | Reword a generated skill's trigger when context-match shows it mis-fires — or demote it back to its note. Bounded per pass. |
-| `mage:specify` … `mage:constitution` | The spec-driven-development workflow (`specify`, `clarify`, `plan`, `tasks`, `implement`, `analyze`, `constitution`). |
 | `mage-wing-<x>` | Per-wing skill **generated** by `mage skills` into `.claude/skills/` + `.agents/skills/`, scoped to one wing's rooms. |
 
 ## Obsidian-native

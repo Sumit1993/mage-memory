@@ -94,7 +94,7 @@ program
 
 // ─── index ───────────────────────────────────────────────────────────────────
 program
-  .command("index")
+  .command("index", { hidden: true })
   .description(
     "(Re)generate INDEX.md — the always-loaded index of notes (deterministic, idempotent)",
   )
@@ -161,7 +161,7 @@ program
 
 // ─── ingest ──────────────────────────────────────────────────────────────────
 program
-  .command("ingest")
+  .command("ingest", { hidden: true })
   .description(
     "Enumerate + classify ingestable sources under <dir> (read-only) — what `mage:learn --from` distills.",
   )
@@ -173,7 +173,7 @@ program
 
 // ─── distill ─────────────────────────────────────────────────────────────────
 program
-  .command("distill")
+  .command("distill", { hidden: true })
   .description(
     "Read observed .learnings into note candidates (plumbing behind the mage:distill skill)",
   )
@@ -192,7 +192,7 @@ program
 
 // ─── promote ─────────────────────────────────────────────────────────────────
 program
-  .command("promote")
+  .command("promote", { hidden: true })
   .description(
     "Fold observed .learnings into recurring note candidates (plumbing behind the mage:promote skill)",
   )
@@ -212,11 +212,11 @@ program
 // ─── observe ─────────────────────────────────────────────────────────────────
 // Registration lives next to the handler (commands/observe.ts) so the flag list
 // and the ObserveOptions contract can't drift apart.
-program.addCommand(buildObserveCommand());
+program.addCommand(buildObserveCommand(), { hidden: true });
 
 // ─── redact ──────────────────────────────────────────────────────────────────
 program
-  .command("redact")
+  .command("redact", { hidden: true })
   .description(
     "Deterministically scan a file or stdin for secrets/PII (ADR-0014 Gate 2); --strip emits redacted text",
   )

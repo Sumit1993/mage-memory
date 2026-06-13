@@ -256,7 +256,7 @@ clean names, no `mage-` baked into each one (see [ADR-0013](mage/decisions/0013-
 |---|---|---|
 | `mage:learn` | capture a durable note | plugin (`skills/learn/`) |
 | `mage:guide` | how to use the knowledge base | plugin (`skills/guide/`) |
-| `mage:specify` · `mage:clarify` · `mage:plan` · `mage:tasks` · `mage:implement` · `mage:analyze` · `mage:constitution` | the spec-driven-development workflow | plugin (`skills/<phase>/`) |
+| `mage:distill` · `mage:promote` · `mage:graduate` · `mage:optimize` | the self-grooming loop (scratch → note → skill) | plugin (`skills/<name>/`) |
 | `mage-wing-<wing>` | per-wing awareness skill | **generated** by `mage skills` into `.claude/skills/` + `.agents/skills/` |
 | `mage-skill-<slug>` | **Procedure skill** (a graduated Playbook/Gotcha note) | **generated** on graduate |
 
@@ -282,7 +282,7 @@ mage's CLI is one binary but **three tiers**, sorted by the deterministic/judgme
 |---|---|---|---|
 | **Hook-fired** (plumbing seams) | `observe`, `skills --metrics --quiet` (Stop rollup fold), `index --if-changed`, `skills`, `verify --check`, `redact --check[ --staged]`, `ingest --json`, `distill --json` / `--seen`, `promote --json` / `--seen`, `dream --apply` / `--reject` (the single-writer applier reading ONE Proposal JSON from stdin) | host hooks · git pre-commit · the learn/distill/promote/graduate/optimize skills | Deterministic. **Users never type these.** They are commands only because hooks/skills/git reach mage across a process boundary. |
 | **Judgment — nudged** | `learn`, `distill` (`mage:distill`), `promote` (`mage:promote`), `graduate` (`mage:graduate`), `optimize` (`mage:optimize`), `dream` | the agent, *nudged* by a hook | The hook prints a nudge; the **agent** reasons. Never blindly auto-run. `mage:graduate`/`optimize` apply by piping a Proposal JSON to `mage dream --apply` — there is no `mage graduate`/`mage optimize` verb. |
-| **Human verbs** | `init`, `connect`, `disconnect`, `skills --metrics` (read-only report), `doctor`, `status`, `list`, `link`, `unlink` | a person | Setup + read-only queries + judgment-invoked mutations. |
+| **Human verbs** | `init`, `connect`, `disconnect`, `link`, `unlink`, `list`, `status`, `verify`, `doctor`, `dashboard`, `dream`, `migrate`, `skills --metrics` (read-only report) | a person | Setup + read-only queries + judgment-invoked mutations. **The only tier `mage --help` shows** — the hook-fired plumbing commands (`observe`, `index`, `ingest`, `distill`, `promote`, `redact`) are registered `hidden` in the CLI (0.0.10). `dream`/`skills`/`verify` are dual-tier (a visible human face + unadvertised plumbing flags). |
 
 **Guardrails (all tiers):**
 - **Never auto-commit.** Hook-fired `index`/`skills`/`verify` *write* files (auto-write

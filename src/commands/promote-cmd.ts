@@ -193,6 +193,6 @@ function reportHuman(manifest: PromoteManifest): void {
   }
   logger.blank();
   logger.step(
-    "Run the `mage:promote` skill to draft notes, then `mage promote --seen <session>:<offset>` to commit.",
+    "Plumbing engine (you don't normally run this): the `mage:promote` skill turns these candidates into notes, then `mage promote --seen <session>:<offset>` commits.",
   );
 }

@@ -1,7 +1,7 @@
 {
   "name": "mage",
   "version": "0.0.9",
-  "description": "mage — a portable, self-maintaining knowledge base for software systems: durable notes navigable as an Obsidian graph, usable by any AI coding agent. Installs as mage:learn (capture) + mage:distill (mine the observed scratch) + the self-grooming loop mage:promote (recurrence → note) / mage:graduate (note → skill) / mage:optimize (reword/demote on context-match) + the mage:specify/clarify/plan/tasks/implement/analyze/constitution spec-driven workflow + mage:guide.",
+  "description": "mage — a portable, self-maintaining knowledge base for software systems: durable notes navigable as an Obsidian graph, usable by any AI coding agent. Installs as mage:learn (capture) + mage:distill (mine the observed scratch) + the self-grooming loop mage:promote (recurrence → note) / mage:graduate (note → skill) / mage:optimize (reword/demote on context-match) + mage:guide.",
   "author": { "name": "Sumit Patel" },
   "homepage": "https://github.com/Sumit1993/mage-memory",
   "repository": "https://github.com/Sumit1993/mage-memory",
