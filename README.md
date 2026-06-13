@@ -15,7 +15,7 @@
 [![CI](https://github.com/Sumit1993/mage-memory/actions/workflows/ci.yml/badge.svg)](https://github.com/Sumit1993/mage-memory/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/mage-memory?style=flat&logo=npm)](https://www.npmjs.com/package/mage-memory)
 ![License](https://img.shields.io/badge/License-MIT-blue?style=flat)
-![Node](https://img.shields.io/badge/Node-%3E%3D18-339933?style=flat&logo=node.js)
+![Node](https://img.shields.io/badge/Node-%3E%3D20-339933?style=flat&logo=node.js)
 ![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey?style=flat)
 ![Status](https://img.shields.io/badge/status-0.0.9-orange?style=flat)
 
@@ -153,7 +153,7 @@ agents.
 
 | Term | Meaning |
 |------|---------|
-| **knowledge base** | The `mage/` tree: notes, work units, decisions, archive, and the generated index. |
+| **knowledge base** | The mage knowledge base: notes, work units, decisions, archive, and the generated index. One KB per repo (in-repo or hybrid) or one hub-KB spanning many repos. |
 | **note** | A durable markdown file (with optional YAML frontmatter) recording insight + procedure + pointers on one topic. |
 | **wing** | A top-level scope — a project, repo, service, or person. The first tag segment (`billing/payments` → wing `billing`). **Optional**: untagged notes are valid (they index as *Cross-cutting*). A note can carry several tags and is indexed under **each** wing (multi-home); the first is its primary wing. |
 | **room** | A topic within a wing. The second tag segment (`billing/payments` → room `payments`). |
@@ -162,7 +162,7 @@ agents.
 | **artifact** | Scratch output inside a work unit's `artifacts/` subdir. Git-ignored — never committed. |
 | **skill** | An auto-discovered agent capability (a folder with `SKILL.md`) that teaches agents how to use this knowledge base. |
 
-## Layout (in-repo mode)
+## Layout (in-repo KB)
 
 ```text
 mage/
@@ -176,10 +176,10 @@ mage/
 ├── .learnings/         GENERATED capture scratch (git-ignored; `mage observe`)
 ├── .metrics/           GENERATED context-match rollup (git-ignored; `mage skills --metrics`)
 ├── .obsidian/          Obsidian vault config
-└── metadata.json       schema "mage.v1"; mode "in-repo" | "external"
+└── metadata.json       schema "mage.v2"; mode "in-repo" | "hybrid" | "external"
 ```
 
-The scanner recurses the **whole** vault and indexes every note except a fixed
+The scanner recurses the **whole** KB and indexes every note except a fixed
 skip-set (`.obsidian/`, `.git/`, `node_modules/`, `artifacts/`, `.learnings/`,
 `archive/`) and mage's own generated/scaffolding files (`INDEX.md`,
 `_index.*.md`, `AGENTS.md`, `CLAUDE.md`, `IDENTITY.md`) — so "folders are
@@ -219,6 +219,7 @@ listed for transparency). The deterministic/judgment split behind this is
 | `mage status` / `mage list` / `mage verify` | Read-only: pending changes, note/work-unit listing, structure + frontmatter + link sanity-check. |
 | `mage dashboard` | Generate this KB's dashboard: a portable `Dashboard.md` + an Obsidian-core `Knowledge.base`. `--html` adds a self-contained `dashboard.html` **cockpit** (inline data + CSS/SVG, opens in any browser, no plugins) whose hero is the **proposal queue**; `--open` prints the open command. No server — it's a generated artifact ([ADR-0020](mage/decisions/0020-no-server-tiered-dashboards.md)). |
 | `mage doctor` | Diagnose **env + KB & connection health** (Node, git, Obsidian config, skills install, capture-sink ignore coverage). `--fix` adds any missing capture-sink ignore rules; `--report` prints a **redacted, content-free** support bundle to attach to bug reports ([ADR-0021](mage/decisions/0021-offline-no-telemetry-local-signal.md)). |
+| `mage migrate` | Upgrade this KB's metadata to the current schema (idempotent). |
 | `mage dream` | Report knowledge-base health (stale, superseded-but-active, dangling links, orphans), read-only. The agent runs this after a nudge; safe to run yourself. `mage dream --apply` / `--reject` (below) are the **single-writer** seams the grooming skills drive — you don't type those. |
 
 ### Plumbing seams (machinery runs these for you)
@@ -369,17 +370,22 @@ issues at [github.com/Sumit1993/mage-memory/issues](https://github.com/Sumit1993
 - **in-repo** — the knowledge base lives in `mage/` inside the code repo,
   committed alongside the code it describes. `metadata.json` has
   `mode: "in-repo"`.
-- **hub** — a standalone repo *is* one Obsidian vault spanning several projects.
-  Create it with `mage init <name>` (no code repo required), then `mage link`
-  code repos into it. A hub-owned project's notes live **flat** at
-  `<hub>/projects/<name>/`, surfaced as a wing; the code repo's `AGENTS.md`
-  routes agents to `<hub>/_index.<project>.md`.
-- **hybrid** (in-repo member) — an in-repo knowledge base that also registers
-  with a hub (`mage init --in-repo`, then `mage link <hub>`). Notes stay with the
-  code; the hub lists the member as a **pointer** to its repo's `INDEX`
-  (`storage: in-repo`), never silently empty.
+- **hub** — a standalone KB that federates several project-KBs. A hub KB is its
+  own repo spanning several projects; create it with `mage init <name>` (no code
+  repo required), then `mage link` code repos into it. A hub-owned project's
+  notes live **flat** at `<hub>/projects/<name>/`, surfaced as a wing; the code
+  repo's `AGENTS.md` routes agents to `<hub>/_index.<project>.md`.
+- **hybrid** — an in-repo KB that also registers with a hub
+  (`mage init --in-repo`, then `mage link <hub>`). Notes stay with the code; the
+  hub lists the member as a **pointer** to its repo's `INDEX`
+  (`storage: repo-owned`), never silently empty. `metadata.json` has
+  `mode: "hybrid"`.
+- **external** — a code repo whose durable knowledge lives entirely in a hub
+  (hub-owned storage). The code repo's `AGENTS.md` routes agents to the hub's
+  index. `metadata.json` has `mode: "external"`.
 
-> `--external` is a deprecated alias of `--hub`.
+> `--external` is an alias of `--hub` (creates a hub, not an external-mode KB);
+> it is deprecated and will be removed.
 
 ## Skills
 
@@ -443,7 +449,7 @@ reflect the actual CLI. Recent releases:
   behind `mage:learn --from`.
 - **0.0.3** — skills ship as a Claude Code **plugin** (the `mage:` namespace) +
   `mage redact` (Gate 2, ADR-0014).
-- **0.0.2** — the scanner recurses the whole vault (hub `projects/` indexed),
+- **0.0.2** — the scanner recurses the whole KB (hub `projects/` indexed),
   wings generalized (optional, multi-home), detection-first `mage init` + hubs.
 
 Expect refinement.

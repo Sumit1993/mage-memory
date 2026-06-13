@@ -18,11 +18,11 @@
 //     ladder.scratch === 0). Renderers never have to guard for `undefined` on a
 //     required field.
 //   - `registry` is the lone hub-only field — present (possibly empty) for a hub
-//     KB, omitted for an in-repo KB. It carries POINTERS only (names, repo URLs,
+//     KB, omitted for a repo KB. It carries POINTERS only (names, repo URLs,
 //     local paths), never remote content (ADR-0020 §4).
 
 /** Which kind of KB this snapshot was collected from. Mirrors `resolveDocsRoot`. */
-export type DashboardKbKind = "in-repo" | "hub";
+export type DashboardKbKind = "repo" | "hub";
 
 /** A grooming proposal's kind — the ADR-0019 §2 `ProposalAction` vocabulary. */
 export type ProposalKind = "note" | "graduate" | "merge" | "split" | "reword" | "demote";

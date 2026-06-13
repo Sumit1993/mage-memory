@@ -23,6 +23,8 @@ import {
   hubMetadataPath,
   looksLikeHub,
   metadataPath,
+  writeHubMetadata,
+  writeMetadata,
 } from "../paths.js";
 import { run } from "../shell.js";
 
@@ -164,7 +166,7 @@ async function initInRepo(codeRepo: string, project: string): Promise<void> {
     hub_refs: [],
     linked_at: nowIso(),
   };
-  await writeFile(metadataPath(codeRepo), `${JSON.stringify(meta, null, 2)}\n`);
+  await writeMetadata(codeRepo, meta);
   logger.success(`Wrote ${metadataPath(codeRepo)}`);
 
   // Git-ignore raw artifacts + pre-promotion scratch + the cockpit (ADR-0020 §6:
@@ -179,7 +181,7 @@ async function initInRepo(codeRepo: string, project: string): Promise<void> {
   if (added.length > 0) logger.detail(`Added .gitignore patterns: ${added.join(", ")}`);
 
   // Portable navigation contract for any agent (AGENTS.md + CLAUDE.md shim).
-  await writeAgentsMd(codeRepo, { docsRel: "mage", kind: "in-repo" });
+  await writeAgentsMd(codeRepo, { kind: "repo", mode: "in-repo", docsRel: "mage" });
 
   logger.blank();
   logger.success(`Initialized in-repo mage knowledge base for project '${project}'.`);
@@ -291,7 +293,7 @@ async function initStandaloneHub(args: HubArgs): Promise<string> {
     created_at: nowIso(),
     projects: [],
   };
-  await writeFile(hubMetadataPath(hubDir), `${JSON.stringify(hubMeta, null, 2)}\n`);
+  await writeHubMetadata(hubDir, hubMeta);
   logger.success(`Wrote ${hubMetadataPath(hubDir)}`);
 
   const added = await ensureGitignored(hubDir, [
@@ -305,7 +307,7 @@ async function initStandaloneHub(args: HubArgs): Promise<string> {
   ]);
   if (added.length > 0) logger.detail(`Added .gitignore patterns: ${added.join(", ")}`);
 
-  await writeAgentsMd(hubDir, { docsRel: ".", kind: "hub" });
+  await writeAgentsMd(hubDir, { kind: "hub", docsRel: "." });
 
   logger.blank();
   logger.success(`Initialized standalone mage hub '${hubName}'.`);

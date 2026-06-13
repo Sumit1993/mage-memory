@@ -15,10 +15,10 @@ async function tmp(): Promise<string> {
 }
 const readAgents = (d: string) => readFile(join(d, "AGENTS.md"), "utf8");
 
-describe("writeAgentsMd — external kind (ADR-0011/0012)", () => {
+describe("writeAgentsMd — KB shape blocks (kind repo/hub · mode in-repo/hybrid/external) (ADR-0011/0012)", () => {
   it("routes an external code repo to the hub index + names its wing (flat-safe)", async () => {
     const repo = await tmp();
-    await writeAgentsMd(repo, { kind: "external", docsRel: "mage", hubPath: "/abs/hub", project: "engine" });
+    await writeAgentsMd(repo, { kind: "repo", mode: "external", docsRel: "mage", hubPath: "/abs/hub", project: "engine" });
     const agents = await readAgents(repo);
     expect(agents).toContain("/abs/hub/INDEX.md"); // always-present entry (flat or hierarchical)
     expect(agents).toContain("/abs/hub/_index.engine.md"); // the hierarchical-mode sub-index
@@ -27,7 +27,7 @@ describe("writeAgentsMd — external kind (ADR-0011/0012)", () => {
 
   it("does NOT reference the retired per-project entry path", async () => {
     const repo = await tmp();
-    await writeAgentsMd(repo, { kind: "external", docsRel: "mage", hubPath: "/abs/hub", project: "engine" });
+    await writeAgentsMd(repo, { kind: "repo", mode: "external", docsRel: "mage", hubPath: "/abs/hub", project: "engine" });
     const agents = await readAgents(repo);
     expect(agents).not.toContain("projects/engine/mage/INDEX.md");
     expect(agents).not.toContain("/projects/");
@@ -35,7 +35,13 @@ describe("writeAgentsMd — external kind (ADR-0011/0012)", () => {
 
   it("is idempotent (a second write replaces, not appends, the block)", async () => {
     const repo = await tmp();
-    const opts = { kind: "external" as const, docsRel: "mage", hubPath: "/abs/hub", project: "engine" };
+    const opts = {
+      kind: "repo" as const,
+      mode: "external" as const,
+      docsRel: "mage",
+      hubPath: "/abs/hub",
+      project: "engine",
+    };
     await writeAgentsMd(repo, opts);
     const first = await readAgents(repo);
     await writeAgentsMd(repo, opts);
@@ -46,20 +52,20 @@ describe("writeAgentsMd — external kind (ADR-0011/0012)", () => {
 
   it("adds the @AGENTS.md import to CLAUDE.md", async () => {
     const repo = await tmp();
-    await writeAgentsMd(repo, { kind: "external", docsRel: "mage", hubPath: "/abs/hub", project: "engine" });
+    await writeAgentsMd(repo, { kind: "repo", mode: "external", docsRel: "mage", hubPath: "/abs/hub", project: "engine" });
     expect(await readFile(join(repo, "CLAUDE.md"), "utf8")).toContain("@AGENTS.md");
   });
 
   it("rejects an unsafe project name and writes nothing", async () => {
     const repo = await tmp();
     await expect(
-      writeAgentsMd(repo, { kind: "external", docsRel: "mage", hubPath: "/abs/hub", project: "../evil" }),
+      writeAgentsMd(repo, { kind: "repo", mode: "external", docsRel: "mage", hubPath: "/abs/hub", project: "../evil" }),
     ).rejects.toThrow();
   });
 
-  it("leaves the in-repo kind unchanged", async () => {
+  it("leaves the in-repo mode unchanged", async () => {
     const repo = await tmp();
-    await writeAgentsMd(repo, { kind: "in-repo", docsRel: "mage" });
+    await writeAgentsMd(repo, { kind: "repo", mode: "in-repo", docsRel: "mage" });
     const agents = await readAgents(repo);
     expect(agents).toContain("knowledge base at `mage/`");
     expect(agents).not.toContain("_index.");
@@ -67,8 +73,8 @@ describe("writeAgentsMd — external kind (ADR-0011/0012)", () => {
 
   it("names the capture skill `mage:learn`, not the retired `/mage-learn`", async () => {
     for (const opts of [
-      { kind: "in-repo", docsRel: "mage" },
-      { kind: "external", docsRel: "mage", hubPath: "/abs/hub", project: "engine" },
+      { kind: "repo", mode: "in-repo", docsRel: "mage" },
+      { kind: "repo", mode: "external", docsRel: "mage", hubPath: "/abs/hub", project: "engine" },
     ] as const) {
       const repo = await tmp();
       await writeAgentsMd(repo, opts);

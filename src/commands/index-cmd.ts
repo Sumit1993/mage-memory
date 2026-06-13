@@ -93,7 +93,7 @@ function buildRegistryView(projects: HubProject[]): RegistryView {
   const decorationByWing = new Map<string, string>();
   for (const p of projects) decorationByWing.set(p.name, p.code_repo_url || p.code_repo_path);
   const inRepoMembers = projects
-    .filter((p) => p.storage === "in-repo")
+    .filter((p) => p.storage === "repo-owned")
     .map((p) => ({ name: p.name, codeRepoPath: p.code_repo_path }))
     .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
   return { decorationByWing, inRepoMembers };

@@ -103,7 +103,7 @@ async function pushEnvChecks(checks: DoctorCheck[], opts: DoctorOptions): Promis
     ok: gh,
     detail: gh
       ? "available"
-      : "missing (optional; required for `init --external --visibility private|public`)",
+      : "missing (optional; required for `init --hub --visibility private|public`)",
     optional: true,
   });
 

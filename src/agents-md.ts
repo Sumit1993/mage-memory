@@ -14,15 +14,32 @@ const BEGIN = "<!-- BEGIN mage -->";
 const END = "<!-- END mage -->";
 const CLAUDE_IMPORT = "@AGENTS.md";
 
-export interface AgentsMdOptions {
-  /** Relative path (from `root`) to the knowledge base: "mage" in-repo, "." for a hub. */
+/**
+ * Which AGENTS.md block to write, discriminated on the reconciled `kind`
+ * (`repo` | `hub`; ADR-0009/0012 vocabulary). A code repo's KB additionally
+ * carries its on-disk `mode` (`in-repo` | `hybrid` | `external`) — the three
+ * metadata modes — which selects the wording; a hub has no mode. This mirrors the
+ * metadata split exactly: `kind` is the runtime umbrella, `mode` the on-disk shape.
+ * (Previously a single 4-value `kind` blended the two, colliding with the
+ * `ResolvedDocsRoot.kind` = `repo|hub` reconcile.)
+ */
+export interface RepoAgentsMd {
+  kind: "repo";
+  /** The on-disk metadata mode; picks the in-repo / hybrid / external template. */
+  mode: "in-repo" | "hybrid" | "external";
+  /** Relative path (from `root`) to the KB — "mage" for a code repo. */
   docsRel: string;
-  kind: "in-repo" | "hub" | "external";
-  /** external only: absolute path to the hub root this code repo is registered with. */
+  /** external/hybrid only: absolute path to the hub root this repo is registered with. */
   hubPath?: string;
-  /** external only: the project name as registered in the hub (its wing). */
+  /** external/hybrid only: the project name as registered in the hub (its wing). */
   project?: string;
 }
+export interface HubAgentsMd {
+  kind: "hub";
+  /** Relative path (from `root`) to the KB — "." for a hub. */
+  docsRel: string;
+}
+export type AgentsMdOptions = RepoAgentsMd | HubAgentsMd;
 
 function rel(docsRel: string, child: string): string {
   return docsRel === "." ? child : `${docsRel}/${child}`;
@@ -35,7 +52,7 @@ function rel(docsRel: string, child: string): string {
  * `projects/<name>/mage/INDEX.md`); in a large/hierarchical hub the wing links
  * out to its own `_index.<project>.md`, which only exists in that mode.
  */
-function externalBlock(opts: AgentsMdOptions): string {
+function externalBlock(opts: RepoAgentsMd): string {
   const hub = opts.hubPath ?? "";
   const project = opts.project ?? "";
   assertSafeName(project, "project name");
@@ -43,9 +60,9 @@ function externalBlock(opts: AgentsMdOptions): string {
   const hubIndex = `${hub}/${INDEX_FILE}`;
   const hubDecisions = `${hub}/${DECISIONS_DIR}/`;
   return `${BEGIN}
-## mage knowledge base (external hub)
+## mage knowledge base (hub-linked)
 
-This repository's durable knowledge lives in an external **mage hub** at
+This repository's durable knowledge lives in a **mage hub** at
 \`${hub}\`, where this repo is the **${project}** project. mage is a portable,
 file-based knowledge base of notes — insight, procedure, and pointers (not
 copies of sources) — navigable as an Obsidian graph.
@@ -71,14 +88,11 @@ ${END}`;
 }
 
 function mageBlock(opts: AgentsMdOptions): string {
-  if (opts.kind === "external") return externalBlock(opts);
+  if (opts.kind === "repo" && opts.mode === "external") return externalBlock(opts);
   const indexPath = rel(opts.docsRel, INDEX_FILE);
   const notesPath = rel(opts.docsRel, `${NOTES_DIR}/`);
   const decisionsPath = rel(opts.docsRel, `${DECISIONS_DIR}/`);
-  const kbDesc =
-    opts.kind === "hub"
-      ? "This repository is a **mage hub** — a multi-project knowledge base spanning several repos/services."
-      : `This repository has a **mage** knowledge base at \`${opts.docsRel}/\`.`;
+  const kbDesc = kbDescription(opts);
   return `${BEGIN}
 ## mage knowledge base
 
@@ -104,6 +118,22 @@ add a note under \`${notesPath}\` and run \`mage index\`. Capture the reusable
 **Commit hygiene:** mage never commits for you. It suggests \`git\` commands; you
 run them.
 ${END}`;
+}
+
+/**
+ * The one-line "what this KB is" sentence, by shape. A hub spans several repos; a
+ * hybrid repo stores locally AND is registered with one or more hubs; an in-repo
+ * repo just stores locally. (external never reaches here — {@link mageBlock} routes
+ * it to {@link externalBlock} — but this stays total over the type.)
+ */
+function kbDescription(opts: AgentsMdOptions): string {
+  if (opts.kind === "hub") {
+    return "This repository is a **mage hub** — a multi-project knowledge base spanning several repos/services.";
+  }
+  if (opts.mode === "hybrid") {
+    return `This repository has a **mage** knowledge base at \`${opts.docsRel}/\` and is also registered with one or more external hubs.`;
+  }
+  return `This repository has a **mage** knowledge base at \`${opts.docsRel}/\`.`;
 }
 
 /** Insert-or-replace the mage block in AGENTS.md, and ensure CLAUDE.md imports it. */

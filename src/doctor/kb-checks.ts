@@ -93,7 +93,7 @@ async function pushSinkIgnoreCheck(
   connected: boolean,
 ): Promise<void> {
   const { root, patterns } = sinkIgnoreSpec(kb);
-  const prefix = kb.kind === "in-repo" ? "mage/" : "";
+  const prefix = kb.kind === "repo" ? "mage/" : "";
   const probes = [`${prefix}${LEARNINGS_DIR}/probe`, `${prefix}${METRICS_DIR}/probe`];
 
   // Guard the write on the root existing: an external repo can resolve to a hub
@@ -127,7 +127,7 @@ async function pushSinkIgnoreCheck(
  * only written on `--html`) — but `--fix` adds it here for completeness.
  */
 export function sinkIgnoreSpec(kb: Kb): { root: string; patterns: string[] } {
-  if (kb.kind === "in-repo") {
+  if (kb.kind === "repo") {
     return {
       root: kb.repo,
       patterns: [`mage/${LEARNINGS_DIR}/`, `mage/${METRICS_DIR}/`, "mage/dashboard.html"],

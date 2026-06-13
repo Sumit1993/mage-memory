@@ -96,7 +96,7 @@ export function thresholdsFor(s: Sensitivity): Thresholds {
  */
 export async function readSensitivity(resolved: {
   root: string;
-  kind: "in-repo" | "hub";
+  kind: "repo" | "hub";
   repo: string;
 }): Promise<Sensitivity> {
   let raw: unknown;

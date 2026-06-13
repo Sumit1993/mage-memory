@@ -10,7 +10,6 @@
 // moved HUB (the code repo's hub_path is stale and we don't know the new location)
 // or a missing project registration — both need an explicit `mage link <hub>`.
 
-import { writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { DoctorCheck, DoctorOptions } from "../commands/doctor.js";
 import {
@@ -18,10 +17,10 @@ import {
   META_FILE,
   absolutePath,
   exists,
-  hubMetadataPath,
   looksLikeHub,
   readHubMetadata,
   readMetadata,
+  writeHubMetadata,
 } from "../paths.js";
 
 const CHECK = "link integrity";
@@ -102,7 +101,7 @@ async function checkExternalLink(
       ...hubMeta,
       projects: hubMeta.projects.map((p) => (p.name === project ? { ...p, code_repo_path: codeRepo } : p)),
     };
-    await writeFile(hubMetadataPath(hubPath), `${JSON.stringify(repaired, null, 2)}\n`);
+    await writeHubMetadata(hubPath, repaired);
     checks.push({
       name: CHECK,
       ok: true,

@@ -164,7 +164,7 @@ async function verifyCodeRepoOnly(
     const detail =
       m.mode === "external"
         ? `${path}: mode=external → hub at ${m.hub_path} (project=${m.project})`
-        : `${path}: mode=in-repo (project=${m.project})${m.hub_refs.length > 0 ? `, ${m.hub_refs.length} hub_refs` : ""}`;
+        : `${path}: mode=${m.mode} (project=${m.project})${m.hub_refs.length > 0 ? `, ${m.hub_refs.length} hub_refs` : ""}`;
     result.linkedRepoChecks.push({ repo: path, ok: true, detail });
     logger.success(detail);
   }
@@ -278,16 +278,16 @@ function checkCodeRepoMode(
     }
     return { repo, ok: true, detail: `${repo} → external hub @ ${hub} (project=${meta.project})` };
   }
-  // in-repo (possibly with hub_refs)
+  // in-repo or hybrid (possibly with hub_refs)
   const linkedHere = meta.hub_refs.some((r) => r.hub_path === hub);
   if (!linkedHere && meta.hub_refs.length > 0) {
     return {
       repo,
       ok: true,
-      detail: `${repo}: in-repo mode, ${meta.hub_refs.length} hub_refs (none point at ${hub})`,
+      detail: `${repo}: ${meta.mode} mode, ${meta.hub_refs.length} hub_refs (none point at ${hub})`,
     };
   }
-  return { repo, ok: true, detail: `${repo}: in-repo mode (project=${meta.project})` };
+  return { repo, ok: true, detail: `${repo}: ${meta.mode} mode (project=${meta.project})` };
 }
 
 async function findZoneIdentifierFiles(root: string): Promise<number> {

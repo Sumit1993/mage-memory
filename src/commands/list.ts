@@ -16,11 +16,11 @@ export interface ListOptions {
 
 export interface ProjectInfo {
   name: string;
-  storage: "hub-owned" | "in-repo" | "unknown";
+  storage: "hub-owned" | "repo-owned" | "unknown";
   path: string;
   codeRepo: string | null;
   fileCount: number;
-  /** Last modification time across any file (hub-owned only — in-repo lives elsewhere). */
+  /** Last modification time across any file (hub-owned only — repo-owned lives elsewhere). */
   lastModified: Date | null;
 }
 
@@ -98,7 +98,7 @@ export async function list(opts: ListOptions = {}): Promise<ListResult> {
   logger.detail("─".repeat(header.length));
   for (const p of projects) {
     const last = p.lastModified ? p.lastModified.toISOString().slice(0, 10) : "—";
-    const fileCount = p.storage === "in-repo" ? "—" : String(p.fileCount);
+    const fileCount = p.storage === "repo-owned" ? "—" : String(p.fileCount);
     logger.info(
       `${p.name.padEnd(nameWidth)}  ${p.storage.padEnd(storageWidth)}  ${fileCount.padStart(5)}  ${last}`,
     );
