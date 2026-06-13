@@ -73,6 +73,7 @@ program
     "-y, --yes",
     "non-interactive: use defaults (detect in-repo vs hub from the cwd)",
   )
+  .option("--no-connect", "skip auto-wiring capture hooks after an in-repo init")
   .action(async (name: string | undefined, opts) => {
     const mode = modeFromOpts(opts);
     if (name && opts.inRepo) {
@@ -89,6 +90,7 @@ program
       owner: opts.owner,
       project: opts.project,
       yes: opts.yes,
+      connect: opts.connect,
     });
   });
 
@@ -259,15 +261,17 @@ program
     "override auto-detected storage: 'repo-owned' (hybrid; the repo keeps its docs) or 'hub-owned' (the hub owns the docs)",
   )
   .option("-y, --yes", "non-interactive: auto-confirm prompts")
+  .option("--no-connect", "skip auto-wiring capture hooks after link")
   .action(
     async (
       hubPath: string,
-      opts: { project?: string; storage?: string; yes?: boolean },
+      opts: { project?: string; storage?: string; yes?: boolean; connect?: boolean },
     ) => {
       await link(hubPath, {
         project: opts.project,
         storage: coerceStorage(opts.storage),
         yes: opts.yes,
+        connect: opts.connect,
       });
     },
   );

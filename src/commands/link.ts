@@ -1,9 +1,9 @@
-import { confirm, select } from "@inquirer/prompts";
 import { mkdir, readdir } from "node:fs/promises";
 import { basename, dirname } from "node:path";
 import { writeAgentsMd } from "../agents-md.js";
 import { getRemoteOriginUrl } from "../git.js";
 import { logger } from "../logger.js";
+import { connect, type ConnectResult } from "./connect.js";
 import {
   type MageMetadata,
   type HubMetadata,
@@ -32,6 +32,8 @@ export interface LinkOptions {
   storage?: Storage;
   /** Skip prompts. */
   yes?: boolean;
+  /** Wire capture hooks after link (Decision 5). Default true; `--no-connect` sets false. */
+  connect?: boolean;
 }
 
 export interface LinkResult {
@@ -40,6 +42,8 @@ export interface LinkResult {
   project: string;
   storage: Storage;
   hubMetadataAction: "created" | "updated" | "appended-project";
+  /** What `connect` wired, when auto-connect ran (Decision 5); absent if skipped. */
+  connectResult?: ConnectResult;
 }
 
 /**
@@ -75,6 +79,22 @@ export async function link(hubPathInput: string, opts: LinkOptions = {}): Promis
         "  (a hub directory has a projects/ dir and a top-level metadata.json registry)\n" +
         "  Run `mage init --hub <name>` to create one.",
     );
+  }
+
+  // ─── 11E: project-name guardrail ───────────────────────────────────────
+  // A renamed repo links under its basename and silently creates a divergent
+  // project instead of matching the hub's registered name (friction E). Warn when
+  // the name was auto-derived (no --project) and matches no registered project.
+  const earlyHubMeta = await readHubMetadata(hub);
+  if (!opts.project && earlyHubMeta && earlyHubMeta.projects.length > 0) {
+    const names = earlyHubMeta.projects.map((p) => p.name);
+    if (!names.includes(project)) {
+      logger.warn(
+        `Project '${project}' (from the repo basename) is not registered in this hub ` +
+          `(registered: ${names.join(", ")}). If it should map to an existing project, ` +
+          `re-run with \`--project <name>\`. Continuing as a new project '${project}'.`,
+      );
+    }
   }
 
   // ─── auto-detect storage ───────────────────────────────────────────────
@@ -127,6 +147,7 @@ export async function link(hubPathInput: string, opts: LinkOptions = {}): Promis
     project,
     storage,
     codeRepo,
+    existing: earlyHubMeta,
   });
 
   // ─── create hub-side stub dir for hub-owned storage ────────────────────
@@ -159,15 +180,29 @@ export async function link(hubPathInput: string, opts: LinkOptions = {}): Promis
   logger.detail(`  git -C ${hub} add metadata.json${storage === "hub-owned" ? ` projects/${project}/` : ""}`);
   logger.detail(`  git -C ${hub} commit -m "register project '${project}' (storage=${storage})"`);
 
-  // Refuse silently if user didn't pre-confirm — interactive caller can decide.
-  if (!opts.yes && !opts.storage) {
-    // (caller doesn't necessarily need to confirm; we already did the writes)
+  // Auto-connect (Decision 5), best-effort: the link is already written, so a connect
+  // failure (e.g. a malformed settings.local.json) must NOT fail link — warn + continue.
+  // For a hub-owned link the capture SINKS live inside the hub repo, so announce that
+  // cross-repo gitignore write (friction G).
+  let connectResult: ConnectResult | undefined;
+  if (opts.connect !== false) {
+    if (storage === "hub-owned") {
+      logger.info(
+        `Capture sinks for '${project}' live inside the hub repo (${hub}) and will be gitignored there.`,
+      );
+    }
+    logger.info("Wiring capture hooks (pass --no-connect to skip)…");
+    try {
+      connectResult = await connect({ cwd: codeRepo, yes: opts.yes, gitHook: true });
+    } catch (err) {
+      logger.warn(
+        `Link recorded, but auto-connect failed: ${(err as Error).message} — ` +
+          "run `mage connect` to wire capture hooks.",
+      );
+    }
   }
-  // sub-expression to satisfy "select" unused-import lint via void
-  void confirm;
-  void select;
 
-  return { codeRepo, hub, project, storage, hubMetadataAction };
+  return { codeRepo, hub, project, storage, hubMetadataAction, connectResult };
 }
 
 // ─── hub-side metadata upsert ───────────────────────────────────────────
@@ -176,6 +211,8 @@ interface UpsertHubProjectArgs {
   project: string;
   storage: Storage;
   codeRepo: string;
+  /** The hub registry already read by the caller (avoids a second read). */
+  existing?: HubMetadata | null;
 }
 
 async function upsertHubProject(
@@ -190,7 +227,7 @@ async function upsertHubProject(
     code_repo_url: codeRepoUrl,
   };
 
-  const existing = await readHubMetadata(hub);
+  const existing = args.existing ?? (await readHubMetadata(hub));
 
   if (!existing) {
     // Legacy hub (no top-level metadata.json) — bootstrap it.
