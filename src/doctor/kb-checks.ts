@@ -6,13 +6,28 @@
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import {
+  type ClaudeSettings,
   diffMageHooks,
   readClaudeSettings,
+  removeMageHooks,
   resolveSettingsTarget,
+  upsertMageHooks,
+  writeClaudeSettings,
 } from "../claude-settings.js";
+import { mageMigrate } from "../commands/migrate.js";
 import type { DoctorCheck, DoctorOptions } from "../commands/doctor.js";
+import { detectRedactHook } from "../git-hooks.js";
 import { ensureGitignored } from "../gitignore.js";
-import { INDEX_FILE, LEARNINGS_DIR, METRICS_DIR, exists, type resolveDocsRoot } from "../paths.js";
+import {
+  INDEX_FILE,
+  LEARNINGS_DIR,
+  METADATA_SCHEMA,
+  METRICS_DIR,
+  exists,
+  readHubMetadata,
+  readMetadata,
+  type resolveDocsRoot,
+} from "../paths.js";
 import { run } from "../shell.js";
 
 type ResolvedKb = Awaited<ReturnType<typeof resolveDocsRoot>>;
@@ -46,7 +61,11 @@ export async function pushKbChecks(
   // Tell "never connected" (benign, fresh KB) apart from "was capturing, now
   // disconnected" (a regression) using the sink's capture history.
   const hadCapture = await learningsHasHistory(kb.root);
-  pushConnectionCheck(checks, conn, hadCapture);
+  await pushConnectionCheck(checks, conn, hadCapture, opts);
+  // Gate-2 redaction pre-commit hook (detect+nudge; never installed by --fix) and
+  // metadata schema drift (advisory; --fix migrates in place). Both fail-open.
+  await pushRedactHookCheck(checks, kb, conn.diff.connected);
+  await pushSchemaDriftCheck(checks, kb, opts);
 }
 
 /**
@@ -167,43 +186,69 @@ type MageDiff = ReturnType<typeof diffMageHooks>;
 interface Connection {
   diff: MageDiff;
   scope: string;
+  /**
+   * Absolute path of the settings file the connection state was read from — the
+   * CONNECTED scope when connected, else the local path. This is the `--fix`
+   * target for the hook-block-drift refresh.
+   */
+  settingsPath: string;
+  /** Parsed settings at {@link settingsPath} (null when absent/malformed). */
+  settings: ClaudeSettings | null;
 }
 
 /**
  * Read connection state once: local settings first, then user settings as a
- * fallback, returning the connected diff (with its scope). Shared by the sink-leak
- * severity decision and the connection-health check so settings are read once.
+ * fallback, returning the connected diff (with its scope, path, and parsed
+ * settings). Shared by the sink-leak severity decision, the connection-health
+ * check, and the `--fix` hook-block refresh so settings are read once.
  */
 async function resolveConnection(opts: DoctorOptions): Promise<Connection> {
   const cwd = opts.cwd ?? process.cwd();
-  const localRead = await readClaudeSettings(resolveSettingsTarget({ cwd }).path);
+  const localPath = resolveSettingsTarget({ cwd }).path;
+  const localRead = await readClaudeSettings(localPath);
   let diff = diffMageHooks(localRead.settings);
   let scope = "local";
+  let settingsPath = localPath;
+  let settings = localRead.settings;
 
   if (!diff.connected) {
-    const userRead = await readClaudeSettings(resolveSettingsTarget({ user: true }).path);
+    const userPath = resolveSettingsTarget({ user: true }).path;
+    const userRead = await readClaudeSettings(userPath);
     const userDiff = diffMageHooks(userRead.settings);
     if (userDiff.connected) {
       diff = userDiff;
       scope = "user";
+      settingsPath = userPath;
+      settings = userRead.settings;
     }
   }
 
-  return { diff, scope };
+  return { diff, scope, settingsPath, settings };
 }
 
 /**
  * Connection health / hook-drift, from the already-resolved Connection:
  *  - not connected anywhere → advisory (optional) nudge `mage connect`; a fresh,
  *    healthy post-`mage init` KB must NOT make `doctor` exit 1 just for this.
- *  - connected but drifted (missing/stale/extra mage:* ids) → REQUIRED failure,
- *    nudge re-connect (the version-bump nudge from the gotcha's stale-hook-block).
+ *    `--fix` deliberately does NOT wire from scratch here (Decision 7: repair
+ *    drift, never connect-from-scratch — that is `mage connect`'s job).
+ *  - connected but drifted (missing/stale/extra mage:* ids) → with `--fix`, refresh
+ *    the block IN PLACE (the version-bump self-heal); without it, a REQUIRED
+ *    failure nudging re-connect.
  *  - matches → ok with the connected scope.
  */
-function pushConnectionCheck(checks: DoctorCheck[], conn: Connection, hadCapture: boolean): void {
+async function pushConnectionCheck(
+  checks: DoctorCheck[],
+  conn: Connection,
+  hadCapture: boolean,
+  opts: DoctorOptions,
+): Promise<void> {
   const { diff, scope } = conn;
 
   if (!diff.connected) {
+    // --fix never wires a never-connected (or intentionally `disconnect`'d) repo
+    // from scratch — that crosses from "repair" into "connect". Stay a nudge even
+    // under --fix.
     checks.push(
       hadCapture
         ? {
@@ -227,6 +272,22 @@ function pushConnectionCheck(checks: DoctorCheck[], conn: Connection, hadCapture
   }
 
   if (!diff.matches) {
+    // Connected but the hook block drifted. With --fix, rewrite it to the current
+    // MAGE_HOOKS set in place and re-evaluate. Best-effort: a write failure (or a
+    // refresh that somehow still mismatches) degrades to the normal nudge — doctor
+    // must never throw and must never silently claim a fix it did not make.
+    if (opts.fix) {
+      const after = await refreshHookBlock(conn);
+      if (after?.matches) {
+        checks.push({
+          name: "connection",
+          ok: true,
+          detail: `${scope}: refreshed drifted mage hook block`,
+        });
+        return;
+      }
+    }
+
     const missing = diff.missingIds.length > 0 ? diff.missingIds.join(",") : "none";
     const stale = diff.staleIds.length > 0 ? diff.staleIds.join(",") : "none";
     checks.push({
@@ -234,10 +295,167 @@ function pushConnectionCheck(checks: DoctorCheck[], conn: Connection, hadCapture
       ok: false,
       detail:
         `hook block out of date (mage:* drift: missing=[${missing}] stale=[${stale}]); ` +
-        "re-run `mage connect`",
+        `re-run \`mage connect\`${opts.fix ? " (auto-fix could not be applied)" : ""}`,
     });
     return;
   }
 
   checks.push({ name: "connection", ok: true, detail: `${scope}: mage hooks current` });
+}
+
+/**
+ * Rewrite the drifted mage hook block in the connected settings file to the
+ * current MAGE_HOOKS set, returning the post-write diff (or null on any failure —
+ * doctor never throws). We STRIP every mage:* group first (`removeMageHooks`) then
+ * re-add (`upsertMageHooks`): upsert alone is replace-by-id and would leave behind
+ * an EXTRA renamed/removed id, so a strip+add is what guarantees `matches` after.
+ * Non-mage groups and other top-level keys are preserved by both helpers.
+ */
+async function refreshHookBlock(conn: Connection): Promise<MageDiff | null> {
+  try {
+    const cleared = removeMageHooks(conn.settings).settings;
+    const refreshed = upsertMageHooks(cleared);
+    await writeClaudeSettings(conn.settingsPath, refreshed);
+    return diffMageHooks(refreshed);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Detect-and-nudge the Gate-2 redaction pre-commit hook (ADR-0018 §7), which blocks
+ * a commit that stages a live secret. `mage connect` installs it; `doctor` only
+ * DETECTS — it never installs (Decision 7: --fix repairs drift, it does not wire
+ * from scratch). Scope:
+ *   - kind "hub" is skipped — this covers BOTH true hubs (not a code repo mage
+ *     connects, Decision 5) AND external-mode projects (resolveDocsRoot reports them
+ *     as kind "hub"; their notes commit to the hub, not the code repo, so the code
+ *     repo has no note-commit to gate). External-mode Gate-2 placement is a
+ *     deliberate deferral, not an oversight.
+ *   - non-git KBs are skipped: there is no pre-commit hook to speak of.
+ * Severity is advisory throughout: Gate 1 (inline `mage redact`) still applies, and
+ * a human's own pre-commit hook (foreign) is theirs to keep — we only suggest
+ * adding the staged-secret check to it.
+ */
+async function pushRedactHookCheck(
+  checks: DoctorCheck[],
+  kb: Kb,
+  connected: boolean,
+): Promise<void> {
+  if (kb.kind !== "repo") return; // hubs + external-mode KBs (see doc above)
+
+  const status = await detectRedactHook(kb.repo);
+  if (status === "not-a-repo") return; // no pre-commit hook concept here
+
+  if (status === "present") {
+    checks.push({
+      name: "redact hook",
+      ok: true,
+      detail: "Gate-2 redaction pre-commit hook installed",
+    });
+    return;
+  }
+
+  if (status === "foreign") {
+    checks.push({
+      name: "redact hook",
+      ok: true,
+      optional: true,
+      detail:
+        "a non-mage pre-commit hook is present — add `mage redact --check --staged` to it " +
+        "for staged-secret blocking",
+    });
+    return;
+  }
+
+  // absent
+  checks.push({
+    name: "redact hook",
+    ok: false,
+    // Advisory: Gate 1 still applies and the leak only matters at the tracked write.
+    optional: true,
+    detail: connected
+      ? "Gate-2 redaction pre-commit hook missing — run `mage connect` to install it"
+      : "Gate-2 redaction pre-commit hook not installed — `mage connect` adds it when you wire capture",
+  });
+}
+
+/**
+ * Detect metadata schema drift (a pre-`mage.v2` file) and, with `--fix`, migrate it
+ * in place. The lenient readers already normalize v1 → v2 in memory, so a drifted
+ * file is never *broken* — this only makes the upgrade durable on disk, so the
+ * check is advisory (optional). `--fix` routes through {@link mageMigrate}, wrapped
+ * so doctor never throws.
+ */
+async function pushSchemaDriftCheck(
+  checks: DoctorCheck[],
+  kb: Kb,
+  opts: DoctorOptions,
+): Promise<void> {
+  const onDisk = await readOnDiskSchema(kb);
+  if (onDisk === null) return; // unreadable/absent — the structure check covers it
+
+  if (onDisk === METADATA_SCHEMA) {
+    checks.push({ name: "metadata schema", ok: true, detail: `current (${METADATA_SCHEMA})` });
+    return;
+  }
+
+  if (opts.fix) {
+    try {
+      // `kb.repo` is the migration anchor for BOTH kinds: the code-repo root for a
+      // repo KB (holds mage/metadata.json), the hub root for a hub/external KB
+      // (holds metadata.json). mageMigrate resolves the KB from there. Report the
+      // file COUNT when >1 so a walk-up that also migrates an enclosing repo (a hub
+      // nested inside a code repo) is visible, not masked by the single-file detail.
+      const res = await mageMigrate({ dir: kb.repo });
+      const n = res.migrated.length;
+      checks.push({
+        name: "metadata schema",
+        ok: true,
+        detail:
+          n === 0
+            ? `current (${METADATA_SCHEMA})`
+            : n === 1
+              ? `migrated ${onDisk} → ${METADATA_SCHEMA}`
+              : `migrated ${n} metadata files → ${METADATA_SCHEMA}`,
+      });
+      return;
+    } catch {
+      // Fall through to the advisory nudge — doctor never throws.
+    }
+  }
+
+  checks.push({
+    name: "metadata schema",
+    ok: false,
+    optional: true, // the lenient reader keeps a v1 KB fully working.
+    detail: `metadata is ${onDisk} (current ${METADATA_SCHEMA}) — run \`mage migrate\` or \`mage doctor --fix\``,
+  });
+}
+
+/**
+ * The on-disk metadata schema for this KB, or null when absent/unreadable/foreign.
+ * Keyed off `kb.repo` (NOT `kb.root`) for both kinds — that is where the metadata
+ * file physically lives:
+ *   - repo KB: kb.repo is the code-repo root → mage/metadata.json (readMetadata).
+ *   - hub KB:  kb.repo is the HUB root → metadata.json (readHubMetadata). For an
+ *     EXTERNAL-mode KB resolveDocsRoot sets root=<hub>/projects/<project> (no
+ *     metadata.json there) but repo=<hub>, so reading kb.root would ENOENT→null and
+ *     silently skip the check; kb.repo targets the hub's real metadata. For a true
+ *     hub repo===root, so this is a no-op.
+ * The readers preserve the ON-DISK `schema` field (they normalize the rest), so a
+ * v1 file reports "mage.v1". Fail-open: a foreign schema throws in the reader,
+ * which we swallow to null (doctor never throws on a malformed metadata file).
+ */
+async function readOnDiskSchema(kb: Kb): Promise<string | null> {
+  try {
+    if (kb.kind === "repo") {
+      const meta = await readMetadata(kb.repo);
+      return meta?.schema ?? null;
+    }
+    const hub = await readHubMetadata(kb.repo);
+    return hub?.schema ?? null;
+  } catch {
+    return null;
+  }
 }

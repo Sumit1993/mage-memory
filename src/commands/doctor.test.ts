@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -9,7 +9,8 @@ import {
   upsertMageHooks,
 } from "../claude-settings.js";
 import { gitInit } from "../git.js";
-import { METADATA_SCHEMA } from "../paths.js";
+import { detectRedactHook, installRedactHook } from "../git-hooks.js";
+import { METADATA_SCHEMA, METADATA_SCHEMA_V1, exists } from "../paths.js";
 import { doctor } from "./doctor.js";
 
 const made: string[] = [];
@@ -119,6 +120,14 @@ describe("diffMageHooks", () => {
     const d = diffMageHooks(null);
     expect(d.connected).toBe(false);
     expect(d.matches).toBe(false);
+  });
+
+  it("a non-object entry in a hooks-event array does not throw (doctor stays total)", () => {
+    // A hand-edited settings file can carry `null`/scalars in a hooks array; `g.id`
+    // on a null would throw and crash `mage doctor`, which must never throw.
+    const settings = { hooks: { SessionStart: [null, 7, "x"] } } as unknown as ClaudeSettings;
+    expect(() => diffMageHooks(settings)).not.toThrow();
+    expect(diffMageHooks(settings).connected).toBe(false);
   });
 });
 
@@ -417,5 +426,350 @@ describe("doctor — link integrity", () => {
     const c = check((await doctor({ cwd: hub })).checks, "link integrity");
     expect(c?.ok).toBe(false);
     expect(c?.optional).toBe(true);
+  });
+});
+
+// ─── doctor --fix repair-drift (Decision 7) ───────────────────────────────────
+
+describe("doctor --fix — hook-block drift refresh", () => {
+  let home: string;
+  let origHome: string | undefined;
+  beforeEach(async () => {
+    home = await freshDir("mage-home-");
+    origHome = process.env.HOME;
+    process.env.HOME = home;
+  });
+  afterEach(() => {
+    if (origHome === undefined) delete process.env.HOME;
+    else process.env.HOME = origHome;
+  });
+
+  /** Write `settings` as the repo-local settings.local.json under `dir`. */
+  async function writeLocalSettings(dir: string, settings: ClaudeSettings): Promise<void> {
+    await mkdir(join(dir, ".claude"), { recursive: true });
+    await writeFile(
+      join(dir, ".claude", "settings.local.json"),
+      `${JSON.stringify(settings, null, 2)}\n`,
+    );
+  }
+
+  /** Re-read the local settings and diff against the current MAGE_HOOKS. */
+  async function localDiff(dir: string) {
+    const raw = await readFile(join(dir, ".claude", "settings.local.json"), "utf8");
+    return diffMageHooks(JSON.parse(raw) as ClaudeSettings);
+  }
+
+  it("connected-but-partial block: --fix rewrites the block to current and passes", async () => {
+    const dir = await freshDir();
+    await makeInRepoKb(dir, { gitignoreSinks: true });
+    const partial = upsertMageHooks(null) as ClaudeSettings;
+    const drop = ["mage:observe:Stop", "mage:metrics:Stop"];
+    for (const ev of Object.keys(partial.hooks ?? {})) {
+      partial.hooks![ev] = (partial.hooks?.[ev] ?? []).filter((g) => !drop.includes(g.id ?? ""));
+    }
+    await writeLocalSettings(dir, partial);
+
+    const after = await doctor({ cwd: dir, fix: true });
+    const conn = check(after.checks, "connection");
+    expect(conn?.ok).toBe(true);
+    expect(conn?.detail).toMatch(/refreshed drifted mage hook block/);
+    // The on-disk block is now the full, current set.
+    expect((await localDiff(dir)).matches).toBe(true);
+  });
+
+  it("--fix clears an EXTRA renamed mage:* id (strip+add, not just upsert)", async () => {
+    const dir = await freshDir();
+    await makeInRepoKb(dir, { gitignoreSinks: true });
+    const drifted = upsertMageHooks(null) as ClaudeSettings;
+    // A leftover from a renamed hook — upsert-by-id alone would never remove it.
+    drifted.hooks!.SessionStart!.push({
+      id: "mage:legacy:Gone",
+      hooks: [{ type: "command", command: "mage observe" }],
+    });
+    await writeLocalSettings(dir, drifted);
+
+    const after = await doctor({ cwd: dir, fix: true });
+    expect(check(after.checks, "connection")?.ok).toBe(true);
+    const d = await localDiff(dir);
+    expect(d.matches).toBe(true); // matches requires NO extra mage:* id
+  });
+
+  it("without --fix, a drifted block stays a required failure (no rewrite)", async () => {
+    const dir = await freshDir();
+    await makeInRepoKb(dir, { gitignoreSinks: true });
+    const partial = upsertMageHooks(null) as ClaudeSettings;
+    partial.hooks!.SessionStart = (partial.hooks?.SessionStart ?? []).filter(
+      (g) => g.id !== "mage:observe:SessionStart",
+    );
+    await writeLocalSettings(dir, partial);
+
+    const r = await doctor({ cwd: dir });
+    const conn = check(r.checks, "connection");
+    expect(conn?.ok).toBe(false);
+    expect(conn?.detail).toMatch(/hook block out of date/);
+    // file untouched: still drifted
+    expect((await localDiff(dir)).matches).toBe(false);
+  });
+
+  it("--fix does NOT wire a never-connected repo from scratch", async () => {
+    const dir = await freshDir();
+    await makeInRepoKb(dir, { gitignoreSinks: true });
+    const r = await doctor({ cwd: dir, fix: true });
+    const conn = check(r.checks, "connection");
+    expect(conn?.ok).toBe(false);
+    expect(conn?.detail).toMatch(/not connected; run `mage connect`/);
+    // crucial: --fix created no settings file (connect-from-scratch is not a repair)
+    expect(await exists(join(dir, ".claude", "settings.local.json"))).toBe(false);
+  });
+
+  it("--fix write failure degrades to the nudge (no throw, no false success, file intact)", async () => {
+    const dir = await freshDir();
+    await makeInRepoKb(dir, { gitignoreSinks: true });
+    const partial = upsertMageHooks(null) as ClaudeSettings;
+    partial.hooks!.SessionStart = (partial.hooks?.SessionStart ?? []).filter(
+      (g) => g.id !== "mage:observe:SessionStart",
+    );
+    await writeLocalSettings(dir, partial);
+    const file = join(dir, ".claude", "settings.local.json");
+    await chmod(file, 0o400); // read-only → writeClaudeSettings throws inside refreshHookBlock
+
+    try {
+      const r = await doctor({ cwd: dir, fix: true }); // must not throw
+      const conn = check(r.checks, "connection");
+      expect(conn?.ok).toBe(false);
+      expect(conn?.detail).toMatch(/auto-fix could not be applied/);
+      // file untouched: still drifted on disk
+      expect((await localDiff(dir)).matches).toBe(false);
+    } finally {
+      await chmod(file, 0o600); // restore so afterEach cleanup can unlink
+    }
+  });
+
+  it("user-scope drift: --fix refreshes ~/.claude/settings.json and preserves foreign keys", async () => {
+    const dir = await freshDir();
+    await makeInRepoKb(dir, { gitignoreSinks: true }); // no LOCAL settings → user-scope fallback
+    // Drifted mage block in the (isolated) user settings, plus a foreign key.
+    const partial = upsertMageHooks(null) as ClaudeSettings;
+    partial.hooks!.SessionStart = (partial.hooks?.SessionStart ?? []).filter(
+      (g) => g.id !== "mage:observe:SessionStart",
+    );
+    (partial as Record<string, unknown>).$schema = "https://example/keep-me";
+    const userFile = join(home, ".claude", "settings.json");
+    await mkdir(join(home, ".claude"), { recursive: true });
+    await writeFile(userFile, `${JSON.stringify(partial, null, 2)}\n`);
+
+    const r = await doctor({ cwd: dir, fix: true });
+    const conn = check(r.checks, "connection");
+    expect(conn?.ok).toBe(true);
+    expect(conn?.detail).toMatch(/user: refreshed drifted mage hook block/);
+
+    const onDisk = JSON.parse(await readFile(userFile, "utf8")) as ClaudeSettings;
+    expect(diffMageHooks(onDisk).matches).toBe(true);
+    expect((onDisk as Record<string, unknown>).$schema).toBe("https://example/keep-me");
+  });
+});
+
+describe("doctor — redact pre-commit hook (detect+nudge)", () => {
+  let home: string;
+  let origHome: string | undefined;
+  beforeEach(async () => {
+    home = await freshDir("mage-home-");
+    origHome = process.env.HOME;
+    process.env.HOME = home;
+  });
+  afterEach(() => {
+    if (origHome === undefined) delete process.env.HOME;
+    else process.env.HOME = origHome;
+  });
+
+  it("installed hook → redact hook check passes", async () => {
+    const dir = await freshDir();
+    await makeInRepoKb(dir, { gitignoreSinks: true });
+    await installRedactHook(dir);
+    expect(await detectRedactHook(dir)).toBe("present");
+    const c = check((await doctor({ cwd: dir })).checks, "redact hook");
+    expect(c?.ok).toBe(true);
+    expect(c?.detail).toMatch(/installed/);
+  });
+
+  it("missing hook → advisory nudge (never a hard failure)", async () => {
+    const dir = await freshDir();
+    await makeInRepoKb(dir, { gitignoreSinks: true });
+    const c = check((await doctor({ cwd: dir })).checks, "redact hook");
+    expect(c?.ok).toBe(false);
+    expect(c?.optional).toBe(true);
+    expect(c?.detail).toMatch(/redaction pre-commit hook/);
+  });
+
+  it("hubs are skipped (a hub is not a connected code repo)", async () => {
+    const hub = await freshDir("mage-hub-");
+    await gitInit(hub); // git repo, so the skip is by KB kind, not not-a-repo
+    await mkdir(join(hub, "projects"), { recursive: true });
+    await writeFile(
+      join(hub, "metadata.json"),
+      `${JSON.stringify({ schema: METADATA_SCHEMA, name: "h", created_at: "", projects: [] }, null, 2)}\n`,
+    );
+    const r = await doctor({ cwd: hub });
+    expect(check(r.checks, "redact hook")).toBeUndefined();
+  });
+
+  it("--fix never installs the redact hook (detect-only)", async () => {
+    const dir = await freshDir();
+    await makeInRepoKb(dir, { gitignoreSinks: true });
+    await doctor({ cwd: dir, fix: true });
+    // detect-only: --fix must not have written the hook
+    expect(await detectRedactHook(dir)).toBe("absent");
+  });
+
+  it("a foreign (non-mage) pre-commit hook → advisory ok, KB still passes, never clobbered", async () => {
+    const dir = await freshDir();
+    await makeInRepoKb(dir, { gitignoreSinks: true });
+    const hookPath = join(dir, ".git", "hooks", "pre-commit");
+    const FOREIGN = "#!/bin/sh\necho someone-elses-hook\n";
+    await writeFile(hookPath, FOREIGN);
+    await chmod(hookPath, 0o755);
+    expect(await detectRedactHook(dir)).toBe("foreign");
+
+    const r = await doctor({ cwd: dir, fix: true });
+    const c = check(r.checks, "redact hook");
+    expect(c?.ok).toBe(true);
+    expect(c?.optional).toBe(true);
+    expect(c?.detail).toMatch(/non-mage pre-commit hook/);
+    // never clobbered, even under --fix
+    expect(await readFile(hookPath, "utf8")).toBe(FOREIGN);
+  });
+
+  it("a symlink at pre-commit → foreign (advisory), never followed/clobbered by --fix", async () => {
+    const dir = await freshDir();
+    await makeInRepoKb(dir, { gitignoreSinks: true });
+    const target = join(dir, "real-hook.sh");
+    await writeFile(target, "#!/bin/sh\necho linked\n");
+    const hookPath = join(dir, ".git", "hooks", "pre-commit");
+    await symlink(target, hookPath);
+    expect(await detectRedactHook(dir)).toBe("foreign");
+
+    const r = await doctor({ cwd: dir, fix: true });
+    expect(check(r.checks, "redact hook")?.optional).toBe(true);
+    // still a foreign symlink afterward — --fix neither followed nor replaced it
+    expect(await detectRedactHook(dir)).toBe("foreign");
+    expect(await readFile(target, "utf8")).toBe("#!/bin/sh\necho linked\n");
+  });
+});
+
+describe("doctor — metadata schema drift", () => {
+  let home: string;
+  let origHome: string | undefined;
+  beforeEach(async () => {
+    home = await freshDir("mage-home-");
+    origHome = process.env.HOME;
+    process.env.HOME = home;
+  });
+  afterEach(() => {
+    if (origHome === undefined) delete process.env.HOME;
+    else process.env.HOME = origHome;
+  });
+
+  /** Build an in-repo KB whose metadata.json is the prior schema (mage.v1). */
+  async function makeV1InRepoKb(dir: string): Promise<void> {
+    await gitInit(dir);
+    await mkdir(join(dir, "mage"), { recursive: true });
+    const meta = {
+      schema: METADATA_SCHEMA_V1,
+      mode: "in-repo",
+      project: "demo",
+      hub_path: null,
+      hub_repo: null,
+      hub_refs: [],
+      linked_at: "",
+    };
+    await writeFile(join(dir, "mage", "metadata.json"), `${JSON.stringify(meta, null, 2)}\n`);
+    await writeFile(join(dir, "mage", "INDEX.md"), "# Index\n");
+    await writeFile(join(dir, ".gitignore"), "mage/.learnings/\nmage/.metrics/\n");
+  }
+
+  it("v2 metadata → schema check passes", async () => {
+    const dir = await freshDir();
+    await makeInRepoKb(dir, { gitignoreSinks: true });
+    const c = check((await doctor({ cwd: dir })).checks, "metadata schema");
+    expect(c?.ok).toBe(true);
+    expect(c?.detail).toMatch(/current/);
+  });
+
+  it("v1 metadata → advisory drift nudge (the lenient reader keeps it working)", async () => {
+    const dir = await freshDir();
+    await makeV1InRepoKb(dir);
+    const c = check((await doctor({ cwd: dir })).checks, "metadata schema");
+    expect(c?.ok).toBe(false);
+    expect(c?.optional).toBe(true);
+    expect(c?.detail).toMatch(/mage\.v1/);
+    expect(c?.detail).toMatch(/mage migrate|mage doctor --fix/);
+  });
+
+  it("--fix migrates v1 metadata to v2 on disk", async () => {
+    const dir = await freshDir();
+    await makeV1InRepoKb(dir);
+    const after = await doctor({ cwd: dir, fix: true });
+    const c = check(after.checks, "metadata schema");
+    expect(c?.ok).toBe(true);
+    expect(c?.detail).toMatch(/migrated/);
+    const onDisk = JSON.parse(await readFile(join(dir, "mage", "metadata.json"), "utf8"));
+    expect(onDisk.schema).toBe(METADATA_SCHEMA);
+  });
+
+  it("--fix migrates a v1 hub's metadata to v2 on disk", async () => {
+    const hub = await freshDir("mage-hub-");
+    await mkdir(join(hub, "projects"), { recursive: true });
+    const meta = {
+      schema: METADATA_SCHEMA_V1,
+      name: "h",
+      created_at: "",
+      projects: [{ name: "engine", storage: "in-repo", code_repo_path: hub, code_repo_url: "" }],
+    };
+    await writeFile(join(hub, "metadata.json"), `${JSON.stringify(meta, null, 2)}\n`);
+
+    const after = await doctor({ cwd: hub, fix: true });
+    expect(check(after.checks, "metadata schema")?.detail).toMatch(/migrated/);
+    const onDisk = JSON.parse(await readFile(join(hub, "metadata.json"), "utf8"));
+    expect(onDisk.schema).toBe(METADATA_SCHEMA);
+    expect(onDisk.projects[0].storage).toBe("repo-owned"); // v1 "in-repo" normalized
+  });
+
+  // An EXTERNAL-mode code repo resolves to kind "hub" with root=<hub>/projects/<project>
+  // but repo=<hub>. The schema check must read the hub's real metadata at kb.repo,
+  // not kb.root (which has no metadata.json) — else the check silently vanishes.
+  it("external-mode KB: a v1 hub is detected (reads kb.repo, not kb.root) and --fix migrates it", async () => {
+    const hub = await freshDir("mage-hub-");
+    const repo = await freshDir("mage-ext-");
+    await mkdir(join(hub, "projects", "engine"), { recursive: true });
+    const hubMeta = {
+      schema: METADATA_SCHEMA_V1,
+      name: "h",
+      created_at: "",
+      projects: [{ name: "engine", storage: "hub-owned", code_repo_path: repo, code_repo_url: "" }],
+    };
+    await writeFile(join(hub, "metadata.json"), `${JSON.stringify(hubMeta, null, 2)}\n`);
+    await mkdir(join(repo, "mage"), { recursive: true });
+    const repoMeta = {
+      schema: METADATA_SCHEMA, // the pointer file itself is current
+      mode: "external",
+      project: "engine",
+      hub_path: hub,
+      hub_repo: null,
+      hub_refs: [],
+      linked_at: "",
+    };
+    await writeFile(join(repo, "mage", "metadata.json"), `${JSON.stringify(repoMeta, null, 2)}\n`);
+
+    // detect: the v1 hub is flagged from the external repo (would be skipped if keyed on kb.root)
+    const before = check((await doctor({ cwd: repo })).checks, "metadata schema");
+    expect(before?.ok).toBe(false);
+    expect(before?.detail).toMatch(/mage\.v1/);
+
+    // --fix migrates the hub's metadata.json
+    const after = await doctor({ cwd: repo, fix: true });
+    expect(check(after.checks, "metadata schema")?.detail).toMatch(/migrated/);
+    expect(JSON.parse(await readFile(join(hub, "metadata.json"), "utf8")).schema).toBe(
+      METADATA_SCHEMA,
+    );
   });
 });

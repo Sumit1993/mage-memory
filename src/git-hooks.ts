@@ -113,6 +113,34 @@ export async function installRedactHook(repoPath: string): Promise<InstallHookRe
   return { installed: true, path: hookPath, backedUp: false };
 }
 
+// ─── detect ────────────────────────────────────────────────────────────────────
+
+/** The state of the redaction pre-commit hook in a repo, from {@link detectRedactHook}. */
+export type RedactHookStatus = "present" | "absent" | "foreign" | "not-a-repo";
+
+/**
+ * Detect the redaction pre-commit hook WITHOUT installing anything — the read-only
+ * counterpart to {@link installRedactHook}, used by `mage doctor` to detect+nudge.
+ * Mirrors install's recognition rules exactly:
+ *   - not a git work tree (or git missing) → "not-a-repo"
+ *   - a symlink at pre-commit → "foreign" (foreign-by-definition; we never wrote one)
+ *   - no pre-commit hook → "absent"
+ *   - a hook lacking our marker → "foreign" (a human's hook — never touch it)
+ *   - our hook (carries REDACT_HOOK_MARKER) → "present"
+ * Fail-open: never throws (a host-reachable diagnostic must not abort doctor).
+ */
+export async function detectRedactHook(repoPath: string): Promise<RedactHookStatus> {
+  const hooksDir = await resolveHooksDir(repoPath);
+  if (hooksDir === null) return "not-a-repo";
+
+  const hookPath = resolve(hooksDir, "pre-commit");
+  if (await isSymlink(hookPath)) return "foreign";
+
+  const existing = await readHookIfPresent(hookPath);
+  if (existing === null) return "absent";
+  return existing.includes(REDACT_HOOK_MARKER) ? "present" : "foreign";
+}
+
 // ─── remove ──────────────────────────────────────────────────────────────────
 
 /** Outcome of {@link removeRedactHook}. */
