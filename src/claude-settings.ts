@@ -79,6 +79,10 @@ export function diffMageHooks(settings: ClaudeSettings | null): {
   const installed = new Map<string, string | undefined>();
   const groups = settings?.hooks ? Object.values(settings.hooks).flat() : [];
   for (const g of groups) {
+    // Skip non-object array entries (a hand-edited file can carry `null`/scalars in
+    // a hooks-event array): `g.id` on a null would throw. diffMageHooks is on the
+    // `mage doctor` hot path, which must be total over any parseable settings JSON.
+    if (!g || typeof g !== "object") continue;
     if (typeof g.id === "string" && g.id.startsWith(MAGE_ID_PREFIX)) {
       installed.set(g.id, g.hooks?.[0]?.command);
     }
