@@ -181,7 +181,7 @@ async function initInRepo(codeRepo: string, project: string): Promise<void> {
   if (added.length > 0) logger.detail(`Added .gitignore patterns: ${added.join(", ")}`);
 
   // Portable navigation contract for any agent (AGENTS.md + CLAUDE.md shim).
-  await writeAgentsMd(codeRepo, { docsRel: "mage", kind: "in-repo" });
+  await writeAgentsMd(codeRepo, { kind: "repo", mode: "in-repo", docsRel: "mage" });
 
   logger.blank();
   logger.success(`Initialized in-repo mage knowledge base for project '${project}'.`);
@@ -307,7 +307,7 @@ async function initStandaloneHub(args: HubArgs): Promise<string> {
   ]);
   if (added.length > 0) logger.detail(`Added .gitignore patterns: ${added.join(", ")}`);
 
-  await writeAgentsMd(hubDir, { docsRel: ".", kind: "hub" });
+  await writeAgentsMd(hubDir, { kind: "hub", docsRel: "." });
 
   logger.blank();
   logger.success(`Initialized standalone mage hub '${hubName}'.`);

@@ -134,7 +134,7 @@ export async function link(hubPathInput: string, opts: LinkOptions = {}): Promis
     await mkdir(hubProjectDocsRoot(hub, project), { recursive: true });
     logger.success(`Created empty stub: projects/${project}/`);
     // Route this code repo's agents to the hub's per-project entry (ADR-0011 §6).
-    await writeAgentsMd(codeRepo, { kind: "external", docsRel: "mage", hubPath: hub, project });
+    await writeAgentsMd(codeRepo, { kind: "repo", mode: "external", docsRel: "mage", hubPath: hub, project });
     logger.detail(`Wrote ${codeRepo}/AGENTS.md (external → ${hub}/_index.${project}.md)`);
   }
 
