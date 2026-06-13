@@ -30,7 +30,7 @@ export interface DoctorResult {
   checks: DoctorCheck[];
 }
 
-const REQUIRED_NODE_MAJOR = 18;
+const REQUIRED_NODE_MAJOR = 20;
 
 /**
  * Diagnostic checks. Reports environment, tool availability, network reach, and —

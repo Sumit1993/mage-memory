@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -101,5 +101,43 @@ describe("mage init — detection-first + standalone hub (ADR-0012 §3)", () => 
     const dir = await fresh();
     await init({ codeRepo: dir, yes: true }); // standalone hub
     await expect(init({ codeRepo: dir, yes: true })).rejects.toThrow(/already a mage hub/);
+  });
+});
+
+describe("mage init — auto-connect (Decision 5)", () => {
+  it("in-repo init auto-connects by default; --no-connect skips", async () => {
+    const dir = await fresh();
+    const r = await init({ mode: "in-repo", yes: true, codeRepo: dir, project: "demo" });
+    expect(r.connectResult).toBeDefined();
+    expect(await exists(join(dir, ".claude", "settings.local.json"))).toBe(true);
+
+    const dir2 = await fresh();
+    const skipped = await init({
+      mode: "in-repo",
+      yes: true,
+      codeRepo: dir2,
+      project: "demo",
+      connect: false,
+    });
+    expect(skipped.connectResult).toBeUndefined();
+    expect(await exists(join(dir2, ".claude", "settings.local.json"))).toBe(false);
+  });
+
+  it("hub init does NOT auto-connect (the hub is not a code repo)", async () => {
+    const dir = await fresh();
+    const r = await init({ codeRepo: dir, yes: true }); // standalone hub
+    expect(r.mode).toBe("hub");
+    expect(r.connectResult).toBeUndefined();
+    expect(await exists(join(dir, ".claude", "settings.local.json"))).toBe(false);
+  });
+
+  it("auto-connect is best-effort: a malformed settings file does not fail init", async () => {
+    const dir = await fresh();
+    await mkdir(join(dir, ".claude"), { recursive: true });
+    await writeFile(join(dir, ".claude", "settings.local.json"), "{ not valid json");
+    // Must NOT throw — the KB is written, connect is skipped with a warning.
+    const r = await init({ mode: "in-repo", yes: true, codeRepo: dir, project: "demo" });
+    expect(r.connectResult).toBeUndefined();
+    expect(await exists(join(dir, "mage", "metadata.json"))).toBe(true);
   });
 });

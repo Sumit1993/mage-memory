@@ -1,7 +1,8 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { logger } from "../logger.js";
 import { exists, readHubMetadata, readMetadata } from "../paths.js";
 import { init } from "./init.js";
 import { link } from "./link.js";
@@ -73,5 +74,43 @@ describe("mage link", () => {
     await expect(link(notHub, { codeRepo: code, project: "x", yes: true })).rejects.toThrow(
       /mage init --hub/,
     );
+  });
+
+  it("11E: warns when an auto-derived project name is not registered in the hub", async () => {
+    const hub = await makeHub();
+    const repoA = await emptyRepo();
+    await link(hub, { codeRepo: repoA, project: "engine", yes: true, connect: false });
+    const repoB = await emptyRepo(); // random `mage-code-*` basename — not "engine"
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    await link(hub, { codeRepo: repoB, yes: true, connect: false });
+    expect(warn).toHaveBeenCalled();
+    expect(warn.mock.calls.flat().join(" ")).toContain("engine");
+    warn.mockRestore();
+  });
+
+  it("11E: no warning when the auto-derived basename matches a registered project", async () => {
+    const hub = await makeHub();
+    const parent = await emptyRepo();
+    const repoEngine = join(parent, "engine");
+    await mkdir(repoEngine, { recursive: true });
+    await link(hub, { codeRepo: repoEngine, project: "engine", yes: true, connect: false });
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    // re-link with no --project: basename "engine" matches the registry → silent.
+    await link(hub, { codeRepo: repoEngine, yes: true, connect: false });
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it("Decision 5: link auto-connects by default; --no-connect skips", async () => {
+    const hub = await makeHub();
+    const code = await emptyRepo();
+    const wired = await link(hub, { codeRepo: code, project: "x", yes: true });
+    expect(wired.connectResult).toBeDefined();
+    expect(await exists(join(code, ".claude", "settings.local.json"))).toBe(true);
+
+    const code2 = await emptyRepo();
+    const skipped = await link(hub, { codeRepo: code2, project: "y", yes: true, connect: false });
+    expect(skipped.connectResult).toBeUndefined();
+    expect(await exists(join(code2, ".claude", "settings.local.json"))).toBe(false);
   });
 });

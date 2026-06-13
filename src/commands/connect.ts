@@ -57,7 +57,11 @@ export async function connect(opts: ConnectOptions): Promise<ConnectResult> {
   const proceed = await resolveDecision<boolean>({
     flagValue: opts.yes ? true : undefined,
     yes: opts.yes,
-    interactive: () => confirm({ message: `Wire mage capture into ${target.path}?`, default: true }),
+    interactive: () =>
+      confirm({
+        message: `Wire capture hooks + the redact pre-commit hook? (${target.path})`,
+        default: true,
+      }),
     fallback: { value: true },
     flagName: "yes",
   });
