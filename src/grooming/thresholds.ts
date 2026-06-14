@@ -57,6 +57,21 @@ export const BASE_THRESHOLDS: Thresholds = {
   editBudget: 3,
 };
 
+/**
+ * The min-work floor for a compact CHAPTER to count as one distinct recurrence unit
+ * (0.0.11). The recurrence gates count distinct *chapters* (compact/session_end
+ * segments), not session_ids — so a single continuously-compacted chat can still
+ * accrue recurrence (a session_id is constant across compaction). A chapter must carry
+ * at least this many WORK events (user_prompt + tool_use) so a trivial `/compact`
+ * cannot manufacture a unit. STRUCTURAL floor — NOT dial-scaled.
+ *
+ * KNOWN LIMITATION (deferred, plan-0.0.11-signal-and-capture.md, Candidate 1): chapter
+ * SIZE tracks the context-window (compaction fires when it fills), so the raw chapter
+ * count is window-sensitive. A window-independent unit (distinct days / idle-gap
+ * episodes) is the planned refinement.
+ */
+export const MIN_CHAPTER_WORK_EVENTS = 2;
+
 /** The recurrence gates per dial position — the ONLY fields the dial scales. */
 const GATES: Record<Sensitivity, { promoteSessions: number; graduateSessions: number }> = {
   // high → easier to surface (fewer sessions needed).

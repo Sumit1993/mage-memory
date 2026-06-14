@@ -1,9 +1,12 @@
 // The recurrence tally fold (ADR-0019 §1/§2). promote's "second deterministic fold
 // over the same scratch" — distill's sibling. Where the rollup folds skill_load
 // outcomes and distill reads first-sight clusters, this folds CLOSED segments into a
-// per-`(wing+keywords)`-signature recurrence count that COUNTS DISTINCT SESSIONS, not
-// raw hits ("came up in 3 separate sessions" is signal; "3 times in one chatty
-// session" is not). It reuses the rollup mould VERBATIM (rollup.ts): a gitignored
+// per-`(wing+keywords)`-signature recurrence count that COUNTS DISTINCT CHAPTERS
+// (compact/session_end segments clearing a min-work floor), not raw hits — a pattern
+// across 3 separate chapters is signal; 3 times in one chapter is not. A chapter is the
+// recurrence work-unit (0.0.11): a single continuously-compacted chat still accrues
+// recurrence (session_id is constant across compaction), while a multi-session user's
+// sessions are each ≥1 chapter. It reuses the rollup mould VERBATIM (rollup.ts): a gitignored
 // `.metrics/promote.json`, a per-session bookmark, an idempotent never-regress
 // `Math.max` fold over CLOSED segments only, fail-open read. PURE compute (foldSession)
 // + an fs orchestrator (foldTally). No model in the fold (ADR-0009).
@@ -27,13 +30,18 @@ import type {
   SignatureStat,
 } from "./types.js";
 import { segmentSignatures } from "./signature.js";
+import { MIN_CHAPTER_WORK_EVENTS } from "./thresholds.js";
 
 // ─── consts ──────────────────────────────────────────────────────────────────
 
 /** The single tally file, sibling of the context-match rollup + distill bookmark. */
 export const PROMOTE_FILE = "promote.json";
-/** Bump when the on-disk tally shape changes (a fresh empty tally re-stamps). */
-export const PROMOTE_VERSION = 1;
+/**
+ * Bump when the tally's MEANING or shape changes — `normalizeTally` then discards an
+ * older-version tally and re-folds from the live `.learnings`. v2 (0.0.11): the
+ * recurrence unit is a distinct compact-CHAPTER, not a session_id.
+ */
+export const PROMOTE_VERSION = 2;
 
 /** A fresh, empty tally at the current version. */
 function emptyTally(): PromoteTally {
@@ -77,8 +85,12 @@ export async function readTally(docsRoot: string): Promise<PromoteTally> {
 function normalizeTally(parsed: unknown): PromoteTally {
   if (parsed === null || typeof parsed !== "object") return emptyTally();
   const p = parsed as Partial<PromoteTally>;
+  // A version bump changes the recurrence unit's MEANING (v1 distinct sessions →
+  // v2 distinct chapters), so an older tally's counts are not comparable — discard it
+  // and re-fold from the live `.learnings` under the current algorithm.
+  if (p.v !== PROMOTE_VERSION) return emptyTally();
   return {
-    v: typeof p.v === "number" ? p.v : PROMOTE_VERSION,
+    v: PROMOTE_VERSION,
     signatures: isRecord(p.signatures) ? (p.signatures as Record<string, SignatureStat>) : {},
     sessions: isRecord(p.sessions) ? (p.sessions as Record<string, SessionFold>) : {},
   };
@@ -140,28 +152,28 @@ function segmentClosed(events: ObserveEvent[], from: number, upto: number): Segm
   return segments;
 }
 
-// ─── foldSession — PURE distinct-session fold (the crux) ────────────────────────
+// ─── foldSession — PURE distinct-CHAPTER fold (the crux) ────────────────────────
 
 /**
  * Fold ONE session's newly-closed region into the tally and return a NEW tally
- * (inputs never mutated). THE DISTINCT-SESSION ALGORITHM (ADR-0019 §2):
+ * (inputs never mutated). THE DISTINCT-CHAPTER ALGORITHM (ADR-0019 §2; revised 0.0.11):
  *
  *   1. closedCount = index just past the LAST terminator. Region to fold =
  *      [fold.offset, closedCount). offset >= closedCount → nothing new closed.
- *   2. Segment the region at terminator boundaries.
- *   3. Collect the SET of SignatureHits across the region (dedupe by `key`, merging
- *      lens per key — a key seen under two lenses in this region carries both).
- *   4. For each signature key in the region's set: if it is NOT already in
- *      sessions[session].sigs, then signatures[key].sessions += 1, push the key into
- *      sessions[session].sigs, and merge lens/keywords/wing/lastSeen/hint into the
- *      stat. If it IS already there, only merge lens/lastSeen (NO session increment).
- *      → a session counts each signature AT MOST ONCE EVER.
+ *   2. Segment the region into CHAPTERS at compact/session_end boundaries.
+ *   3. For EACH chapter that clears the MIN_CHAPTER_WORK_EVENTS floor, collect its
+ *      distinct SignatureHits (dedupe by `key` within the chapter, merging lens).
+ *   4. For each such chapter a key appears in: signatures[key].sessions += 1 and merge
+ *      lens/keywords/wing/lastSeen/hint. → a key recurring across N qualifying chapters
+ *      counts N, whether those chapters fall in one session or many (the unit is the
+ *      chapter, so a single continuously-compacted chat accrues recurrence too).
  *   5. sessions[session].offset = Math.max(prev.offset, closedCount) — never regress.
  *
- * Idempotent (re-folding an unchanged file adds nothing: the region is empty AND every
- * key is already in sigs), purge-safe (global counts persist after a session prunes),
- * and correct across multi-pass folds of a still-closing session (each fold advances
- * the offset, so a signature recurring within ONE session across folds counts once).
+ * Idempotent (re-folding an unchanged file adds nothing: the offset watermark skips the
+ * already-closed region), purge-safe (global counts persist after a session prunes). A
+ * chapter is folded EXACTLY ONCE — the offset advances past its terminator — so a count
+ * never doubles across folds. (`sessions[session].sigs` is retained empty: the chapter
+ * granularity + the offset now do the dedupe the per-session set used to.)
  */
 export function foldSession(
   tally: PromoteTally,
@@ -185,43 +197,36 @@ export function foldSession(
     };
   }
 
-  // ── steps 2–3: segment the region, collect the deduped SET of hits (merge lens). ──
+  // ── steps 2–4: count each QUALIFYING chapter a signature appears in. The chapter
+  //    (a compact/session_end segment clearing the min-work floor) is the recurrence
+  //    work-unit; the offset watermark guarantees each is folded exactly once. ──
   const segments = segmentClosed(events, from, closedCount);
-  const hitByKey = new Map<string, { hit: SignatureHit; lenses: Set<Lens>; lastTs: string }>();
-  for (const seg of segments) {
-    const segTs = lastTsOf(events, seg);
-    for (const hit of segmentSignatures(events, seg, repoRoot)) {
-      const cur = hitByKey.get(hit.key);
-      if (cur === undefined) {
-        hitByKey.set(hit.key, { hit, lenses: new Set<Lens>([hit.lens]), lastTs: segTs });
-      } else {
-        cur.lenses.add(hit.lens);
-        if (segTs > cur.lastTs) cur.lastTs = segTs;
-      }
-    }
-  }
-
-  // ── step 4: per-session distinct dedupe → increment global counts. ──
   const signatures: Record<string, SignatureStat> = { ...tally.signatures };
-  const seen = new Set(prevFold.sigs);
-  const newSigs = [...prevFold.sigs];
 
-  for (const { hit, lenses, lastTs } of hitByKey.values()) {
-    const isNewForSession = !seen.has(hit.key);
-    signatures[hit.key] = mergeStat(signatures[hit.key], hit, lenses, lastTs, isNewForSession);
-    if (isNewForSession) {
-      seen.add(hit.key);
-      newSigs.push(hit.key);
+  for (const seg of segments) {
+    if (chapterWorkCount(events, seg) < MIN_CHAPTER_WORK_EVENTS) continue; // floor: skip trivial chapters.
+    const segTs = lastTsOf(events, seg);
+    // The distinct signatures WITHIN this chapter, merging lens per key.
+    const chapterHits = new Map<string, { hit: SignatureHit; lenses: Set<Lens> }>();
+    for (const hit of segmentSignatures(events, seg, repoRoot)) {
+      const cur = chapterHits.get(hit.key);
+      if (cur === undefined) chapterHits.set(hit.key, { hit, lenses: new Set<Lens>([hit.lens]) });
+      else cur.lenses.add(hit.lens);
+    }
+    // Every qualifying chapter the key appears in bumps its recurrence count by 1.
+    for (const { hit, lenses } of chapterHits.values()) {
+      signatures[hit.key] = mergeStat(signatures[hit.key], hit, lenses, segTs, true);
     }
   }
 
-  // ── step 5: advance the offset, never regress. ──
+  // ── step 5: advance the offset, never regress. `sigs` no longer gates counting (the
+  //    offset watermark + per-chapter granularity do) — retained empty for shape. ──
   return {
     ...tally,
     signatures,
     sessions: {
       ...tally.sessions,
-      [session]: { offset: Math.max(prevFold.offset, closedCount), sigs: newSigs },
+      [session]: { offset: Math.max(prevFold.offset, closedCount), sigs: [] },
     },
   };
 }
@@ -253,6 +258,17 @@ function mergeStat(
     lastSeen: lastTs > cur.lastSeen ? lastTs : cur.lastSeen,
     hint: cur.hint.length > 0 ? cur.hint : hit.hint, // first non-empty wins (stable).
   };
+}
+
+/** Count of a chapter's WORK events (user_prompt | tool_use) — the min-work floor
+ *  metric that keeps a trivial `/compact` from minting a recurrence unit. */
+function chapterWorkCount(events: ObserveEvent[], seg: Segment): number {
+  let n = 0;
+  for (let i = seg.start; i < seg.end; i++) {
+    const e = events[i];
+    if (e !== undefined && (e.type === "user_prompt" || e.type === "tool_use")) n += 1;
+  }
+  return n;
 }
 
 /** The lexical-max ts within a segment — the stat's lastSeen source. "" if none. */
