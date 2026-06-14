@@ -88,6 +88,14 @@ tags. Likely the wing is derived from a path segment of the flat hub-owned docs 
 (`<hub>/projects/<name>/`) and grabs `projects`. Fix: derive wing from the resolved
 **project name** (registry/metadata), not a path basename. Look in `src/grooming/signature.ts`.
 
+**BUILT (0.0.11).** `wingFromSegment` now treats a hub's `projects/` container as
+TRANSPARENT: `projects/<name>/<leaf>` (>= 3 segments, so `<name>` is a real directory
+scope) names the wing `<name>`, via a new `wingOfSegments` helper keyed on `PROJECTS_DIR`
+(paths.ts). The `<hub>` repoRoot makes touched doc paths relative to `projects/<name>/...`,
+so this is the right de-container point. **Validated on the live soak:** prismalens-engine
+and sreforge signatures now carry `wing = prismalens-engine` / `wing = sreforge` (was
+`wing = projects` for every one).
+
 ## Candidate 3 — keyword signatures are noise-dominated → patterns never recur
 
 Signatures key on generic tool-verbs, **raw command strings**, and path fragments
@@ -97,6 +105,25 @@ signatures, so recurrence is impossible even after Candidate 1. Fix: de-noise
 `signature.ts` — drop path fragments, collapse tool-call boilerplate, normalize verbs;
 key on the **topic**, not the shell incantation. (Candidate 1 makes graduation possible;
 this makes it meaningful.)
+
+**BUILT (0.0.11) — MODERATE dial (user-chosen).** A `DENOISE` set in `keywordsFromText`
+drops two token classes alongside STOPWORDS: ① tool / shell VERBS (`read`, `edit`, `bash`,
+`grep`, `git`, `echo`…) and ② generic file / container NAMES (`readme`, `index`, `cli`,
+`paths`, `package`…). Topical file words (`spec`, `roadmap`, `conductor`, `types`,
+`structuredoutput`…) deliberately survive. `PROMOTE_VERSION` bumped **2 → 3** (key
+semantics changed) so old-key tallies rebuild under the de-noised keys.
+
+**Validated on the live soak — PRECISION, not reach (honest finding):** proposals went from
+verb+filename noise (`mage::read,readme`, `mage::edit,readme`, `mage::paths,read`) to real
+topics (`mage::structuredoutput`, `mage::plan,release,sequence`, `mage::claude,settings`;
+`sreforge::alert,prometheus`, `sreforge::conductor`, `sreforge::deployer`). Signatures
+2237 → 1967; note-eligible (≥3) 61 → 40. BUT **max recurrence 6 → 5**: the old top
+(`read+readme` = 6) was NOISE; de-noise dropped it and revealed the true topical ceiling
+(`plan+release+sequence` = 5), still **below M=8**. So de-noise did NOT make graduation
+newly reachable — it made the measured signal honest. **Implication:** topical recurrence
+climbs as more compact-chapters accrue; M=8 is reachable with more real work, OR — now that
+de-noise + the bounded budget already tame the flood — M could come back down toward the
+real signal level (a `dynamic/percentile` threshold remains the deferred lever).
 
 ## Candidate 4 — CRITICAL: capture autonomous subagent work (SubagentStop)
 
@@ -112,6 +139,18 @@ This widens capture to where autonomous work increasingly happens — and a suba
 itself a natural work-unit candidate that complements Candidate 1's chapters. (Verify
 mage isn't already getting subagent signal another way; `PreToolUse` is likely redundant
 with `PostToolUse`'s `tool_input` — confirm before wiring.)
+
+**BUILT (0.0.11) — minimal, correct capture seam.** Wired `SubagentStop` into both halves:
+`MAGE_HOOKS` (claude-settings.ts, now 9 groups) AND `observe.ts` `inferType`
+(`SubagentStop → assistant_msg`, alongside `Stop`). Confirmed a subagent's tool calls never
+reach the main-session `PostToolUse` hook, so the SubagentStop payload's `transcript_path`
+(the SUBAGENT transcript) is the one seam — reusing the proven `buildAssistantMsgEvent` path
+that reads the last assistant reply, scrubbed. **Scope note:** this CAPTURES the subagent's
+product (final reply) into `.learnings`; it does NOT yet mint subagent-specific *signatures*
+(an assistant_msg is a correction antecedent, not itself a lens hit). Treating a whole
+subagent run as a first-class work-unit (parse its transcript's tool_uses, or a dedicated
+`subagent` lens) is the natural **follow-up** once we confirm the hook fires with a usable
+transcript on a real autonomous run.
 
 ## Relations
 

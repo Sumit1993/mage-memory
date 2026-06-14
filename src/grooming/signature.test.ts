@@ -139,6 +139,21 @@ describe("wingFromSegment — first touched-path wing", () => {
     const events = [tool({ paths: [`${root}/toplevel-file.md`] }), sessionEnd()];
     expect(wingFromSegment(events, whole(events), root)).toBe("");
   });
+
+  it("de-containers a hub `projects/<name>/...` path → the project name is the wing (0.0.11 Candidate 2)", () => {
+    // A hub-owned project's docs live at `projects/<name>/...`; the wing must be the
+    // PROJECT (`prismalens-engine`), not the literal `projects` container — else every
+    // hub project collapses to one "projects" wing (the soak's mis-tag).
+    const events = [tool({ paths: ["projects/prismalens-engine/specs/api.md"] }), sessionEnd()];
+    expect(wingFromSegment(events, whole(events), null)).toBe("prismalens-engine");
+  });
+
+  it("a length-2 `projects/<name>` path is not de-containered (name is a leaf, not a scope)", () => {
+    // Only `projects/<name>/<leaf>` (>= 3 segments) names a project wing; a bare
+    // `projects/<name>` keeps the conservative first-segment fallback.
+    const events = [tool({ paths: ["projects/prismalens-engine"] }), sessionEnd()];
+    expect(wingFromSegment(events, whole(events), null)).toBe("projects");
+  });
 });
 
 // ─── segmentSignatures — the four lenses ──────────────────────────────────────
@@ -178,15 +193,30 @@ describe("segmentSignatures — the four ADR-0019 lenses", () => {
     expect(fail?.hint.startsWith("failure:")).toBe(true);
   });
 
-  it("lens ③ workflow: a tool repeated >=2 in the segment fires workflow", () => {
+  it("lens ③ workflow: a tool repeated >=2 in the segment fires workflow (keyed on the TOPIC, not the tool verb)", () => {
+    // The tool name ("grep") is a de-noise token (Candidate 3) — the signature keys on
+    // the touched topic (the basename words), never the verb, so near-identical work
+    // doesn't shatter into per-verb buckets.
+    const events = [
+      tool({ tool: "Grep", paths: ["payments/webhook-handler.ts"] }),
+      tool({ tool: "Grep", paths: ["payments/webhook-retry.ts"] }),
+      sessionEnd(),
+    ];
+    const wf = segmentSignatures(events, whole(events), null).find((h) => h.lens === "workflow");
+    expect(wf).toBeDefined();
+    expect(wf?.keywords).toContain("webhook");
+    expect(wf?.keywords).not.toContain("grep"); // the tool verb is de-noised out.
+  });
+
+  it("a bare tool+file with no topical words yields NO signature (de-noise drops it, 0.0.11 Candidate 3)", () => {
+    // `Grep a.ts` is pure noise: the verb is de-noised and the basename is too short —
+    // an empty keyword set must mint NO bucket rather than a degenerate `wing::` key.
     const events = [
       tool({ tool: "Grep", paths: ["payments/a.ts"] }),
       tool({ tool: "Grep", paths: ["payments/b.ts"] }),
       sessionEnd(),
     ];
-    const wf = segmentSignatures(events, whole(events), null).find((h) => h.lens === "workflow");
-    expect(wf).toBeDefined();
-    expect(wf?.keywords).toContain("grep");
+    expect(segmentSignatures(events, whole(events), null).some((h) => h.lens === "workflow")).toBe(false);
   });
 
   it("lens ④ preference: a salient non-repeat tool_use fires preference", () => {

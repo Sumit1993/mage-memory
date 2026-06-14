@@ -201,7 +201,7 @@ describe("(b2) min-work floor — a chapter below the work floor is skipped", ()
 // ─── (b3) VERSION MIGRATION — an older-version tally is discarded on read ──────
 
 describe("(b3) version migration — readTally discards an older-version tally", () => {
-  it("a v1 tally (per-session counts) is reset to fresh so it re-folds under the v2 chapter unit", async () => {
+  it("an older-version tally is reset to fresh so it re-folds under the current chapter + de-noised-key unit", async () => {
     const dir = await tmp();
     await mkdir(join(dir, ".metrics"), { recursive: true });
     const old = {

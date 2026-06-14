@@ -16,6 +16,7 @@
 // through redact() (idempotent) and is capped — a raw secret never leaves here.
 
 import type { ObserveEvent } from "../observe/types.js";
+import { PROJECTS_DIR } from "../paths.js";
 import { redact } from "../redact.js";
 import type { Lens, SignatureHit } from "./types.js";
 
@@ -43,14 +44,39 @@ const STOPWORDS: ReadonlySet<string> = new Set([
   "their", "using", "use", "used", "about",
 ]);
 
+/**
+ * De-noise tokens dropped from signature keywords (0.0.11 Candidate 3). These name
+ * *how* work was done — not *what* it was about — so keying on them shatters near-
+ * identical work into per-file/per-verb buckets (`read+readme`, `edit+readme`,
+ * `paths+read`…), which kept recurrence below the graduate gate even after the
+ * compact-chapter unit. Two classes:
+ *   ① tool / shell VERBS — the same handful of tool names and shell commands recur
+ *      across ALL work, so they carry no topical signal.
+ *   ② generic file / container NAMES — `readme`, `index`, `cli`… name a file, not a
+ *      topic. Topical file words (`spec`, `roadmap`, `conductor`…) deliberately survive.
+ * Dropped alongside {@link STOPWORDS} in {@link keywordsFromText}; the redacted human
+ * `hint` keeps the full body (it is the human's context, not a bucket key).
+ */
+const DENOISE: ReadonlySet<string> = new Set([
+  // ① tool names (Claude Code tool vocabulary, lower-cased; multi-word tools are one token)
+  "read", "edit", "write", "multiedit", "bash", "grep", "glob", "ls", "task",
+  "webfetch", "websearch", "notebookedit", "todowrite",
+  // ① common shell verbs that ride in a Bash detail body
+  "cat", "echo", "git", "cd", "mkdir", "rm", "cp", "mv", "sed", "awk", "head", "tail",
+  "find", "npm", "pnpm", "npx", "chmod", "touch", "curl", "wget",
+  // ② generic file / container names (a file, not a topic)
+  "readme", "index", "license", "licence", "changelog", "todo", "notes",
+  "cli", "paths", "package", "makefile", "dockerfile", "dist", "gitignore",
+]);
+
 // ─── keywordsFromText — deterministic keyword derivation ──────────────────────
 
 /**
  * Derive a stable keyword set from free text (ADR-0019 §2). Lower-case, tokenize on
- * non-(letter|number) across all scripts, drop stopwords + tokens shorter than
- * {@link MIN_TOKEN}, de-dupe. Rank by frequency DESC then alpha ASC, take the first
- * {@link SIG_KEYWORDS}, then SORT alpha so the resulting `key` is order-independent
- * (the same words always produce the same key). PURE, deterministic — no randomness.
+ * non-(letter|number) across all scripts, drop stopwords, {@link DENOISE} tokens, and
+ * tokens shorter than {@link MIN_TOKEN}, de-dupe. Rank by frequency DESC then alpha
+ * ASC, take the first {@link SIG_KEYWORDS}, then SORT alpha so the resulting `key` is
+ * order-independent (the same words always produce the same key). PURE, deterministic.
  */
 export function keywordsFromText(text: string): string[] {
   const freq = new Map<string, number>();
@@ -58,7 +84,9 @@ export function keywordsFromText(text: string): string[] {
   // stopword set still applies (mirrors note.ts deriveKeywords).
   for (const raw of text.toLowerCase().split(/[^\p{L}\p{N}]+/u)) {
     const w = raw.trim();
-    if (w.length < MIN_TOKEN || STOPWORDS.has(w)) continue;
+    // Drop stopwords (function words) and de-noise tokens (tool/shell verbs + generic
+    // file names, 0.0.11 Candidate 3) so the key is the TOPIC, not how the work ran.
+    if (w.length < MIN_TOKEN || STOPWORDS.has(w) || DENOISE.has(w)) continue;
     freq.set(w, (freq.get(w) ?? 0) + 1);
   }
   // Rank: frequency DESC, ties broken alpha ASC — a stable, total order.
@@ -102,12 +130,32 @@ export function wingFromSegment(
     const e = events[i];
     if (e === undefined || e.type !== "tool_use") continue;
     for (const p of e.paths) {
-      const segs = pathSegments(p, repoRoot);
-      // Require a directory segment before the leaf — a bare filename names no wing.
-      if (segs.length >= 2 && segs[0] !== undefined && segs[0].length > 0) {
-        return segs[0];
-      }
+      const wing = wingOfSegments(pathSegments(p, repoRoot));
+      if (wing.length > 0) return wing;
     }
+  }
+  return "";
+}
+
+/**
+ * The wing named by a touched path's lower-cased segments: the FIRST directory
+ * segment (a bare filename — fewer than 2 segments — names no wing). EXCEPTION
+ * (0.0.11 Candidate 2): a hub's `projects/` container is TRANSPARENT —
+ * `projects/<name>/<leaf>` names the wing `<name>` (the project itself), never the
+ * literal `projects`. Without this, every hub-owned project collapses to one
+ * `projects` wing, which both fragments per-project recurrence AND never matches a
+ * project-derived note wing (the soak's prismalens-/sreforge- signatures were all
+ * mis-tagged `wing=projects`). The `>= 3` guard keeps `<name>` a directory (a leaf
+ * after it), mirroring the bare-filename rule below.
+ */
+function wingOfSegments(segs: string[]): string {
+  if (segs[0] === PROJECTS_DIR && segs.length >= 3) {
+    const name = segs[1];
+    if (name !== undefined && name.length > 0) return name;
+  }
+  // Require a directory segment before the leaf — a bare filename names no wing.
+  if (segs.length >= 2 && segs[0] !== undefined && segs[0].length > 0) {
+    return segs[0];
   }
   return "";
 }

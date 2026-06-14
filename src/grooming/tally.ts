@@ -39,9 +39,11 @@ export const PROMOTE_FILE = "promote.json";
 /**
  * Bump when the tally's MEANING or shape changes — `normalizeTally` then discards an
  * older-version tally and re-folds from the live `.learnings`. v2 (0.0.11): the
- * recurrence unit is a distinct compact-CHAPTER, not a session_id.
+ * recurrence unit is a distinct compact-CHAPTER, not a session_id. v3 (0.0.11): the
+ * signature KEY semantics changed — de-noised keywords (Candidate 3) + de-containered
+ * project wings (Candidate 2) — so old-key buckets must rebuild under the new keys.
  */
-export const PROMOTE_VERSION = 2;
+export const PROMOTE_VERSION = 3;
 
 /** A fresh, empty tally at the current version. */
 function emptyTally(): PromoteTally {
