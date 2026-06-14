@@ -36,7 +36,7 @@ write through the single applier.
 
 1. **Resolve the knowledge base.** Find the nearest `mage/metadata.json` (walk
    up). docs root = `<repo>/mage/` (in-repo) or
-   `<hub_path>/projects/<project>/mage/` (external). If none, tell the user to run
+   `<hub_path>/projects/<project>/` (external). If none, tell the user to run
    `mage init` first — there is nothing to graduate.
 
 2. **Run the deterministic recurrence reader.**

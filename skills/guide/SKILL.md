@@ -37,7 +37,7 @@ there the hub root itself is the knowledge base.
 | `mode` | Docs root |
 |--------|-----------|
 | `in-repo`  | `<code-repo>/mage/` |
-| `external` | `<hub_path>/projects/<project>/mage/` |
+| `external` | `<hub_path>/projects/<project>/` |
 
 Hybrid (mode=in-repo with non-empty `hub_refs[]`): docs root is the in-repo
 `mage/`; each `hub_ref` is a cross-cutting registration with a hub.
@@ -110,7 +110,7 @@ the user runs them. Pick the right repo by where the file physically lives:
 | File location | Commit to |
 |---------------|-----------|
 | Code repo's `mage/` (in-repo or hybrid) | the code repo |
-| `<hub>/projects/<project>/mage/` (hub-owned) | the hub repo (`git -C <hub> …`) |
+| `<hub>/projects/<project>/` (hub-owned) | the hub repo (`git -C <hub> …`) |
 | Hub root `notes/`, `decisions/`, `INDEX.md`, `IDENTITY.md`, `archive/` | the hub repo |
 
 `artifacts/` and `.learnings/` are git-ignored by design — don't try to commit them.

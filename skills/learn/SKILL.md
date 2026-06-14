@@ -30,7 +30,7 @@ to avoid), and **pointers** to canonical sources — never a copy of the source
 
 1. **Resolve the knowledge base.** Find the nearest `mage/metadata.json`
    (walk up). docs root = `<repo>/mage/` (in-repo) or
-   `<hub_path>/projects/<project>/mage/` (external). If none, tell the user to
+   `<hub_path>/projects/<project>/` (external). If none, tell the user to
    run `mage init` first.
 
 2. **Classify the finding.** Pick a `type` (open vocab — see `CONVENTIONS.md`):

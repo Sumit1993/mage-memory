@@ -53,7 +53,7 @@ export interface LinkResult {
  * `mage/`:
  *   - empty/absent  → storage="hub-owned" (scenario 2): code repo has no local docs;
  *                     the hub owns them. We create the empty stub at
- *                     `<hub>/projects/<project>/mage/`.
+ *                     `<hub>/projects/<project>/` (FLAT — no nested `mage/`; ADR-0011/0023).
  *   - has content   → storage="repo-owned" (scenario 4 / hybrid): code repo already has
  *                     local docs; the hub just registers awareness via metadata.
  *                     No `<hub>/projects/<project>/` directory is created.

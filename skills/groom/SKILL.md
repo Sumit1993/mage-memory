@@ -37,13 +37,33 @@ source (see `CONVENTIONS.md`). groom mines **only mage's own** `.learnings/` —
 foreign memory stores (ECC instincts, Claude `MEMORY.md`) are not harvested
 (ADR-0018 §8).
 
-## Step 0 — Resolve the knowledge base (once, for both phases)
+## Step 0 — Resolve the roots to groom (once, for both phases)
 
-Find the nearest `mage/metadata.json` (walk up). docs root = `<repo>/mage/`
-(in-repo / hybrid) or `<hub_path>/projects/<project>/mage/` (external). If none,
-tell the user to run `mage init` first — there is nothing to groom into. **At a
-hub root** the engines groom the hub's own `.learnings/` AND fan out to every
-registered project (pass `--root-only` to scope to just the hub's own notes).
+Find the nearest `mage/metadata.json` (walk up). The docs root to groom is:
+
+- **in-repo / hybrid** → `<repo>/mage/`
+- **external** → the hub project it points at: `<hub_path>/projects/<project>/`
+  — **FLAT**, no nested `mage/` (ADR-0011 / ADR-0023: a project looks like the hub
+  it lives in, not like a code-repo `mage/`).
+
+If none is found and the cwd is not a hub, you are not in a knowledge base —
+`mage doctor` flags a **"bare parent"** when a dir sits above several KBs but is
+itself neither. Don't groom; tell the user to `cd` into a project or `mage init`.
+
+**At a hub root, fan out (Decision 1).** A hub is one KB *and* a registry of
+project KBs, so groom the hub's OWN `.learnings/` (at the hub root) **and every
+registered project**. Read the hub's `metadata.json` registry and derive each
+project's docs root from its `storage`:
+
+- `repo-owned` (hybrid) → `<code_repo_path>/mage/`
+- `hub-owned`           → `<hub>/projects/<name>/` (flat)
+
+Then run **both phases below once per root**, passing `--dir <root>` to each engine
+command. Each root keeps its **own** watermark + tally, so `--seen` stays
+unambiguous and projects never conflate — this is why the fan-out is a per-root
+loop, not one mixed manifest. Skip any project whose `code_repo_path` is absent on
+this machine. If the user scopes the run to the hub only (e.g. "groom root-only"),
+groom just the hub root and skip the fan-out.
 
 ---
 
