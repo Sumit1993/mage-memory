@@ -9,7 +9,7 @@
     {
       "name": "mage",
       "source": "./",
-      "description": "mage skills: mage:learn (capture durable notes) + the self-grooming loop mage:distill / mage:promote / mage:graduate / mage:optimize + mage:guide (how to use the knowledge base).",
+      "description": "mage skills: mage:learn (capture durable notes) + the self-grooming loop mage:groom / mage:graduate / mage:optimize + mage:guide (how to use the knowledge base).",
       "version": "0.0.10",
       "author": { "name": "Sumit Patel" },
       "homepage": "https://github.com/Sumit1993/mage-memory",

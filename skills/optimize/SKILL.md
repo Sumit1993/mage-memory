@@ -219,7 +219,7 @@ edits this pass — the learning rate held.
 
 - **mage:graduate** (`skills/graduate/SKILL.md`) — the forward move (note →
   Procedure skill); demote is its reverse (skill → archived, note kept).
-- **mage:promote** (`skills/promote/SKILL.md`) — the recurrence catch-net that
+- **mage:groom** (`skills/groom/SKILL.md`) — its Phase 2 (recurrence catch-net)
   feeds new generated skills into the catalog this skill then tunes.
 - **ADR-0016** (`mage/decisions/0016-context-match-confidence-ladder-applier.md`)
   — context-match as the load-bearing predicate, the confidence ladder, the

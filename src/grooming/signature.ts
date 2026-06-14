@@ -8,7 +8,7 @@
 // reply is a steer, per the ADR-0015 amendment).
 //
 // The signature is COARSE on purpose (ADR-0019 §2): the deterministic fold buckets,
-// the `mage:promote` skill refines at proposal time. Keyword derivation is the same
+// the `mage:groom` skill refines at proposal time. Keyword derivation is the same
 // deterministic shape observe/context-match already use — lower-case, tokenize, drop
 // stopwords + short tokens, frequency-rank, then SORT alpha for a stable `key`.
 //

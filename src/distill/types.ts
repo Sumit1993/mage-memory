@@ -1,7 +1,7 @@
 // distill core types (ADR-0018). Pure shapes — no runtime logic. The reader
 // (reader.ts) groups un-distilled `.learnings/*.jsonl` events into candidate
 // CLUSTERS carrying salient signals across the four ADR-0018 §4 lenses; the
-// `mage:distill` skill reasons over them and drafts notes. These types are the
+// `mage:groom` skill reasons over them and drafts notes. These types are the
 // locked contract the command and the integrator depend on.
 
 /**

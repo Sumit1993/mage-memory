@@ -87,8 +87,8 @@ mage's skills ship as a **Claude Code plugin** so they group under a clean
 ```
 
 You get `mage:learn` (capture a note) and `mage:guide` (how to use the base). The
-**self-grooming loop** adds `mage:distill` (mine observed scratch on first sight),
-`mage:promote` (recurrence → note), `mage:graduate` (proven note → skill), and
+**self-grooming loop** adds `mage:groom` (mine observed scratch — first-sight
+insight + recurrence catch-net), `mage:graduate` (proven note → skill), and
 `mage:optimize` (reword/demote a mis-firing trigger). `mage init` prints the two
 install lines for you (it never runs slash commands). Per-wing `mage-wing-*`
 skills are still **generated** into `.claude/skills/` + `.agents/skills/` by
@@ -228,10 +228,10 @@ listed for transparency). The deterministic/judgment split behind this is
 | `mage index` | `Stop` hook · after `mage:learn` | Regenerate the always-loaded `INDEX.md` (+ per-wing indexes). Never hand-edit the output. |
 | `mage skills` | after a new wing appears | Regenerate the per-wing `mage-wing-<x>` skills into `.claude/skills/` + `.agents/skills/`. `--metrics --quiet` folds the metrics rollup at `Stop`. |
 | `mage ingest <dir>` | `mage:learn --from` | Enumerate + classify ingestable sources under a foreign `<dir>` (read-only) — what bulk-import distills into notes. |
-| `mage distill --json` | `mage:distill` skill | Read `.learnings/` events into note candidates (first-sight insight). |
-| `mage promote --json` / `--seen <s>:<o>` | `mage:promote` skill | Fold `.learnings/` into a **recurrence** manifest of `note`/`graduate` proposals; `--seen` advances the per-session watermark after the human dispositions a batch. |
-| `mage dream --apply` / `--reject` | `mage:promote` · `mage:graduate` · `mage:optimize` | The **single writer**: reads ONE Proposal JSON on stdin and applies it through the applier — `graduate` / `demote` / `merge` / `split` / `reword` — enforcing the four ceilings (never auto-commit, never touch a bespoke skill, never hard-delete, never write past a Gate-2 secret block). `--reject` buffers a proposal so it backs off and won't be re-surfaced. |
-| `mage redact <file>` | `mage:learn` · `mage:promote` · `mage:graduate` · git pre-commit | Scan/strip secrets from a file or stdin — redaction Gate 2 before a tracked note/skill is written. |
+| `mage distill --json` | `mage:groom` (Phase 1) | Read `.learnings/` events into note candidates (first-sight insight). |
+| `mage promote --json` / `--seen <s>:<o>` | `mage:groom` (Phase 2) | Fold `.learnings/` into a **recurrence** manifest of `note`/`graduate` proposals; `--seen` advances the per-session watermark after the human dispositions a batch. |
+| `mage dream --apply` / `--reject` | `mage:groom` · `mage:graduate` · `mage:optimize` | The **single writer**: reads ONE Proposal JSON on stdin and applies it through the applier — `graduate` / `demote` / `merge` / `split` / `reword` — enforcing the four ceilings (never auto-commit, never touch a bespoke skill, never hard-delete, never write past a Gate-2 secret block). `--reject` buffers a proposal so it backs off and won't be re-surfaced. |
+| `mage redact <file>` | `mage:learn` · `mage:groom` · `mage:graduate` · git pre-commit | Scan/strip secrets from a file or stdin — redaction Gate 2 before a tracked note/skill is written. |
 
 Run `mage <command> --help` for per-command flags.
 
@@ -289,8 +289,8 @@ observe ──> distill ──> promote ──> graduate ──> optimize
 
 | Move | Detector (deterministic) | Skill (judgment) | What it does |
 |------|--------------------------|------------------|--------------|
-| **distill** | `mage distill --json` | `mage:distill` | Mine the observed scratch for a striking insight **on first sight** → a new note. |
-| **promote** | `mage promote --json` | `mage:promote` | The recurrence catch-net: a pattern that recurred across ≥ K **distinct sessions** with no note covering it → draft a note (or `merge` into one). Distinct-session counting, never per-event. |
+| **groom · first sight** | `mage distill --json` | `mage:groom` (Phase 1) | Mine the observed scratch for a striking insight **on first sight** → a new note. |
+| **groom · recurrence** | `mage promote --json` | `mage:groom` (Phase 2) | The recurrence catch-net: a pattern that recurred across ≥ K **distinct sessions** with no note covering it → draft a note (or `merge` into one). Distinct-session counting, never per-event. |
 | **graduate** | `mage promote --json` (`graduate` proposals) | `mage:graduate` | A proven procedural note (playbook/gotcha) recurring across enough sessions earns its own loadable `mage-skill-<slug>`. The note stays the substrate; the skill is its pushed form. |
 | **optimize** | `mage skills --metrics --json` | `mage:optimize` | **context-match** measures whether a generated skill loaded where the work actually touched its wing/keywords. A persistently low match → **reword** the trigger (fresh measurement window); never fits → **demote** it back to its note. Bounded per pass (a textual learning rate). |
 
@@ -396,8 +396,7 @@ then `/plugin install mage@mage` (`mage init` prints both lines).
 |-------|---------|
 | `mage:guide` | Awareness — teaches agents to detect `mage/`, read the index first, capture by pointer, and never auto-commit. |
 | `mage:learn` | Capture a durable note (insight + procedure + pointers) from the work just done; `mage:learn --from <dir>` bulk-imports existing docs/skills. |
-| `mage:distill` | Mine the observed scratch (`.learnings/`) for a striking insight **on first sight** → a new note. |
-| `mage:promote` | The recurrence catch-net: a pattern that recurred across ≥ K distinct sessions with no covering note → draft (or `merge` into) one. |
+| `mage:groom` | Mine the observed scratch (`.learnings/`) into notes — two phases: **first sight** (a striking insight earns a note the first time it is seen) then **recurrence** (a pattern across ≥ K distinct sessions with no covering note → draft or `merge`). |
 | `mage:graduate` | A proven procedural note recurring across enough sessions → its own loadable `mage-skill-<slug>` (the note stays the substrate). |
 | `mage:optimize` | Reword a generated skill's trigger when context-match shows it mis-fires — or demote it back to its note. Bounded per pass. |
 | `mage-wing-<x>` | Per-wing skill **generated** by `mage skills` into `.claude/skills/` + `.agents/skills/`, scoped to one wing's rooms. |
@@ -419,9 +418,16 @@ awareness skill teaches agents the same rule.
 
 ## Status
 
-v0.0.9. Early and evolving — the note model, command surface, and skills here
+v0.0.10. Early and evolving — the note model, command surface, and skills here
 reflect the actual CLI. Recent releases:
 
+- **0.0.10** — **coherence**: metadata schema **`mage.v2`** (lenient v1 read +
+  `mage migrate`); the self-grooming skills merged into one **`mage:groom`**
+  (first-sight + recurrence phases); `init`/`link` **auto-connect** capture hooks;
+  **`mage doctor --fix`** repairs drift (hook block / redaction hook / metadata
+  schema); the plumbing commands are hidden from `mage --help`; the spec-driven
+  (SDD) skills were removed. Vocabulary reconciled across the codebase (shapes:
+  in-repo · hybrid · external; a hub is one repo that is both a KB and a registry).
 - **0.0.9** — **`mage dashboard`** — a no-server, per-KB dashboard (`Dashboard.md`
   + Obsidian-core `Knowledge.base`; `--html` adds the self-contained cockpit
   whose hero is the proposal queue) — plus **`mage doctor`** widened to env + KB

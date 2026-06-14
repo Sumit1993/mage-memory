@@ -126,7 +126,7 @@ adopting an authored skill is *remembering*, not copying a source (ADR-0013 §5)
 
 > **Observed scratch is a different lane.** `--from` imports *foreign* docs by
 > pointer. Distilling mage's **own** observed `.learnings/*.jsonl` into notes
-> lives in the separate **mage:distill** skill — mage reads only its own
+> lives in the separate **mage:groom** skill — mage reads only its own
 > artifacts; foreign memory stores (ECC instincts, Claude `MEMORY.md`) are not
 > harvested (ADR-0018).
 

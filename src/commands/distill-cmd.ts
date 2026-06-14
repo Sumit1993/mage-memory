@@ -3,7 +3,7 @@
 //
 //   mage distill            → PURE READ. Group un-distilled CLOSED `.learnings/`
 //                             events into candidate clusters; print a human
-//                             summary (or --json the manifest the `mage:distill`
+//                             summary (or --json the manifest the `mage:groom`
 //                             skill consumes). NEVER advances the watermark.
 //   mage distill --seen S:N → THE ONLY WRITE PATH. After the human dispositions a
 //                             batch (keep/skip), advance session S's watermark to
@@ -139,5 +139,5 @@ function reportHuman(manifest: DistillManifest): void {
     logger.detail(`${c.session} ${c.span} — ${c.hint}`);
   }
   logger.blank();
-  logger.step("Plumbing engine (you don't normally run this): the `mage:distill` skill turns these candidates into notes, then `mage distill --seen <session>:<offset>` commits.");
+  logger.step("Plumbing engine (you don't normally run this): mage:groom (Phase 1) turns these candidates into notes, then `mage distill --seen <session>:<offset>` commits.");
 }

@@ -177,7 +177,7 @@ program
 program
   .command("distill", { hidden: true })
   .description(
-    "Read observed .learnings into note candidates (plumbing behind the mage:distill skill)",
+    "Read observed .learnings into note candidates (plumbing behind mage:groom Phase 1)",
   )
   .option(
     "-d, --dir <path>",
@@ -196,7 +196,7 @@ program
 program
   .command("promote", { hidden: true })
   .description(
-    "Fold observed .learnings into recurring note candidates (plumbing behind the mage:promote skill)",
+    "Fold observed .learnings into recurring note candidates (plumbing behind mage:groom Phase 2)",
   )
   .option(
     "-d, --dir <path>",

@@ -1,7 +1,7 @@
 // The promote manifest builder (ADR-0019 §4/§5). PURE — no fs, no model, no network.
 // The final deterministic stage of the promote core: it folds a recurrence tally,
 // the repo's notes, the thresholds dial, and the rejected-edit buffer into the
-// `PromoteManifest` the `mage:promote` / `mage:graduate` skills reason over.
+// `PromoteManifest` the `mage:groom` / `mage:graduate` skills reason over.
 //
 // TWO LADDER RUNGS, one tally (ADR-0019 §4):
 //   ① scratch → note (the catch-net): a signature becomes a "note" proposal iff it
@@ -34,7 +34,7 @@ import type { ScannedNote } from "../scan.js";
 /**
  * The canonical `"note"` proposal a signature would produce: `target` is the
  * signature KEY (action "note" acts on a signature, per types.ts), `payload` carries
- * the `{wing, keywords, hint}` the `mage:promote` skill drafts a note from, and
+ * the `{wing, keywords, hint}` the `mage:groom` skill drafts a note from, and
  * `evidence` is the recurrence rationale. PURE — the SAME signature always yields the
  * SAME proposal (the rejected-buffer dedupe keys on action+target, both stable here).
  */
