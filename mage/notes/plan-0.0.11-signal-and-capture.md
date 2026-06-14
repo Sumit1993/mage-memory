@@ -68,10 +68,17 @@ doesn't mint a work-unit); reconcile the M/K thresholds with the new, finer unit
 distinct qualifying chapters (the offset watermark keeps each folded once); `PROMOTE_VERSION`
 bumped to 2 with a `normalizeTally` reset so v1 per-session tallies rebuild under the new unit.
 **Validated on the live single-chat KB:** max recurrence 2 → **8**; note-eligible (≥3) 0 → **93**;
-graduation-eligible (≥5) **0 → 27**. The gate is now reachable. **Open tuning (deferred):** 27
-graduation candidates from one re-fold means **M=5 on chapters is loose** — raise the bar (likely
-via the sensitivity dial / a higher M for the finer unit) before relying on auto-graduation; and
-the window-dependence above still wants a window-independent unit eventually.
+graduation-eligible (≥5) **0 → 27**. The gate is now reachable.
+
+**Tuning BUILT (0.0.11).** Raised **M 5→8** (dial high 6 / low 11) and added a **bounded, ranked
+promotion budget** (`promotionBudget=5`, thresholds.ts): in `buildManifest`, eligible proposals rank
+strongest-first (graduate rung, then recurrence, lens diversity, recency, target asc) and only the top
+N surface — the rest are reported as `deferred`. This is the "dynamic, good-enough promotion stage" that
+deals with the flood the finer chapter unit creates. **Validated on the live KB:** the 93-candidate note
+flood → **5 surfaced + 88 deferred**, strongest-first. NOTE the surfaced candidates are still NOISY
+(`home::cli,read`; "Read cli.ts recurred 8×") — exactly what **Candidates 2 + 3** fix. **Still deferred:**
+a window-independent unit (days/episodes) and a fully-dynamic (percentile) threshold if the budget proves
+insufficient.
 
 ## Candidate 2 — hub-owned project signatures mis-tag `wing = projects`
 

@@ -186,8 +186,13 @@ function reportHuman(manifest: PromoteManifest): void {
     return;
   }
   logger.success(
-    `${proposals.length} note candidate(s); ${manifest.covered} recurring signature(s) already covered.`,
+    `${proposals.length} candidate(s); ${manifest.covered} recurring signature(s) already covered.`,
   );
+  if (manifest.deferred > 0) {
+    logger.info(
+      `+${manifest.deferred} more eligible — surfaced the strongest ${proposals.length} this pass (bounded promotion budget; the rest defer).`,
+    );
+  }
   for (const p of proposals) {
     logger.detail(`${p.target} — ${p.evidence}`);
   }

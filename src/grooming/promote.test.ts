@@ -146,7 +146,7 @@ describe("buildManifest — covering-note gate (covered counts, never proposed)"
 
 describe("buildManifest — graduation rung (covered PROCEDURAL note >= graduateSessions)", () => {
   it("emits a graduate proposal for a covered playbook note recurring >= M sessions", () => {
-    const t = tally({ "payments::webhook": stat({ wing: "payments", keywords: ["webhook"], sessions: 5 }) });
+    const t = tally({ "payments::webhook": stat({ wing: "payments", keywords: ["webhook"], sessions: 8 }) });
     const notes = [note({ wing: "payments", keywords: ["webhook"], relPath: "notes/pay.md", type: "playbook" })];
     const m = buildManifest(t, notes, T, [], {});
     const grad = m.proposals.find((p) => p.action === "graduate");
@@ -156,7 +156,7 @@ describe("buildManifest — graduation rung (covered PROCEDURAL note >= graduate
   });
 
   it("does NOT graduate a covered procedural note BELOW M sessions (only covered++)", () => {
-    // promoteSessions=3 is met but graduateSessions=5 is not (sessions=4).
+    // promoteSessions=3 is met but graduateSessions=8 is not (sessions=4).
     const t = tally({ "payments::webhook": stat({ wing: "payments", keywords: ["webhook"], sessions: 4 }) });
     const notes = [note({ wing: "payments", keywords: ["webhook"], type: "playbook" })];
     const m = buildManifest(t, notes, T, [], {});
@@ -173,7 +173,7 @@ describe("buildManifest — graduation rung (covered PROCEDURAL note >= graduate
   });
 
   it("graduates a gotcha note too (the other procedural type)", () => {
-    const t = tally({ "payments::webhook": stat({ wing: "payments", keywords: ["webhook"], sessions: 6 }) });
+    const t = tally({ "payments::webhook": stat({ wing: "payments", keywords: ["webhook"], sessions: 8 }) });
     const notes = [note({ wing: "payments", keywords: ["webhook"], relPath: "notes/g.md", type: "gotcha" })];
     const grad = buildManifest(t, notes, T, [], {}).proposals.find((p) => p.action === "graduate");
     expect(grad?.target).toBe("notes/g.md");
@@ -181,8 +181,8 @@ describe("buildManifest — graduation rung (covered PROCEDURAL note >= graduate
 
   it("dedupes graduation by note relPath when multiple recurring signatures cover one note", () => {
     const t = tally({
-      "payments::webhook": stat({ wing: "payments", keywords: ["webhook"], sessions: 5 }),
-      "payments::retry": stat({ wing: "payments", keywords: ["retry"], sessions: 6 }),
+      "payments::webhook": stat({ wing: "payments", keywords: ["webhook"], sessions: 8 }),
+      "payments::retry": stat({ wing: "payments", keywords: ["retry"], sessions: 9 }),
     });
     const notes = [note({ wing: "payments", keywords: ["webhook", "retry"], relPath: "notes/pay.md", type: "playbook" })];
     const grads = buildManifest(t, notes, T, [], {}).proposals.filter((p) => p.action === "graduate");
@@ -191,7 +191,7 @@ describe("buildManifest — graduation rung (covered PROCEDURAL note >= graduate
   });
 
   it("respects the rejected buffer for a graduate proposal", () => {
-    const t = tally({ "payments::webhook": stat({ wing: "payments", keywords: ["webhook"], sessions: 5 }) });
+    const t = tally({ "payments::webhook": stat({ wing: "payments", keywords: ["webhook"], sessions: 8 }) });
     const notes = [note({ wing: "payments", keywords: ["webhook"], relPath: "notes/pay.md", type: "playbook" })];
     const rejected: Proposal[] = [{ action: "graduate", target: "notes/pay.md", payload: {}, evidence: "declined" }];
     const grads = buildManifest(t, notes, T, rejected, {}).proposals.filter((p) => p.action === "graduate");
@@ -224,6 +224,46 @@ describe("buildManifest — rejected back-off (action+target match suppresses)",
       { action: "demote", target: "::webhook", payload: {}, evidence: "declined" },
     ];
     expect(buildManifest(t, [], T, rejected, {}).proposals).toHaveLength(1);
+  });
+});
+
+describe("buildManifest — bounded promotion budget (0.0.11)", () => {
+  it("surfaces at most `promotionBudget` proposals and reports the rest as deferred", () => {
+    const sigs: Record<string, SignatureStat> = {};
+    for (const k of ["a", "b", "c", "d", "e", "f", "g", "h"]) {
+      sigs[`::${k}`] = stat({ keywords: [k], sessions: 4 });
+    }
+    const m = buildManifest(tally(sigs), [], { ...BASE_THRESHOLDS, promotionBudget: 5 }, [], {});
+    expect(m.proposals).toHaveLength(5);
+    expect(m.deferred).toBe(3);
+  });
+
+  it("ranks stronger recurrence first within the budget", () => {
+    const t = tally({
+      "::weak": stat({ keywords: ["weak"], sessions: 3 }),
+      "::strong": stat({ keywords: ["strong"], sessions: 9 }),
+      "::mid": stat({ keywords: ["mid"], sessions: 5 }),
+    });
+    const m = buildManifest(t, [], { ...BASE_THRESHOLDS, promotionBudget: 2 }, [], {});
+    expect(m.proposals.map((p) => p.target)).toEqual(["::strong", "::mid"]);
+    expect(m.deferred).toBe(1);
+  });
+
+  it("ranks the graduate rung ahead of a higher-recurrence note proposal", () => {
+    const t = tally({
+      "payments::webhook": stat({ wing: "payments", keywords: ["webhook"], sessions: 8 }),
+      "::loud": stat({ keywords: ["loud"], sessions: 50 }),
+    });
+    const notes = [note({ wing: "payments", keywords: ["webhook"], relPath: "notes/pay.md", type: "playbook" })];
+    const m = buildManifest(t, notes, { ...BASE_THRESHOLDS, promotionBudget: 1 }, [], {});
+    expect(m.proposals).toHaveLength(1);
+    expect(m.proposals[0]?.action).toBe("graduate"); // graduate wins the slot despite the note's higher count
+    expect(m.deferred).toBe(1);
+  });
+
+  it("deferred is 0 when everything eligible fits the budget", () => {
+    const t = tally({ "::x": stat({ keywords: ["x"], sessions: 4 }) });
+    expect(buildManifest(t, [], BASE_THRESHOLDS, [], {}).deferred).toBe(0);
   });
 });
 
