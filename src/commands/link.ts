@@ -150,13 +150,21 @@ export async function link(hubPathInput: string, opts: LinkOptions = {}): Promis
     existing: earlyHubMeta,
   });
 
-  // ─── create hub-side stub dir for hub-owned storage ────────────────────
+  // ─── refresh the code-repo AGENTS.md for the resulting shape ───────────
   if (storage === "hub-owned") {
+    // hub-owned = external: the hub owns this project's docs.
     await mkdir(hubProjectDocsRoot(hub, project), { recursive: true });
     logger.success(`Created empty stub: projects/${project}/`);
     // Route this code repo's agents to the hub's per-project entry (ADR-0011 §6).
     await writeAgentsMd(codeRepo, { kind: "repo", mode: "external", docsRel: "mage", hubPath: hub, project });
     logger.detail(`Wrote ${codeRepo}/AGENTS.md (external → ${hub}/_index.${project}.md)`);
+  } else {
+    // repo-owned = hybrid: the repo keeps its local docs AND registers with this
+    // hub. The AGENTS.md was written as a plain in-repo block at `mage init`; refresh
+    // it to the hybrid template so agents are told both stores exist (Decision 11A —
+    // previously the hybrid block was reachable-by-type but no caller emitted it).
+    await writeAgentsMd(codeRepo, { kind: "repo", mode: "hybrid", docsRel: "mage", hubPath: hub, project });
+    logger.detail(`Refreshed ${codeRepo}/AGENTS.md (hybrid — local KB + hub ref)`);
   }
 
   // ─── write/update code-repo-side metadata ──────────────────────────────
@@ -172,9 +180,9 @@ export async function link(hubPathInput: string, opts: LinkOptions = {}): Promis
   logger.success(`Linked code repo '${project}' to hub '${hubMeta.name}'.`);
   logger.blank();
   logger.info("Suggested commits (run yourself; mage never auto-commits):");
-  logger.detail(
-    `  git -C ${codeRepo} add mage${storage === "hub-owned" ? " AGENTS.md CLAUDE.md" : ""}`,
-  );
+  // Both shapes now refresh AGENTS.md + CLAUDE.md (external block for hub-owned, the
+  // hybrid block for repo-owned), so stage them in either case.
+  logger.detail(`  git -C ${codeRepo} add mage AGENTS.md CLAUDE.md`);
   logger.detail(`  git -C ${codeRepo} commit -m "feat: link to mage '${hubMeta.name}' (project=${project}, storage=${storage})"`);
   logger.blank();
   logger.detail(`  git -C ${hub} add metadata.json${storage === "hub-owned" ? ` projects/${project}/` : ""}`);

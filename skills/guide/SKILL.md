@@ -30,7 +30,7 @@ test -f mage/metadata.json && cat mage/metadata.json
 - **Present** → note `mode`, `project`, `hub_path`, `hub_refs`.
 
 A **hub** is a repo whose root has `projects/` + a top-level `metadata.json`;
-there the hub root itself is the knowledge base (vault).
+there the hub root itself is the knowledge base.
 
 ## B. Path resolution — where the knowledge base lives
 
