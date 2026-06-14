@@ -1,5 +1,5 @@
 import { access, readFile, stat, writeFile } from "node:fs/promises";
-import { dirname, isAbsolute, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 // ─── path constants ──────────────────────────────────────────────────────
 /** The knowledge-base (KB) dir nested in a code repo (in-repo and hybrid modes). */
@@ -318,14 +318,16 @@ export interface ResolvedDocsRoot {
  *              (`<hub_path>/projects/<project>/`), so captures/grooming land in the
  *              hub, not the code repo. Reported as kind "hub" (a hub-owned project
  *              is a flat docs root living inside the hub's repo); `repo` is the hub.
- *  - hub:      `startDir` itself looks like a hub → the hub root. Reported as kind "hub".
+ *  - hub:      `startDir` is a hub root, or sits inside one. Inside a hub-owned
+ *              project dir (`<hub>/projects/<name>/…`) → that project's flat docs
+ *              root; the hub root or elsewhere under it → the hub root. Kind "hub".
  * Returns null if none is found. A malformed/unreadable metadata degrades to the
  * repo KB root (never throws — this is on the capture hot path).
  */
 export async function resolveDocsRoot(startDir: string): Promise<ResolvedDocsRoot | null> {
   const abs = absolutePath(startDir);
 
-  // Walk up looking for a code-repo `mage/metadata.json`.
+  // Walk up looking for a code-repo `mage/metadata.json` (in-repo/hybrid/external).
   let dir = abs;
   for (;;) {
     if (await exists(join(dir, META_DIR, META_FILE))) {
@@ -338,12 +340,38 @@ export async function resolveDocsRoot(startDir: string): Promise<ResolvedDocsRoo
     dir = parent;
   }
 
-  // Otherwise, is the start dir itself a hub?
-  if (await looksLikeHub(abs)) {
-    return { root: abs, kind: "hub", repo: abs };
+  // Otherwise, walk up looking for a hub root. `startDir` may BE the hub, or sit
+  // INSIDE it — most importantly inside a hub-owned project dir
+  // (`<hub>/projects/<name>/`), a flat docs root the hub owns but which carries no
+  // metadata.json of its own. Resolving it is what lets `mage <engine> --dir
+  // <hub>/projects/<name>/` (the Decision 1 groom fan-out) reach the project's
+  // own `.learnings/` even when its member code repo is absent on this machine.
+  dir = abs;
+  for (;;) {
+    if (await looksLikeHub(dir)) return hubDocsRoot(dir, abs);
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
   }
 
   return null;
+}
+
+/**
+ * Resolve a docs root given that `hub` is a hub root and `abs` is at or below it.
+ * Inside `<hub>/projects/<name>/…` → that project's flat docs root; the hub root
+ * itself or anywhere else under it → the hub root. Always kind "hub" (the hub repo
+ * owns the files).
+ */
+function hubDocsRoot(hub: string, abs: string): ResolvedDocsRoot {
+  const rel = relative(hub, abs);
+  if (rel && !rel.startsWith("..") && !isAbsolute(rel)) {
+    const [top, name] = rel.split(sep);
+    if (top === PROJECTS_DIR && name) {
+      return { root: hubProjectDocsRoot(hub, name), kind: "hub", repo: hub };
+    }
+  }
+  return { root: hub, kind: "hub", repo: hub };
 }
 
 /**
