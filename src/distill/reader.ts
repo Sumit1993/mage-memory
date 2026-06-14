@@ -1,7 +1,7 @@
 // The distill reader (ADR-0018 §3–§5). Deterministic — NO model, NO judgment.
 // It reads mage's OWN `.learnings/*.jsonl` (ADR-0015 schema), groups the
 // un-distilled CLOSED events into candidate clusters, attaches salient signals
-// across the four ADR-0018 §4 lenses, and emits a manifest the `mage:distill`
+// across the four ADR-0018 §4 lenses, and emits a manifest the `mage:groom`
 // skill reasons over. The semantic clustering (split/merge) is the SKILL's job;
 // this chops mechanically at compact/session boundaries (the natural chapters,
 // already the closed-window unit the metrics fold uses).

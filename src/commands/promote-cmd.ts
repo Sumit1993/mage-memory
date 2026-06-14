@@ -7,7 +7,7 @@
 //                             DISTINCT sessions), persist the derived tally (like the
 //                             rollup Stop-fold), then build the manifest of fresh
 //                             note-candidates (>= K sessions, no covering note, not
-//                             rejected). --json emits the manifest the `mage:promote`
+//                             rejected). --json emits the manifest the `mage:groom`
 //                             skill drafts notes from; else a human summary.
 //   mage promote --seen S:N → Disposition a batch: advance session S's tally offset to
 //                             N (never-regress) and persist. Marks the proposals the
@@ -193,6 +193,6 @@ function reportHuman(manifest: PromoteManifest): void {
   }
   logger.blank();
   logger.step(
-    "Plumbing engine (you don't normally run this): the `mage:promote` skill turns these candidates into notes, then `mage promote --seen <session>:<offset>` commits.",
+    "Plumbing engine (you don't normally run this): mage:groom (Phase 2) turns these candidates into notes, then `mage promote --seen <session>:<offset>` commits.",
   );
 }

@@ -1,5 +1,5 @@
 import { Command, Option } from "commander";
-import { connect } from "./commands/connect.js";
+import { connect, connectAllProjects } from "./commands/connect.js";
 import { dashboard } from "./commands/dashboard-cmd.js";
 import { OPEN_WITH_TARGETS } from "./dashboard/html.js";
 import { disconnect } from "./commands/disconnect.js";
@@ -177,7 +177,7 @@ program
 program
   .command("distill", { hidden: true })
   .description(
-    "Read observed .learnings into note candidates (plumbing behind the mage:distill skill)",
+    "Read observed .learnings into note candidates (plumbing behind mage:groom Phase 1)",
   )
   .option(
     "-d, --dir <path>",
@@ -196,7 +196,7 @@ program
 program
   .command("promote", { hidden: true })
   .description(
-    "Fold observed .learnings into recurring note candidates (plumbing behind the mage:promote skill)",
+    "Fold observed .learnings into recurring note candidates (plumbing behind mage:groom Phase 2)",
   )
   .option(
     "-d, --dir <path>",
@@ -387,10 +387,15 @@ program
     "Wire mage capture hooks into this repo's Claude Code settings (.claude/settings.local.json; personal + gitignored)",
   )
   .option("--user", "target the personal ~/.claude/settings.json instead of the repo-local file")
+  .option("--all-projects", "from a hub: wire every registered project's code repo (repo-local each)")
   .option("--no-git-hook", "skip installing the redaction pre-commit hook")
   .option("-y, --yes", "non-interactive: skip the confirmation prompt")
   .action(async (opts) => {
-    await connect({ user: opts.user, yes: opts.yes, gitHook: opts.gitHook });
+    if (opts.allProjects) {
+      await connectAllProjects({ yes: opts.yes, gitHook: opts.gitHook });
+    } else {
+      await connect({ user: opts.user, yes: opts.yes, gitHook: opts.gitHook });
+    }
   });
 
 // ─── disconnect ───────────────────────────────────────────────────────────

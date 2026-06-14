@@ -9,13 +9,13 @@
     {
       "name": "mage",
       "source": "./",
-      "description": "mage skills: mage:learn (capture durable notes) + the self-grooming loop mage:distill / mage:promote / mage:graduate / mage:optimize + mage:guide (how to use the knowledge base).",
-      "version": "0.0.8",
+      "description": "mage skills: mage:learn (capture durable notes) + the self-grooming loop mage:groom / mage:graduate / mage:optimize + mage:guide (how to use the knowledge base).",
+      "version": "0.0.10",
       "author": { "name": "Sumit Patel" },
       "homepage": "https://github.com/Sumit1993/mage-memory",
       "repository": "https://github.com/Sumit1993/mage-memory",
       "license": "MIT",
-      "keywords": ["knowledge-base", "memory", "obsidian", "ai-agents", "notes", "specs"],
+      "keywords": ["knowledge-base", "memory", "obsidian", "ai-agents", "notes"],
       "category": "workflow",
       "strict": false
     }

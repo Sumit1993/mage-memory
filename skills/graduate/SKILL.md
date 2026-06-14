@@ -3,7 +3,7 @@ name: graduate
 description: |
   Push a proven procedural note up into its own auto-loadable Procedure skill.
   Fires when the user says "graduate", "make this a skill", or when
-  `mage:promote` surfaces a proven note that recurred across enough sessions.
+  `mage:groom` surfaces a proven note that recurred across enough sessions.
   Reads the deterministic recurrence reader (`mage promote --json`) for
   `action: "graduate"` proposals, shows the human the backing note plus the
   recurrence evidence, and on confirm pipes the graduate Proposal JSON to
@@ -36,7 +36,7 @@ write through the single applier.
 
 1. **Resolve the knowledge base.** Find the nearest `mage/metadata.json` (walk
    up). docs root = `<repo>/mage/` (in-repo) or
-   `<hub_path>/projects/<project>/mage/` (external). If none, tell the user to run
+   `<hub_path>/projects/<project>/` (external). If none, tell the user to run
    `mage init` first — there is nothing to graduate.
 
 2. **Run the deterministic recurrence reader.**
@@ -44,7 +44,7 @@ write through the single applier.
    mage promote --json
    ```
    It emits a `PromoteManifest`. Look only at the `action: "graduate"` proposals
-   here (`mage:promote` handles the `action: "note"` catch-net):
+   here (`mage:groom`'s Phase 2 handles the `action: "note"` catch-net):
    ```jsonc
    {
      "action": "graduate",
@@ -101,7 +101,7 @@ write through the single applier.
 
 ## Worked example — a proven gotcha graduates
 
-`mage:promote` surfaced, and you ran `mage promote --json`, which returned:
+`mage:groom` surfaced, and you ran `mage promote --json`, which returned:
 
 ```jsonc
 {
@@ -160,7 +160,7 @@ stay a note.
 
 ## See also
 
-- **mage:promote** (`skills/promote/SKILL.md`) — surfaces the `action: "graduate"`
+- **mage:groom** (`skills/groom/SKILL.md`) — surfaces the `action: "graduate"`
   proposals this skill applies (and the `action: "note"` catch-net it does not).
 - **mage:optimize** (`skills/optimize/SKILL.md`) — the post-graduation half:
   reword a mis-firing trigger, or **demote** a skill that stops earning its keep

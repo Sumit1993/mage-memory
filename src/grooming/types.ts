@@ -73,7 +73,7 @@ export interface Proposal {
   evidence: string;
 }
 
-/** The manifest `mage promote --json` emits for the `mage:promote` / `mage:graduate` skills. */
+/** The manifest `mage promote --json` emits for the `mage:groom` / `mage:graduate` skills. */
 export interface PromoteManifest {
   /**
    * Both ladder rungs (ADR-0019 §4): `"note"` proposals (signature ≥ K sessions, no

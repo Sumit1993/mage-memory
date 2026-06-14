@@ -60,6 +60,42 @@ describe("paths", () => {
     expect((await resolveDocsRoot(dir))?.kind).toBe("hub");
   });
 
+  it("resolveDocsRoot resolves a hub-owned project dir directly (groom fan-out, Decision 1)", async () => {
+    // A hub-owned project (`<hub>/projects/<name>/`) is a flat docs root with NO
+    // metadata.json of its own. Pointing the engine at it (e.g. `distill --dir
+    // <hub>/projects/engine`) must resolve to that project so the fan-out can groom
+    // its `.learnings/` even when the member code repo is absent on this machine.
+    const hub = await mkdtemp(join(tmpdir(), "mage-projhub-"));
+    made.push(hub);
+    await mkdir(join(hub, "projects", "engine", "notes"), { recursive: true });
+    await writeFile(
+      join(hub, "metadata.json"),
+      JSON.stringify({ schema: METADATA_SCHEMA, name: "h", created_at: "", projects: [] }),
+    );
+    const proj = hubProjectDocsRoot(hub, "engine");
+    // From the project root AND a deep subdir, resolve to the project (kind hub, repo = hub).
+    for (const start of [proj, join(proj, "notes")]) {
+      const r = await resolveDocsRoot(start);
+      expect(r?.root).toBe(proj);
+      expect(r?.kind).toBe("hub");
+      expect(r?.repo).toBe(hub);
+    }
+  });
+
+  it("resolveDocsRoot resolves a non-project dir inside a hub to the hub root", async () => {
+    const hub = await mkdtemp(join(tmpdir(), "mage-inhub-"));
+    made.push(hub);
+    await mkdir(join(hub, "projects"), { recursive: true });
+    await mkdir(join(hub, "notes", "deep"), { recursive: true });
+    await writeFile(
+      join(hub, "metadata.json"),
+      JSON.stringify({ schema: METADATA_SCHEMA, name: "h", created_at: "", projects: [] }),
+    );
+    const r = await resolveDocsRoot(join(hub, "notes", "deep"));
+    expect(r?.root).toBe(hub);
+    expect(r?.kind).toBe("hub");
+  });
+
   it("resolveDocsRoot follows an external code repo to its hub project (capture routing)", async () => {
     // A hub that owns the project's notes.
     const hub = await mkdtemp(join(tmpdir(), "mage-exthub-"));

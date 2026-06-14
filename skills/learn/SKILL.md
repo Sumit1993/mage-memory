@@ -30,7 +30,7 @@ to avoid), and **pointers** to canonical sources — never a copy of the source
 
 1. **Resolve the knowledge base.** Find the nearest `mage/metadata.json`
    (walk up). docs root = `<repo>/mage/` (in-repo) or
-   `<hub_path>/projects/<project>/mage/` (external). If none, tell the user to
+   `<hub_path>/projects/<project>/` (external). If none, tell the user to
    run `mage init` first.
 
 2. **Classify the finding.** Pick a `type` (open vocab — see `CONVENTIONS.md`):
@@ -126,7 +126,7 @@ adopting an authored skill is *remembering*, not copying a source (ADR-0013 §5)
 
 > **Observed scratch is a different lane.** `--from` imports *foreign* docs by
 > pointer. Distilling mage's **own** observed `.learnings/*.jsonl` into notes
-> lives in the separate **mage:distill** skill — mage reads only its own
+> lives in the separate **mage:groom** skill — mage reads only its own
 > artifacts; foreign memory stores (ECC instincts, Claude `MEMORY.md`) are not
 > harvested (ADR-0018).
 

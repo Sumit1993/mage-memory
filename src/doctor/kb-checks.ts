@@ -21,9 +21,12 @@ import { ensureGitignored } from "../gitignore.js";
 import {
   INDEX_FILE,
   LEARNINGS_DIR,
+  META_DIR,
+  META_FILE,
   METADATA_SCHEMA,
   METRICS_DIR,
   exists,
+  looksLikeHub,
   readHubMetadata,
   readMetadata,
   type resolveDocsRoot,
@@ -44,12 +47,7 @@ export async function pushKbChecks(
   opts: DoctorOptions,
 ): Promise<void> {
   if (!kb) {
-    checks.push({
-      name: "mage KB",
-      ok: true,
-      detail: "No mage KB here — run `mage init` to create one (env checks above still apply)",
-      optional: true,
-    });
+    await pushNoKbCheck(checks, opts);
     return;
   }
 
@@ -66,6 +64,114 @@ export async function pushKbChecks(
   // metadata schema drift (advisory; --fix migrates in place). Both fail-open.
   await pushRedactHookCheck(checks, kb, conn.diff.connected);
   await pushSchemaDriftCheck(checks, kb, opts);
+  // Hub-aware: a per-project liveness rollup when run AT a hub (Decision 11B).
+  if (kb.kind === "hub") await pushHubProjectsCheck(checks, kb.repo);
+}
+
+/**
+ * The no-KB case, with bare-parent detection (Decision 1). `resolveDocsRoot` walks
+ * UP only, so when it finds nothing we ALSO peek one level DOWN: if the cwd sits
+ * directly above one or more mage KBs/hubs but is itself neither, it is a "bare
+ * parent" — capture binds to the session's cwd and never down-scans, so a session
+ * started here captures into nothing. Warn loudly (no down-scan magic — we never
+ * treat the children as the KB). Otherwise, the benign "no KB here" note.
+ */
+async function pushNoKbCheck(checks: DoctorCheck[], opts: DoctorOptions): Promise<void> {
+  const cwd = opts.cwd ?? process.cwd();
+  const children = await childKbCount(cwd);
+  if (children > 0) {
+    checks.push({
+      name: "mage KB",
+      ok: false,
+      // Advisory severity, LOUD message: a parent-dir invocation may be intentional,
+      // but the capture-binds-to-nothing gotcha must be impossible to miss.
+      optional: true,
+      detail:
+        `BARE PARENT — this dir sits directly above ${children} mage KB(s)/hub(s) but is itself ` +
+        "neither. mage binds capture to the session's cwd and only walks UP, so a session started " +
+        "HERE captures into nothing. `cd` into a project, or run `mage init --hub` to make this a hub.",
+    });
+    return;
+  }
+  checks.push({
+    name: "mage KB",
+    ok: true,
+    detail: "No mage KB here — run `mage init` to create one (env checks above still apply)",
+    optional: true,
+  });
+}
+
+/**
+ * Count the immediate children of `dir` that are a mage KB (`<child>/mage/metadata.json`)
+ * or a hub (`looksLikeHub`). Bounded to one level (immediate children) — this is a
+ * "is cwd a bare parent" probe, NOT a recursive discovery scan. Fail-open to 0 so
+ * doctor never throws on an unreadable dir.
+ */
+async function childKbCount(dir: string): Promise<number> {
+  let entries: string[];
+  try {
+    entries = await readdir(dir);
+  } catch {
+    return 0;
+  }
+  let count = 0;
+  for (const name of entries) {
+    if (name.startsWith(".") || name === META_DIR) continue; // skip hidden + this dir's own mage/
+    const child = join(dir, name);
+    if ((await exists(join(child, META_DIR, META_FILE))) || (await looksLikeHub(child))) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+/**
+ * Per-project liveness rollup for a hub (Decision 11B). For each registered project:
+ * is its code repo present on THIS machine, and is capture wired there
+ * (`<code_repo>/.claude/settings.local.json` carrying mage hooks)? Advisory — a code
+ * repo may simply not be cloned here, and an unconnected project is a nudge, not a
+ * hub failure. Reads each project's settings once; never throws.
+ */
+async function pushHubProjectsCheck(checks: DoctorCheck[], hub: string): Promise<void> {
+  const meta = await readHubMetadata(hub).catch(() => null);
+  const projects = meta?.projects ?? [];
+  if (projects.length === 0) {
+    checks.push({
+      name: "hub projects",
+      ok: true,
+      optional: true,
+      detail: "no projects registered yet — `mage link <hub>` from each code repo",
+    });
+    return;
+  }
+
+  let present = 0;
+  let connected = 0;
+  const issues: string[] = [];
+  for (const p of projects) {
+    if (!p.code_repo_path || !(await exists(p.code_repo_path))) {
+      issues.push(`${p.name} (code repo absent here)`);
+      continue;
+    }
+    present += 1;
+    const read = await readClaudeSettings(resolveSettingsTarget({ cwd: p.code_repo_path }).path);
+    if (diffMageHooks(read.settings).connected) {
+      connected += 1;
+    } else {
+      issues.push(`${p.name} (not connected)`);
+    }
+  }
+
+  const summary = `${projects.length} registered · ${present} present · ${connected} connected`;
+  const ok = issues.length === 0;
+  checks.push({
+    name: "hub projects",
+    ok,
+    optional: true,
+    detail: ok
+      ? summary
+      : `${summary} — ${issues.join("; ")} (run \`mage connect --all-projects\` from the hub)`,
+  });
 }
 
 /**

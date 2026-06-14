@@ -50,7 +50,7 @@ describe("mage link", () => {
     expect(await exists(join(code, ".git"))).toBe(false);
   });
 
-  it("in-repo (hybrid) link: no external block, no projects/<name>/ dir", async () => {
+  it("repo-owned (hybrid) link: AGENTS.md refreshed to the hybrid block, no projects/<name>/ dir", async () => {
     const hub = await makeHub();
     const code = await emptyRepo();
     await init({ mode: "in-repo", yes: true, codeRepo: code, project: "web" });
@@ -59,8 +59,9 @@ describe("mage link", () => {
     expect(r.storage).toBe("repo-owned");
     expect(await exists(join(hub, "projects", "web"))).toBe(false);
     const agents = await readFile(join(code, "AGENTS.md"), "utf8");
-    expect(agents).toContain("knowledge base at `mage/`"); // in-repo block kept
-    expect(agents).not.toContain("_index.web.md"); // not overwritten with external block
+    expect(agents).toContain("knowledge base at `mage/`"); // local KB retained
+    expect(agents).toContain("also registered with one or more external hubs"); // hybrid wording (Dec 11A)
+    expect(agents).not.toContain("_index.web.md"); // not the external block
     const meta = await readHubMetadata(hub);
     expect(meta?.projects.find((p) => p.name === "web")?.storage).toBe("repo-owned");
     // Linking a local KB to a hub makes its mode explicitly hybrid (v2).

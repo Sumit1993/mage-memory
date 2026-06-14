@@ -387,7 +387,7 @@ TODO — naming, wings in use, voice.
 
 /**
  * Point the user at mage's skills, which ship as a Claude Code plugin (the
- * `mage:` namespace keeps names clean — `mage:learn`, `mage:distill`, …). Install
+ * `mage:` namespace keeps names clean — `mage:learn`, `mage:groom`, …). Install
  * is user-driven; mage never runs the slash commands for you.
  */
 function printPluginSkillsHint(): void {
