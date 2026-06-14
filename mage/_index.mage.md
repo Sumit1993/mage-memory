@@ -2,7 +2,7 @@
 
 # mage
 
-> 33 notes. Part of the [index](INDEX.md).
+> 34 notes. Part of the [index](INDEX.md).
 
 ### capture
 
@@ -36,6 +36,7 @@
 - `decision` [0020 — the dashboard: a per-KB, no-server generated view (Option D)](decisions/0020-no-server-tiered-dashboards.md) — 0020, dashboard, per, server, generated, view, option, decision, considered, rejected, relations, mage _(reviewed 2026-06-09)_
 - `decision` [0021 — mage stays offline: no phone-home telemetry; signal is local + voluntarily shared](decisions/0021-offline-no-telemetry-local-signal.md) — 0021, mage, stays, offline, phone, home, telemetry, signal, local, voluntarily, shared, decision _(reviewed 2026-06-09)_
 - `decision` [0022 — Remove the spec-kit-derived SDD skills](decisions/0022-remove-sdd-skills.md) — 0022, remove, spec, kit, derived, sdd, skills, decision, consequences, relations, mage, decisions _(reviewed 2026-06-13)_
+- `decision` [0023 — A hub keeps its own notes AND flat per-project subdirs (ratification)](decisions/0023-hub-own-notes-and-flat-projects.md) — 0023, hub, keeps, own, notes, flat, per, project, subdirs, ratification, scope, separation _(reviewed 2026-06-14)_
 
 ### design
 
