@@ -773,3 +773,78 @@ describe("doctor — metadata schema drift", () => {
     );
   });
 });
+
+// ─── bare-parent warning + hub liveness rollup (Decisions 1 + 11B) ────────────
+
+describe("doctor — bare-parent + hub liveness", () => {
+  let home: string;
+  let origHome: string | undefined;
+  beforeEach(async () => {
+    home = await freshDir("mage-home-");
+    origHome = process.env.HOME;
+    process.env.HOME = home;
+  });
+  afterEach(() => {
+    if (origHome === undefined) delete process.env.HOME;
+    else process.env.HOME = origHome;
+  });
+
+  it("a dir directly above a mage KB warns loudly (BARE PARENT)", async () => {
+    const parent = await freshDir();
+    const child = join(parent, "proj");
+    await mkdir(child, { recursive: true });
+    await makeInRepoKb(child, { gitignoreSinks: true });
+    const r = await doctor({ cwd: parent });
+    const kb = check(r.checks, "mage KB");
+    expect(kb?.ok).toBe(false);
+    expect(kb?.optional).toBe(true); // loud, but a parent invocation may be intentional
+    expect(kb?.detail).toMatch(/BARE PARENT/);
+    expect(kb?.detail).toMatch(/captures into nothing/);
+  });
+
+  it("a plain empty dir (no child KBs) keeps the benign no-KB note", async () => {
+    const dir = await freshDir();
+    const r = await doctor({ cwd: dir });
+    const kb = check(r.checks, "mage KB");
+    expect(kb?.ok).toBe(true);
+    expect(kb?.detail).toMatch(/No mage KB here/);
+  });
+
+  it("at a hub, rolls up per-project liveness (present + connected, flags the rest)", async () => {
+    const hub = await freshDir();
+    await mkdir(join(hub, "projects"), { recursive: true });
+    // alpha: present + connected (mage hooks wired in its local settings)
+    const alpha = await freshDir();
+    await mkdir(join(alpha, ".claude"), { recursive: true });
+    await writeFile(
+      join(alpha, ".claude", "settings.local.json"),
+      `${JSON.stringify(upsertMageHooks(null), null, 2)}\n`,
+    );
+    const meta = {
+      schema: METADATA_SCHEMA,
+      name: "h",
+      created_at: "",
+      projects: [
+        { name: "alpha", storage: "hub-owned", code_repo_path: alpha, code_repo_url: "" },
+        { name: "ghost", storage: "hub-owned", code_repo_path: "/no/such/repo", code_repo_url: "" },
+      ],
+    };
+    await writeFile(join(hub, "metadata.json"), `${JSON.stringify(meta, null, 2)}\n`);
+
+    const r = await doctor({ cwd: hub });
+    const hp = check(r.checks, "hub projects");
+    expect(hp).toBeDefined();
+    expect(hp?.optional).toBe(true);
+    expect(hp?.detail).toMatch(/2 registered/);
+    expect(hp?.detail).toMatch(/1 present/);
+    expect(hp?.detail).toMatch(/1 connected/);
+    expect(hp?.detail).toMatch(/ghost/);
+  });
+
+  it("an in-repo KB (not a hub) gets NO hub-projects check", async () => {
+    const dir = await freshDir();
+    await makeInRepoKb(dir, { gitignoreSinks: true });
+    const r = await doctor({ cwd: dir });
+    expect(check(r.checks, "hub projects")).toBeUndefined();
+  });
+});

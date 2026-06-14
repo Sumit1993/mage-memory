@@ -5,6 +5,8 @@ import {
   codeRepoDocsRoot,
   exists,
   hubProjectDocsRoot,
+  looksLikeHub,
+  readHubMetadata,
   readMetadata,
 } from "../paths.js";
 
@@ -35,7 +37,12 @@ export interface StatusResult {
 export async function status(opts: StatusOptions): Promise<StatusResult> {
   const result: StatusResult = { passed: true, repos: [] };
 
-  for (const repoInput of opts.codeRepos) {
+  // Hub-aware (Decision 11B): an argument that is a HUB expands to its registered
+  // project code repos, so `mage status <hub>` rolls up the whole fleet's liveness
+  // instead of (wrongly) treating the hub root as a code repo.
+  const repos = await expandHubs(opts.codeRepos);
+
+  for (const repoInput of repos) {
     const repo = absolutePath(repoInput);
     const rs = await statusOne(repo);
     result.repos.push(rs);
@@ -57,6 +64,34 @@ export async function status(opts: StatusOptions): Promise<StatusResult> {
   if (result.passed) logger.success("All repos OK.");
   else logger.error("Some repos have issues.");
   return result;
+}
+
+/**
+ * Expand any hub argument to its registered project code repos (Decision 11B). A
+ * non-hub argument passes through unchanged. A hub with no projects (or unreadable
+ * metadata) contributes nothing but a warning — `status` then has nothing to check
+ * for it, which is the honest signal. Order is preserved; non-hub args first-class.
+ */
+async function expandHubs(inputs: string[]): Promise<string[]> {
+  const out: string[] = [];
+  for (const input of inputs) {
+    const abs = absolutePath(input);
+    if (!(await looksLikeHub(abs))) {
+      out.push(abs);
+      continue;
+    }
+    const meta = await readHubMetadata(abs).catch(() => null);
+    const projects = meta?.projects ?? [];
+    if (projects.length === 0) {
+      logger.warn(`Hub ${abs} has no registered projects — nothing to check.`);
+      continue;
+    }
+    logger.info(`Hub ${abs}: checking ${projects.length} registered project(s).`);
+    for (const p of projects) {
+      if (p.code_repo_path) out.push(p.code_repo_path);
+    }
+  }
+  return out;
 }
 
 async function statusOne(repo: string): Promise<RepoStatus> {
