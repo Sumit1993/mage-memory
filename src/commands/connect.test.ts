@@ -4,7 +4,8 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { gitInit } from "../git.js";
 import { REDACT_HOOK_MARKER, resolveHooksDir } from "../git-hooks.js";
-import { connect } from "./connect.js";
+import { METADATA_SCHEMA } from "../paths.js";
+import { connect, connectAllProjects } from "./connect.js";
 
 const made: string[] = [];
 afterEach(async () => {
@@ -297,5 +298,66 @@ describe("connect", () => {
 
     // No .gitignore created for the capture sinks.
     expect(await exists(join(dir, ".gitignore"))).toBe(false);
+  });
+});
+
+describe("connect --all-projects (Decision 11C)", () => {
+  async function makeHubWithProjects(
+    projects: Array<{ name: string; code_repo_path: string }>,
+  ): Promise<string> {
+    const hub = await freshDir();
+    await mkdir(join(hub, "projects"), { recursive: true });
+    const meta = {
+      schema: METADATA_SCHEMA,
+      name: "h",
+      created_at: "",
+      projects: projects.map((p) => ({
+        name: p.name,
+        storage: "hub-owned",
+        code_repo_path: p.code_repo_path,
+        code_repo_url: "",
+      })),
+    };
+    await writeFile(join(hub, "metadata.json"), `${JSON.stringify(meta, null, 2)}\n`);
+    return hub;
+  }
+
+  it("wires every registered project's code repo (repo-local each)", async () => {
+    const a = await freshDir();
+    const b = await freshDir();
+    const hub = await makeHubWithProjects([
+      { name: "alpha", code_repo_path: a },
+      { name: "beta", code_repo_path: b },
+    ]);
+    const r = await connectAllProjects({ cwd: hub, yes: true, gitHook: false });
+    expect(r.wired).toBe(2);
+    expect(await exists(localPath(a))).toBe(true);
+    expect(await exists(localPath(b))).toBe(true);
+  });
+
+  it("skips a project whose code repo is absent here, wires the rest", async () => {
+    const a = await freshDir();
+    const hub = await makeHubWithProjects([
+      { name: "alpha", code_repo_path: a },
+      { name: "ghost", code_repo_path: "/no/such/repo/here" },
+    ]);
+    const r = await connectAllProjects({ cwd: hub, yes: true, gitHook: false });
+    expect(r.wired).toBe(1);
+    expect(r.projects.find((p) => p.project === "ghost")?.skipped).toMatch(/not present/);
+    expect(await exists(localPath(a))).toBe(true);
+  });
+
+  it("a hub with no projects wires nothing (no throw)", async () => {
+    const hub = await makeHubWithProjects([]);
+    const r = await connectAllProjects({ cwd: hub, yes: true, gitHook: false });
+    expect(r.wired).toBe(0);
+    expect(r.projects).toEqual([]);
+  });
+
+  it("throws when not run from a hub", async () => {
+    const notHub = await freshDir();
+    await expect(connectAllProjects({ cwd: notHub, yes: true })).rejects.toThrow(
+      /must run from a mage hub/,
+    );
   });
 });
