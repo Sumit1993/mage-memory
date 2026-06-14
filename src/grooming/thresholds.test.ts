@@ -70,6 +70,7 @@ describe("BASE_THRESHOLDS — finalizes the provisional 0.0.6 numbers", () => {
     expect(BASE_THRESHOLDS.graduateSessions).toBe(5);
     expect(BASE_THRESHOLDS.noteSizeCap).toBe(6000);
     expect(BASE_THRESHOLDS.editBudget).toBe(3);
+    expect(BASE_THRESHOLDS.promotionBudget).toBe(5);
   });
 
   it("reuses context-match.ts's rate-floors (never forks the numbers)", () => {

@@ -2,7 +2,7 @@
 
 # mage
 
-> 34 notes. Part of the [index](INDEX.md).
+> 35 notes. Part of the [index](INDEX.md).
 
 ### capture
 
@@ -41,6 +41,10 @@
 ### design
 
 - `reference` [mage — context & glossary](notes/context.md) — knowledge-base, note, wing, room, index, tag, moc, skill, work-unit, artifact, note-types, glossary _(reviewed 2026-06-09)_
+
+### grooming
+
+- `plan` [0.0.11 — "signal quality + autonomous capture"](notes/plan-0.0.11-signal-and-capture.md) — signal, quality, autonomous, capture, candidate, blocker, count, compact, chapters, session, ids, serves _(reviewed 2026-06-14)_
 
 ### plan
 

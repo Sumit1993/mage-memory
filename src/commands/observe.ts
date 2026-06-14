@@ -181,6 +181,10 @@ async function mapEvent(
  * BOTH `PostToolUse` (success) and `PostToolUseFailure` (Claude Code's dedicated
  * tool-failure hook, carrying a top-level `error` string) map to a tool event —
  * dropping the failure hook would discard the highest-value gotcha signal.
+ * BOTH `Stop` (the main agent's final reply) and `SubagentStop` (an autonomous Task
+ * subagent's final reply, 0.0.11 Candidate 4) map to assistant_msg: a subagent's
+ * tool calls never reach the main-session `PostToolUse` hook, so its `transcript_path`
+ * (the subagent transcript) is the one capture seam for autonomous work.
  */
 function inferType(payload: Record<string, unknown>): ObserveEventType | null {
   const hook = str(payload.hook_event_name);
@@ -190,6 +194,7 @@ function inferType(payload: Record<string, unknown>): ObserveEventType | null {
     case "UserPromptSubmit":
       return "user_prompt";
     case "Stop":
+    case "SubagentStop":
       return "assistant_msg";
     case "PreCompact":
       return "compact";
@@ -209,11 +214,13 @@ function buildUserPromptEvent(payload: Record<string, unknown>, base: EventBase)
 }
 
 /**
- * Stop → assistant_msg (ADR-0019 amendment). The Stop hook payload carries no
- * reply text inline, only a `transcript_path`; read the LAST assistant message
- * from that `.jsonl`. Fail-open at every gap: a missing/garbage `transcript_path`
- * or a transcript with no assistant text → null (nothing written), so a bare Stop
- * never parks an empty line. Scrub BEFORE truncate (the scrub-then-cap invariant).
+ * Stop / SubagentStop → assistant_msg (ADR-0019 amendment; SubagentStop is the 0.0.11
+ * Candidate 4 capture seam for autonomous subagent work). Neither hook payload carries
+ * reply text inline, only a `transcript_path` — Stop's is the main transcript,
+ * SubagentStop's is the subagent transcript; either way read the LAST assistant message
+ * from that `.jsonl`. Fail-open at every gap: a missing/garbage `transcript_path` or a
+ * transcript with no assistant text → null (nothing written), so a bare Stop never parks
+ * an empty line. Scrub BEFORE truncate (the scrub-then-cap invariant).
  */
 async function buildAssistantMsgEvent(
   payload: Record<string, unknown>,

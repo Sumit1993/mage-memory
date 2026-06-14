@@ -15,8 +15,11 @@
 // demote actions are NOT emitted here — merge/split are judgment-constructed by the skill,
 // reword/demote come from `mage skills --metrics` (context-match), not the recurrence tally.
 //
-// Proposals are emitted in a STABLE order (action asc, then target asc) so the manifest is
-// deterministic across runs — the skill and any snapshot test see the same sequence.
+// Eligible proposals are RANKED strongest-first (graduate rung, then recurrence, lens
+// diversity, recency, target asc) and only the top `promotionBudget` are surfaced — a
+// bounded, deterministic stage (0.0.11): a flood of eligible signatures (which the finer
+// compact-chapter unit can produce) never buries the strongest, and the rest are reported
+// as `deferred` for the next pass.
 
 import { coveringNote } from "./covering-note.js";
 import { isRejected } from "./proposals.js";
@@ -67,6 +70,40 @@ function isProcedural(type: string): boolean {
   return type === "playbook" || type === "gotcha";
 }
 
+// ─── the bounded promotion budget (0.0.11) — rank strongest-first, surface top-N ─────
+
+/** An eligible proposal with the stat + rung it was scored from (pre-budget ranking). */
+interface RankedProposal {
+  proposal: Proposal;
+  stat: SignatureStat;
+  rung: "graduate" | "note";
+}
+
+/** Count of distinct lenses a signature fired under (more lenses = more robust signal). */
+function lensDiversity(s: SignatureStat): number {
+  const l = s.lenses;
+  return (
+    (l.correction > 0 ? 1 : 0) +
+    (l.failure > 0 ? 1 : 0) +
+    (l.workflow > 0 ? 1 : 0) +
+    (l.preference > 0 ? 1 : 0)
+  );
+}
+
+/**
+ * Strength comparator for the promotion budget. Graduate rung first (a proven note → skill
+ * is the higher-consequence, 0.1.0-gating move), then more recurrence, more lens diversity,
+ * more recent, then target asc — a TOTAL, deterministic order so the budget is stable.
+ */
+function rankProposals(a: RankedProposal, b: RankedProposal): number {
+  if (a.rung !== b.rung) return a.rung === "graduate" ? -1 : 1;
+  if (a.stat.sessions !== b.stat.sessions) return b.stat.sessions - a.stat.sessions;
+  const dl = lensDiversity(b.stat) - lensDiversity(a.stat);
+  if (dl !== 0) return dl;
+  if (a.stat.lastSeen !== b.stat.lastSeen) return a.stat.lastSeen < b.stat.lastSeen ? 1 : -1;
+  return a.proposal.target < b.proposal.target ? -1 : a.proposal.target > b.proposal.target ? 1 : 0;
+}
+
 // ─── buildManifest — both ladder rungs ──────────────────────────────────────────
 
 /**
@@ -83,7 +120,7 @@ export function buildManifest(
   rejected: Proposal[],
   cursors: Record<string, number>,
 ): PromoteManifest {
-  const proposals: Proposal[] = [];
+  const eligible: RankedProposal[] = []; // every proposal that passed its gate, pre-budget.
   const graduateTargets = new Set<string>(); // note relPaths already proposed (dedupe).
   let covered = 0;
 
@@ -105,7 +142,7 @@ export function buildManifest(
       ) {
         const gp = graduateProposalFor(cover, stat);
         if (!isRejected(gp, rejected)) {
-          proposals.push(gp);
+          eligible.push({ proposal: gp, stat, rung: "graduate" });
           graduateTargets.add(cover.relPath);
         }
       }
@@ -113,17 +150,20 @@ export function buildManifest(
     }
 
     // Rung ①: an UNCOVERED recurring signature → a fresh "note" proposal (unless rejected).
-    const proposal = noteProposalFor(key, stat);
-    if (isRejected(proposal, rejected)) continue; // the human already declined — back off.
-    proposals.push(proposal);
+    const np = noteProposalFor(key, stat);
+    if (isRejected(np, rejected)) continue; // the human already declined — back off.
+    eligible.push({ proposal: np, stat, rung: "note" });
   }
 
-  // Stable order: action asc, then target asc — deterministic across runs.
-  proposals.sort(
-    (a, b) =>
-      (a.action < b.action ? -1 : a.action > b.action ? 1 : 0) ||
-      (a.target < b.target ? -1 : a.target > b.target ? 1 : 0),
-  );
+  // Rank strongest-first, then surface only the top `promotionBudget` — the rest defer.
+  eligible.sort(rankProposals);
+  const budget = Math.max(0, thresholds.promotionBudget);
+  const surfaced = eligible.slice(0, budget);
 
-  return { proposals, cursors: { ...cursors }, covered };
+  return {
+    proposals: surfaced.map((e) => e.proposal),
+    cursors: { ...cursors },
+    covered,
+    deferred: eligible.length - surfaced.length,
+  };
 }

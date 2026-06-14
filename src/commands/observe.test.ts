@@ -443,6 +443,35 @@ describe("observeCmd — Stop → assistant_msg (ADR-0019 amendment)", () => {
     }
   });
 
+  it("SubagentStop with a subagent transcript → one assistant_msg (Candidate 4: autonomous capture)", async () => {
+    const repo = await mkRepo();
+    const transcript = await writeTranscript(
+      repo,
+      "subagent.jsonl",
+      JSON.stringify({
+        type: "assistant",
+        message: { role: "assistant", content: [{ type: "text", text: `subagent result ${SECRET}` }] },
+      }),
+    );
+
+    await run(
+      JSON.stringify({
+        hook_event_name: "SubagentStop",
+        session_id: "s1",
+        cwd: repo,
+        transcript_path: transcript,
+      }),
+      { cwd: repo },
+    );
+
+    const [e] = await readEvents(repo, "s1");
+    expect(e?.type).toBe("assistant_msg"); // SubagentStop maps to assistant_msg, exactly like Stop.
+    if (e?.type === "assistant_msg") {
+      expect(e.text).toContain("subagent result"); // the subagent's final reply is captured.
+      expect(e.text).not.toContain(SECRET); // scrubbed before truncate (same seam as Stop).
+    }
+  });
+
   it("concatenates multiple text parts of the final assistant message", async () => {
     const repo = await mkRepo();
     const transcript = await writeTranscript(

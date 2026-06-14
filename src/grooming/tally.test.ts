@@ -143,20 +143,22 @@ describe("(a) idempotency — re-folding an unchanged stream is a no-op", () => 
   });
 });
 
-// ─── (b) DISTINCT-SESSION — one session, signature recurs across TWO folds ────
+// ─── (b) DISTINCT-CHAPTER — one session, signature recurs across TWO chapters ──
 
-describe("(b) distinct-session — a signature recurring in ONE session counts ONCE", () => {
-  it("a growing file folded twice (same signature in both chapters) counts the session once", () => {
+describe("(b) distinct-chapter — a signature recurring across chapters of ONE session counts each", () => {
+  it("a growing file folded twice (same signature in two chapters) counts the chapters separately", () => {
     const empty: PromoteTally = { v: PROMOTE_VERSION, signatures: {}, sessions: {} };
 
-    // Fold 1: first closed chapter carries the signature.
+    // Fold 1: first closed chapter carries the signature → 1.
     const chapter1 = correctionSegment("s-1");
     const after1 = foldSession(empty, "s-1", chapter1, null);
     expect(after1.signatures[SIG_KEY]?.sessions).toBe(1);
     expect(after1.sessions["s-1"]?.offset).toBe(3);
 
-    // Fold 2: the file GREW — a second closed chapter with the SAME signature words
-    // (same wing via a payments/ path, same correction text → same `(wing+keywords)` key).
+    // Fold 2: the file GREW — a SECOND closed chapter (compact-delimited) with the SAME
+    // signature words. The recurrence unit is the CHAPTER, so even within the same
+    // session_id this is a distinct chapter → the count rises to 2 (0.0.11: this is what
+    // lets a single continuously-compacted chat accrue recurrence toward graduation).
     const chapter2 = [
       tool("s-1", ["payments/retry.ts"]),
       prompt("s-1", "always validate the webhook idempotency"),
@@ -165,12 +167,52 @@ describe("(b) distinct-session — a signature recurring in ONE session counts O
     const grown = [...chapter1, ...chapter2];
     const after2 = foldSession(after1, "s-1", grown, null);
 
-    // Same session, same signature, second occurrence → STILL sessions === 1.
-    expect(after2.signatures[SIG_KEY]?.sessions).toBe(1);
-    // But the lens count accumulated (the second contribution merged its lens).
+    expect(after2.signatures[SIG_KEY]?.sessions).toBe(2);
+    // Lens count accumulated across both chapters.
     expect(after2.signatures[SIG_KEY]?.lenses.correction).toBeGreaterThanOrEqual(2);
     // The offset advanced past the new chapter (never regress).
     expect(after2.sessions["s-1"]?.offset).toBe(grown.length);
+  });
+});
+
+// ─── (b2) MIN-WORK FLOOR — a trivial chapter does not mint a recurrence unit ───
+
+describe("(b2) min-work floor — a chapter below the work floor is skipped", () => {
+  it("a single salient tool_use then an immediate /compact (1 work event) counts nothing", () => {
+    const empty: PromoteTally = { v: PROMOTE_VERSION, signatures: {}, sessions: {} };
+    const trivial = [tool("s-1", ["payments/webhook.ts"]), compact("s-1")]; // 1 work event < floor (2)
+    const after = foldSession(empty, "s-1", trivial, null);
+    expect(Object.keys(after.signatures)).toHaveLength(0); // floored out
+    expect(after.sessions["s-1"]?.offset).toBe(trivial.length); // but offset still advances
+  });
+
+  it("the same work in a chapter that CLEARS the floor does count", () => {
+    const empty: PromoteTally = { v: PROMOTE_VERSION, signatures: {}, sessions: {} };
+    const ok = [
+      tool("s-1", ["payments/webhook.ts"]),
+      prompt("s-1", "always validate the webhook idempotency"),
+      compact("s-1"),
+    ]; // tool + prompt = 2 work events == floor → qualifies
+    const after = foldSession(empty, "s-1", ok, null);
+    expect(after.signatures[SIG_KEY]?.sessions).toBe(1);
+  });
+});
+
+// ─── (b3) VERSION MIGRATION — an older-version tally is discarded on read ──────
+
+describe("(b3) version migration — readTally discards an older-version tally", () => {
+  it("an older-version tally is reset to fresh so it re-folds under the current chapter + de-noised-key unit", async () => {
+    const dir = await tmp();
+    await mkdir(join(dir, ".metrics"), { recursive: true });
+    const old = {
+      v: 1,
+      signatures: {
+        "w::k": { sessions: 9, lenses: { correction: 9, failure: 0, workflow: 0, preference: 0 }, wing: "w", keywords: ["k"], lastSeen: "t", hint: "" },
+      },
+      sessions: { "s-1": { offset: 3, sigs: ["w::k"] } },
+    };
+    await writeFile(promoteTallyPath(dir), JSON.stringify(old), "utf8");
+    expect(await readTally(dir)).toEqual({ v: PROMOTE_VERSION, signatures: {}, sessions: {} });
   });
 });
 

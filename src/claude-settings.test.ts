@@ -25,7 +25,7 @@ async function tmp(): Promise<string> {
 }
 
 describe("MAGE_HOOKS table", () => {
-  it("wires exactly the eight expected event/id/command rows", () => {
+  it("wires exactly the nine expected event/id/command rows", () => {
     expect(MAGE_HOOKS).toEqual([
       { event: "SessionStart", id: "mage:observe:SessionStart", command: "mage observe" },
       { event: "UserPromptSubmit", id: "mage:observe:UserPromptSubmit", command: "mage observe" },
@@ -39,6 +39,7 @@ describe("MAGE_HOOKS table", () => {
       { event: "SessionEnd", id: "mage:observe:SessionEnd", command: "mage observe" },
       { event: "Stop", id: "mage:metrics:Stop", command: "mage skills --metrics --quiet" },
       { event: "Stop", id: "mage:observe:Stop", command: "mage observe" },
+      { event: "SubagentStop", id: "mage:observe:SubagentStop", command: "mage observe" },
     ]);
   });
 
