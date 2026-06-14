@@ -63,6 +63,11 @@ boundary (`MAGE_HOOKS` runs only `mage observe` + `mage skills --metrics`). So e
 uncovered workflow candidates never reach you at the reflection moment. But surfacing alone
 wouldn't help — what would surface is activity not worth a procedural note.
 
+> **Caveat — this is ONE phase's data (raised 2026-06-14).** The 40/40-workflow skew reflects
+> active *early-greenfield* development (planning + MVP builds of sreforge/prismalens, solo,
+> one compacted chat). A different usage pattern shifts the lens mix — and possibly the whole
+> story. See **Validity & over-fitting risk** below before trusting any tuning.
+
 ## Reframe — two graduation paths, only one belongs to recurrence
 
 mage conflates two paths through the ladder:
@@ -78,6 +83,91 @@ mage conflates two paths through the ladder:
 
 The three changes below complete the **procedure path**. (The lesson path is largely fine;
 if anything, corrections/failures deserve a LOWER bar — see Open Questions.)
+
+## Validity & over-fitting risk (raised 2026-06-14)
+
+**The diagnosis above was drawn from ONE usage phase.** The soak is dominated by a single
+pattern: active *early-greenfield* development — planning + MVP/early-version builds of
+sreforge and prismalens, solo, in one continuously-compacted chat. That phase is
+workflow-heavy BY NATURE (you touch many new files in sequences; you issue few "corrections"
+because you let the agent run), which is exactly why 40/40 ≥K signatures are workflow and
+lessons barely recur. **Other patterns tell a different story:**
+
+- *Maintenance / debugging / incident response* → `failure` recurs (same bug class, same
+  flaky test) and `correction` recurs (the same mistake re-steered). The **lesson path**
+  carries real recurrence — and those signals ARE worth noting.
+- *Code review / multi-developer* → more corrections, more diverse signatures, less
+  single-author file-touch repetition.
+- *Mature codebase* → recurring procedures are genuine (deploy runbook, release cut, triage)
+  — the **procedure path** lights up with material that really is a procedure.
+
+**The inversion this forces:** "zero graduations in early planning" may be the **correct**
+output, not a bug. There may simply be little worth graduating yet. Tuning the loop to MAKE
+this phase's data graduate would *manufacture noise* — promoting "I keep editing the plan"
+into a skill nobody wants. The honest reading of the soak is *"not yet,"* not *"broken."*
+
+**Design consequences (these CHANGE the plan, not just annotate it):**
+
+1. **Build for BOTH paths, lens-balanced — do NOT optimize for workflow.** Let whichever path
+   has genuine signal in the current phase light up: procedures in a build/maintenance phase,
+   lessons in a debugging phase, *nothing* in a thin planning phase. The two-path design is
+   the hedge against over-fitting — keep it central.
+2. **DEFER per-lens threshold/bar tuning until a SECOND data pattern exists.** Any specific
+   "workflow needs K=N, correction needs K=M" numbers tuned only on this phase will over-fit.
+   Validate on a *constructed multi-phase scenario* (a debugging trace, a maintenance trace),
+   not just the live early-greenfield soak.
+3. **Re-examine the 0.1.0 GATE — it may be the real over-fit.** The soak rule ("a real
+   note→skill graduation in any unit cuts 0.1.0") pressures the design to manufacture a
+   graduation from whatever phase the user is in. Better: gate 0.1.0 on a **correct, tested
+   loop** — graduation demonstrably fires on a constructed procedure scenario AND correctly
+   stays quiet on thin/planning work — not on an *observed* organic graduation that may
+   legitimately not occur for months.
+
+**Phase-robust** pieces: the two-path reframe, **A** (enrich workflow→procedure), **B**
+(organic surfacing — helps any phase), the quality gate. **Phase-FRAGILE** pieces to treat
+with care: **C** (bias-to-playbook — only right when the workflow is genuinely procedural; in
+a thin phase it mints junk) and any threshold tuning.
+
+## Deterministic plumbing vs agent judgment — the "memory" pattern (raised 2026-06-14)
+
+The over-fitting risk is really an argument for **agent judgment at the decision point**: a
+deterministic recurrence counter cannot tell "I keep editing the plan" (not graduatable) from
+"I keep doing this 4-step release dance" (a real procedure) — a model can. The fear is the
+obvious one: *don't dump all the captures into a model.* Two reference systems already solve
+exactly that, and mage is closer to them than it looks:
+
+- **Claude Code's own memory** — agent-judged, two-tier, selectively recalled. The session
+  model decides what is durable and writes ONE distilled fact per file with a one-line
+  `description`; a lightweight INDEX (`MEMORY.md`, one line each) is the ONLY thing always in
+  context; full entries are recalled into a `<system-reminder>` ONLY when the `description`
+  matches the task; dedup/curation is the agent's job. The model judges — but over a BOUNDED
+  view (the index), never the raw transcript.
+- **ECC / context-mode** — checked the plugin: continuous CAPTURE is *deterministic*
+  (`session-extract.bundle.mjs`, a regex/heuristic extractor — not a model), and it keeps data
+  out of the main context via *sandboxed* processing ("Think-in-Code"). The `claude-haiku-4-5`
+  reference is a **cost-accounting table**; the ADR "Haiku" mentions are **tool-description
+  A/B tests** — NOT, in what's visible, a Haiku continuous-learning judge. (Caveat: the MCP
+  backend isn't in the hook bundle, so a model-judge there isn't ruled out.)
+
+**Shared pattern — and mage already fits it:** deterministic cheap CAPTURE → a BOUNDED ranked
+SURFACE → MODEL JUDGMENT over that surface, never raw data. mage's deterministic fold +
+`promotionBudget` top-N manifest IS the bounded surface; the `mage:groom` / `mage:graduate`
+SKILLS ARE the agent judgment (the host session model reading the manifest). Per ADR-0009
+("no model lives here") + ADR-0021 (offline / no-telemetry), the judge is the HOST model
+invoked through a skill, NOT a model embedded in the engine.
+
+**So agent-vs-deterministic is mostly a FALSE FORK — mage is already both.** What's missing is
+(A) richer candidates so the agent can judge well, (B) an organic TRIGGER so it is asked to
+judge at the right moment, and TRUSTING the agent to judge WORTHINESS (reject "edit the plan")
+rather than transcribe — which is also the over-fitting fix.
+
+**The one REAL fork (grill, OQ 9):** should mage EMBED a cheap dedicated judge (a Haiku-class
+model mage calls itself at session boundaries, ECC-style) to groom fully autonomously and OFF
+the main chat's expensive context? Pro: out-of-band continuous learning that doesn't spend the
+main session's tokens; consistent judgment. Con: breaks ADR-0009/0021 (embeds a model, needs a
+key + network, opens a cost/telemetry surface) — a genuine identity shift. Default lean: keep
+the host-skill judge + organic trigger (B); the bounded manifest already keeps data off the
+model. An embedded judge is a LATER option IF fully-autonomous out-of-band grooming is wanted.
 
 ## Proposed changes
 
@@ -151,6 +241,16 @@ a quality gate, or it trades "nothing graduates" for "junk graduates":
 6. Release home: a focused **0.0.12 "organic grooming loop"**, or is this the real substance
    of **0.1.0**'s "complete solution"? (See [[mage-011-signal-capture]] / the release
    sequence.)
+7. **Re-gate 0.1.0?** Should the gate be a *correct, TESTED* loop (graduates a constructed
+   procedure scenario, stays quiet on thin work) rather than an *observed* organic graduation
+   in the live soak — which over-fits to whatever phase the user is in? (Validity §3.)
+8. **Where do we get a SECOND usage pattern** to validate against — wait for the
+   sreforge/prismalens work to mature into a maintenance/debugging phase, or construct
+   synthetic debugging/maintenance traces now?
+9. **Embed a cheap dedicated judge?** A Haiku-class model mage calls itself at session
+   boundaries (ECC-style, out-of-band, off the main chat's context) vs the current
+   host-skill judgment + organic trigger (B). Touches ADR-0009 ("no model in the engine") +
+   ADR-0021 (offline / no-telemetry) — an identity decision, not just a knob. (Lean: B.)
 
 ## Relations
 
@@ -163,6 +263,11 @@ a quality gate, or it trades "nothing graduates" for "junk graduates":
   definitions (workflow vs correction/failure) the diagnosis turns on.
 - relates_to [ADR-0018](../decisions/0018-mage-distill-observed-scratch-reader.md) — the
   lesson path's proper home (first-sight, not recurrence).
+- constrains [ADR-0009](../decisions/0009-no-runtime-automation-rides-host-hooks.md) — "no
+  model in the engine; judgment rides host hooks/skills" — the principle the embedded-judge
+  fork (OQ 9) would have to amend.
+- constrains [ADR-0021](../decisions/0021-offline-no-telemetry-local-signal.md) — offline /
+  no-telemetry / local-signal — the other principle an embedded cheap judge would touch.
 - follows [plan-0.0.11-signal-and-capture](plan-0.0.11-signal-and-capture.md) — whose honest
   soak finding (precision not reach) surfaced this.
 - informs [plan-release-sequence](plan-release-sequence.md) — slots a grooming-loop release

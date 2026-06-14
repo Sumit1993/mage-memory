@@ -45,7 +45,7 @@
 ### grooming
 
 - `plan` [0.0.11 — "signal quality + autonomous capture"](notes/plan-0.0.11-signal-and-capture.md) — signal, quality, autonomous, capture, candidate, blocker, count, compact, chapters, session, ids, serves _(reviewed 2026-06-14)_
-- `plan` [Organic grooming loop — closing the procedure path](notes/plan-organic-grooming-loop.md) — grooming, graduation, organic, recurrence, workflow, lens, procedure, playbook, nudge, surfacing _(draft · reviewed 2026-06-14)_
+- `plan` [Organic grooming loop — closing the procedure path](notes/plan-0.1.0-organic-grooming-loop.md) — grooming, graduation, organic, recurrence, workflow, lens, procedure, playbook, nudge, surfacing _(draft · reviewed 2026-06-14)_
 
 ### plan
 
