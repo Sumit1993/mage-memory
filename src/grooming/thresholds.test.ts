@@ -67,7 +67,7 @@ async function writeHubMeta(root: string, grooming?: unknown): Promise<void> {
 describe("BASE_THRESHOLDS — finalizes the provisional 0.0.6 numbers", () => {
   it("uses the @normal recurrence gates and the new 0.0.8 constants", () => {
     expect(BASE_THRESHOLDS.promoteSessions).toBe(3);
-    expect(BASE_THRESHOLDS.graduateSessions).toBe(8);
+    expect(BASE_THRESHOLDS.graduateSessions).toBe(5);
     expect(BASE_THRESHOLDS.noteSizeCap).toBe(6000);
     expect(BASE_THRESHOLDS.editBudget).toBe(3);
     expect(BASE_THRESHOLDS.promotionBudget).toBe(5);
@@ -94,13 +94,13 @@ describe("thresholdsFor — the dial scales only promote/graduate sessions", () 
   it("high lowers the gates (easier to surface)", () => {
     const t = thresholdsFor("high");
     expect(t.promoteSessions).toBe(2);
-    expect(t.graduateSessions).toBe(6);
+    expect(t.graduateSessions).toBe(4);
   });
 
   it("low raises the gates (harder to surface)", () => {
     const t = thresholdsFor("low");
     expect(t.promoteSessions).toBe(4);
-    expect(t.graduateSessions).toBe(11);
+    expect(t.graduateSessions).toBe(7);
   });
 
   it("never scales the rate-floors / minLoads / editBudget / sizeCap", () => {

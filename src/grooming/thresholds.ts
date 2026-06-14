@@ -46,11 +46,16 @@ export const DEFAULT_SENSITIVITY: Sensitivity = "normal";
  * BASE = the @normal thresholds. These FINALIZE the provisional 0.0.6 numbers:
  * the rate-floors (rewordRate / demoteRate) and minLoads are IMPORTED from
  * context-match.ts so the metric and the seam never drift. The recurrence gates
- * (K=3, M=8 — chapters, 0.0.11), the note size cap, and the edit budget are constants.
+ * (K=3, M=5 — chapters, 0.0.11), the note size cap, and the edit budget are constants.
+ *
+ * M NOTE (0.0.11): briefly raised to 8 to tame the chapter-unit flood, then returned
+ * to 5 — de-noise (Candidate 3) + the bounded promotionBudget already tame the flood,
+ * and the live soak showed real topical recurrence tops at ~5, so M=8 made graduation
+ * unreachable. M=5 keeps graduation organically achievable.
  */
 export const BASE_THRESHOLDS: Thresholds = {
   promoteSessions: 3,
-  graduateSessions: 8,
+  graduateSessions: 5,
   noteSizeCap: 6000,
   rewordRate: LOW_MATCH_RATE,
   demoteRate: DEMOTE_MATCH_RATE,
@@ -77,11 +82,11 @@ export const MIN_CHAPTER_WORK_EVENTS = 2;
 /** The recurrence gates per dial position — the ONLY fields the dial scales. */
 const GATES: Record<Sensitivity, { promoteSessions: number; graduateSessions: number }> = {
   // high → easier to surface (fewer chapters needed).
-  high: { promoteSessions: 2, graduateSessions: 6 },
+  high: { promoteSessions: 2, graduateSessions: 4 },
   // normal → BASE.
   normal: { promoteSessions: BASE_THRESHOLDS.promoteSessions, graduateSessions: BASE_THRESHOLDS.graduateSessions },
   // low → harder to surface (more chapters needed).
-  low: { promoteSessions: 4, graduateSessions: 11 },
+  low: { promoteSessions: 4, graduateSessions: 7 },
 };
 
 // ─── thresholdsFor — scale ONLY the recurrence gates ──────────────────────────
@@ -92,9 +97,9 @@ const GATES: Record<Sensitivity, { promoteSessions: number; graduateSessions: nu
  * sizeCap are quality floors and stay at BASE. PURE: returns a NEW object spread
  * from BASE — BASE_THRESHOLDS is never mutated.
  *
- *   high  → easier: promoteSessions 2, graduateSessions 6
- *   normal→ BASE  : promoteSessions 3, graduateSessions 8
- *   low   → harder: promoteSessions 4, graduateSessions 11
+ *   high  → easier: promoteSessions 2, graduateSessions 4
+ *   normal→ BASE  : promoteSessions 3, graduateSessions 5
+ *   low   → harder: promoteSessions 4, graduateSessions 7
  */
 export function thresholdsFor(s: Sensitivity): Thresholds {
   const gates = GATES[s];

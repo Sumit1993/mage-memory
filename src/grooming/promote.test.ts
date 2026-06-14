@@ -156,7 +156,7 @@ describe("buildManifest — graduation rung (covered PROCEDURAL note >= graduate
   });
 
   it("does NOT graduate a covered procedural note BELOW M sessions (only covered++)", () => {
-    // promoteSessions=3 is met but graduateSessions=8 is not (sessions=4).
+    // promoteSessions=3 is met but graduateSessions=5 is not (sessions=4).
     const t = tally({ "payments::webhook": stat({ wing: "payments", keywords: ["webhook"], sessions: 4 }) });
     const notes = [note({ wing: "payments", keywords: ["webhook"], type: "playbook" })];
     const m = buildManifest(t, notes, T, [], {});
