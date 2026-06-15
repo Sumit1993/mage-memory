@@ -124,10 +124,17 @@ async function ensureSinkIgnores(startDir: string): Promise<void> {
   // mirroring init's `mage/`-prefixed sink patterns. hub: ignore at the hub root.
   const { root, patterns } =
     kb.kind === "repo"
-      ? { root: kb.repo, patterns: ["mage/.learnings/", "mage/.metrics/"] }
+      ? { root: kb.repo, patterns: ["mage/.learnings/", "mage/.metrics/", "mage/.staging/"] }
       : {
           root: kb.root,
-          patterns: [".learnings/", "**/.learnings/", ".metrics/", "**/.metrics/"],
+          patterns: [
+            ".learnings/",
+            "**/.learnings/",
+            ".metrics/",
+            "**/.metrics/",
+            ".staging/",
+            "**/.staging/",
+          ],
         };
 
   const added = await ensureGitignored(root, patterns);
