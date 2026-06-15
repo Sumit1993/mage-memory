@@ -17,7 +17,7 @@
 ![License](https://img.shields.io/badge/License-MIT-blue?style=flat)
 ![Node](https://img.shields.io/badge/Node-%3E%3D20-339933?style=flat&logo=node.js)
 ![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey?style=flat)
-![Status](https://img.shields.io/badge/status-0.0.9-orange?style=flat)
+![Status](https://img.shields.io/badge/status-0.0.10-orange?style=flat) <!-- x-release-please-version -->
 
 <p align="center">
   <img src="assets/social-card.png" alt="mage — durable memory for AI coding agents" width="640" />
