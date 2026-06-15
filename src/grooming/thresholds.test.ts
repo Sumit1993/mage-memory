@@ -128,34 +128,34 @@ describe("readSensitivity — in-repo dial read", () => {
   it("reads a valid dial from the in-repo metadata", async () => {
     const repo = await tmp();
     await writeRepoMeta(repo, { sensitivity: "high" });
-    const got = await readSensitivity({ root: join(repo, META_DIR), kind: "in-repo", repo });
+    const got = await readSensitivity({ root: join(repo, META_DIR), kind: "repo", repo });
     expect(got).toBe("high");
   });
 
   it("defaults to normal when no grooming block is present", async () => {
     const repo = await tmp();
     await writeRepoMeta(repo);
-    const got = await readSensitivity({ root: join(repo, META_DIR), kind: "in-repo", repo });
+    const got = await readSensitivity({ root: join(repo, META_DIR), kind: "repo", repo });
     expect(got).toBe("normal");
   });
 
   it("defaults to normal when the metadata file is absent (fail-open)", async () => {
     const repo = await tmp();
-    const got = await readSensitivity({ root: join(repo, META_DIR), kind: "in-repo", repo });
+    const got = await readSensitivity({ root: join(repo, META_DIR), kind: "repo", repo });
     expect(got).toBe("normal");
   });
 
   it("defaults to normal on an out-of-enum value", async () => {
     const repo = await tmp();
     await writeRepoMeta(repo, { sensitivity: "aggressive" });
-    const got = await readSensitivity({ root: join(repo, META_DIR), kind: "in-repo", repo });
+    const got = await readSensitivity({ root: join(repo, META_DIR), kind: "repo", repo });
     expect(got).toBe("normal");
   });
 
   it("defaults to normal when grooming is the wrong shape", async () => {
     const repo = await tmp();
     await writeRepoMeta(repo, "high"); // grooming is a string, not an object.
-    const got = await readSensitivity({ root: join(repo, META_DIR), kind: "in-repo", repo });
+    const got = await readSensitivity({ root: join(repo, META_DIR), kind: "repo", repo });
     expect(got).toBe("normal");
   });
 
@@ -167,7 +167,7 @@ describe("readSensitivity — in-repo dial read", () => {
       JSON.stringify({ schema: "bogus.v0", grooming: { sensitivity: "low" } }),
       "utf8",
     );
-    const got = await readSensitivity({ root: join(repo, META_DIR), kind: "in-repo", repo });
+    const got = await readSensitivity({ root: join(repo, META_DIR), kind: "repo", repo });
     expect(got).toBe("normal");
   });
 });

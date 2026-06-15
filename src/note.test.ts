@@ -1,9 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { deriveKeywords, noteRoom, noteWing, noteWings, normalizeTags, parseNote, stringifyNote } from "./note.js";
+import {
+  type NoteFrontmatter,
+  deriveKeywords,
+  noteRoom,
+  noteWing,
+  noteWings,
+  normalizeTags,
+  parseNote,
+  stringifyNote,
+} from "./note.js";
 
 describe("note frontmatter", () => {
   it("round-trips frontmatter and body", () => {
-    const fm = { type: "interface", tags: ["billing/payments"], status: "active" };
+    const fm: NoteFrontmatter = { type: "interface", tags: ["billing/payments"], status: "active" };
     const body = "# Title\n\nBody text.\n";
     const parsed = parseNote(stringifyNote(fm, body));
     expect(parsed.frontmatter.type).toBe("interface");
@@ -100,7 +109,11 @@ describe("deriveKeywords", () => {
   });
 
   it("is deterministic and drops stopwords / short words", () => {
-    const args = [{ tags: ["billing/payments"] }, "# How the payments service works", "x.md"] as const;
+    const args: [NoteFrontmatter, string, string] = [
+      { tags: ["billing/payments"] },
+      "# How the payments service works",
+      "x.md",
+    ];
     const kw = deriveKeywords(...args);
     expect(kw).toEqual(deriveKeywords(...args));
     expect(kw).not.toContain("the");

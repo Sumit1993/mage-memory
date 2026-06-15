@@ -157,9 +157,9 @@ describe("collectDashboardData — populated KB", () => {
 
   it("derives REAL counts, wings, and KPIs from the scan + metrics", async () => {
     const root = await populated();
-    const data = await collectDashboardData({ root, kind: "in-repo" }, FIXED_OPTS);
+    const data = await collectDashboardData({ root, kind: "repo" }, FIXED_OPTS);
 
-    expect(data.meta.kind).toBe("in-repo");
+    expect(data.meta.kind).toBe("repo");
     expect(data.meta.mageVersion).toBe("9.9.9");
     expect(data.meta.lastRefreshed).toBe(NOW.toISOString());
     expect(data.meta.root).toBe(root);
@@ -180,7 +180,7 @@ describe("collectDashboardData — populated KB", () => {
 
   it("fills the hero proposal queue and the graduate KPI", async () => {
     const root = await populated();
-    const data = await collectDashboardData({ root, kind: "in-repo" }, FIXED_OPTS);
+    const data = await collectDashboardData({ root, kind: "repo" }, FIXED_OPTS);
 
     expect(data.kpis.awaitingYou).toBe(2);
     expect(data.kpis.graduateReady).toBe(1);
@@ -197,7 +197,7 @@ describe("collectDashboardData — populated KB", () => {
 
   it("builds the durability ladder (scratch tally + climbing rungs)", async () => {
     const root = await populated();
-    const data = await collectDashboardData({ root, kind: "in-repo" }, FIXED_OPTS);
+    const data = await collectDashboardData({ root, kind: "repo" }, FIXED_OPTS);
 
     // scratch = 3 + 2 lines (the .skills sidecar is excluded).
     expect(data.ladder.scratch).toBe(5);
@@ -212,7 +212,7 @@ describe("collectDashboardData — populated KB", () => {
 
   it("builds the note graph and per-day activity from real note dates/links", async () => {
     const root = await populated();
-    const data = await collectDashboardData({ root, kind: "in-repo" }, FIXED_OPTS);
+    const data = await collectDashboardData({ root, kind: "repo" }, FIXED_OPTS);
 
     expect(data.graph.nodes.map((n) => n.id).sort()).toEqual([
       "notes/a1.md",
@@ -231,7 +231,7 @@ describe("collectDashboardData — populated KB", () => {
 
   it("computes health (orphans / dangling / due-for-review)", async () => {
     const root = await populated();
-    const data = await collectDashboardData({ root, kind: "in-repo" }, FIXED_OPTS);
+    const data = await collectDashboardData({ root, kind: "repo" }, FIXED_OPTS);
 
     // b1 is an orphan (no links in/out); a1↔a2 are linked.
     expect(data.health.orphanNotes).toBe(1);
@@ -250,7 +250,7 @@ describe("collectDashboardData — cold KB (no .metrics)", () => {
     const root = await tmpKb("mage-dash-cold-");
     await note(root, "notes/only.md", { type: "note" }, "# Only Note\n\nNothing else.");
 
-    const data = await collectDashboardData({ root, kind: "in-repo" }, FIXED_OPTS);
+    const data = await collectDashboardData({ root, kind: "repo" }, FIXED_OPTS);
 
     // The scan still works — one note, zero wings (untagged).
     expect(data.kpis.notes).toBe(1);
@@ -275,7 +275,7 @@ describe("collectDashboardData — cold KB (no .metrics)", () => {
 
   it("a completely empty KB (zero notes) still yields a valid snapshot", async () => {
     const root = await tmpKb("mage-dash-empty-");
-    const data = await collectDashboardData({ root, kind: "in-repo" }, FIXED_OPTS);
+    const data = await collectDashboardData({ root, kind: "repo" }, FIXED_OPTS);
 
     expect(data.kpis.notes).toBe(0);
     expect(data.notes).toEqual([]);

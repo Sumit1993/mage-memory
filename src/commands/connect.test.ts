@@ -90,9 +90,9 @@ describe("connect", () => {
     // unknown top-level key survives untouched
     expect(settings.permissions).toEqual({ allow: ["Bash(ls)"] });
     // host's own SessionStart group is preserved alongside the mage one
-    const hostGroup = settings.hooks.SessionStart.find((g) => g.hooks[0]?.command === "host-thing");
+    const hostGroup = settings.hooks.SessionStart?.find((g) => g.hooks[0]?.command === "host-thing");
     expect(hostGroup).toBeTruthy();
-    const mageGroup = settings.hooks.SessionStart.find((g) => g.id === "mage:observe:SessionStart");
+    const mageGroup = settings.hooks.SessionStart?.find((g) => g.id === "mage:observe:SessionStart");
     expect(mageGroup).toBeTruthy();
   });
 

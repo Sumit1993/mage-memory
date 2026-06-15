@@ -24,8 +24,14 @@ async function note(dir: string, rel: string, content: string): Promise<void> {
   await writeFile(p, content);
 }
 
+// The on-disk metadata.json may carry the legacy v1 `storage: "in-repo"` alias,
+// which readHubMetadata normalizes to "repo-owned" on read. Model that raw shape
+// so a fixture can exercise the normalization path (the `schema: "mage.v1"` file
+// written below is exactly where the legacy value is valid).
+type RawHubProject = Omit<HubProject, "storage"> & { storage: HubProject["storage"] | "in-repo" };
+
 /** A hub root (kind=hub): projects/ dir + a top-level metadata.json registry. */
-async function hub(projects: HubProject[] = []): Promise<string> {
+async function hub(projects: RawHubProject[] = []): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), "mage-hub-"));
   made.push(dir);
   await mkdir(join(dir, "projects"), { recursive: true });
