@@ -11,6 +11,18 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.11](https://github.com/Sumit1993/mage-memory/compare/v0.0.10...v0.0.11) (2026-06-15)
+
+
+### Features
+
+* **0.0.11:** signal quality + autonomous capture ([#17](https://github.com/Sumit1993/mage-memory/issues/17)) ([434e3fb](https://github.com/Sumit1993/mage-memory/commit/434e3fba8c553f634a543548051b092ae589076a))
+
+
+### Bug Fixes
+
+* **deps:** clear all security advisories (drop gray-matter for yaml; pin esbuild) ([#22](https://github.com/Sumit1993/mage-memory/issues/22)) ([9eb76bb](https://github.com/Sumit1993/mage-memory/commit/9eb76bb9ced0cceac406085365f0c928fae5f97a))
+
 ## [0.0.10] - 2026-06-14
 
 Coherence — one consistent vocabulary, one grooming skill, and a metadata schema
