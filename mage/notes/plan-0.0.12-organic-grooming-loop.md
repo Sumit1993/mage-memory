@@ -1,12 +1,13 @@
 ---
 type: plan
-tags: [mage/grooming, mage/0.1.0]
+tags: [mage/grooming, mage/0.0.12]
 created: "2026-06-14"
-last_reviewed: "2026-06-14"
-status: draft
+updated: "2026-06-15"
+last_reviewed: "2026-06-15"
+status: active
 provenance:
   repo: mage-memory
-  work: organic-grooming-loop
+  work: 0.0.12-organic-grooming-loop
 sources:
   - src/grooming/signature.ts
   - src/grooming/promote.ts
@@ -14,17 +15,114 @@ sources:
   - src/grooming/thresholds.ts
   - src/claude-settings.ts
   - src/dashboard/nudges.ts
+  - src/observe/scrub.ts
+  - src/commands/observe.ts
+  - skills/learn/SKILL.md
   - skills/groom/SKILL.md
+  - mage/decisions/0009-no-runtime-automation-rides-host-hooks.md
   - mage/decisions/0013-procedure-skills-self-grooming-loop.md
+  - mage/decisions/0018-mage-distill-observed-scratch-reader.md
   - mage/decisions/0019-mage-promote-self-grooming.md
-keywords: [grooming, graduation, organic, recurrence, workflow, lens, procedure, playbook, nudge, surfacing]
+  - ~/ai-context/mage-redact-false-positives-issue.md
+keywords: [grooming, organic, lesson, first-sight, distill, staging, nudge, inline, claude-code-memory, redact, 0.0.12]
 ---
 
-# Organic grooming loop — closing the procedure path
+# Organic grooming loop (0.0.12) — the lesson path
 
-**Status: DRAFT — design to grill before any build.** Once locked, the concrete
-changes become an ADR (next free number 0024) amending [ADR-0013](../decisions/0013-procedure-skills-self-grooming-loop.md)
-and [ADR-0019](../decisions/0019-mage-promote-self-grooming.md).
+**Status: GRILLED 2026-06-15 — decisions locked, ready to build.** Becomes **ADR-0024**
+once built — *finishing* [ADR-0009](../decisions/0009-no-runtime-automation-rides-host-hooks.md)
+§24 step 2 (the planned-but-unbuilt nudge) and amending
+[ADR-0013](../decisions/0013-procedure-skills-self-grooming-loop.md) /
+[ADR-0019](../decisions/0019-mage-promote-self-grooming.md).
+
+> **The grill flipped the thesis.** This note was drafted as "closing the *procedure* path"
+> (recurring workflow → skill). The 2026-06-15 grill established the opposite: the organic
+> win is the **lesson path** (first-sight → note, Claude-Code-memory style), and the
+> procedure path (skill graduation) is **deferred**. The analysis below is the rationale that
+> led there; **the locked spec is this section.** Read it first.
+
+## Decisions locked (grill 2026-06-15) — the 0.0.12 spec
+
+**Gate & scope**
+1. **Gate = a1: observed organic NOTE creation**, Claude-Code-memory style (SHORT + concise).
+   **a2 (note→skill graduation) is DEFERRED** to a longer timeframe / bigger user base.
+2. **0.0.12 = the LESSON path** (first-sight → note), NOT the procedure path. The 0.0.11
+   recurrence machinery (tally, K/M, de-noise, Candidates 1–4) is **untouched** — it serves
+   the deferred procedure path (a2). Evidence: 40/40 ≥K signatures are `workflow` (activity),
+   while the notes Claude Code's *own* memory minted from this same work (no-emojis, dogfood,
+   branch-protected) are first-sight LESSONS — and CC memory has no skill-graduation at all.
+3. **Release: the loop ships as 0.0.12** (bake it); **0.1.0 = the announcement** once a1 is
+   observed working in real use.
+
+**Architecture (how notes get made)**
+4. **Inline-primary + boundary safety-net; reject the embedded judge.** Verified CC memory
+   uses **no hook**: index loaded at session start, recall via `<system-reminder>`, creation
+   **inline via the Write tool during the response**, driven by an always-on instruction. So
+   inline is the primary path; the boundary is only the safety-net. (OQ 9 = NO embedded judge:
+   breaks ADR-0009 "no reasoner in the engine" + ADR-0021 no-egress, and is redundant — the
+   skills already ARE the judge.)
+5. **(b2) frictionless staged write + batch-confirm at the boundary.** The agent writes a
+   short draft with NO per-note confirm; the human-confirm happens at the batch commit. Bends
+   (doesn't break) "human-confirm is the commit" (ADR-0013), exactly like CC memory's
+   frictionless-write / no-commit split — plus mage's committed-notes tier on top.
+6. **New gitignored `mage/.staging/`** holds judged-but-uncommitted drafts — a third epistemic
+   state, separate from `.learnings/` (raw, deterministic, auto-pruned) and `notes/`
+   (committed, indexed-live). Keeps unconfirmed drafts OUT of the live index until promoted.
+
+**Mechanism**
+7. **Engine = first-sight** (`mage distill`, ADR-0018) + inline capture — never the recurrence
+   tally.
+8. **The boundary nudge RUNS distill (ii)** over the new `.learnings/` segment to catch
+   lessons the agent forgot to capture inline, drafts them to `.staging/`, and surfaces the
+   batch — robust against the forgetting that IS the failure mode.
+9. **Anti-flood gate:** dedup (against `notes/` via `coveringNote`, `.staging/`, and
+   `rejected.json`) + **bounded budget N = 3** drafts surfaced per boundary + reject →
+   `rejected.json` (never re-drafts) + distill's first-sight salience bar. N=3 is load-bearing
+   (caps volume even if the bar is loose).
+10. **No per-prompt nag to start.** Ship inline + boundary-safety-net; escalate salience (a
+    light `UserPromptSubmit` reminder) ONLY if dogfooding shows inline misses.
+11. **Notes stay SHORT** (CC-memory-sized). Tension to resolve in build: the 6000-char
+    `noteSizeCap` is for authored design notes; staged lesson-notes want a much smaller target.
+
+## The 0.0.12 build — portable core + Claude-Code adapter
+
+The whole loop splits along ADR-0009's existing line (*"notes portable, capture host-specific"*):
+
+- **Portable core (any harness with a shell + an instruction):** a new deterministic
+  **`mage stage`** verb (redacts via `scrubField`/`redact`, writes a short draft to
+  `.staging/`) · the agent drafts inline and calls it · **`mage groom`** surfaces the batch
+  and moves confirmed drafts to `notes/` + `mage index` · reject → `rejected.json`. File
+  layout + verbs + the draft-then-stage pattern need nothing host-specific.
+- **Claude-Code adapter (first):** the boundary distill (PreCompact + SessionEnd) safety-net,
+  agent-aimed via `additionalContext`, wired by `mage connect`. Hooks + context-injection are
+  per-harness — others land as demand appears (ADR-0009 §27).
+- **Graceful degradation (ADR-0009 ladder):** no hook adapter on a harness → inline capture,
+  or manual `mage:learn`/`mage stage` — **lossless**. Nothing depends on a hook for correctness;
+  inline reliability is a quality gradient (harness-dependent salience), not a correctness hole.
+
+## Also in 0.0.12 (bundled) — redact false-positives
+
+`mage redact` (Gate-2 pre-commit) blocks **legitimate** commits on false-positive
+high-entropy / generic-key-value matches with **no allowlist** — and the loop generates *more*
+note commits, so this becomes load-bearing (every false positive blocks the loop). Source:
+`~/ai-context/mage-redact-false-positives-issue.md`. Fixes:
+- **Skip mage's own generated artifacts** in the staged scan (`INDEX.md`, `_index.*.md`,
+  `.agents/skills/**`, `.claude/skills/**`, `AGENTS.md`, `CLAUDE.md`, `IDENTITY.md`) — reuse the
+  indexer skip-set; their paths are not secrets.
+- **Don't flag `${ENV}` placeholders** (`${...}` / `${env:...}` / `${varlock:...}`) as values.
+- **Tune the high-entropy detector** to exclude path-like tokens (contain `/`, end `.md`,
+  slash/hyphen-joined word runs) and CamelCase prose.
+- **Add a non-bypass allowlist** (`mage/.redactignore` globs + literal allows, and/or the
+  `--confirm` flow the hook message already promises) so no-`--no-verify` environments aren't
+  deadlocked.
+
+## Deferred to a2 / later (the procedure path)
+
+The procedure path — **A** (enrich workflow→procedure), **C** (bias-to-playbook), **D** (the
+confidence-ladder auto-tuner, planned in ADR-0009 §25 / ADR-0021 §2), A2 sequence mining,
+lens-aware K (OQ 2), and a second-usage-pattern validation (OQ 8) — is **deferred** with a2.
+The recurrence machinery built in 0.0.11 already serves it when it lands. The sections below
+are the rationale that produced this split; treat them as background, not scope.
 
 ## Why (the evidenced problem)
 
@@ -256,10 +354,15 @@ a quality gate, or it trades "nothing graduates" for "junk graduates":
 - The human-confirm-is-the-commit invariant (ADR-0013) stays the backstop; B never
   auto-grooms.
 
-## Open questions (to grill)
+## Open questions — RESOLVED in the 2026-06-15 grill
+
+> All resolved; see **Decisions locked** above. Quick map: OQ6 → 0.0.12 (announce 0.1.0
+> later); OQ7 → gate is **a1** observed note creation; OQ9 → **no** embedded judge; over-fit →
+> signal exists but it's *lessons*, build the lesson path, defer a2; OQ1/OQ2/OQ5/OQ8 + D →
+> deferred with the procedure path (a2). Retained below for traceability.
 
 1. A1 vs A2 — is enriching the hint / skill-side reconstruction enough, or do we need real
-   sequence bucketing? (Lean A1.)
+   sequence bucketing? (Lean A1.) → **deferred (a2).**
 2. Should `correction`/`failure` candidates get a LOWER K than `workflow` (lessons are more
    note-worthy per occurrence)? Or route one-shot strong lessons through distill only?
 3. B's boundary + audience: SessionStart-on-compact, SessionEnd, or both? Nudge the AGENT
