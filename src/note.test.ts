@@ -11,6 +11,25 @@ describe("note frontmatter", () => {
     expect(parsed.body).toContain("Body text.");
   });
 
+  it("round-trips a full frontmatter shape losslessly (nested maps, arrays, dates, unknown keys)", () => {
+    const fm = {
+      type: "gotcha",
+      tags: ["mage/release", "web"],
+      created: "2026-06-15",
+      provenance: { repo: "mage-memory", work: "0.0.11-release" },
+      sources: ["package.json", "README.md"],
+      status: "active" as const,
+      custom_unknown: { nested: ["x", "y"], n: 3 },
+    };
+    const body = "# Title\n\nBody with a colon: value, and a [link](x.md).\n";
+    const parsed = parseNote(stringifyNote(fm, body));
+    expect(parsed.frontmatter).toEqual(fm); // nothing lost or coerced
+    expect(parsed.body).toBe(body);
+    // YAML 1.1: a quoted date stays a STRING (matching the `created?: string` type),
+    // not a Date object — guarding the engine pin.
+    expect(typeof parsed.frontmatter.created).toBe("string");
+  });
+
   it("parses a note with no frontmatter (graceful)", () => {
     const parsed = parseNote("# Just markdown\n\nNo frontmatter.\n");
     expect(parsed.frontmatter).toEqual({});
@@ -96,7 +115,14 @@ describe("deriveKeywords", () => {
 });
 
 describe("note security", () => {
-  it("blocks executable (JavaScript) frontmatter engines", () => {
-    expect(() => parseNote("---js\nmodule.exports = { x: 1 }\n---\nbody\n")).toThrow();
+  it("has no executable frontmatter engine — parsing never runs code", () => {
+    // gray-matter shipped JS/CoffeeScript engines that RAN CODE for a `---js`
+    // fence; the yaml parser has none. A `---js` header is not a recognized fence,
+    // so it stays inert — no frontmatter, nothing executed.
+    expect(parseNote("---js\nmodule.exports = { x: 1 }\n---\nbody\n").frontmatter).toEqual({});
+    // And a `!!js/function` tag is never deserialized to a callable (js-yaml's old
+    // RCE surface): it resolves to a harmless string.
+    const tagged = parseNote('---\nx: !!js/function "function(){return 42}"\n---\nbody\n');
+    expect(typeof tagged.frontmatter.x).not.toBe("function");
   });
 });
