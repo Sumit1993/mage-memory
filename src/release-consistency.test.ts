@@ -1,10 +1,12 @@
 // Release-artifact consistency guard. A version bump touches MORE than
-// package.json — the Claude Code plugin manifest, the marketplace listing, the
-// README status badge, and the CHANGELOG all carry the version. As of 0.0.11
-// release-please owns these bumps (it rewrites them all from one source on every
-// release PR), but this test stays as a CI backstop: it fails on a PARTIAL bump,
-// a stale badge, or a missing CHANGELOG entry, whether the bump came from
-// release-please or a hand edit. See mage/notes/release-bump-touches-many-artifacts.md.
+// package.json — the Claude Code plugin manifest, the marketplace listing, and
+// the CHANGELOG all carry the version. As of 0.0.11 release-please owns these
+// bumps (it rewrites them all from one source on every release PR), but this test
+// stays as a CI backstop: it fails on a PARTIAL bump or a missing CHANGELOG entry,
+// whether the bump came from release-please or a hand edit. (The README no longer
+// carries a hand-version: the status badge is a static "pre-1.0" mark and the
+// live version shows via the npm badge.) See
+// mage/notes/release-bump-touches-many-artifacts.md.
 
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
@@ -34,11 +36,6 @@ describe("release artifact consistency — guards the version-bump surface", () 
     };
     const mage = (market.plugins ?? []).find((p) => p.name === "mage");
     expect(mage?.version).toBe(VERSION);
-  });
-
-  it("the README status badge matches package.json", () => {
-    const m = read("README.md").match(/badge\/status-([\d.]+)-/);
-    expect(m?.[1]).toBe(VERSION);
   });
 
   it("CHANGELOG.md has a dated heading for the current version", () => {
