@@ -1,14 +1,13 @@
-import matter from "gray-matter";
 import { describe, expect, it } from "vitest";
+import { parseNote } from "../note.js";
 import { renderKnowledgeBase } from "./bases.js";
 import type { DashboardData } from "./types.js";
 
 // ─── YAML parse helper ───────────────────────────────────────────────────────
 //
-// The package ships no YAML library, but `gray-matter` bundles a YAML engine.
-// Wrap the emitted `.base` body in frontmatter delimiters and parse it back: a
-// clean parse PROVES the renderer produced valid YAML. We assert on the parsed
-// object so the test is structural (not string-brittle).
+// Wrap the emitted `.base` body in frontmatter delimiters and parse it through
+// mage's own note parser: a clean parse PROVES the renderer produced valid YAML.
+// We assert on the parsed object so the test is structural (not string-brittle).
 
 interface BasesDoc {
   properties?: Record<string, { displayName?: string }>;
@@ -24,7 +23,7 @@ interface BasesView {
 }
 
 function parseBase(yaml: string): BasesDoc {
-  return matter(`---\n${yaml}---\n`).data as BasesDoc;
+  return parseNote(`---\n${yaml}---\n`).frontmatter as BasesDoc;
 }
 
 // ─── fixture ─────────────────────────────────────────────────────────────────

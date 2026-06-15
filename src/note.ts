@@ -1,4 +1,4 @@
-import matter from "gray-matter";
+import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import { readFile, writeFile } from "node:fs/promises";
 import { basename } from "node:path";
 
@@ -54,23 +54,33 @@ export async function readNote(path: string): Promise<Note> {
 }
 
 /**
- * gray-matter ships executable frontmatter engines (JavaScript / CoffeeScript)
- * that RUN CODE when a note opens with e.g. ` ---js `. mage only ever uses YAML,
- * so we hard-disable those engines — a crafted/untrusted note can't execute code.
+ * Frontmatter is a leading `---` fence, its YAML body, then a closing `---` on
+ * its own line; everything after is the note body. We split it by hand and parse
+ * only the YAML — pinned to **1.1** to match the prior js-yaml engine, so quoted
+ * dates stay quoted and unquoted ones keep their timestamp semantics (no churn).
+ * Unlike the previous gray-matter engine, the `yaml` parser has NO executable
+ * engines: an untrusted note can never run code on open.
  */
-const blockEngine = (_input: string): never => {
-  throw new Error("mage: executable frontmatter engines are disabled (YAML only)");
-};
-const SAFE_MATTER_OPTIONS = {
-  engines: { javascript: blockEngine, js: blockEngine, coffee: blockEngine },
-};
+const YAML_VERSION = "1.1" as const;
+const FENCE_OPEN = /^---[ \t]*\r?\n/;
+const FENCE_CLOSE = /(?:^|\r?\n)---[ \t]*(?:\r?\n|$)/;
 
 /** Parse note text into frontmatter + body. Tolerates a missing frontmatter block. */
 export function parseNote(raw: string): Note {
-  const parsed = matter(raw, SAFE_MATTER_OPTIONS);
+  const text = raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw; // strip a BOM
+  const open = FENCE_OPEN.exec(text);
+  if (!open) return { frontmatter: {}, body: text };
+  const rest = text.slice(open[0].length);
+  const close = FENCE_CLOSE.exec(rest);
+  if (!close) return { frontmatter: {}, body: text }; // unterminated fence → no frontmatter
+  const block = rest.slice(0, close.index);
+  const body = rest.slice(close.index + close[0].length);
+  // `logLevel: "error"` keeps real parse errors throwing (callers skip the note)
+  // while silencing the library's console warnings — mage owns its own output.
+  const data = block.trim() === "" ? {} : parseYaml(block, { version: YAML_VERSION, logLevel: "error" });
   return {
-    frontmatter: (parsed.data ?? {}) as NoteFrontmatter,
-    body: parsed.content ?? "",
+    frontmatter: (data ?? {}) as NoteFrontmatter,
+    body,
   };
 }
 
@@ -85,7 +95,10 @@ export function stringifyNote(fm: NoteFrontmatter, body: string): string {
   if (Object.keys(clean).length === 0) {
     return body.endsWith("\n") ? body : `${body}\n`;
   }
-  return matter.stringify(body, clean);
+  // `stringifyYaml` ends with a newline; `lineWidth: 0` disables wrapping so long
+  // values (descriptions, URLs) stay on one line. version 1.1 keeps date strings quoted.
+  const yaml = stringifyYaml(clean, { version: YAML_VERSION, lineWidth: 0 });
+  return `---\n${yaml}---\n${body}`;
 }
 
 // ─── derivations (used by `mage index`) ────────────────────────────────────

@@ -2,10 +2,10 @@ allowBuilds:
   esbuild: true
 
 overrides:
-  # esbuild 0.27.7 -> ^0.28.1 clears two advisories: GHSA-gv7w-rqvm-qjhr (high —
-  # RCE via the Deno install path) and GHSA-g7r4-m6w7-qqqr (low — Windows
-  # dev-server file read). Dev-only (esbuild rides vite/vitest); vite 8 declares
+  # esbuild 0.27.7 -> ^0.28.1 clears two dev-only advisories: GHSA-gv7w-rqvm-qjhr
+  # (high - RCE via the Deno install path) and GHSA-g7r4-m6w7-qqqr (low - Windows
+  # dev-server file read). esbuild rides vite/vitest; vite 8 declares
   # esbuild "^0.27.0 || ^0.28.0", so the bump is in range.
-  # js-yaml's only fix (4.x) is deliberately NOT overridden: it removes
-  # safeLoad/safeDump, which gray-matter calls, so it would break note parsing.
+  # (The js-yaml runtime advisory is fixed separately in this change by dropping
+  # gray-matter for the `yaml` package, which removes js-yaml from the tree.)
   esbuild: ^0.28.1

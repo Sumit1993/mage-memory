@@ -90,7 +90,9 @@ describe("scanNotes — recursive deny-list walk (ADR-0011 §2)", () => {
 
   it("skips an unparseable note with a warning, without crashing the scan", async () => {
     const root = await mkVault();
-    await put(root, "notes/bad.md", "---js\nmodule.exports = { x: 1 }\n---\nbody\n");
+    // Malformed YAML (an unterminated flow sequence) — the parser throws, and the
+    // scan must skip the note rather than crash.
+    await put(root, "notes/bad.md", "---\nbad: [1, 2\n---\nbody\n");
     await put(root, "notes/good.md", note(["x/y"]));
     const out = await scanNotes(root);
     expect(out.map((n) => n.relPath)).toEqual(["notes/good.md"]);
