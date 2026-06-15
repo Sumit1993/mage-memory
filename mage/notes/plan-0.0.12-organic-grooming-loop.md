@@ -116,6 +116,36 @@ note commits, so this becomes load-bearing (every false positive blocks the loop
   `--confirm` flow the hook message already promises) so no-`--no-verify` environments aren't
   deadlocked.
 
+## Also in the 0.0.12 cycle — adopt release-please (decided 2026-06-15)
+
+Releases move from a hand-made version-bump PR to **release-please**. Researched the landscape
+first: **husky** is the wrong layer (a hook *runner*, not a bumper); **release-it** has no
+native PR mode (its CI model pushes the bump+tag straight to the branch) and would need either
+a bypass-actor (which violates mage's "never direct-push; the USER merges PRs" rule) or a
+hand-built two-phase wrap that just re-implements release-please. **release-please fits the
+branch-protected, human-merges-the-PR model natively.**
+
+- **How it handles "one release = many PRs":** it runs on every merge to `main` and maintains
+  ONE rolling `chore(main): release X` PR that accumulates all the feature PRs' conventional
+  commits (version + CHANGELOG grow as more land). You merge that release PR once to cut the
+  release — the #12–17 → hand-made #18 pattern, automated.
+- **0.0.x cadence:** release-please derives the bump from commit type (`feat`→minor), so a
+  pre-1.0 `feat:` would jump to 0.1.0. Keep 0.0.x with **`bump-patch-for-minor-pre-major: true`**
+  (feats bump the patch), with a `Release-As: 0.0.x` commit footer as the milestone override.
+- **Bespoke files** ride `extra-files`: `package.json` (native), `.claude-plugin/plugin.json`
+  (`$.version`), `.claude-plugin/marketplace.json` (`$.plugins[0].version`), and the README
+  status badge (a `generic` marker). CHANGELOG is maintained natively. **npm publish stays
+  manual** (no `NPM_TOKEN` in CI to start). `src/release-consistency.test.ts` (the 0.0.11
+  interim guard) is **kept** — it now backstops that the `extra-files` config stays correct.
+- **Sequencing:** **PR #18 is refactored from a manual 0.0.11 bump into the release-please
+  INIT PR** — so **0.0.11 becomes the first release-please-managed release** (no manual
+  tag/publish). The refactor reverts the manual bump, adds `.github/workflows/release-please.yml`
+  + `release-please-config.json` + `.release-please-manifest.json` (pinned to `0.0.10`), and
+  keeps the one-time historical `CHANGELOG [0.0.10]` fix. **Caveat:** a release-please bootstrap
+  on an existing repo usually needs one post-merge CI iteration (extra-files paths / README
+  marker / version derivation reveal only when the Action runs) — verify config against current
+  release-please docs, don't guess the schema.
+
 ## Deferred to a2 / later (the procedure path)
 
 The procedure path — **A** (enrich workflow→procedure), **C** (bias-to-playbook), **D** (the
