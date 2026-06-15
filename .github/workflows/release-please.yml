@@ -1,0 +1,33 @@
+# release-please maintains a rolling "release" PR off conventional commits: each
+# feature/fix PR merged to main updates it. Merging the release PR bumps the
+# version across all artifacts (package.json + the extra-files in
+# release-please-config.json), writes the CHANGELOG, tags, and cuts the GitHub
+# release. npm publish stays MANUAL — we dogfood the built artifact locally before
+# `npm publish`, so there is intentionally no publish step here.
+name: release-please
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          # MUST be a PAT, not the default GITHUB_TOKEN. main is branch-protected
+          # with required status checks, and PRs created by GITHUB_TOKEN do NOT
+          # trigger CI — so the release PR could never satisfy its checks. A PAT
+          # makes release-please's commits trigger ci.yml. Store a fine-grained PAT
+          # (contents: write + pull-requests: write on this repo) as the
+          # RELEASE_PLEASE_TOKEN repository secret before merging this PR.
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
