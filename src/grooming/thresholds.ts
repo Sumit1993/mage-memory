@@ -27,13 +27,14 @@ export type Sensitivity = "low" | "normal" | "high";
 
 /** The full thresholds seam — every provisional grooming constant in one place. */
 export interface Thresholds {
-  promoteSessions: number; // K: distinct sessions to surface a NEW note candidate
-  graduateSessions: number; // M: distinct sessions to graduate a note → skill (Stage 2)
+  promoteSessions: number; // K: distinct CHAPTERS to surface a NEW note candidate (0.0.11)
+  graduateSessions: number; // M: distinct CHAPTERS to graduate a note → skill (0.0.11: unit is a compact-chapter, not a session)
   noteSizeCap: number; // split trigger: note body char cap (Stage 2)
   rewordRate: number; // context-match rate below which reword (Stage 3)
   demoteRate: number; // context-match rate below which demote (Stage 2/3)
   minLoads: number; // min skill loads before a context-match suggestion
   editBudget: number; // bounded edits per optimize pass ("textual learning rate", Stage 3)
+  promotionBudget: number; // max proposals surfaced per promote pass (ranked strongest-first; the rest defer)
 }
 
 // ─── consts ──────────────────────────────────────────────────────────────────
@@ -45,7 +46,12 @@ export const DEFAULT_SENSITIVITY: Sensitivity = "normal";
  * BASE = the @normal thresholds. These FINALIZE the provisional 0.0.6 numbers:
  * the rate-floors (rewordRate / demoteRate) and minLoads are IMPORTED from
  * context-match.ts so the metric and the seam never drift. The recurrence gates
- * (K=3, M=5), the note size cap, and the edit budget are the new 0.0.8 constants.
+ * (K=3, M=5 — chapters, 0.0.11), the note size cap, and the edit budget are constants.
+ *
+ * M NOTE (0.0.11): briefly raised to 8 to tame the chapter-unit flood, then returned
+ * to 5 — de-noise (Candidate 3) + the bounded promotionBudget already tame the flood,
+ * and the live soak showed real topical recurrence tops at ~5, so M=8 made graduation
+ * unreachable. M=5 keeps graduation organically achievable.
  */
 export const BASE_THRESHOLDS: Thresholds = {
   promoteSessions: 3,
@@ -55,15 +61,31 @@ export const BASE_THRESHOLDS: Thresholds = {
   demoteRate: DEMOTE_MATCH_RATE,
   minLoads: MIN_LOADS_FOR_SUGGESTION,
   editBudget: 3,
+  promotionBudget: 5,
 };
+
+/**
+ * The min-work floor for a compact CHAPTER to count as one distinct recurrence unit
+ * (0.0.11). The recurrence gates count distinct *chapters* (compact/session_end
+ * segments), not session_ids — so a single continuously-compacted chat can still
+ * accrue recurrence (a session_id is constant across compaction). A chapter must carry
+ * at least this many WORK events (user_prompt + tool_use) so a trivial `/compact`
+ * cannot manufacture a unit. STRUCTURAL floor — NOT dial-scaled.
+ *
+ * KNOWN LIMITATION (deferred, plan-0.0.11-signal-and-capture.md, Candidate 1): chapter
+ * SIZE tracks the context-window (compaction fires when it fills), so the raw chapter
+ * count is window-sensitive. A window-independent unit (distinct days / idle-gap
+ * episodes) is the planned refinement.
+ */
+export const MIN_CHAPTER_WORK_EVENTS = 2;
 
 /** The recurrence gates per dial position — the ONLY fields the dial scales. */
 const GATES: Record<Sensitivity, { promoteSessions: number; graduateSessions: number }> = {
-  // high → easier to surface (fewer sessions needed).
+  // high → easier to surface (fewer chapters needed).
   high: { promoteSessions: 2, graduateSessions: 4 },
   // normal → BASE.
   normal: { promoteSessions: BASE_THRESHOLDS.promoteSessions, graduateSessions: BASE_THRESHOLDS.graduateSessions },
-  // low → harder to surface (more sessions needed).
+  // low → harder to surface (more chapters needed).
   low: { promoteSessions: 4, graduateSessions: 7 },
 };
 

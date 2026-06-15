@@ -85,4 +85,7 @@ export interface PromoteManifest {
   cursors: Record<string, number>;
   /** Count of signatures at/above K that ARE already covered by a note (info; not proposed). */
   covered: number;
+  /** Eligible proposals NOT surfaced this pass — the bounded promotion budget deferred them
+   *  (strongest-first); >0 means more candidates wait for the next pass (0.0.11). */
+  deferred: number;
 }

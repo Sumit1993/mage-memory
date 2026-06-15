@@ -349,7 +349,7 @@ describe("doctor env checks still run", () => {
   });
 
   it("MAGE_HOOKS length is the expected hook count used by the connection check", () => {
-    expect(MAGE_HOOKS.length).toBe(8);
+    expect(MAGE_HOOKS.length).toBe(9);
   });
 });
 

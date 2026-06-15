@@ -38,7 +38,7 @@ describe("connect", () => {
 
     expect(r.scope).toBe("local");
     expect(r.path).toBe(localPath(dir));
-    expect(r.wired).toBe(8);
+    expect(r.wired).toBe(9);
 
     const settings = JSON.parse(await readFile(r.path, "utf8")) as {
       hooks: Record<string, Array<{ id?: string }>>;
@@ -47,7 +47,7 @@ describe("connect", () => {
       .flat()
       .map((g) => g.id)
       .filter((id): id is string => typeof id === "string" && id.startsWith("mage:"));
-    expect(ids).toHaveLength(8);
+    expect(ids).toHaveLength(9);
     expect(new Set(ids)).toEqual(
       new Set([
         "mage:observe:SessionStart",
@@ -58,6 +58,7 @@ describe("connect", () => {
         "mage:observe:SessionEnd",
         "mage:metrics:Stop",
         "mage:observe:Stop",
+        "mage:observe:SubagentStop",
       ]),
     );
   });
@@ -74,7 +75,7 @@ describe("connect", () => {
     await writeFile(localPath(dir), `${JSON.stringify(pre, null, 2)}\n`);
 
     const r = await connect({ cwd: dir, yes: true });
-    expect(r.wired).toBe(8);
+    expect(r.wired).toBe(9);
     expect(r.backedUp).toBe(true);
 
     // .bak preserves the original verbatim
@@ -103,16 +104,16 @@ describe("connect", () => {
     const r2 = await connect({ cwd: dir, yes: true });
     const after2 = await readFile(localPath(dir), "utf8");
 
-    expect(r2.wired).toBe(8);
+    expect(r2.wired).toBe(9);
     expect(after2).toBe(after1);
 
-    // still exactly 8 mage groups (no duplication)
+    // still exactly 9 mage groups (no duplication)
     const settings = JSON.parse(after2) as { hooks: Record<string, Array<{ id?: string }>> };
     const ids = Object.values(settings.hooks)
       .flat()
       .map((g) => g.id)
       .filter((id): id is string => typeof id === "string" && id.startsWith("mage:"));
-    expect(ids).toHaveLength(8);
+    expect(ids).toHaveLength(9);
   });
 
   it("--user targets the user path", async () => {
@@ -152,7 +153,7 @@ describe("connect", () => {
   it("in a non-repo dir, connect installs no hook (result.hook reports not-a-repo)", async () => {
     const dir = await freshDir();
     const r = await connect({ cwd: dir, yes: true });
-    expect(r.wired).toBe(8);
+    expect(r.wired).toBe(9);
     expect(r.hook).toEqual({ installed: false, reason: "not-a-repo" });
   });
 
@@ -202,7 +203,7 @@ describe("connect", () => {
     await gitInit(dir);
 
     const r = await connect({ cwd: dir, yes: true, gitHook: false });
-    expect(r.wired).toBe(8);
+    expect(r.wired).toBe(9);
     expect(r.hook).toBeUndefined();
 
     const hooksDir = await resolveHooksDir(dir);
@@ -294,7 +295,7 @@ describe("connect", () => {
     const dir = await freshDir();
     // No mage/, no projects/ → resolveDocsRoot returns null → self-heal skipped.
     const r = await connect({ cwd: dir, yes: true, gitHook: false });
-    expect(r.wired).toBe(8);
+    expect(r.wired).toBe(9);
 
     // No .gitignore created for the capture sinks.
     expect(await exists(join(dir, ".gitignore"))).toBe(false);

@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { collectDashboardData } from "./collect.js";
+import { PROMOTE_VERSION } from "../grooming/tally.js";
 
 // ─── fixture plumbing ────────────────────────────────────────────────────────
 
@@ -93,7 +94,7 @@ describe("collectDashboardData — populated KB", () => {
 
     // context-match rollup — two skills, 8 loads / 6 matches → 75% whole-KB.
     await metrics(root, "context-match.json", {
-      v: 1,
+      v: PROMOTE_VERSION,
       skills: {
         "alpha:deploy::h1": {
           loads: 5,
@@ -113,7 +114,7 @@ describe("collectDashboardData — populated KB", () => {
 
     // promote tally — two signatures recurring: one at 3 sessions, one at 5.
     await metrics(root, "promote.json", {
-      v: 1,
+      v: PROMOTE_VERSION,
       signatures: {
         "alpha::deploy,rollback": {
           sessions: 5,
