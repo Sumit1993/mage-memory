@@ -169,6 +169,31 @@ key + network, opens a cost/telemetry surface) — a genuine identity shift. Def
 the host-skill judge + organic trigger (B); the bounded manifest already keeps data off the
 model. An embedded judge is a LATER option IF fully-autonomous out-of-band grooming is wanted.
 
+## Provenance — finishing a planned loop, not inventing one (raised 2026-06-14)
+
+The whole organic loop this note proposes was **written down at the start and simply left
+unbuilt** — A/B are completing [ADR-0009](../decisions/0009-no-runtime-automation-rides-host-hooks.md),
+not extending it:
+
+- **The nudge trigger (B) = ADR-0009 §24, step 2** — *"A `PreCompact` / `SessionEnd` hook
+  **nudges** the agent … before context is lost."* The deployed hooks stopped at step 1
+  (`mage observe`, deterministic capture); the step-2 nudge was never wired.
+- **The loosening-to-autonomy (the confidence ladder / auto-tuner) was planned twice** —
+  ADR-0009 §25 (*"Promote … starts human-confirm; graduates to **auto-promote** when a pattern
+  recurs ≥2× at confidence ≥ threshold"*) and [ADR-0021](../decisions/0021-offline-no-telemetry-local-signal.md)
+  §2 (*"local data drives **per-user adaptation (the deferred auto-tuner / autonomy rungs)** …
+  more automated promotions over time runs through the user's **own local accept-rate**, not a
+  remote server"*). Both UNBUILT — promotion still cold-starts at human-confirm (ADR-0016 Rung
+  A), with no local-accept-rate loosening yet.
+- **What these ADRs already SETTLE for OQ 9:** judgment "rides" the host agent and "never
+  smuggle a reasoner into the CLI" (ADR-0009 §17,§19); signal stays local, no phone-home
+  (ADR-0021 §1). So an embedded cloud judge breaks BOTH on two counts (reasoner-in-engine +
+  network egress); even a local model still adds the "runtime of our own" ADR-0009 forbids. The
+  blessed path is exactly B + the §25/§2 local-accept-rate ladder.
+
+Framing: this is **finishing the plan, not a pivot.** The only genuinely new decision is OQ 9
+(embed a judge), and the ADRs already lean it toward "no."
+
 ## Proposed changes
 
 ### A — make a recurring workflow DRAFTABLE as a procedure (highest leverage)
@@ -191,6 +216,11 @@ playbook from that.
 
 Add a hook path that injects a SHORT nudge into the agent's context when (and only when) a
 candidate is ripe — never auto-grooms, never commits.
+
+> **Not new design — UNBUILT design.** This is [ADR-0009](../decisions/0009-no-runtime-automation-rides-host-hooks.md)
+> §24 step 2 verbatim: *"A `PreCompact` / `SessionEnd` hook **nudges** the agent ('distill
+> `.learnings/` … before context is lost')."* The nudge was planned at the start; the wired
+> hooks only ever ran `mage observe` (capture, step 1), never the nudge (step 2). B finishes it.
 
 - **Mechanism:** a `mage nudge` (or `mage promote --nudge`) command run from a SessionStart
   group (and/or SessionEnd) that folds incrementally (the offset watermark keeps re-folds
