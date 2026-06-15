@@ -11,16 +11,37 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.0.10] - 2026-06-14
+
+Coherence — one consistent vocabulary, one grooming skill, and a metadata schema
+that migrates itself.
+
+### Added
+
+- Metadata schema **`mage.v2`** with a lenient v1 read and a first-class
+  `mage migrate`.
+- `mage doctor --fix` repairs drift — a missing hook block, the redaction hook, or
+  an out-of-date metadata schema.
+- `init` / `link` **auto-connect** capture hooks, so a fresh KB starts capturing
+  without a separate `mage connect`.
 
 ### Changed
 
+- The self-grooming skills merged into a single **`mage:groom`** (first-sight and
+  recurrence phases); the engine output is now labelled and the plumbing commands
+  are hidden from `mage --help`.
+- Vocabulary reconciled across the codebase — shapes are **in-repo · hybrid ·
+  external**, and a **hub** is one repo that is both a KB and a registry.
 - **Node 18 is no longer supported — the runtime floor is now Node 20.** Node 18
   reached end-of-life on 2025-04-30, and the upgraded CLI dependencies
   (commander 15, ora 9, @inquirer/prompts 8) use `node:util.styleText`, available
   only on Node 20.12+. `engines.node` is now `>=20`.
 - Dependency modernization: commander 12 → 15, ora 8 → 9, @inquirer/prompts 7 → 8;
   dev: TypeScript 5.7 → 6.0, @types/node 22 → 25, @types/tar 6 → 7.
+
+### Removed
+
+- The spec-driven (SDD) skills.
 
 ## [0.0.9] - 2026-06-10
 
@@ -170,6 +191,7 @@ specshub.
 - Awareness and `mage:learn` skills.
 - In-repo, external, and hybrid modes, plus a hub registry.
 
+[0.0.10]: https://github.com/Sumit1993/mage-memory/compare/v0.0.9...v0.0.10
 [0.0.9]: https://github.com/Sumit1993/mage-memory/compare/v0.0.8...v0.0.9
 [0.0.8]: https://github.com/Sumit1993/mage-memory/compare/v0.0.7...v0.0.8
 [0.0.7]: https://github.com/Sumit1993/mage-memory/compare/v0.0.6...v0.0.7
