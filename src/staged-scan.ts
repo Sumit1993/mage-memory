@@ -21,8 +21,10 @@
 // owning `file` — never the staged content itself.
 
 import { relative, sep } from "node:path";
-import { resolveDocsRoot } from "./paths.js";
+import { REDACTIGNORE_FILE, resolveDocsRoot } from "./paths.js";
 import { scanSecrets, type SecretFinding } from "./redact.js";
+import { matchesRedactGlob, readRedactIgnore } from "./redactignore.js";
+import { isGeneratedArtifact } from "./scan.js";
 import { run } from "./shell.js";
 
 /** A SecretFinding attributed to the staged file it was found in. */
@@ -66,6 +68,10 @@ export async function scanStaged(repoPath: string): Promise<StagedScanResult> {
   const docs = await resolveDocsRoot(repoPath).catch(() => null);
   if (!docs) return { findings: [], blocked: false, scannedFiles: 0 };
   const inScope = docsScopeFilter(docs.repo, docs.root);
+  const toDocsRel = docsRelPathMapper(docs.repo, docs.root);
+  // The committed false-positive allowlist (mage/.redactignore) — fail-open (empty
+  // when absent/unreadable), so a missing allowlist never changes gate behavior.
+  const ignore = await readRedactIgnore(docs.root);
 
   const list = await run("git", [
     "-C",
@@ -81,18 +87,32 @@ export async function scanStaged(repoPath: string): Promise<StagedScanResult> {
 
   // NUL-delimited: split on "\0" and drop the trailing empty. No `.trim()` — a path
   // is taken verbatim (trimming would corrupt a name with leading/trailing spaces).
-  const files = list.stdout.split("\0").filter((l) => l.length > 0).filter(inScope);
+  const files = list.stdout
+    .split("\0")
+    .filter((l) => l.length > 0)
+    .filter(inScope)
+    .filter((file) => {
+      // Skip mage's OWN generated artifacts (their path strings trip the high-entropy
+      // detector but are never user secrets), the allowlist file itself (its literal
+      // allows can be secret-shaped), and any path allowlisted via a `.redactignore`
+      // glob — the non-bypass override for a strict, no-`--no-verify` environment.
+      const rel = toDocsRel(file);
+      return (
+        !isGeneratedArtifact(rel) && rel !== REDACTIGNORE_FILE && !matchesRedactGlob(rel, ignore)
+      );
+    });
 
   const findings: StagedFinding[] = [];
   let scannedFiles = 0;
   for (const file of files) {
     // `:<path>` addresses the staged (index) blob — exactly what a commit writes.
-    const blob = await run("git", ["-C", repoPath, "show", ":" + file]);
+    const blob = await run("git", ["-C", repoPath, "show", `:${file}`]);
     if (blob.code !== 0) continue; // deleted/renamed/binary race — skip, don't abort.
     scannedFiles += 1;
     // Map each finding to a file-attributed one. scanSecrets() already masks the
-    // preview; we add ONLY the file — the raw blob never escapes this loop.
-    for (const f of scanSecrets(blob.stdout)) {
+    // preview; we add ONLY the file — the raw blob never escapes this loop. Literal
+    // allows are suppressed INSIDE the scanner, where the raw value is available.
+    for (const f of scanSecrets(blob.stdout, ignore.literals)) {
       findings.push({ ...f, file });
     }
   }
@@ -109,9 +129,29 @@ export async function scanStaged(repoPath: string): Promise<StagedScanResult> {
  * scope), or e.g. "mage" in-repo (a path is in scope iff it equals the prefix or
  * sits under `prefix/`). Pure + sync.
  */
+/** Docs root as a POSIX prefix relative to the repo: "" for a hub (the repo IS the
+ *  KB), else e.g. "mage" in-repo. Shared by the scope filter and the docs-rel mapper. */
+function docsPrefix(repo: string, root: string): string {
+  return relative(repo, root).split(sep).join("/");
+}
+
 function docsScopeFilter(repo: string, root: string): (file: string) => boolean {
-  const prefix = relative(repo, root).split(sep).join("/");
+  const prefix = docsPrefix(repo, root);
   if (prefix === "" || prefix === ".") return () => true; // hub: the repo is the KB.
   const under = `${prefix}/`;
   return (file: string) => file === prefix || file.startsWith(under);
+}
+
+/**
+ * Map a repo-relative POSIX staged path to one relative to the docs root, so it can
+ * be matched against `.redactignore` globs (which the user writes relative to the KB
+ * root) and compared to {@link REDACTIGNORE_FILE}. In a hub the docs root IS the repo
+ * (prefix ""), so the path is returned unchanged; in-repo, the `mage/` prefix is
+ * stripped. Pure + sync.
+ */
+function docsRelPathMapper(repo: string, root: string): (file: string) => string {
+  const prefix = docsPrefix(repo, root);
+  if (prefix === "" || prefix === ".") return (file) => file;
+  const under = `${prefix}/`;
+  return (file) => (file.startsWith(under) ? file.slice(under.length) : file);
 }

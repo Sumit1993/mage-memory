@@ -2,7 +2,7 @@ import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
-import { CROSS, scanNotes } from "./scan.js";
+import { CROSS, isGeneratedArtifact, scanNotes } from "./scan.js";
 
 async function mkVault(): Promise<string> {
   return mkdtemp(join(tmpdir(), "mage-scan-"));
@@ -146,5 +146,35 @@ describe("scanNotes — multi-home wings[] (ADR-0012 §5)", () => {
       expect(n.wings).toEqual([]);
       expect(n.wing).toBe(CROSS);
     }
+  });
+});
+
+describe("isGeneratedArtifact (docs-root-relative; Gate-2 generated-artifact skip)", () => {
+  it("matches the fixed scaffolding files ONLY at the docs root", () => {
+    for (const f of ["INDEX.md", "IDENTITY.md", "AGENTS.md", "CLAUDE.md", "Dashboard.md"]) {
+      expect(isGeneratedArtifact(f)).toBe(true);
+    }
+  });
+
+  it("does NOT match a reserved basename in a subdirectory (author content → must be scanned)", () => {
+    expect(isGeneratedArtifact("notes/INDEX.md")).toBe(false);
+    expect(isGeneratedArtifact("notes/decisions/AGENTS.md")).toBe(false);
+    expect(isGeneratedArtifact("projects/p/INDEX.md")).toBe(false);
+  });
+
+  it("matches per-wing _index.*.md at any depth (generated everywhere)", () => {
+    expect(isGeneratedArtifact("_index.mage.md")).toBe(true);
+    expect(isGeneratedArtifact("notes/_index.mage.md")).toBe(true);
+  });
+
+  it("matches anything under a host skill/config dir (.claude / .agents) at any depth", () => {
+    expect(isGeneratedArtifact(".claude/skills/groom/SKILL.md")).toBe(true);
+    expect(isGeneratedArtifact(".agents/skills/learn/SKILL.md")).toBe(true);
+    expect(isGeneratedArtifact("notes/.claude/x.md")).toBe(true);
+  });
+
+  it("does NOT match an ordinary authored note", () => {
+    expect(isGeneratedArtifact("notes/my-lesson.md")).toBe(false);
+    expect(isGeneratedArtifact("README.md")).toBe(false);
   });
 });
