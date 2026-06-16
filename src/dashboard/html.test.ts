@@ -9,7 +9,7 @@ function populated(): DashboardData {
   return {
     meta: {
       kbName: "my-kb",
-      kind: "in-repo",
+      kind: "repo",
       root: "/abs/repo/mage",
       mageVersion: "9.9.9",
       lastRefreshed: "2026-06-09T12:00:00.000Z",
@@ -109,7 +109,7 @@ function cold(): DashboardData {
   return {
     meta: {
       kbName: "fresh",
-      kind: "in-repo",
+      kind: "repo",
       root: "/abs/fresh/mage",
       mageVersion: "9.9.9",
       lastRefreshed: "2026-06-09T12:00:00.000Z",

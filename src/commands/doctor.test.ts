@@ -11,7 +11,7 @@ import {
 import { gitInit } from "../git.js";
 import { detectRedactHook, installRedactHook } from "../git-hooks.js";
 import { METADATA_SCHEMA, METADATA_SCHEMA_V1, exists } from "../paths.js";
-import { doctor } from "./doctor.js";
+import { type DoctorCheck, doctor } from "./doctor.js";
 
 const made: string[] = [];
 afterEach(async () => {
@@ -25,7 +25,7 @@ async function freshDir(prefix = "mage-doctor-"): Promise<string> {
 }
 
 /** Find a check by name in a DoctorResult. */
-function check(checks: Array<{ name: string }>, name: string) {
+function check(checks: DoctorCheck[], name: string) {
   return checks.find((c) => c.name === name);
 }
 
