@@ -29,11 +29,14 @@ keywords: [grooming, organic, lesson, first-sight, distill, staging, nudge, inli
 
 # Organic grooming loop (0.0.12) — the lesson path
 
-**Status: GRILLED 2026-06-15 — decisions locked, ready to build.** Becomes **ADR-0024**
-once built — *finishing* [ADR-0009](../decisions/0009-no-runtime-automation-rides-host-hooks.md)
-§24 step 2 (the planned-but-unbuilt nudge) and amending
+**Status: GRILLED 2026-06-15 — decisions locked; BUILT 2026-06-16.** Recorded as
+**[ADR-0024](../decisions/0024-organic-grooming-loop.md)** (this note remains the full grill
+rationale; the ADR is the crisp decision of record) — *finishing*
+[ADR-0009](../decisions/0009-no-runtime-automation-rides-host-hooks.md) §24 step 2 (the
+planned-but-unbuilt nudge) and amending
 [ADR-0013](../decisions/0013-procedure-skills-self-grooming-loop.md) /
-[ADR-0019](../decisions/0019-mage-promote-self-grooming.md).
+[ADR-0019](../decisions/0019-mage-promote-self-grooming.md). Follow-up:
+**[ADR-0025](../decisions/0025-one-transient-state-home.md)** folds the transient dirs into `.mage/`.
 
 > **The grill flipped the thesis.** This note was drafted as "closing the *procedure* path"
 > (recurring workflow → skill). The 2026-06-15 grill established the opposite: the organic
