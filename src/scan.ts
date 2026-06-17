@@ -23,6 +23,7 @@ import {
   METRICS_DIR,
   NODE_MODULES_DIR,
   OBSIDIAN_DIR,
+  STAGING_DIR,
 } from "./paths.js";
 
 /** Sentinel wing key for untagged / cross-cutting notes. */
@@ -40,6 +41,7 @@ const SKIP_DIRS = new Set<string>([
   ARTIFACTS_DIRNAME,
   LEARNINGS_DIR,
   METRICS_DIR,
+  STAGING_DIR, // judged-but-uncommitted grooming-loop drafts — never in the live index (0.0.12)
   ARCHIVE_DIR,
   CLAUDE_DIR,
   AGENTS_SKILLS_DIR,

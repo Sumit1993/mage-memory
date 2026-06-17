@@ -12,7 +12,7 @@ function base(): DD {
   return {
     meta: {
       kbName: "kb",
-      kind: "in-repo",
+      kind: "repo",
       root: "/abs/kb",
       mageVersion: "9.9.9",
       lastRefreshed: "2026-06-09T12:00:00.000Z",

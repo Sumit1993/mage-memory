@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   buildAssistantMsg,
-  buildCompact,
   buildSessionEnd,
   buildSessionStart,
   buildSkillLoad,
@@ -67,7 +66,6 @@ function sessionStart(): ObserveEvent {
     source: "startup",
   });
 }
-const compact = (): ObserveEvent => buildCompact(base(), "manual");
 const sessionEnd = (): ObserveEvent => buildSessionEnd(base());
 
 /** Whole-array segment helper. */

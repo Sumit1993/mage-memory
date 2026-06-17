@@ -33,5 +33,8 @@
     "ignoreDeprecations": "6.0"
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts"]
+  // Test files are intentionally INCLUDED so `tsc --noEmit` (the typecheck
+  // script + CI) and the editor both type-check them. The build (tsup) bundles
+  // from explicit entries and is unaffected.
+  "exclude": ["node_modules", "dist"]
 }

@@ -84,6 +84,33 @@ once built — *finishing* [ADR-0009](../decisions/0009-no-runtime-automation-ri
 11. **Notes stay SHORT** (CC-memory-sized). Tension to resolve in build: the 6000-char
     `noteSizeCap` is for authored design notes; staged lesson-notes want a much smaller target.
 
+## Build decisions (locked during the build, 2026-06-15)
+
+Resolving the spec's "resolve in build" tensions + the codebase-map's open questions:
+
+- **D1 — `.staging/` = a new gitignored `STAGING_DIR=".staging"`** sibling of `.learnings/`/`.metrics/`,
+  holding **complete note drafts** as `<slug>.md` (frontmatter + body). It is in the indexer
+  **SKIP_DIRS** (never indexed); `mage groom` reads it **directly** (bypasses the scanner). So
+  groom-accept = **move + index** (no re-serialize). Per-project in a hub (each project gets its own).
+- **D2 — slug = kebab(title)**, de-collided with `-2`, `-3` … on clash.
+- **D3 — short lesson cap = `lessonNoteCap` (BASE 1200 chars, body)** in `thresholds.ts`. CC-memory-sized.
+  **Soft**: `mage stage` *warns* past it but never blocks (frictionless). The 6000 `noteSizeCap`
+  stays for authored design notes.
+- **D4 — `mage stage`** (hidden plumbing): `--title` + `--type`(default `gotcha`) + `--tags` + `--wing`
+  + body on **stdin**; composes a note, **scrubs via `redact()`** (keep-context, NEVER blocks — drafts
+  are pre-commit + gitignored), dedups, writes `.staging/<slug>.md`; `--json` → `{staged,path,key,skipped,reason}`.
+- **D5 — `mage groom`** (hidden plumbing): default/`--json` **surfaces** the deduped, N-capped pending
+  batch (read-only); `--accept <slugs|all>` **moves** drafts → `notes/<slug>.md` + runs the indexer;
+  `--reject <slugs|all>` deletes them + records their key. Notes are **flat** in `notes/` (wing via tags).
+- **D6 — dedup reuses `coveringNote(sig, notes)`** (grooming/covering-note.ts); `sig = {wing from tags,
+  keywords from title+body}`. A draft is skipped if a committed note covers it, it is already staged,
+  or its key is in the reject ledger.
+- **D7 — budget = `stagingBudget` (BASE 3)** in `thresholds.ts`; surface caps at 3 and **logs the
+  remaining count** (no silent truncation).
+- **D8 — lesson reject ledger = `.metrics/staged-rejects.json`** (`{v,keys:[]}`, fail-open) — a NEW
+  file, kept **out of `.staging/`** (so groom can safely clear staging) and **distinct from** the
+  recurrence-path `.metrics/rejected.json` (which keys on proposal action+target, the procedure path).
+
 ## The 0.0.12 build — portable core + Claude-Code adapter
 
 The whole loop splits along ADR-0009's existing line (*"notes portable, capture host-specific"*):

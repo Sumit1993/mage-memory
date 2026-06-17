@@ -35,6 +35,8 @@ export interface Thresholds {
   minLoads: number; // min skill loads before a context-match suggestion
   editBudget: number; // bounded edits per optimize pass ("textual learning rate", Stage 3)
   promotionBudget: number; // max proposals surfaced per promote pass (ranked strongest-first; the rest defer)
+  lessonNoteCap: number; // SOFT target for an organic lesson draft (`mage stage`) — CC-memory-sized, warn-not-block (0.0.12)
+  stagingBudget: number; // max staged lesson drafts `mage groom` surfaces per pass (anti-flood; the rest defer) (0.0.12)
 }
 
 // ─── consts ──────────────────────────────────────────────────────────────────
@@ -62,6 +64,13 @@ export const BASE_THRESHOLDS: Thresholds = {
   minLoads: MIN_LOADS_FOR_SUGGESTION,
   editBudget: 3,
   promotionBudget: 5,
+  // 0.0.12 lesson path: organic drafts are CC-memory-sized (one distilled fact +
+  // Why/How), far under the 6000 authored-note cap. SOFT — `mage stage` warns past
+  // it but never blocks (frictionless inline capture).
+  lessonNoteCap: 1200,
+  // Anti-flood: at most 3 staged drafts surfaced per `mage groom` pass; the budget
+  // is load-bearing even if the salience bar is loose (plan §9).
+  stagingBudget: 3,
 };
 
 /**

@@ -82,7 +82,7 @@ describe("planReword", () => {
   it("plans writes only for the dirs the skill actually exists in", async () => {
     const repo = await tmpRepo();
     // Only the first target dir has the skill.
-    await putSkill(repo, "mage-skill-solo", skillMd("mage-skill-solo", "old"), [TARGET_AGENT_DIRS[0]]);
+    await putSkill(repo, "mage-skill-solo", skillMd("mage-skill-solo", "old"), [TARGET_AGENT_DIRS[0]!]);
 
     const plan = await planReword(repo, { skill: "mage-skill-solo", description: "fresh" });
     expect(plan.writes).toHaveLength(1);
@@ -99,7 +99,7 @@ describe("planReword", () => {
   it("THROWS when the SKILL.md has no description key (nothing to reword)", async () => {
     const repo = await tmpRepo();
     const noDesc = ["---", "name: mage-skill-nd", "wing: a", "---", "", GEN_MARKER, "", "# x", ""].join("\n");
-    await putSkill(repo, "mage-skill-nd", noDesc, [TARGET_AGENT_DIRS[0]]);
+    await putSkill(repo, "mage-skill-nd", noDesc, [TARGET_AGENT_DIRS[0]!]);
     await expect(planReword(repo, { skill: "mage-skill-nd", description: "y" })).rejects.toThrow(
       /description/,
     );
@@ -111,7 +111,7 @@ describe("planReword", () => {
       repo,
       "mage-skill-foo",
       skillMd("mage-skill-foo", "OLD trigger. Load when old."),
-      [TARGET_AGENT_DIRS[0]],
+      [TARGET_AGENT_DIRS[0]!],
     );
 
     // A crafted description with newlines + a colon trying to inject name/wing/malicious.
@@ -147,7 +147,7 @@ describe("planReword", () => {
       "body",
       "",
     ].join("\n");
-    await putSkill(repo, "mage-skill-fold", folded, [TARGET_AGENT_DIRS[0]]);
+    await putSkill(repo, "mage-skill-fold", folded, [TARGET_AGENT_DIRS[0]!]);
 
     const plan = await planReword(repo, { skill: "mage-skill-fold", description: "one liner now" });
     const content = plan.writes[0]?.content ?? "";

@@ -25,6 +25,7 @@ import {
   META_FILE,
   METADATA_SCHEMA,
   METRICS_DIR,
+  STAGING_DIR,
   exists,
   looksLikeHub,
   readHubMetadata,
@@ -219,7 +220,11 @@ async function pushSinkIgnoreCheck(
 ): Promise<void> {
   const { root, patterns } = sinkIgnoreSpec(kb);
   const prefix = kb.kind === "repo" ? "mage/" : "";
-  const probes = [`${prefix}${LEARNINGS_DIR}/probe`, `${prefix}${METRICS_DIR}/probe`];
+  const probes = [
+    `${prefix}${LEARNINGS_DIR}/probe`,
+    `${prefix}${METRICS_DIR}/probe`,
+    `${prefix}${STAGING_DIR}/probe`,
+  ];
 
   // Guard the write on the root existing: an external repo can resolve to a hub
   // project dir not yet materialized on disk — writing a .gitignore there would
@@ -255,7 +260,12 @@ export function sinkIgnoreSpec(kb: Kb): { root: string; patterns: string[] } {
   if (kb.kind === "repo") {
     return {
       root: kb.repo,
-      patterns: [`mage/${LEARNINGS_DIR}/`, `mage/${METRICS_DIR}/`, "mage/dashboard.html"],
+      patterns: [
+        `mage/${LEARNINGS_DIR}/`,
+        `mage/${METRICS_DIR}/`,
+        `mage/${STAGING_DIR}/`,
+        "mage/dashboard.html",
+      ],
     };
   }
   return {
@@ -265,6 +275,8 @@ export function sinkIgnoreSpec(kb: Kb): { root: string; patterns: string[] } {
       `**/${LEARNINGS_DIR}/`,
       `${METRICS_DIR}/`,
       `**/${METRICS_DIR}/`,
+      `${STAGING_DIR}/`,
+      `**/${STAGING_DIR}/`,
       "dashboard.html",
     ],
   };

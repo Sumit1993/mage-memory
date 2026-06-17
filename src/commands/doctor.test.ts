@@ -11,7 +11,7 @@ import {
 import { gitInit } from "../git.js";
 import { detectRedactHook, installRedactHook } from "../git-hooks.js";
 import { METADATA_SCHEMA, METADATA_SCHEMA_V1, exists } from "../paths.js";
-import { doctor } from "./doctor.js";
+import { type DoctorCheck, doctor } from "./doctor.js";
 
 const made: string[] = [];
 afterEach(async () => {
@@ -25,7 +25,7 @@ async function freshDir(prefix = "mage-doctor-"): Promise<string> {
 }
 
 /** Find a check by name in a DoctorResult. */
-function check(checks: Array<{ name: string }>, name: string) {
+function check(checks: DoctorCheck[], name: string) {
   return checks.find((c) => c.name === name);
 }
 
@@ -54,7 +54,7 @@ async function makeInRepoKb(
     await writeFile(join(dir, "mage", "INDEX.md"), "# Index\n");
   }
   if (opts.gitignoreSinks) {
-    await writeFile(join(dir, ".gitignore"), "mage/.learnings/\nmage/.metrics/\n");
+    await writeFile(join(dir, ".gitignore"), "mage/.learnings/\nmage/.metrics/\nmage/.staging/\n");
   }
 }
 
@@ -684,7 +684,7 @@ describe("doctor — metadata schema drift", () => {
     };
     await writeFile(join(dir, "mage", "metadata.json"), `${JSON.stringify(meta, null, 2)}\n`);
     await writeFile(join(dir, "mage", "INDEX.md"), "# Index\n");
-    await writeFile(join(dir, ".gitignore"), "mage/.learnings/\nmage/.metrics/\n");
+    await writeFile(join(dir, ".gitignore"), "mage/.learnings/\nmage/.metrics/\nmage/.staging/\n");
   }
 
   it("v2 metadata → schema check passes", async () => {
