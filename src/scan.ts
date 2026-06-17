@@ -65,6 +65,30 @@ const RESERVED_MD = new Set<string>([
 ]);
 const GEN_INDEX_RE = /^_index\..+\.md$/;
 
+/**
+ * True iff a DOCS-ROOT-RELATIVE POSIX path (e.g. `INDEX.md`, `notes/x.md`,
+ * `.claude/skills/g/SKILL.md`) points at a mage-GENERATED artifact, not an authored
+ * note. Reused by the Gate-2 staged-redaction scan to skip files mage writes itself
+ * (their PATH strings can trip the high-entropy detector but are never user
+ * secrets — ADR-0014). SECURITY: the fixed scaffolding names ({@link RESERVED_MD})
+ * are matched ONLY at the docs root, because mage generates them there — a
+ * user-AUTHORED file that merely shares the basename in a subdirectory (e.g.
+ * `notes/INDEX.md`) MUST still be secret-scanned, never skipped. Per-wing indexes
+ * (`_index.*.md`) and host skill/config dirs (`.claude/`, `.agents/`) ARE generated
+ * at any depth. Pure + sync.
+ */
+export function isGeneratedArtifact(docsRelPath: string): boolean {
+  const segments = docsRelPath.split("/");
+  // Host skill/config dirs mage owns — generated at any depth.
+  if (segments.some((s) => s === CLAUDE_DIR || s === AGENTS_SKILLS_DIR)) return true;
+  const base = segments[segments.length - 1] ?? "";
+  // Per-wing indexes are generated at any depth.
+  if (GEN_INDEX_RE.test(base)) return true;
+  // The fixed scaffolding files are generated ONLY at the docs root; a subdirectory
+  // file that shares the basename is author content and must still be scanned.
+  return segments.length === 1 && RESERVED_MD.has(base);
+}
+
 export interface ScannedNote {
   /** posix path relative to the docs root */
   relPath: string;
@@ -125,6 +149,9 @@ async function walk(dir: string, root: string, out: ScannedNote[]): Promise<void
     }
     if (!e.name.endsWith(".md")) continue;
     // Skip mage's own generated indexes + scaffolding anywhere (reserved namespace).
+    // NOTE: the indexer deliberately reserves these BASENAMES at any depth (a note is
+    // never named INDEX.md); the Gate-2 isGeneratedArtifact() is stricter (root-only)
+    // because a stray secret in a subdir file must still be scanned.
     if (RESERVED_MD.has(e.name) || GEN_INDEX_RE.test(e.name)) continue;
     const abs = join(dir, e.name);
     const relPath = toPosix(relative(root, abs));

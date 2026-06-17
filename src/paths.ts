@@ -46,6 +46,13 @@ export const AGENTS_SKILLS_DIR = ".agents";
 export const AGENTS_FILE = "AGENTS.md";
 export const CLAUDE_FILE = "CLAUDE.md";
 export const GITIGNORE_FILE = ".gitignore";
+/**
+ * The Gate-2 false-positive allowlist (0.0.12). A COMMITTED (not git-ignored),
+ * shared file at the docs root that lets a strict, no-`--no-verify` environment
+ * confirm a false positive without disabling the redaction hook. Path globs skip a
+ * staged file; `literal:<value>` lines whitelist an exact matched value.
+ */
+export const REDACTIGNORE_FILE = ".redactignore";
 
 // ─── schema ──────────────────────────────────────────────────────────────
 /** Current on-disk schema version — what every writer stamps. */

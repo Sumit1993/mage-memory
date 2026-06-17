@@ -25,6 +25,23 @@ const HEX_DIGEST_LENS = new Set([32, 40, 64]);
 const REDACTION_MARKER = /^\[REDACTED:[A-Za-z0-9-]+\]$/;
 
 /**
+ * An `${ENV}` interpolation placeholder — `${VAR}`, `${env:VAR}`, `${varlock:VAR}`.
+ * The VALUE is an environment reference resolved at runtime, never a literal
+ * secret, so a `key: ${VAR}` assignment must not be flagged (0.0.12 FP fix).
+ */
+const ENV_PLACEHOLDER = /^\$\{[A-Za-z0-9_:.-]{1,200}\}$/;
+
+/**
+ * A matched value that must NOT be treated as a secret, regardless of which
+ * detector fired: an already-redacted marker (keeps redact() idempotent), an
+ * `${ENV}` placeholder, or a caller-supplied allowlist literal (a confirmed false
+ * positive from `mage/.redactignore`). Applied uniformly across both scan passes.
+ */
+function suppressed(raw: string, allow?: ReadonlySet<string>): boolean {
+  return REDACTION_MARKER.test(raw) || ENV_PLACEHOLDER.test(raw) || (allow?.has(raw) ?? false);
+}
+
+/**
  * A single deterministic detector. When `group` is set, that capture group holds
  * the secret VALUE (masked + redacted, and used for the offset); otherwise the
  * whole match is the value. Grouped detectors carry the `d` flag so the value's
@@ -174,7 +191,7 @@ const DETECTORS: readonly Detector[] = [
  * AWS key is not double-reported as high-entropy). Already-redacted markers are
  * skipped, so re-scanning redacted output yields no secrets. Findings sort by line.
  */
-export function scanSecrets(text: string): SecretFinding[] {
+export function scanSecrets(text: string, allow?: ReadonlySet<string>): SecretFinding[] {
   const lineStarts = computeLineStarts(text);
   const claimed: Array<[number, number]> = [];
   const findings: SecretFinding[] = [];
@@ -186,18 +203,19 @@ export function scanSecrets(text: string): SecretFinding[] {
       const matchStart = m.index;
       const matchEnd = matchStart + m[0].length;
       const { raw } = valueSpan(d, m);
-      if (
-        !REDACTION_MARKER.test(raw) &&
-        (!d.accept || d.accept(raw)) &&
-        !overlaps(claimed, matchStart, matchEnd)
-      ) {
+      if ((!d.accept || d.accept(raw)) && !overlaps(claimed, matchStart, matchEnd)) {
+        // Claim the span even when the value is suppressed, so a more-general
+        // detector can't re-match a sub-run of an allowlisted/placeholder value
+        // (e.g. the high-entropy tail of an allowlisted `sk-ant-…` token).
         claimed.push([matchStart, matchEnd]);
-        findings.push({
-          kind: d.kind,
-          line: lineOf(lineStarts, matchStart),
-          severity: d.severity,
-          preview: mask(raw),
-        });
+        if (!suppressed(raw, allow)) {
+          findings.push({
+            kind: d.kind,
+            line: lineOf(lineStarts, matchStart),
+            severity: d.severity,
+            preview: mask(raw),
+          });
+        }
       }
       // Guard against a zero-width match looping forever.
       if (m.index === d.re.lastIndex) d.re.lastIndex += 1;
@@ -215,12 +233,15 @@ export function scanSecrets(text: string): SecretFinding[] {
  * valid. Idempotent — redacting already-redacted text is a no-op (the marker is
  * skipped). Returns the redacted text plus the findings that drove it.
  */
-export function redact(text: string): {
+export function redact(
+  text: string,
+  allow?: ReadonlySet<string>,
+): {
   text: string;
   findings: SecretFinding[];
 } {
-  const findings = scanSecrets(text);
-  const spans = collectSpans(text);
+  const findings = scanSecrets(text, allow);
+  const spans = collectSpans(text, allow);
   let out = text;
   for (const s of spans) {
     out = `${out.slice(0, s.start)}[REDACTED:${s.kind}]${out.slice(s.end)}`;
@@ -242,7 +263,7 @@ interface Span {
 }
 
 /** Spans of just the VALUE to replace, deduped by priority, sorted right-to-left. */
-function collectSpans(text: string): Span[] {
+function collectSpans(text: string, allow?: ReadonlySet<string>): Span[] {
   const claimed: Array<[number, number]> = [];
   const spans: Span[] = [];
   for (const d of DETECTORS) {
@@ -252,13 +273,13 @@ function collectSpans(text: string): Span[] {
       const matchStart = m.index;
       const matchEnd = matchStart + m[0].length;
       const v = valueSpan(d, m);
-      if (
-        !REDACTION_MARKER.test(v.raw) &&
-        (!d.accept || d.accept(v.raw)) &&
-        !overlaps(claimed, matchStart, matchEnd)
-      ) {
+      if ((!d.accept || d.accept(v.raw)) && !overlaps(claimed, matchStart, matchEnd)) {
+        // Claim the span even when suppressed (see scanSecrets) so nothing downstream
+        // re-matches a sub-run of an allowlisted/placeholder value.
         claimed.push([matchStart, matchEnd]);
-        spans.push({ start: v.start, end: v.end, kind: d.kind });
+        if (!suppressed(v.raw, allow)) {
+          spans.push({ start: v.start, end: v.end, kind: d.kind });
+        }
       }
       if (m.index === d.re.lastIndex) d.re.lastIndex += 1;
       m = d.re.exec(text);
@@ -304,6 +325,11 @@ function isHighEntropy(raw: string): boolean {
   if (HEX_DIGEST_LENS.has(raw.length) && /^[0-9a-f]+$/.test(raw)) return false;
   // UUIDs and dashed ids are structured, not secret — reject anything with a dash.
   if (raw.includes("-")) return false;
+  // Path-like runs (slash-joined segments) are file paths, not credentials: mage's
+  // own generated index/skill paths and paths cited in prose trip the entropy bar
+  // (the high-entropy class includes '/'). A genuine base64 blob that uses '/' also
+  // carries '+'/'=' (alphabet + padding) — reject only padding-free, path-shaped runs.
+  if (raw.includes("/") && !/[+=]/.test(raw)) return false;
   // Require a mix: a pure run of one class (e.g. all 'a') is low information.
   if (new Set(raw).size < 12) return false;
   // A long all-lowercase-letter run is far more likely a word than a credential.

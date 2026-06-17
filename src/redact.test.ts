@@ -263,6 +263,90 @@ describe("scanSecrets — false-positive guards", () => {
   });
 });
 
+// ─── 0.0.12 false-positive fixes: env placeholders, paths, allowlist ──────────
+
+describe("scanSecrets — env placeholders are references, not secrets (0.0.12)", () => {
+  for (const input of [
+    "github_token: ${GITHUB_TOKEN}",
+    "api_key=${env:OPENAI_API_KEY}",
+    'password: "${varlock:DB_PASSWORD}"',
+    "access_token = ${TOKEN}",
+  ]) {
+    it(`does not flag a placeholder value: ${input}`, () => {
+      expect(hasLiveSecret(scanSecrets(input))).toBe(false);
+    });
+  }
+
+  it("still flags a real LITERAL value in the same key=value shape", () => {
+    // Guard against over-suppression: only the env reference is whitelisted.
+    expect(hasLiveSecret(scanSecrets("api_key='s3cr3tValue123'"))).toBe(true);
+  });
+
+  it("does NOT suppress a PARTIAL placeholder (anchoring guards against bypass)", () => {
+    // A value that merely starts with a placeholder is not a pure env reference — a
+    // real secret appended to one must still be flagged (the ^...$ anchor matters).
+    expect(hasLiveSecret(scanSecrets("api_key=${VAR}realSecretAppended99"))).toBe(true);
+  });
+
+  it("redact() leaves a placeholder assignment byte-for-byte untouched", () => {
+    const clean = "github_token: ${GITHUB_TOKEN}";
+    expect(redact(clean).text).toBe(clean);
+  });
+});
+
+describe("scanSecrets — path-like runs are not high-entropy secrets (0.0.12)", () => {
+  // The exact false positives from the 2026-06-14 hub commit (issue doc): the
+  // high-entropy class includes '/', so slash-joined file paths trip the bar.
+  for (const input of [
+    "see projects/prismalens-platform/notes/integrations/README for the layout",
+    "stack: GitHub/Vercel/Render/Prometheus/Slack and a few others",
+  ]) {
+    it(`does not flag a slash-joined path: ${input.slice(0, 32)}…`, () => {
+      const findings = scanSecrets(input);
+      expect(kindsOf(findings)).not.toContain("high-entropy");
+      expect(hasLiveSecret(findings)).toBe(false);
+    });
+  }
+
+  it("STILL flags a genuine base64 blob carrying +/= padding (no over-suppression)", () => {
+    // A real-shaped base64 secret that happens to contain '/' must remain detected —
+    // padding ('=') / the '+' alphabet distinguishes it from a path.
+    const blob = "ab/cdEFghIJklMNopQRstUVwxYZ0123456789ab/cd==";
+    expect(kindsOf(scanSecrets(blob))).toContain("high-entropy");
+  });
+});
+
+describe("scanSecrets / redact — literal allowlist suppresses a confirmed FP (0.0.12)", () => {
+  const fp = "Zm9vYmFyQmF6MTIzNDU2Nzg5MEFiQ2RFZkdoSWpLbE1u"; // a high-entropy blob
+
+  it("flags the value without an allowlist", () => {
+    expect(hasLiveSecret(scanSecrets(`blob ${fp} end`))).toBe(true);
+  });
+
+  it("suppresses the finding when the value is allowlisted (exact match)", () => {
+    const allow = new Set([fp]);
+    expect(scanSecrets(`blob ${fp} end`, allow)).toEqual([]);
+  });
+
+  it("redact() does not rewrite an allowlisted value", () => {
+    const text = `blob ${fp} end`;
+    expect(redact(text, new Set([fp])).text).toBe(text);
+  });
+
+  it("redacts two real secrets while leaving an allowlisted value BETWEEN them untouched", () => {
+    // Regression for the claim-before-suppress span logic + right-to-left replace: a
+    // suppressed span sandwiched between two real secrets must neither shift offsets
+    // nor shield the second secret.
+    const allow = new Set([fp]);
+    const text = `api_key='realSecretOne99' ${fp} secret_key='realSecretTwo88'`;
+    const { text: out } = redact(text, allow);
+    expect(out).toContain(fp); // the allowlisted blob is untouched
+    expect(out).not.toContain("realSecretOne99");
+    expect(out).not.toContain("realSecretTwo88");
+    expect((out.match(/\[REDACTED:/g) ?? []).length).toBe(2);
+  });
+});
+
 // ─── redact: value replacement, severity, line numbers ───────────────────────
 
 describe("redact — value replacement keeps the surrounding context", () => {
