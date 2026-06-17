@@ -2,7 +2,11 @@
 
 # mage
 
-> 37 notes. Part of the [index](INDEX.md).
+> 38 notes. Part of the [index](INDEX.md).
+
+### build
+
+- `gotcha` [Test files were never type-checked (tsconfig excluded them)](notes/test-files-were-excluded-from-typecheck.md) — typecheck, tsc, tests, tsconfig, exclude, vitest, tsup, esbuild, ci, fixture _(reviewed 2026-06-15)_
 
 ### capture
 

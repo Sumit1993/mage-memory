@@ -63,7 +63,7 @@ describe("disconnect", () => {
       .map((g) => g.id)
       .filter((id): id is string => typeof id === "string" && id.startsWith("mage:"));
     expect(ids).toHaveLength(0);
-    expect(settings.hooks.SessionStart.find((g) => g.hooks[0]?.command === "host-thing")).toBeTruthy();
+    expect(settings.hooks.SessionStart?.find((g) => g.hooks[0]?.command === "host-thing")).toBeTruthy();
   });
 
   it("disconnect on a missing file is a clean no-op", async () => {
