@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ScannedNote } from "../scan.js";
-import { coveringNote, isCovered } from "./covering-note.js";
+import { coveringNote, coveringNoteMin, isCovered } from "./covering-note.js";
 
 // ─── tmp fixture plumbing (house pattern; this module is pure) ────────────────
 
@@ -88,6 +88,25 @@ describe("isCovered — wing aligns AND keyword overlaps", () => {
 
   it("returns false against an empty note set", () => {
     expect(isCovered({ wing: "payments", keywords: ["webhook"] }, [])).toBe(false);
+  });
+});
+
+describe("coveringNoteMin — parameterized overlap threshold (the lesson-path bar)", () => {
+  const notes = [note({ wing: "mage", keywords: ["release", "badge", "version"] })];
+
+  it("minOverlap 1 behaves like coveringNote (any single shared keyword)", () => {
+    expect(coveringNoteMin({ wing: "mage", keywords: ["release"] }, notes, 1)).not.toBeNull();
+  });
+  it("minOverlap 2 requires two shared keywords (single overlap no longer covers)", () => {
+    expect(coveringNoteMin({ wing: "mage", keywords: ["release"] }, notes, 2)).toBeNull();
+    expect(coveringNoteMin({ wing: "mage", keywords: ["release", "badge"] }, notes, 2)).not.toBeNull();
+  });
+  it("minOverlap above the shared count never covers", () => {
+    expect(coveringNoteMin({ wing: "mage", keywords: ["release", "badge"] }, notes, 3)).toBeNull();
+  });
+  it("a degenerate minOverlap (< 1) or a keyword-less signature is never covered", () => {
+    expect(coveringNoteMin({ wing: "mage", keywords: ["release", "badge"] }, notes, 0)).toBeNull();
+    expect(coveringNoteMin({ wing: "mage", keywords: [] }, notes, 5)).toBeNull();
   });
 });
 

@@ -54,7 +54,7 @@ async function makeInRepoKb(
     await writeFile(join(dir, "mage", "INDEX.md"), "# Index\n");
   }
   if (opts.gitignoreSinks) {
-    await writeFile(join(dir, ".gitignore"), "mage/.learnings/\nmage/.metrics/\n");
+    await writeFile(join(dir, ".gitignore"), "mage/.learnings/\nmage/.metrics/\nmage/.staging/\n");
   }
 }
 
@@ -684,7 +684,7 @@ describe("doctor — metadata schema drift", () => {
     };
     await writeFile(join(dir, "mage", "metadata.json"), `${JSON.stringify(meta, null, 2)}\n`);
     await writeFile(join(dir, "mage", "INDEX.md"), "# Index\n");
-    await writeFile(join(dir, ".gitignore"), "mage/.learnings/\nmage/.metrics/\n");
+    await writeFile(join(dir, ".gitignore"), "mage/.learnings/\nmage/.metrics/\nmage/.staging/\n");
   }
 
   it("v2 metadata → schema check passes", async () => {

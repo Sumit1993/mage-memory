@@ -41,16 +41,32 @@ export function isCovered(sig: SigShape, notes: ScannedNote[]): boolean {
 /**
  * The FIRST scanned note that covers `sig` (notes are scan-sorted by relPath, so the
  * result is deterministic), or null when none does. Same predicate as
- * {@link isCovered}; returns the note for callers that want the merge target.
+ * {@link isCovered}; returns the note for callers that want the merge target. The
+ * recurrence path's coarse bucket → ANY single shared keyword (minOverlap 1).
  */
 export function coveringNote(sig: SigShape, notes: ScannedNote[]): ScannedNote | null {
+  return coveringNoteMin(sig, notes, 1);
+}
+
+/**
+ * Like {@link coveringNote}, but requires the note to share at least `minOverlap`
+ * keywords with the signature (still wing-aligned). The lesson path uses a higher
+ * bar than the recurrence path: with a single-wing KB, wing-alignment is always
+ * true, so a 1-keyword overlap would wrongly suppress every fresh lesson sharing one
+ * common token — first-sight capture must not silently drop a real lesson.
+ */
+export function coveringNoteMin(
+  sig: SigShape,
+  notes: ScannedNote[],
+  minOverlap: number,
+): ScannedNote | null {
   const sigKeywords = lowerSet(sig.keywords);
-  if (sigKeywords.size === 0) return null; // a keyword-less signature is uncoverable.
+  if (sigKeywords.size === 0 || minOverlap < 1) return null; // keyword-less ⇒ uncoverable.
   const sigWing = sig.wing.toLowerCase();
 
   for (const note of notes) {
     if (!wingAligns(sigWing, note)) continue;
-    if (keywordsOverlap(sigKeywords, note.keywords)) return note;
+    if (sharedKeywordCount(sigKeywords, note.keywords) >= minOverlap) return note;
   }
   return null;
 }
@@ -69,12 +85,14 @@ function wingAligns(sigWing: string, note: ScannedNote): boolean {
   return note.wings.some((w) => w.wing.toLowerCase() === sigWing);
 }
 
-/** True iff any signature keyword (already lower-cased) is among the note's keywords. */
-function keywordsOverlap(sigKeywords: ReadonlySet<string>, noteKeywords: string[]): boolean {
-  for (const k of noteKeywords) {
-    if (sigKeywords.has(k.toLowerCase())) return true;
+/** Count of DISTINCT signature keywords (already lower-cased) present in the note. */
+function sharedKeywordCount(sigKeywords: ReadonlySet<string>, noteKeywords: string[]): number {
+  const noteSet = new Set(noteKeywords.map((k) => k.toLowerCase()));
+  let n = 0;
+  for (const k of sigKeywords) {
+    if (noteSet.has(k)) n++;
   }
-  return false;
+  return n;
 }
 
 /** A case-folded Set of non-empty keywords (drops blanks defensively). */
