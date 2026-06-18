@@ -20,7 +20,7 @@ jobs:
   release-please:
     runs-on: ubuntu-latest
     steps:
-      - uses: googleapis/release-please-action@v4
+      - uses: googleapis/release-please-action@v5
         with:
           # MUST be a PAT, not the default GITHUB_TOKEN. main is branch-protected
           # with required status checks, and PRs created by GITHUB_TOKEN do NOT
