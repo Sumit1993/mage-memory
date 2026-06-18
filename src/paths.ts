@@ -18,6 +18,13 @@ export const IDENTITY_FILE = "IDENTITY.md";
 export const LEARNINGS_DIR = ".learnings";
 /** Read-only context-match rollup dir (git-ignored, sibling of LEARNINGS_DIR). */
 export const METRICS_DIR = ".metrics";
+/**
+ * Judged-but-uncommitted lesson drafts of the organic grooming loop (git-ignored,
+ * sibling of LEARNINGS_DIR/METRICS_DIR — 0.0.12). A third epistemic state between
+ * `.learnings/` (raw, auto-pruned) and `notes/` (committed, indexed-live): drafts
+ * wait here, OUT of the live index, until `mage groom` promotes them to `notes/`.
+ */
+export const STAGING_DIR = ".staging";
 /** Rotated `.learnings/` archives (git-ignored, lives inside LEARNINGS_DIR). */
 export const LEARNINGS_ARCHIVE_DIR = ".archive";
 /** Once-per-day age-purge throttle marker (inside LEARNINGS_DIR). */
@@ -39,6 +46,13 @@ export const AGENTS_SKILLS_DIR = ".agents";
 export const AGENTS_FILE = "AGENTS.md";
 export const CLAUDE_FILE = "CLAUDE.md";
 export const GITIGNORE_FILE = ".gitignore";
+/**
+ * The Gate-2 false-positive allowlist (0.0.12). A COMMITTED (not git-ignored),
+ * shared file at the docs root that lets a strict, no-`--no-verify` environment
+ * confirm a false positive without disabling the redaction hook. Path globs skip a
+ * staged file; `literal:<value>` lines whitelist an exact matched value.
+ */
+export const REDACTIGNORE_FILE = ".redactignore";
 
 // ─── schema ──────────────────────────────────────────────────────────────
 /** Current on-disk schema version — what every writer stamps. */
@@ -156,6 +170,16 @@ export function hubProjectPath(hubRoot: string, projectName: string): string {
  */
 export function hubProjectDocsRoot(hubRoot: string, projectName: string): string {
   return hubProjectPath(hubRoot, projectName);
+}
+
+/**
+ * The grooming-loop staging dir for a resolved docs root (0.0.12) —
+ * `<docsRoot>/.staging`. Git-ignored, per-KB (in a hub, each project gets its own,
+ * since the docs root IS the project dir). Holds `<slug>.md` lesson drafts that
+ * `mage stage` writes and `mage groom` promotes.
+ */
+export function stagingPath(docsRoot: string): string {
+  return join(docsRoot, STAGING_DIR);
 }
 
 // ─── reading ─────────────────────────────────────────────────────────────

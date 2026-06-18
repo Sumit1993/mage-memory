@@ -39,8 +39,10 @@ splits collapsed). **Status** tracks where each release stands.
 | **0.0.7** | **distill**: `mage distill --json` reader + `mage:distill` skill over `.learnings/` → notes **on first sight**; feeders **cut**; Gate-2 **pre-commit hook** via `connect` | **0018**, 0015, 0014, 0009 | 0.0.6 | **built³** | planned |
 | **0.0.8** | **self-grooming**: promote-on-recurrence + **note→skill graduation** + `mage:optimize` reword/demote on context-match + the single-writer **dream applier** (graduate/demote/merge/split/reword) | **0019**, 0016, 0013, 0006 | 0.0.7 | **built⁴** | planned |
 | **0.0.9** | **readiness**: **setup-integrity** (connect ensures ignores · doctor KB+connection health + `--fix`/`--report` · version-drift nudge) + the **no-server dashboard** (Option D) + **icon (graph-"m")** + pre-release chores | **0020, 0021**, 0010 | — | grilled⁵ | **built⁶** |
-| **0.0.10** | **coherence**: vocabulary ADR (*every flavor is a knowledge base*; de-overload "hub") + **hub flat-vs-nested grill** → ADR + the `mage link` scaffold-consistency fix + **SDD skills removed** (the deferred ADR-0001/0002 prune) | **(new ADRs)** | 0.0.9 | needs grill⁷ | planned |
-| **→ 0.1.0** | **Milestone: portable, self-grooming memory — the cut** | — | all | — | — |
+| **0.0.10** | **coherence**: vocabulary ADR (*every flavor is a knowledge base*; de-overload "hub") + **hub flat-vs-nested grill** → ADR + the `mage link` scaffold-consistency fix + **SDD skills removed** (the deferred ADR-0001/0002 prune) | **0022, 0023** | 0.0.9 | grilled⁷ | **shipped** |
+| **0.0.11** | **signal quality + autonomous capture** (de-noise signatures · project wings · SubagentStop · bounded ranked promotion) + **release-please adoption** (first bot-managed release) + **security cleanup** (drop gray-matter→yaml; esbuild pin) + **test-typecheck gate** | 0015, 0018, 0019 | 0.0.10 | locked | **shipped⁸** |
+| **0.0.12** | **organic grooming loop** — the *lesson path* (`mage stage`/`mage groom` + gitignored `.staging/` + boundary-nudge adapter via `mage connect` + always-on inline capture) + bundled **redact false-positives** fix | **0024** | 0.0.11 | grilled⁹ | **building** |
+| **→ 0.1.0** | **Milestone: portable, self-grooming memory — the cut** (announced once a1 bakes) | — | all | — | — |
 
 ¹ tagged + GitHub-released; npm still at 0.0.3. · *Status legend:* **shipped · next · planned** (add `building`/`grilled`/`built` in flight).
 ³ 0.0.7 **built + dogfooded 2026-06-08** (473 tests; build+typecheck green). Built via a partitioned workflow (5 parallel module agents → serial integrate → adversarial review → fix). The review caught two real defects (fixed): a Gate-2 **bypass** — `scanStaged` silently skipped C-quoted non-ASCII staged filenames (fixed with `-z` NUL-split); and a **fail-closed** pre-commit hook that blocked every commit with a false "live secret" message when `mage` wasn't on PATH (fixed with a `command -v mage` guard → fail-open). **Dogfooding caught two more (fixed):** the Gate-2 **scope bug** — `scanStaged` scanned the *whole* repo and so blocked the commit on the redaction tool's own `src/` test fixtures; corrected to scope Gate-2 to the **docs root** (`mage/`) per ADR-0014 §2 (ADR-0018 §7 + [gotcha](gate2-blocks-own-redaction-fixtures.md)), which is also what lets mage run its own Gate-2 hook; and a `connect({user})` **test-isolation leak** that installed the hook into the real repo via `process.cwd()`. **Live-dogfooded**: `mage distill` over this repo's real `.learnings/` (four lenses, user-corrections first-class, caps/spills); scoped `redact --check --staged` (blocks a planted key masked-never-raw incl. a `café.md` non-ASCII path; skips `src/` fixtures); the pre-commit hook blocks a real secret commit and fails open when `mage` is absent; malformed `.learnings/` parsed fail-open. Post-build cleanup folded the low-severity review findings (empty-detail salience, strict correction-adjacency, prompts-only hint, `--seen` leading-colon guard, `--staged` positional warning, symlink-hook guard) + boundary tests.
@@ -54,6 +56,38 @@ splits collapsed). **Status** tracks where each release stands.
 ⁶ 0.0.9 **built + dogfooded 2026-06-09** (709 tests; build+typecheck green). Built in **three verified stages via partitioned workflows** (file-disjoint implementers → serial integrate → adversarial code+security review → fix → dogfood). **Stage 1 — setup-integrity:** `connect` self-heals the capture-sink `.gitignore` via `ensureGitignored`; `doctor` grew env-only → **KB + connection health** (KB structure, gitignore-leak guard, hook-block/version drift nudge) with **`--fix`** (repairs ignores) and a redacted, **content-free `--report`** bundle (ADR-0021 §3). The security review hardened `--report`'s redaction (all abs paths → `<path>`, IP:port → `<addr>`, `check.name` routed through `redact()`); dogfood confirmed **0 paths/keywords/secrets** leak. **Stage 2 — dashboard (Option D, ADR-0020):** a KB-dir-agnostic collector + three tiers — committable `Dashboard.md` + Obsidian `Knowledge.base` + the self-contained, offline, **gitignored** `dashboard.html` cockpit (proposal-queue hero, wings/notes/skills, durability ladder, health). Review caught + fixed two HIGH committability bugs (a wall-clock churn stamp; multi-home notes omitted from secondary wings) and hardened the HTML injection boundary (every value `escapeHtml`'d, JSON island `<`-escaped, deep-links encoded, CSP meta, JSON island stripped of abs paths). Dogfood rendered the **real** KB (31 notes · scratch 2129 → 31 → 1 skill; empty proposal queue = honest soak state) with zero external resources. **Stage 3 — chores:** `CHANGELOG.md` backfilled 0.0.1→0.0.9, README marketing pass (mark + 1200×630 social card under `assets/`, offline/no-telemetry positioning, agentmemory *differences*), version → 0.0.9, KB regen. Soak/0.1.0 graduation gate unchanged. **Manual human step:** GitHub Settings → Social preview upload of `assets/social-card.png` (no API).
 
 ⁷ 0.0.10 **coherence** (decided 2026-06-09; needs a grill) — three interrelated items the 0.0.9 build surfaced, deliberately **deferred out of the green 0.0.9 release** to avoid bolt-on churn: **(a) vocabulary ADR** — formalize "**every flavor is a knowledge base (KB)**" (the glossary [context.md](context.md) already makes "knowledge base" the product noun and *avoids* "vault"; it's just applied inconsistently — README limits "KB" to in-repo, "hub" is overloaded across artifact/location/scope, code uses both `mode:"external"` and `storage:"hub-owned"`). ~20-25 user-facing strings + ~80-100 total incl. tests. **(b) hub flat-vs-nested grill → ADR** — the hub-root `notes/`+`decisions/` *plus* per-`projects/<name>/` `notes/`+`decisions/` is intended per [ADR-0011](../decisions/0011-recursive-scan-hub-projects.md) §6 / [ADR-0012](../decisions/0012-wings-optional-convention-standalone-hubs.md) §4 (one vault, grouped by tag/wing) but reads as duplication, and `mage link` (`link.ts`) scaffolds a member inconsistently vs `mage init --hub`; decide the canonical layout (does a hub keep top-level notes, or does everything — incl. hub-level — live under `projects/<name>/`?), then implement + a migration. **(c) SDD skills removed** — drop the 7 spec-kit-derived skills (`specify/clarify/plan/tasks/implement/analyze/constitution`, ~1085 lines; stale `.specify/` paths, missing the promised `ATTRIBUTION.md`, isolated from the memory loop) + their README/`plugin.json` advertising — the **prune ADR-0001/0002 named and deferred**; sharpens the memory-first identity. Pairs (a)+(b) under one grill (defining "a hub is a KB that federates project-KBs" settles both).
+
+⁸ 0.0.11 **shipped 2026-06-15** via release-please (tag `v0.0.11`; npm publish manual after dogfood). The
+0.0.11 soak finding was **precision, not reach** (the de-noise pass) — and the honest read of the live
+tally (40/40 ≥K signatures are `workflow` *activity*, lessons barely recur) **reframed the loop**: the
+organic win is the **lesson path** (first-sight → note, Claude-Code-memory style), so note→skill
+graduation (a2) is **deferred** and the 0.0.11 recurrence machinery stays untouched. This release also
+adopted **release-please** (one rolling `chore(main): release X` PR; `bump-patch-for-minor-pre-major` holds
+0.0.x; `include-component-in-tag:false` keeps `v0.0.x` tags; PAT-driven so CI runs under branch protection),
+a **PR-title conventional-commit gate** (`amannn/action-semantic-pull-request`), a **security cleanup**
+(dropped stale gray-matter for the zero-dep `yaml` package → removes js-yaml; esbuild override), and a
+**test-typecheck gate** (tests were excluded from `tsc` — 98 latent errors fixed; CI now type-checks tests).
+See [the release-bump gotcha](release-bump-touches-many-artifacts.md) + [the typecheck-gap gotcha](test-files-were-excluded-from-typecheck.md).
+
+⁹ 0.0.12 **organic grooming loop** — GRILLED 2026-06-15, spec locked in [plan-0.0.12-organic-grooming-loop](plan-0.0.12-organic-grooming-loop.md)
+(becomes **ADR-0024**), **building**. Ships the LESSON path (a1 = observed organic note creation, CC-memory
+style): a **portable core** (`mage stage` → redacted draft into a gitignored `.staging/`; `mage groom` →
+surface the deduped batch, move confirmed drafts to `notes/` + index; reject → `.metrics/staged-rejects.json`;
+anti-flood = dedup via `coveringNote` + budget N=3 + reject buffer) + a **Claude-Code adapter** (`mage nudge`,
+fired on **`SessionStart(source=compact)`** — NOT the originally-guessed PreCompact/SessionEnd: SessionEnd
+can't inject context and PreCompact precedes chapter close; SessionStart-compact fires after, when
+`.learnings/` is complete and stdout becomes context — runs distill over the new segment, drafts to
+`.staging/`, surfaces via `additionalContext`, wired by `mage connect` — finishing [ADR-0009](../decisions/0009-no-runtime-automation-rides-host-hooks.md)
+§24 step 2) + an **always-on inline-capture instruction** in the generated AGENTS.md. Bundled: the **redact
+false-positives** fix (skip mage's own generated artifacts, ignore `${ENV}` placeholders, tune the
+high-entropy detector, add a non-bypass `mage/.redactignore` allowlist) — load-bearing because the loop
+generates more note commits, so every false positive would deadlock it. **0.1.0 = the announcement** once a1
+is observed working in real use (NOT an over-fit "force a graduation" gate). No embedded judge (holds
+ADR-0009/0021); the host-skill IS the judge.
+**BUILD STATUS (2026-06-16):** shipped as 3 reviewable PRs (release-please rolls them into 0.0.12) —
+**portable core = PR #25** (mage stage/groom + `.staging`), **redact false-positives = PR #26** (off main,
+independent), **Claude-Code capture adapter = PR (this)** (`mage nudge` + inline instruction). Each
+dogfooded + adversarially reviewed. Pending: user merges + a multi-KB soak before npm publish.
 
 ## Critical path (what gates everything)
 
@@ -108,7 +142,7 @@ file rotation — only reveals bugs when actually run. **Definition of done, per
    also pre-validates connect's payload→event mapping). Remove the temp hook after.
 4. Only then tag + `npm publish`.
 
-## Grills to run (remaining: 1 — the **0.0.10 coherence grill** (vocabulary ADR + hub flat-vs-nested + SDD removal), see ⁷; 0.0.9 readiness grilled + closed 2026-06-09, see ⁵; the path to 0.1.0 is build + the soak gate)
+## Grills to run (remaining: 0 — the **0.0.12 organic-grooming-loop grill** closed 2026-06-15, see ⁹; the **0.0.10 coherence grill** closed + shipped, see ⁷; 0.0.9 readiness grilled + closed 2026-06-09, see ⁵; the path to 0.1.0 is now pure build + the a1 bake)
 
 The 2026-06-06 observe grill ([ADR-0015](../decisions/0015-mage-observe-capture-schema.md)
 + [ADR-0016](../decisions/0016-context-match-confidence-ladder-applier.md)) pre-resolved

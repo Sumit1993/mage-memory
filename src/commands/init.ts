@@ -197,6 +197,7 @@ async function initInRepo(codeRepo: string, project: string): Promise<void> {
     "mage/**/artifacts/",
     "mage/.learnings/",
     "mage/.metrics/",
+    "mage/.staging/",
     "mage/dashboard.html",
   ]);
   if (added.length > 0) logger.detail(`Added .gitignore patterns: ${added.join(", ")}`);
@@ -330,6 +331,8 @@ async function initStandaloneHub(args: HubArgs): Promise<string> {
     "**/.learnings/",
     ".metrics/",
     "**/.metrics/",
+    ".staging/",
+    "**/.staging/",
     // The cockpit embeds `.metrics` churn (ADR-0020 §6) — never commit it.
     "dashboard.html",
   ]);

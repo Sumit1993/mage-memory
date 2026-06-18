@@ -6,16 +6,19 @@ import { disconnect } from "./commands/disconnect.js";
 import { distillCmd } from "./commands/distill-cmd.js";
 import { doctor } from "./commands/doctor.js";
 import { dream } from "./commands/dream-cmd.js";
+import { groomCmd } from "./commands/groom-cmd.js";
 import { index } from "./commands/index-cmd.js";
 import { ingestCmd } from "./commands/ingest.js";
 import { type InitMode, type InitVisibility, init } from "./commands/init.js";
 import { link, type Storage } from "./commands/link.js";
 import { list } from "./commands/list.js";
 import { mageMigrate, reportMigrate } from "./commands/migrate.js";
+import { buildNudgeCommand } from "./commands/nudge.js";
 import { buildObserveCommand } from "./commands/observe.js";
 import { promoteCmd } from "./commands/promote-cmd.js";
 import { redactCmd } from "./commands/redact.js";
 import { skills } from "./commands/skills-cmd.js";
+import { stageCmd } from "./commands/stage-cmd.js";
 import { status } from "./commands/status.js";
 import { unlink } from "./commands/unlink.js";
 import { verify } from "./commands/verify.js";
@@ -211,10 +214,59 @@ program
     await promoteCmd({ dir: opts.dir, json: opts.json, seen: opts.seen });
   });
 
+// ─── stage ─────────────────────────────────────────────────────────────────────
+program
+  .command("stage", { hidden: true })
+  .description(
+    "Stage a short lesson draft into .staging/ (frictionless inline capture — the organic grooming loop)",
+  )
+  .option(
+    "-d, --dir <path>",
+    "where to look for the knowledge base (default: cwd; walks up for in-repo)",
+  )
+  .option("-t, --title <title>", "lesson title (required — drives the H1 and slug)")
+  .option("--type <type>", "note type (default: gotcha)")
+  .option("--tags <wing/room,...>", "comma-separated wing/room tags")
+  .option("--wing <wing>", "convenience wing (prepended as a tag when none homes there)")
+  .option("--body <text>", "lesson body (else read from stdin)")
+  .option("--json", "emit the result as JSON")
+  .action(
+    async (opts: {
+      dir?: string;
+      title?: string;
+      type?: string;
+      tags?: string;
+      wing?: string;
+      body?: string;
+      json?: boolean;
+    }) => {
+      await stageCmd(opts);
+    },
+  );
+
+// ─── groom ───────────────────────────────────────────────────────────────────────
+program
+  .command("groom", { hidden: true })
+  .description(
+    "Surface / accept / reject the staged lesson batch (plumbing behind the mage:groom skill)",
+  )
+  .option(
+    "-d, --dir <path>",
+    "where to look for the knowledge base (default: cwd; walks up for in-repo)",
+  )
+  .option("--json", "emit the batch / disposition as JSON")
+  .option("--accept <slugs|all>", "promote these staged drafts to notes/ and re-index")
+  .option("--reject <slugs|all>", "discard these staged drafts and record their keys")
+  .action(async (opts: { dir?: string; json?: boolean; accept?: string; reject?: string }) => {
+    await groomCmd(opts);
+  });
+
 // ─── observe ─────────────────────────────────────────────────────────────────
 // Registration lives next to the handler (commands/observe.ts) so the flag list
 // and the ObserveOptions contract can't drift apart.
 program.addCommand(buildObserveCommand(), { hidden: true });
+// The boundary-nudge adapter (commands/nudge.ts) — fired from the SessionStart hook.
+program.addCommand(buildNudgeCommand(), { hidden: true });
 
 // ─── redact ──────────────────────────────────────────────────────────────────
 program

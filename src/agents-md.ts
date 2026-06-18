@@ -82,6 +82,12 @@ copies of sources) — navigable as an Obsidian graph.
 services couple, a faster path to a source — capture it with \`mage:learn\` into
 the hub. Capture the reusable *insight + procedure + pointers*, never a copy.
 
+**Capture lessons inline, at first sight.** When you learn something durable
+mid-task, stage a SHORT draft right then — \`mage stage --title "..." --tags
+wing/room\` (body on stdin; it is scrubbed and parked in \`.staging/\`). No per-note
+confirm; you batch-review the drafts later with \`mage:groom\`. Don't wait for a
+session boundary — capture at first sight.
+
 **Commit hygiene:** mage never commits for you. It suggests \`git\` commands; you
 run them.
 ${END}`;
@@ -114,6 +120,12 @@ procedure, and pointers (not copies of sources) — navigable as an Obsidian gra
 services couple, a faster path to a source — capture it with \`mage:learn\`, or
 add a note under \`${notesPath}\` and run \`mage index\`. Capture the reusable
 *insight + procedure + pointers*, never a copy of the source.
+
+**Capture lessons inline, at first sight.** When you learn something durable
+mid-task, stage a SHORT draft right then — \`mage stage --title "..." --tags
+wing/room\` (body on stdin; it is scrubbed and parked in \`.staging/\`). No per-note
+confirm; you batch-review the drafts later with \`mage:groom\`. Don't wait for a
+session boundary — capture at first sight.
 
 **Commit hygiene:** mage never commits for you. It suggests \`git\` commands; you
 run them.

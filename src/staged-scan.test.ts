@@ -196,3 +196,92 @@ describe("scanStaged — fail-open on a non-git dir (never throws)", () => {
     expect(result).toEqual({ findings: [], blocked: false, scannedFiles: 0 });
   });
 });
+
+describe("scanStaged — 0.0.12 false-positive fixes (generated artifacts + .redactignore)", () => {
+  it("does NOT scan mage's own generated artifacts, even if they carry a secret-shaped string", async () => {
+    const dir = await tmp();
+    await initMageRepo(dir);
+    // Generated index/scaffolding + host-adapter skill files: skipped wholesale —
+    // their content is mage-authored and their path strings trip the detector.
+    await addFile(dir, "mage/INDEX.md", `API_KEY=${SECRET}\n`);
+    await addFile(dir, "mage/_index.mage.md", `API_KEY=${SECRET}\n`);
+    await addFile(dir, "mage/.claude/skills/groom/SKILL.md", `API_KEY=${SECRET}\n`);
+
+    const { blocked, scannedFiles } = await scanStaged(dir);
+
+    expect(blocked).toBe(false);
+    expect(scannedFiles).toBe(0); // all three are generated artifacts → skipped
+  });
+
+  it("still scans an AUTHORED note alongside skipped generated artifacts", async () => {
+    const dir = await tmp();
+    await initMageRepo(dir);
+    await addFile(dir, "mage/INDEX.md", `API_KEY=${SECRET}\n`); // generated → skipped
+    await addFile(dir, "mage/notes/leak.md", `API_KEY=${SECRET}\n`); // authored → scanned + blocks
+
+    const { blocked, scannedFiles } = await scanStaged(dir);
+
+    expect(blocked).toBe(true);
+    expect(scannedFiles).toBe(1);
+  });
+
+  it("skips a file matched by a .redactignore glob but scans the rest", async () => {
+    const dir = await tmp();
+    await initMageRepo(dir);
+    await addFile(dir, "mage/.redactignore", "notes/generated/**\n");
+    await addFile(dir, "mage/notes/generated/dump.md", `API_KEY=${SECRET}\n`); // allowlisted path
+    await addFile(dir, "mage/notes/real.md", CLEAN); // scanned, clean
+
+    const { blocked, scannedFiles } = await scanStaged(dir);
+
+    expect(blocked).toBe(false); // the secret-bearing path is allowlisted
+    expect(scannedFiles).toBe(1); // only notes/real.md (.redactignore + dump.md skipped)
+  });
+
+  it("never scans the .redactignore file itself (its literal allows can be secret-shaped)", async () => {
+    const dir = await tmp();
+    await initMageRepo(dir);
+    await addFile(dir, "mage/.redactignore", `literal:${SECRET}\n`);
+
+    const { blocked, scannedFiles } = await scanStaged(dir);
+
+    expect(blocked).toBe(false);
+    expect(scannedFiles).toBe(0);
+  });
+
+  it("a .redactignore literal allow suppresses an in-note false positive", async () => {
+    const dir = await tmp();
+    await initMageRepo(dir);
+    await addFile(dir, "mage/.redactignore", `literal:${SECRET}\n`);
+    await addFile(dir, "mage/notes/doc.md", `the example token ${SECRET} is illustrative\n`);
+
+    const { blocked, scannedFiles } = await scanStaged(dir);
+
+    expect(scannedFiles).toBe(1); // doc.md IS scanned…
+    expect(blocked).toBe(false); // …but the allowlisted literal is not a finding
+  });
+
+  it("DOES scan a user-authored subdir file that merely shares a reserved basename (no bypass)", async () => {
+    const dir = await tmp();
+    await initMageRepo(dir);
+    // mage generates INDEX.md only at the docs ROOT. A file named INDEX.md inside a
+    // subdir is author content — a secret there MUST still block (Gate-2 bypass guard).
+    await addFile(dir, "mage/notes/INDEX.md", `API_KEY=${SECRET}\n`);
+
+    const { blocked, scannedFiles } = await scanStaged(dir);
+
+    expect(blocked).toBe(true);
+    expect(scannedFiles).toBe(1); // scanned, NOT skipped as a generated artifact
+  });
+
+  it("still skips a per-wing _index.*.md at any depth (genuinely generated anywhere)", async () => {
+    const dir = await tmp();
+    await initMageRepo(dir);
+    await addFile(dir, "mage/notes/_index.mage.md", `API_KEY=${SECRET}\n`); // generated per-wing
+
+    const { blocked, scannedFiles } = await scanStaged(dir);
+
+    expect(blocked).toBe(false);
+    expect(scannedFiles).toBe(0); // _index.*.md is a generated artifact at any depth
+  });
+});
