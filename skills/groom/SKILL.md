@@ -32,6 +32,22 @@ complementary gates:
   **≥ K distinct sessions** with no covering note, that no single sighting was
   striking enough to capture. Catches the slow-burn Phase 1 misses.
 
+**Phase 0 — pending inline drafts (`mage groom`, 0.0.12).** Before the two mining
+phases, dispose of lessons captured INLINE during work. `mage stage` parks short,
+redacted drafts in `.staging/` with no per-note confirm (and the boundary nudge
+distills forgotten ones there too); your job is the batch human-confirm:
+
+- `mage groom --json` surfaces the pending, deduped batch (capped at the staging
+  budget; the rest defer). For each draft, keep / edit / drop it.
+- `mage groom --accept <slugs|all>` moves the kept drafts into `notes/` and
+  re-indexes; `mage groom --reject <slugs|all>` discards them and records the
+  rejection so the same lesson is never re-drafted.
+
+These drafts are the freshest, highest-signal material (the agent chose to stage
+them) — clear them first, THEN run the mining phases below for what inline capture
+missed. (`mage groom` the COMMAND manages `.staging/`; the two phases below are the
+deeper `.learnings/` mining that the `mage:groom` SKILL also runs.)
+
 Notes are the reusable **insight + procedure + pointers**, never a copy of the
 source (see `CONVENTIONS.md`). groom mines **only mage's own** `.learnings/` —
 foreign memory stores (ECC instincts, Claude `MEMORY.md`) are not harvested

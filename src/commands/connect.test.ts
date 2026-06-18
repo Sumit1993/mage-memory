@@ -32,13 +32,13 @@ async function exists(p: string): Promise<boolean> {
 }
 
 describe("connect", () => {
-  it("connect into a fresh dir creates settings.local.json with all 8 mage groups", async () => {
+  it("connect into a fresh dir creates settings.local.json with all 10 mage groups", async () => {
     const dir = await freshDir();
     const r = await connect({ cwd: dir, yes: true });
 
     expect(r.scope).toBe("local");
     expect(r.path).toBe(localPath(dir));
-    expect(r.wired).toBe(9);
+    expect(r.wired).toBe(10);
 
     const settings = JSON.parse(await readFile(r.path, "utf8")) as {
       hooks: Record<string, Array<{ id?: string }>>;
@@ -47,10 +47,11 @@ describe("connect", () => {
       .flat()
       .map((g) => g.id)
       .filter((id): id is string => typeof id === "string" && id.startsWith("mage:"));
-    expect(ids).toHaveLength(9);
+    expect(ids).toHaveLength(10);
     expect(new Set(ids)).toEqual(
       new Set([
         "mage:observe:SessionStart",
+        "mage:nudge:SessionStart",
         "mage:observe:UserPromptSubmit",
         "mage:observe:PostToolUse",
         "mage:observe:PostToolUseFailure",
@@ -75,7 +76,7 @@ describe("connect", () => {
     await writeFile(localPath(dir), `${JSON.stringify(pre, null, 2)}\n`);
 
     const r = await connect({ cwd: dir, yes: true });
-    expect(r.wired).toBe(9);
+    expect(r.wired).toBe(10);
     expect(r.backedUp).toBe(true);
 
     // .bak preserves the original verbatim
@@ -104,16 +105,16 @@ describe("connect", () => {
     const r2 = await connect({ cwd: dir, yes: true });
     const after2 = await readFile(localPath(dir), "utf8");
 
-    expect(r2.wired).toBe(9);
+    expect(r2.wired).toBe(10);
     expect(after2).toBe(after1);
 
-    // still exactly 9 mage groups (no duplication)
+    // still exactly 10 mage groups (no duplication)
     const settings = JSON.parse(after2) as { hooks: Record<string, Array<{ id?: string }>> };
     const ids = Object.values(settings.hooks)
       .flat()
       .map((g) => g.id)
       .filter((id): id is string => typeof id === "string" && id.startsWith("mage:"));
-    expect(ids).toHaveLength(9);
+    expect(ids).toHaveLength(10);
   });
 
   it("--user targets the user path", async () => {
@@ -153,7 +154,7 @@ describe("connect", () => {
   it("in a non-repo dir, connect installs no hook (result.hook reports not-a-repo)", async () => {
     const dir = await freshDir();
     const r = await connect({ cwd: dir, yes: true });
-    expect(r.wired).toBe(9);
+    expect(r.wired).toBe(10);
     expect(r.hook).toEqual({ installed: false, reason: "not-a-repo" });
   });
 
@@ -203,7 +204,7 @@ describe("connect", () => {
     await gitInit(dir);
 
     const r = await connect({ cwd: dir, yes: true, gitHook: false });
-    expect(r.wired).toBe(9);
+    expect(r.wired).toBe(10);
     expect(r.hook).toBeUndefined();
 
     const hooksDir = await resolveHooksDir(dir);
@@ -295,7 +296,7 @@ describe("connect", () => {
     const dir = await freshDir();
     // No mage/, no projects/ → resolveDocsRoot returns null → self-heal skipped.
     const r = await connect({ cwd: dir, yes: true, gitHook: false });
-    expect(r.wired).toBe(9);
+    expect(r.wired).toBe(10);
 
     // No .gitignore created for the capture sinks.
     expect(await exists(join(dir, ".gitignore"))).toBe(false);

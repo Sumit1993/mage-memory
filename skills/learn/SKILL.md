@@ -136,6 +136,9 @@ adopting an authored skill is *remembering*, not copying a source (ADR-0013 §5)
 - Points to canonical sources; doesn't mirror them.
 - Tagged with one `#<wing>/<room>` so it lands in the index and the wing skill.
 - Links to related notes as graph edges.
+- **Keep it short.** A lesson captured inline during work (via `mage stage`) targets
+  the CC-memory-sized `lessonNoteCap` (~1200 chars) — one durable fact, tersely. The
+  larger 6000-char `noteSizeCap` is for deliberately authored design/reference notes.
 
 ## See also
 

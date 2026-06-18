@@ -29,11 +29,14 @@ keywords: [grooming, organic, lesson, first-sight, distill, staging, nudge, inli
 
 # Organic grooming loop (0.0.12) — the lesson path
 
-**Status: GRILLED 2026-06-15 — decisions locked, ready to build.** Becomes **ADR-0024**
-once built — *finishing* [ADR-0009](../decisions/0009-no-runtime-automation-rides-host-hooks.md)
-§24 step 2 (the planned-but-unbuilt nudge) and amending
+**Status: GRILLED 2026-06-15 — decisions locked; BUILT 2026-06-16.** Recorded as
+**[ADR-0024](../decisions/0024-organic-grooming-loop.md)** (this note remains the full grill
+rationale; the ADR is the crisp decision of record) — *finishing*
+[ADR-0009](../decisions/0009-no-runtime-automation-rides-host-hooks.md) §24 step 2 (the
+planned-but-unbuilt nudge) and amending
 [ADR-0013](../decisions/0013-procedure-skills-self-grooming-loop.md) /
-[ADR-0019](../decisions/0019-mage-promote-self-grooming.md).
+[ADR-0019](../decisions/0019-mage-promote-self-grooming.md). Follow-up:
+**[ADR-0025](../decisions/0025-one-transient-state-home.md)** folds the transient dirs into `.mage/`.
 
 > **The grill flipped the thesis.** This note was drafted as "closing the *procedure* path"
 > (recurring workflow → skill). The 2026-06-15 grill established the opposite: the organic
@@ -84,6 +87,60 @@ once built — *finishing* [ADR-0009](../decisions/0009-no-runtime-automation-ri
 11. **Notes stay SHORT** (CC-memory-sized). Tension to resolve in build: the 6000-char
     `noteSizeCap` is for authored design notes; staged lesson-notes want a much smaller target.
 
+## Build decisions (locked during the build, 2026-06-15)
+
+Resolving the spec's "resolve in build" tensions + the codebase-map's open questions:
+
+- **D1 — `.staging/` = a new gitignored `STAGING_DIR=".staging"`** sibling of `.learnings/`/`.metrics/`,
+  holding **complete note drafts** as `<slug>.md` (frontmatter + body). It is in the indexer
+  **SKIP_DIRS** (never indexed); `mage groom` reads it **directly** (bypasses the scanner). So
+  groom-accept = **move + index** (no re-serialize). Per-project in a hub (each project gets its own).
+- **D2 — slug = kebab(title)**, de-collided with `-2`, `-3` … on clash.
+- **D3 — short lesson cap = `lessonNoteCap` (BASE 1200 chars, body)** in `thresholds.ts`. CC-memory-sized.
+  **Soft**: `mage stage` *warns* past it but never blocks (frictionless). The 6000 `noteSizeCap`
+  stays for authored design notes.
+- **D4 — `mage stage`** (hidden plumbing): `--title` + `--type`(default `gotcha`) + `--tags` + `--wing`
+  + body on **stdin**; composes a note, **scrubs via `redact()`** (keep-context, NEVER blocks — drafts
+  are pre-commit + gitignored), dedups, writes `.staging/<slug>.md`; `--json` → `{staged,path,key,skipped,reason}`.
+- **D5 — `mage groom`** (hidden plumbing): default/`--json` **surfaces** the deduped, N-capped pending
+  batch (read-only); `--accept <slugs|all>` **moves** drafts → `notes/<slug>.md` + runs the indexer;
+  `--reject <slugs|all>` deletes them + records their key. Notes are **flat** in `notes/` (wing via tags).
+- **D6 — dedup reuses `coveringNote(sig, notes)`** (grooming/covering-note.ts); `sig = {wing from tags,
+  keywords from title+body}`. A draft is skipped if a committed note covers it, it is already staged,
+  or its key is in the reject ledger.
+- **D7 — budget = `stagingBudget` (BASE 3)** in `thresholds.ts`; surface caps at 3 and **logs the
+  remaining count** (no silent truncation).
+- **D8 — lesson reject ledger = `.metrics/staged-rejects.json`** (`{v,keys:[]}`, fail-open) — a NEW
+  file, kept **out of `.staging/`** (so groom can safely clear staging) and **distinct from** the
+  recurrence-path `.metrics/rejected.json` (which keys on proposal action+target, the procedure path).
+
+## Adapter build decisions (locked during the build, 2026-06-16) — `mage nudge`
+
+The Claude-Code adapter (`mage nudge`, hook-fired). **The hook mechanism was CORRECTED
+during the build** (the plan hand-waved "PreCompact + SessionEnd"; both are wrong):
+
+- **N1 — fires on `SessionStart` with `source === "compact"`, NOT PreCompact/SessionEnd.**
+  Verified against the Claude-Code hook docs: a **SessionEnd** hook's stdout is NOT injected
+  as context (the session is ending) — it can't nudge the agent. **PreCompact** fires *before*
+  compaction, when the chapter isn't closed yet. **SessionStart(compact)** fires right *after*
+  a compaction, when the just-closed chapter's `.learnings/` are complete AND its structured
+  stdout becomes the new session's context. The command gates on `source==="compact"` itself,
+  so other SessionStart sources (startup/resume/clear) are a fast no-op. (mage writes the hook
+  into settings.json, not plugin config, sidestepping the plugin-hook additionalContext bug.)
+- **N2 — the nudge DRAFTS distilled lessons to `.staging/` but NEVER advances the distill
+  watermark** (only `mage distill --seen` does). Dedup (vs `notes/` + `.staging/` + the reject
+  ledger) makes a chapter re-offered every compact get drafted **at most once** — idempotent.
+- **N3 — budget = `stagingBudget` (3) NEWLY-written drafts per run**; deduped/empty clusters
+  don't consume budget; the rest defer to the next compact.
+- **N4 — anti-nag throttle = `.metrics/nudge-throttle.json`** (`{v,lastNudge}`, fail-open):
+  a fresh draft is ALWAYS surfaced; a *pending-only* reminder fires at most once per 4h.
+- **N5 — `additionalContext` via the structured `{hookSpecificOutput:{hookEventName,
+  additionalContext}}` JSON** (the documented SessionStart form; one line, well under the 10k cap).
+- **N6 — re-SCRUBS the composed draft (title + body) via `redact()`** before disk — defense in
+  depth over the capture-time scrub, so a raw `.learnings` line can never leak into a draft.
+- **No-hook degradation** holds: inline `mage stage` is the primary path; the nudge is the
+  safety-net. NEVER throws to the host (fail-open, exit 0).
+
 ## The 0.0.12 build — portable core + Claude-Code adapter
 
 The whole loop splits along ADR-0009's existing line (*"notes portable, capture host-specific"*):
@@ -93,9 +150,10 @@ The whole loop splits along ADR-0009's existing line (*"notes portable, capture 
   `.staging/`) · the agent drafts inline and calls it · **`mage groom`** surfaces the batch
   and moves confirmed drafts to `notes/` + `mage index` · reject → `rejected.json`. File
   layout + verbs + the draft-then-stage pattern need nothing host-specific.
-- **Claude-Code adapter (first):** the boundary distill (PreCompact + SessionEnd) safety-net,
-  agent-aimed via `additionalContext`, wired by `mage connect`. Hooks + context-injection are
-  per-harness — others land as demand appears (ADR-0009 §27).
+- **Claude-Code adapter (first):** the boundary distill safety-net — fired on
+  **`SessionStart(source=compact)`** (see N1 above; NOT the originally-guessed PreCompact/
+  SessionEnd), agent-aimed via `additionalContext`, wired by `mage connect`. Hooks +
+  context-injection are per-harness — others land as demand appears (ADR-0009 §27).
 - **Graceful degradation (ADR-0009 ladder):** no hook adapter on a harness → inline capture,
   or manual `mage:learn`/`mage stage` — **lossless**. Nothing depends on a hook for correctness;
   inline reliability is a quality gradient (harness-dependent salience), not a correctness hole.

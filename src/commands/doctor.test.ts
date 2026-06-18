@@ -54,7 +54,7 @@ async function makeInRepoKb(
     await writeFile(join(dir, "mage", "INDEX.md"), "# Index\n");
   }
   if (opts.gitignoreSinks) {
-    await writeFile(join(dir, ".gitignore"), "mage/.learnings/\nmage/.metrics/\n");
+    await writeFile(join(dir, ".gitignore"), "mage/.learnings/\nmage/.metrics/\nmage/.staging/\n");
   }
 }
 
@@ -349,7 +349,7 @@ describe("doctor env checks still run", () => {
   });
 
   it("MAGE_HOOKS length is the expected hook count used by the connection check", () => {
-    expect(MAGE_HOOKS.length).toBe(9);
+    expect(MAGE_HOOKS.length).toBe(10);
   });
 });
 
@@ -684,7 +684,7 @@ describe("doctor — metadata schema drift", () => {
     };
     await writeFile(join(dir, "mage", "metadata.json"), `${JSON.stringify(meta, null, 2)}\n`);
     await writeFile(join(dir, "mage", "INDEX.md"), "# Index\n");
-    await writeFile(join(dir, ".gitignore"), "mage/.learnings/\nmage/.metrics/\n");
+    await writeFile(join(dir, ".gitignore"), "mage/.learnings/\nmage/.metrics/\nmage/.staging/\n");
   }
 
   it("v2 metadata → schema check passes", async () => {

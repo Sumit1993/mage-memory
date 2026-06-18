@@ -2,7 +2,7 @@
 
 # mage
 
-> 38 notes. Part of the [index](INDEX.md).
+> 40 notes. Part of the [index](INDEX.md).
 
 ### build
 
@@ -41,6 +41,8 @@
 - `decision` [0021 — mage stays offline: no phone-home telemetry; signal is local + voluntarily shared](decisions/0021-offline-no-telemetry-local-signal.md) — 0021, mage, stays, offline, phone, home, telemetry, signal, local, voluntarily, shared, decision _(reviewed 2026-06-09)_
 - `decision` [0022 — Remove the spec-kit-derived SDD skills](decisions/0022-remove-sdd-skills.md) — 0022, remove, spec, kit, derived, sdd, skills, decision, consequences, relations, mage, decisions _(reviewed 2026-06-13)_
 - `decision` [0023 — A hub keeps its own notes AND flat per-project subdirs (ratification)](decisions/0023-hub-own-notes-and-flat-projects.md) — 0023, hub, keeps, own, notes, flat, per, project, subdirs, ratification, scope, separation _(reviewed 2026-06-14)_
+- `decision` [0024 — Organic grooming loop: the lesson path (inline-primary + boundary nudge)](decisions/0024-organic-grooming-loop.md) — 0024, organic, grooming, loop, lesson, path, inline, primary, boundary, nudge, context, decision _(reviewed 2026-06-16)_
+- `decision` [0025 — One transient-state home (`.mage/`) + redact config in `metadata.json`](decisions/0025-one-transient-state-home.md) — 0025, one, transient, state, home, mage, redact, config, metadata, json, context, artifact _(proposed · reviewed 2026-06-16)_
 
 ### design
 

@@ -25,9 +25,10 @@ async function tmp(): Promise<string> {
 }
 
 describe("MAGE_HOOKS table", () => {
-  it("wires exactly the nine expected event/id/command rows", () => {
+  it("wires exactly the ten expected event/id/command rows", () => {
     expect(MAGE_HOOKS).toEqual([
       { event: "SessionStart", id: "mage:observe:SessionStart", command: "mage observe" },
+      { event: "SessionStart", id: "mage:nudge:SessionStart", command: "mage nudge" },
       { event: "UserPromptSubmit", id: "mage:observe:UserPromptSubmit", command: "mage observe" },
       { event: "PostToolUse", id: "mage:observe:PostToolUse", command: "mage observe" },
       {
@@ -138,9 +139,10 @@ describe("upsertMageHooks", () => {
     const ss = merged.hooks?.SessionStart ?? [];
     // the user's non-mage group survives
     expect(ss.find((g) => g.command === undefined && g.hooks[0]?.command === "user-tool")).toBeTruthy();
-    // mage group appended
+    // both mage SessionStart groups appended (observe + the 0.0.12 nudge)
     expect(ss.find((g) => g.id === "mage:observe:SessionStart")).toBeTruthy();
-    expect(ss.length).toBe(2);
+    expect(ss.find((g) => g.id === "mage:nudge:SessionStart")).toBeTruthy();
+    expect(ss.length).toBe(3);
   });
 
   it("is idempotent — re-upsert produces no duplicate mage groups", () => {
