@@ -68,7 +68,7 @@ trigger has no signal to optimize against yet.
    ```bash
    mage skills --metrics --json
    ```
-   It folds the git-ignored `.metrics/` rollup and prints the rows above
+   It folds the git-ignored `.mage/metrics/` rollup and prints the rows above
    (worst-first). It **never** edits a skill — it only flags. If every row is
    `ok` (or there are no rows yet), nothing needs tuning: say so and stop. Skip
    any row whose `loads` are too low to judge even if it slipped through —

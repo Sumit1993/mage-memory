@@ -13,9 +13,8 @@
 // This mirrors the `mage ingest --json` → `mage:learn --from` split: the CLI does
 // the determinism, the skill does the judgment. No model lives here.
 
-import { join } from "node:path";
 import { logger } from "../logger.js";
-import { absolutePath, LEARNINGS_DIR, resolveDocsRoot } from "../paths.js";
+import { absolutePath, learningsPath, resolveDocsRoot } from "../paths.js";
 import { readDistill } from "../distill/reader.js";
 import type { DistillManifest } from "../distill/types.js";
 import { advanceWatermark, readWatermark, writeWatermark } from "../distill/watermark.js";
@@ -112,7 +111,7 @@ async function readAndReport(
   repo: string,
   asJson: boolean,
 ): Promise<DistillResult> {
-  const manifest = await readDistill(docsRoot, join(docsRoot, LEARNINGS_DIR), repo);
+  const manifest = await readDistill(docsRoot, learningsPath(docsRoot), repo);
 
   if (asJson) {
     process.stdout.write(JSON.stringify(manifest) + "\n");

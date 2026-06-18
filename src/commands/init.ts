@@ -190,14 +190,12 @@ async function initInRepo(codeRepo: string, project: string): Promise<void> {
   await writeMetadata(codeRepo, meta);
   logger.success(`Wrote ${metadataPath(codeRepo)}`);
 
-  // Git-ignore raw artifacts + pre-promotion scratch + the cockpit (ADR-0020 §6:
-  // dashboard.html embeds `.metrics` churn, so it must never be committed); track
-  // everything else (ADR-0003).
+  // Git-ignore raw artifacts + the single transient-state home (`.mage/`, ADR-0025)
+  // + the cockpit (ADR-0020 §6: dashboard.html embeds `.mage/metrics` churn, so it
+  // must never be committed); track everything else (ADR-0003).
   const added = await ensureGitignored(codeRepo, [
     "mage/**/artifacts/",
-    "mage/.learnings/",
-    "mage/.metrics/",
-    "mage/.staging/",
+    "mage/.mage/",
     "mage/dashboard.html",
   ]);
   if (added.length > 0) logger.detail(`Added .gitignore patterns: ${added.join(", ")}`);
@@ -327,13 +325,10 @@ async function initStandaloneHub(args: HubArgs): Promise<string> {
 
   const added = await ensureGitignored(hubDir, [
     "**/artifacts/",
-    ".learnings/",
-    "**/.learnings/",
-    ".metrics/",
-    "**/.metrics/",
-    ".staging/",
-    "**/.staging/",
-    // The cockpit embeds `.metrics` churn (ADR-0020 §6) — never commit it.
+    // The single transient-state home (ADR-0025), at the hub root and per-project.
+    ".mage/",
+    "**/.mage/",
+    // The cockpit embeds `.mage/metrics` churn (ADR-0020 §6) — never commit it.
     "dashboard.html",
   ]);
   if (added.length > 0) logger.detail(`Added .gitignore patterns: ${added.join(", ")}`);

@@ -2,9 +2,9 @@
 type: decision
 tags: [mage/decisions]
 created: "2026-06-16"
-updated: "2026-06-16"
-last_reviewed: "2026-06-16"
-status: proposed
+updated: "2026-06-18"
+last_reviewed: "2026-06-18"
+status: active
 provenance:
   repo: mage-memory
   work: 0.0.12-state-fold
@@ -23,7 +23,7 @@ sources:
 
 # 0025 — One transient-state home (`.mage/`) + redact config in `metadata.json`
 
-**Status: proposed (decided 2026-06-16; implemented by the final 0.0.12 "state fold" PR).**
+**Status: active — implemented (decided 2026-06-16; implemented by the final 0.0.12 "state fold" PR, 2026-06-18). One `.mage/` dir holds all transient state; the redact allowlist now lives in `metadata.json`.**
 
 ## Context — artifact sprawl at the docs root
 

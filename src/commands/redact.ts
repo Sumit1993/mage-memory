@@ -155,7 +155,7 @@ function reportStaged(findings: StagedFinding[], blocked: boolean): void {
   }
   if (blocked) {
     logger.error(
-      "Live secret(s) staged — remove them, allow a confirmed false positive in mage/.redactignore, or `git commit --no-verify` to override.",
+      "Live secret(s) staged — remove them, allow a confirmed false positive via `metadata.redact` (ignore/allow), or `git commit --no-verify` to override.",
     );
   }
 }

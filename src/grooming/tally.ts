@@ -7,7 +7,7 @@
 // recurrence work-unit (0.0.11): a single continuously-compacted chat still accrues
 // recurrence (session_id is constant across compaction), while a multi-session user's
 // sessions are each ≥1 chapter. It reuses the rollup mould VERBATIM (rollup.ts): a gitignored
-// `.metrics/promote.json`, a per-session bookmark, an idempotent never-regress
+// `.mage/metrics/promote.json`, a per-session bookmark, an idempotent never-regress
 // `Math.max` fold over CLOSED segments only, fail-open read. PURE compute (foldSession)
 // + an fs orchestrator (foldTally). No model in the fold (ADR-0009).
 //
@@ -19,7 +19,7 @@
 import type { Dirent } from "node:fs";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
-import { METRICS_DIR } from "../paths.js";
+import { metricsPath } from "../paths.js";
 import type { ObserveEvent } from "../observe/types.js";
 import type {
   Lens,
@@ -59,7 +59,7 @@ function freshLenses(): LensCounts {
 
 /** The on-disk tally path under a docs root. */
 export function promoteTallyPath(docsRoot: string): string {
-  return join(docsRoot, METRICS_DIR, PROMOTE_FILE);
+  return join(metricsPath(docsRoot), PROMOTE_FILE);
 }
 
 // ─── readTally — fail-open on missing/corrupt ───────────────────────────────────
@@ -104,9 +104,9 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 
 // ─── writeTally ─────────────────────────────────────────────────────────────────
 
-/** Persist the tally (creating `.metrics/`), pretty-printed with a trailing NL. */
+/** Persist the tally (creating `.mage/metrics/`), pretty-printed with a trailing NL. */
 export async function writeTally(docsRoot: string, t: PromoteTally): Promise<void> {
-  await mkdir(join(docsRoot, METRICS_DIR), { recursive: true });
+  await mkdir(metricsPath(docsRoot), { recursive: true });
   await writeFile(promoteTallyPath(docsRoot), JSON.stringify(t, null, 2) + "\n", "utf8");
 }
 

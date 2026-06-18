@@ -12,11 +12,11 @@
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { METRICS_DIR } from "../paths.js";
+import { metricsPath } from "../paths.js";
 
 // ─── consts ────────────────────────────────────────────────────────────────────
 
-/** The single watermark file, sibling of the context-match rollup in `.metrics/`. */
+/** The single watermark file, sibling of the context-match rollup in `.mage/metrics/`. */
 export const DISTILL_FILE = "distill.json";
 /** Bump when the on-disk watermark shape changes (a fresh empty file re-stamps). */
 export const DISTILL_VERSION = 1;
@@ -38,7 +38,7 @@ function emptyWatermark(): DistillWatermark {
 
 /** The on-disk watermark path under a docs root. */
 export function distillWatermarkPath(docsRoot: string): string {
-  return join(docsRoot, METRICS_DIR, DISTILL_FILE);
+  return join(metricsPath(docsRoot), DISTILL_FILE);
 }
 
 // ─── readWatermark — fail-open on missing/corrupt ───────────────────────────────
@@ -80,9 +80,9 @@ function isNumberRecord(v: unknown): v is Record<string, number> {
 
 // ─── writeWatermark ─────────────────────────────────────────────────────────────
 
-/** Persist the watermark (creating `.metrics/`), pretty-printed with trailing NL. */
+/** Persist the watermark (creating `.mage/metrics/`), pretty-printed with trailing NL. */
 export async function writeWatermark(docsRoot: string, wm: DistillWatermark): Promise<void> {
-  await mkdir(join(docsRoot, METRICS_DIR), { recursive: true });
+  await mkdir(metricsPath(docsRoot), { recursive: true });
   await writeFile(distillWatermarkPath(docsRoot), JSON.stringify(wm, null, 2) + "\n", "utf8");
 }
 

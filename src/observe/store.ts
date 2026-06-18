@@ -26,8 +26,8 @@ import {
 import { join } from "node:path";
 import {
   LEARNINGS_ARCHIVE_DIR,
-  LEARNINGS_DIR,
   LEARNINGS_PURGE_MARKER,
+  learningsPath,
   resolveDocsRoot,
 } from "../paths.js";
 import type { ObserveEvent } from "./types.js";
@@ -51,13 +51,13 @@ const SAFE_SESSION_FALLBACK = "unknown";
 // ─── resolution ──────────────────────────────────────────────────────────────
 
 /**
- * The `.learnings/` dir for the KB at or above `startDir`, or null when no KB is
- * found (the caller fails open). Reuses resolveDocsRoot — in-repo → `mage/`, hub
+ * The `.mage/learnings/` dir for the KB at or above `startDir`, or null when no KB
+ * is found (the caller fails open). Reuses resolveDocsRoot — in-repo → `mage/`, hub
  * → the hub root.
  */
 export async function resolveLearningsDir(startDir: string): Promise<string | null> {
   const resolved = await resolveDocsRoot(startDir);
-  return resolved ? join(resolved.root, LEARNINGS_DIR) : null;
+  return resolved ? learningsPath(resolved.root) : null;
 }
 
 /**

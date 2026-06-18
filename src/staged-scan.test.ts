@@ -197,7 +197,7 @@ describe("scanStaged — fail-open on a non-git dir (never throws)", () => {
   });
 });
 
-describe("scanStaged — 0.0.12 false-positive fixes (generated artifacts + .redactignore)", () => {
+describe("scanStaged — 0.0.12 false-positive fixes (generated artifacts + metadata.redact)", () => {
   it("does NOT scan mage's own generated artifacts, even if they carry a secret-shaped string", async () => {
     const dir = await tmp();
     await initMageRepo(dir);
@@ -225,34 +225,43 @@ describe("scanStaged — 0.0.12 false-positive fixes (generated artifacts + .red
     expect(scannedFiles).toBe(1);
   });
 
-  it("skips a file matched by a .redactignore glob but scans the rest", async () => {
+  it("skips a file matched by a metadata.redact.ignore glob but scans the rest", async () => {
     const dir = await tmp();
-    await initMageRepo(dir);
-    await addFile(dir, "mage/.redactignore", "notes/generated/**\n");
+    await initRepo(dir);
+    await mkdir(join(dir, "mage"), { recursive: true });
+    // Write metadata with a redact.ignore glob covering the generated dump path.
+    await writeFile(
+      join(dir, "mage", "metadata.json"),
+      JSON.stringify({
+        schema: "mage.v1",
+        mode: "in-repo",
+        project: "t",
+        redact: { ignore: ["notes/generated/**"] },
+      }),
+    );
     await addFile(dir, "mage/notes/generated/dump.md", `API_KEY=${SECRET}\n`); // allowlisted path
     await addFile(dir, "mage/notes/real.md", CLEAN); // scanned, clean
 
     const { blocked, scannedFiles } = await scanStaged(dir);
 
     expect(blocked).toBe(false); // the secret-bearing path is allowlisted
-    expect(scannedFiles).toBe(1); // only notes/real.md (.redactignore + dump.md skipped)
+    expect(scannedFiles).toBe(1); // only notes/real.md (dump.md is glob-ignored)
   });
 
-  it("never scans the .redactignore file itself (its literal allows can be secret-shaped)", async () => {
+  it("a metadata.redact.allow literal suppresses an in-note false positive", async () => {
     const dir = await tmp();
-    await initMageRepo(dir);
-    await addFile(dir, "mage/.redactignore", `literal:${SECRET}\n`);
-
-    const { blocked, scannedFiles } = await scanStaged(dir);
-
-    expect(blocked).toBe(false);
-    expect(scannedFiles).toBe(0);
-  });
-
-  it("a .redactignore literal allow suppresses an in-note false positive", async () => {
-    const dir = await tmp();
-    await initMageRepo(dir);
-    await addFile(dir, "mage/.redactignore", `literal:${SECRET}\n`);
+    await initRepo(dir);
+    await mkdir(join(dir, "mage"), { recursive: true });
+    // Write metadata with the secret-shaped string in the allow list.
+    await writeFile(
+      join(dir, "mage", "metadata.json"),
+      JSON.stringify({
+        schema: "mage.v1",
+        mode: "in-repo",
+        project: "t",
+        redact: { allow: [SECRET] },
+      }),
+    );
     await addFile(dir, "mage/notes/doc.md", `the example token ${SECRET} is illustrative\n`);
 
     const { blocked, scannedFiles } = await scanStaged(dir);
@@ -283,5 +292,39 @@ describe("scanStaged — 0.0.12 false-positive fixes (generated artifacts + .red
 
     expect(blocked).toBe(false);
     expect(scannedFiles).toBe(0); // _index.*.md is a generated artifact at any depth
+  });
+
+  it("metadata.json staged with a secret-shaped allow literal neither leaks nor self-blocks Gate-2", async () => {
+    // Regression pin for the .mage/ state fold (ADR-0025): metadata.json is no longer
+    // skipped by the old `.redactignore` self-skip. It IS in scope and IS scanned.
+    // A `redact.allow` literal stored there is secret-shaped (same Anthropic key form
+    // as SECRET) — this test pins that it is suppressed (blocked=false) and that BOTH
+    // files are counted as scanned (scannedFiles===2).
+    const dir = await tmp();
+    await initRepo(dir);
+    await mkdir(join(dir, "mage"), { recursive: true });
+    // Stage metadata.json (via addFile → git add) with the allow literal in it.
+    // SECRET is the same sk-ant-... shaped value used throughout this file.
+    await addFile(
+      dir,
+      "mage/metadata.json",
+      JSON.stringify({
+        schema: "mage.v1",
+        mode: "in-repo",
+        project: "t",
+        redact: { allow: [SECRET] },
+      }),
+    );
+    // Stage a note containing the SAME secret-shaped token — allowlisted, so it is
+    // suppressed and must NOT block.
+    await addFile(dir, "mage/notes/doc.md", `example token ${SECRET} is illustrative\n`);
+
+    const { blocked, scannedFiles } = await scanStaged(dir);
+
+    // Both files are in scope and are scanned (metadata.json is not a generated artifact).
+    expect(scannedFiles).toBe(2);
+    // The allow literal in metadata.json is suppressed by scanSecrets(); the note's
+    // token is also suppressed because it matches the allow list read from disk.
+    expect(blocked).toBe(false);
   });
 });

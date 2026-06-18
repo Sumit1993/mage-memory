@@ -40,7 +40,7 @@ async function tmpRepo(): Promise<{ repo: string; docsRoot: string; learnings: s
     }),
     "utf8",
   );
-  const learnings = join(docsRoot, ".learnings");
+  const learnings = join(docsRoot, ".mage", "learnings");
   await mkdir(learnings, { recursive: true });
   return { repo, docsRoot, learnings };
 }

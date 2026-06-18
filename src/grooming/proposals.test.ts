@@ -41,11 +41,11 @@ function noteProposal(target: string): Proposal {
 
 // ─── paths ──────────────────────────────────────────────────────────────────────
 
-describe("paths — gitignored .metrics siblings", () => {
-  it("places both stores under .metrics/", () => {
+describe("paths — gitignored .mage/metrics siblings", () => {
+  it("places both stores under .mage/metrics/", () => {
     const root = "/x/mage";
-    expect(proposalsPath(root)).toBe(join(root, ".metrics", PROPOSALS_FILE));
-    expect(rejectedPath(root)).toBe(join(root, ".metrics", REJECTED_FILE));
+    expect(proposalsPath(root)).toBe(join(root, ".mage", "metrics", PROPOSALS_FILE));
+    expect(rejectedPath(root)).toBe(join(root, ".mage", "metrics", REJECTED_FILE));
   });
 });
 
@@ -60,7 +60,7 @@ describe("readProposals / readRejected — fail-open to []", () => {
 
   it("returns [] on corrupt JSON", async () => {
     const dir = await tmp();
-    await mkdir(join(dir, ".metrics"), { recursive: true });
+    await mkdir(join(dir, ".mage", "metrics"), { recursive: true });
     await writeFile(proposalsPath(dir), "{ not json", "utf8");
     await writeFile(rejectedPath(dir), "]]", "utf8");
     expect(await readProposals(dir)).toEqual([]);
@@ -69,7 +69,7 @@ describe("readProposals / readRejected — fail-open to []", () => {
 
   it("returns [] when the JSON is not an array", async () => {
     const dir = await tmp();
-    await mkdir(join(dir, ".metrics"), { recursive: true });
+    await mkdir(join(dir, ".mage", "metrics"), { recursive: true });
     await writeFile(proposalsPath(dir), JSON.stringify({ action: "note" }), "utf8");
     expect(await readProposals(dir)).toEqual([]);
   });
@@ -77,7 +77,7 @@ describe("readProposals / readRejected — fail-open to []", () => {
   it("drops torn entries that aren't proposal-shaped", async () => {
     const dir = await tmp();
     const good = noteProposal("payments::webhook");
-    await mkdir(join(dir, ".metrics"), { recursive: true });
+    await mkdir(join(dir, ".mage", "metrics"), { recursive: true });
     await writeFile(
       proposalsPath(dir),
       JSON.stringify([good, null, 7, { target: "no-action" }, { action: "note" }]),

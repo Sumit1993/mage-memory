@@ -19,11 +19,9 @@ import {
   GIT_DIR,
   IDENTITY_FILE,
   INDEX_FILE,
-  LEARNINGS_DIR,
-  METRICS_DIR,
   NODE_MODULES_DIR,
   OBSIDIAN_DIR,
-  STAGING_DIR,
+  STATE_DIR,
 } from "./paths.js";
 
 /** Sentinel wing key for untagged / cross-cutting notes. */
@@ -39,9 +37,7 @@ const SKIP_DIRS = new Set<string>([
   GIT_DIR,
   NODE_MODULES_DIR,
   ARTIFACTS_DIRNAME,
-  LEARNINGS_DIR,
-  METRICS_DIR,
-  STAGING_DIR, // judged-but-uncommitted grooming-loop drafts — never in the live index (0.0.12)
+  STATE_DIR, // ALL machine-written transient state (learnings/metrics/staging) — never indexed (ADR-0025)
   ARCHIVE_DIR,
   CLAUDE_DIR,
   AGENTS_SKILLS_DIR,

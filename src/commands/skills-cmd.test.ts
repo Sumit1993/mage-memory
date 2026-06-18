@@ -31,7 +31,7 @@ async function stream(
   session: string,
   events: Array<Record<string, unknown>>,
 ): Promise<void> {
-  const p = join(dir, "mage", ".learnings", `${session}.jsonl`);
+  const p = join(dir, "mage", ".mage", "learnings", `${session}.jsonl`);
   await mkdir(join(p, ".."), { recursive: true });
   await writeFile(p, events.map((e) => JSON.stringify(e)).join("\n") + "\n");
 }
@@ -102,8 +102,8 @@ describe("mage skills --metrics (read-only)", () => {
 
     expect(spy).not.toHaveBeenCalled();
     expect(r.metricsRows).toBeDefined();
-    // The rollup file was written under <root>/.metrics/context-match.json.
-    const rollupRaw = await readFile(join(dir, "mage", ".metrics", "context-match.json"), "utf8");
+    // The rollup file was written under <root>/.mage/metrics/context-match.json.
+    const rollupRaw = await readFile(join(dir, "mage", ".mage", "metrics", "context-match.json"), "utf8");
     const rollup = JSON.parse(rollupRaw) as { skills: Record<string, { loads: number; matches: number }> };
     const stat = rollup.skills["mage-wing-mage::h1"];
     expect(stat).toBeDefined();

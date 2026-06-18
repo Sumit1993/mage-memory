@@ -21,9 +21,14 @@
 // owning `file` — never the staged content itself.
 
 import { relative, sep } from "node:path";
-import { REDACTIGNORE_FILE, resolveDocsRoot } from "./paths.js";
+import {
+  type RedactConfig,
+  readHubMetadata,
+  readMetadata,
+  resolveDocsRoot,
+} from "./paths.js";
 import { scanSecrets, type SecretFinding } from "./redact.js";
-import { matchesRedactGlob, readRedactIgnore } from "./redactignore.js";
+import { matchesRedactGlob, redactIgnoreFromMetadata } from "./redactignore.js";
 import { isGeneratedArtifact } from "./scan.js";
 import { run } from "./shell.js";
 
@@ -69,9 +74,10 @@ export async function scanStaged(repoPath: string): Promise<StagedScanResult> {
   if (!docs) return { findings: [], blocked: false, scannedFiles: 0 };
   const inScope = docsScopeFilter(docs.repo, docs.root);
   const toDocsRel = docsRelPathMapper(docs.repo, docs.root);
-  // The committed false-positive allowlist (mage/.redactignore) — fail-open (empty
-  // when absent/unreadable), so a missing allowlist never changes gate behavior.
-  const ignore = await readRedactIgnore(docs.root);
+  // The false-positive allowlist now lives in `metadata.redact` (ADR-0025), not a
+  // `.redactignore` file. Fail-open (empty when metadata is absent/unreadable), so a
+  // missing allowlist never changes gate behavior — same contract as before.
+  const ignore = redactIgnoreFromMetadata(await readRedactConfig(docs.repo, docs.kind));
 
   const list = await run("git", [
     "-C",
@@ -93,13 +99,11 @@ export async function scanStaged(repoPath: string): Promise<StagedScanResult> {
     .filter(inScope)
     .filter((file) => {
       // Skip mage's OWN generated artifacts (their path strings trip the high-entropy
-      // detector but are never user secrets), the allowlist file itself (its literal
-      // allows can be secret-shaped), and any path allowlisted via a `.redactignore`
-      // glob — the non-bypass override for a strict, no-`--no-verify` environment.
+      // detector but are never user secrets) and any path allowlisted via a
+      // `metadata.redact.ignore` glob — the non-bypass override for a strict,
+      // no-`--no-verify` environment.
       const rel = toDocsRel(file);
-      return (
-        !isGeneratedArtifact(rel) && rel !== REDACTIGNORE_FILE && !matchesRedactGlob(rel, ignore)
-      );
+      return !isGeneratedArtifact(rel) && !matchesRedactGlob(rel, ignore);
     });
 
   const findings: StagedFinding[] = [];
@@ -143,11 +147,29 @@ function docsScopeFilter(repo: string, root: string): (file: string) => boolean 
 }
 
 /**
+ * Read a KB's `metadata.redact` allowlist from where the metadata physically lives —
+ * `repo` (the code-repo root for a repo KB, the hub root for a hub/external KB). The
+ * kind picks the reader (code-repo vs hub metadata). Fail-open: any read/parse error
+ * → undefined, which {@link redactIgnoreFromMetadata} compiles to an empty allowlist.
+ * Reachable from a pre-commit hook ⇒ must never throw.
+ */
+async function readRedactConfig(
+  repo: string,
+  kind: "repo" | "hub",
+): Promise<RedactConfig | undefined> {
+  try {
+    const meta = kind === "repo" ? await readMetadata(repo) : await readHubMetadata(repo);
+    return meta?.redact;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Map a repo-relative POSIX staged path to one relative to the docs root, so it can
- * be matched against `.redactignore` globs (which the user writes relative to the KB
- * root) and compared to {@link REDACTIGNORE_FILE}. In a hub the docs root IS the repo
- * (prefix ""), so the path is returned unchanged; in-repo, the `mage/` prefix is
- * stripped. Pure + sync.
+ * be matched against `metadata.redact.ignore` globs (which the user writes relative
+ * to the KB root). In a hub the docs root IS the repo (prefix ""), so the path is
+ * returned unchanged; in-repo, the `mage/` prefix is stripped. Pure + sync.
  */
 function docsRelPathMapper(repo: string, root: string): (file: string) => string {
   const prefix = docsPrefix(repo, root);

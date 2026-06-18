@@ -1,6 +1,7 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { STATE_DIR, METRICS_DIR, STAGING_DIR } from "../paths.js";
 import { afterEach, describe, expect, it } from "vitest";
 import type { ScannedNote } from "../scan.js";
 import {
@@ -119,7 +120,7 @@ describe("composeDraft", () => {
 describe("writeDraft / readStagedDrafts", () => {
   it("round-trips a draft and is fail-open on a missing dir", async () => {
     const root = await tmp();
-    const staging = join(root, ".staging");
+    const staging = join(root, STATE_DIR, STAGING_DIR);
     expect(await readStagedDrafts(staging)).toEqual([]); // missing dir → []
 
     const { frontmatter, body } = composeDraft({ title: "A Lesson", tags: ["mage/x"], body: "body text", created: "2026-06-15" });
@@ -179,13 +180,13 @@ describe("reject ledger", () => {
     await addStagedRejects(root, ["a::x"]); // dup is a no-op
     expect(await readStagedRejects(root)).toEqual(new Set(["a::x", "b::y"]));
 
-    const raw = JSON.parse(await readFile(join(root, ".metrics", "staged-rejects.json"), "utf8"));
+    const raw = JSON.parse(await readFile(join(root, STATE_DIR, METRICS_DIR, "staged-rejects.json"), "utf8"));
     expect(raw).toEqual({ v: 1, keys: ["a::x", "b::y"] });
   });
   it("tolerates a corrupt ledger", async () => {
     const root = await tmp();
-    await mkdir(join(root, ".metrics"), { recursive: true });
-    await writeFile(join(root, ".metrics", "staged-rejects.json"), "{ not json");
+    await mkdir(join(root, STATE_DIR, METRICS_DIR), { recursive: true });
+    await writeFile(join(root, STATE_DIR, METRICS_DIR, "staged-rejects.json"), "{ not json");
     expect(await readStagedRejects(root)).toEqual(new Set());
   });
 });
@@ -195,7 +196,7 @@ describe("reject ledger", () => {
 describe("promoteDraft / discardDraft", () => {
   it("moves a draft into notes/, de-colliding the slug", async () => {
     const root = await tmp();
-    const staging = join(root, ".staging");
+    const staging = join(root, STATE_DIR, STAGING_DIR);
     const { frontmatter, body } = composeDraft({ title: "Lesson", tags: ["mage/x"], body: "b" });
     await writeDraft(staging, "lesson", frontmatter, body);
     await mkdir(join(root, "notes"), { recursive: true });
@@ -210,7 +211,7 @@ describe("promoteDraft / discardDraft", () => {
   });
   it("discardDraft removes the file (idempotent)", async () => {
     const root = await tmp();
-    const staging = join(root, ".staging");
+    const staging = join(root, STATE_DIR, STAGING_DIR);
     const { frontmatter, body } = composeDraft({ title: "X", body: "b" });
     await writeDraft(staging, "x", frontmatter, body);
     const [d] = await readStagedDrafts(staging);

@@ -13,26 +13,26 @@
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { METRICS_DIR } from "../paths.js";
+import { metricsPath } from "../paths.js";
 import type { Proposal } from "./types.js";
 
 // ─── consts ────────────────────────────────────────────────────────────────────
 
-/** The pending-proposal queue, sibling of the rollup in `.metrics/`. */
+/** The pending-proposal queue, sibling of the rollup in `.mage/metrics/`. */
 export const PROPOSALS_FILE = "proposals.json";
-/** The rejected-edit buffer, sibling of the rollup in `.metrics/`. */
+/** The rejected-edit buffer, sibling of the rollup in `.mage/metrics/`. */
 export const REJECTED_FILE = "rejected.json";
 
 // ─── paths ─────────────────────────────────────────────────────────────────────
 
 /** The on-disk proposals-queue path under a docs root. */
 export function proposalsPath(docsRoot: string): string {
-  return join(docsRoot, METRICS_DIR, PROPOSALS_FILE);
+  return join(metricsPath(docsRoot), PROPOSALS_FILE);
 }
 
 /** The on-disk rejected-buffer path under a docs root. */
 export function rejectedPath(docsRoot: string): string {
-  return join(docsRoot, METRICS_DIR, REJECTED_FILE);
+  return join(metricsPath(docsRoot), REJECTED_FILE);
 }
 
 // ─── reads — fail-open on missing/corrupt ───────────────────────────────────────
@@ -90,9 +90,9 @@ export async function writeRejected(docsRoot: string, ps: Proposal[]): Promise<v
   await writeProposalArray(rejectedPath(docsRoot), docsRoot, ps);
 }
 
-/** Shared write: mkdir `.metrics/`, then JSON.stringify(,,2)+"\n" (mirrors rollup). */
+/** Shared write: mkdir `.mage/metrics/`, then JSON.stringify(,,2)+"\n" (mirrors rollup). */
 async function writeProposalArray(path: string, docsRoot: string, ps: Proposal[]): Promise<void> {
-  await mkdir(join(docsRoot, METRICS_DIR), { recursive: true });
+  await mkdir(metricsPath(docsRoot), { recursive: true });
   await writeFile(path, JSON.stringify(ps, null, 2) + "\n", "utf8");
 }
 

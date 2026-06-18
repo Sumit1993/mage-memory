@@ -113,7 +113,7 @@ the user runs them. Pick the right repo by where the file physically lives:
 | `<hub>/projects/<project>/` (hub-owned) | the hub repo (`git -C <hub> …`) |
 | Hub root `notes/`, `decisions/`, `INDEX.md`, `IDENTITY.md`, `archive/` | the hub repo |
 
-`artifacts/` and `.learnings/` are git-ignored by design — don't try to commit them.
+`artifacts/` and the `.mage/` state dir are git-ignored by design — don't try to commit them.
 
 ## H. Proactive suggestions (be conservative)
 
