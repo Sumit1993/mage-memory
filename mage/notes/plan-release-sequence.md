@@ -73,15 +73,21 @@ See [the release-bump gotcha](release-bump-touches-many-artifacts.md) + [the typ
 (becomes **ADR-0024**), **building**. Ships the LESSON path (a1 = observed organic note creation, CC-memory
 style): a **portable core** (`mage stage` → redacted draft into a gitignored `.staging/`; `mage groom` →
 surface the deduped batch, move confirmed drafts to `notes/` + index; reject → `.metrics/staged-rejects.json`;
-anti-flood = dedup via `coveringNote` + budget N=3 + reject buffer) + a **Claude-Code adapter** (a PreCompact/SessionEnd
-**nudge** that runs distill over the new `.learnings/` segment, drafts to `.staging/`, surfaces via
-`additionalContext`, wired by `mage connect` — finishing [ADR-0009](../decisions/0009-no-runtime-automation-rides-host-hooks.md)
+anti-flood = dedup via `coveringNote` + budget N=3 + reject buffer) + a **Claude-Code adapter** (`mage nudge`,
+fired on **`SessionStart(source=compact)`** — NOT the originally-guessed PreCompact/SessionEnd: SessionEnd
+can't inject context and PreCompact precedes chapter close; SessionStart-compact fires after, when
+`.learnings/` is complete and stdout becomes context — runs distill over the new segment, drafts to
+`.staging/`, surfaces via `additionalContext`, wired by `mage connect` — finishing [ADR-0009](../decisions/0009-no-runtime-automation-rides-host-hooks.md)
 §24 step 2) + an **always-on inline-capture instruction** in the generated AGENTS.md. Bundled: the **redact
 false-positives** fix (skip mage's own generated artifacts, ignore `${ENV}` placeholders, tune the
 high-entropy detector, add a non-bypass `mage/.redactignore` allowlist) — load-bearing because the loop
 generates more note commits, so every false positive would deadlock it. **0.1.0 = the announcement** once a1
 is observed working in real use (NOT an over-fit "force a graduation" gate). No embedded judge (holds
 ADR-0009/0021); the host-skill IS the judge.
+**BUILD STATUS (2026-06-16):** shipped as 3 reviewable PRs (release-please rolls them into 0.0.12) —
+**portable core = PR #25** (mage stage/groom + `.staging`), **redact false-positives = PR #26** (off main,
+independent), **Claude-Code capture adapter = PR (this)** (`mage nudge` + inline instruction). Each
+dogfooded + adversarially reviewed. Pending: user merges + a multi-KB soak before npm publish.
 
 ## Critical path (what gates everything)
 

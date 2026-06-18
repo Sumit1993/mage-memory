@@ -83,4 +83,22 @@ describe("writeAgentsMd — KB shape blocks (kind repo/hub · mode in-repo/hybri
       expect(agents).not.toContain("/mage-learn");
     }
   });
+
+  it("carries the always-on inline-capture instruction in every shape (0.0.12)", async () => {
+    for (const opts of [
+      { kind: "repo", mode: "in-repo", docsRel: "mage" },
+      { kind: "repo", mode: "hybrid", docsRel: "mage" },
+      { kind: "hub", mode: "in-repo", docsRel: "." },
+      { kind: "repo", mode: "external", docsRel: "mage", hubPath: "/abs/hub", project: "engine" },
+    ] as const) {
+      const repo = await tmp();
+      await writeAgentsMd(repo, opts);
+      const agents = await readAgents(repo);
+      // The inline-primary path: capture at first sight via `mage stage` → `.staging/`.
+      expect(agents).toContain("Capture lessons inline");
+      expect(agents).toContain("mage stage");
+      expect(agents).toContain(".staging");
+      expect(agents).toContain("mage:groom");
+    }
+  });
 });
