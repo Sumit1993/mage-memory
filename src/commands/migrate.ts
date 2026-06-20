@@ -30,9 +30,9 @@ import {
   absolutePath,
   exists,
   hubMetadataPath,
-  hubProjectDocsRoot,
   looksLikeHub,
   metadataPath,
+  ownedDocsRoots,
   readHubMetadata,
   readMetadata,
   stateDir,
@@ -144,7 +144,7 @@ export async function mageMigrate(opts: MigrateOptions = {}): Promise<MigrateRes
       // metadata (project docs roots carry no metadata.json of their own). Each source
       // file is parsed-but-not-deleted and removed only AFTER the hub write resolves —
       // this bounds loss to zero across all N projects even if the hub write fails.
-      const roots = [start, ...hubProjectRoots(start, hub.projects)];
+      const roots = await ownedDocsRoots({ root: start, kind: "hub", repo: start });
       const folds: ParsedRedactIgnore[] = [];
       let folded: RedactConfig | undefined;
       for (const root of roots) {
@@ -190,20 +190,6 @@ async function findCodeRepo(start: string): Promise<string | null> {
     if (parent === dir) return null;
     dir = parent;
   }
-}
-
-/** Every hub-owned project's flat docs root (`<hub>/projects/<name>/`). */
-function hubProjectRoots(hub: string, projects: { name: string }[]): string[] {
-  const roots: string[] = [];
-  for (const p of projects) {
-    if (!p.name) continue;
-    try {
-      roots.push(hubProjectDocsRoot(hub, p.name));
-    } catch {
-      // assertSafeName rejected a hostile project name — skip it, never throw.
-    }
-  }
-  return roots;
 }
 
 /**

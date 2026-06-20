@@ -14,7 +14,8 @@
 // the determinism, the skill does the judgment. No model lives here.
 
 import { logger } from "../logger.js";
-import { absolutePath, learningsPath, resolveDocsRoot } from "../paths.js";
+import { absolutePath, learningsPath, type ResolvedDocsRoot, resolveDocsRoot } from "../paths.js";
+import { reportHubFanout } from "./fanout-hint.js";
 import { readDistill } from "../distill/reader.js";
 import type { DistillManifest } from "../distill/types.js";
 import { advanceWatermark, readWatermark, writeWatermark } from "../distill/watermark.js";
@@ -49,10 +50,10 @@ export async function distillCmd(opts: DistillOptions): Promise<DistillResult> {
       `No mage knowledge base found at or above ${start}. Run \`mage init\` first.`,
     );
   }
-  const { root, repo } = resolved;
+  const { root } = resolved;
 
   if (opts.seen !== undefined) return commitSeen(root, opts.seen);
-  return readAndReport(root, repo, Boolean(opts.json));
+  return readAndReport(resolved, Boolean(opts.json));
 }
 
 // ─── --seen: the only write path ─────────────────────────────────────────────
@@ -107,11 +108,11 @@ function parseSeen(seen: string): { session: string; offset: number } {
 
 /** Read the manifest, then emit it as JSON (for the skill) or a human summary. */
 async function readAndReport(
-  docsRoot: string,
-  repo: string,
+  resolved: ResolvedDocsRoot,
   asJson: boolean,
 ): Promise<DistillResult> {
-  const manifest = await readDistill(docsRoot, learningsPath(docsRoot), repo);
+  const { root, repo } = resolved;
+  const manifest = await readDistill(root, learningsPath(root), repo);
 
   if (asJson) {
     process.stdout.write(JSON.stringify(manifest) + "\n");
@@ -119,6 +120,7 @@ async function readAndReport(
   }
 
   reportHuman(manifest);
+  await reportHubFanout(resolved, "distill");
   return { manifest };
 }
 

@@ -25,9 +25,9 @@ import {
   METADATA_SCHEMA,
   STATE_DIR,
   exists,
-  hubProjectDocsRoot,
   learningsPath,
   looksLikeHub,
+  ownedDocsRoots,
   readHubMetadata,
   readMetadata,
   type resolveDocsRoot,
@@ -584,28 +584,6 @@ async function pushLayoutDriftCheck(
         }
       : { name: "state layout", ok: true, detail: "state consolidated under `.mage/`" },
   );
-}
-
-/**
- * The docs roots this KB owns, for the layout-drift probe: the resolved root, plus —
- * when run AT a hub root — every registered `projects/<name>/`. Mirrors the set
- * {@link mageMigrate} relocates. Fail-open: an unreadable hub metadata yields just the
- * root.
- */
-async function ownedDocsRoots(kb: Kb): Promise<string[]> {
-  const roots = [kb.root];
-  if (kb.kind === "hub" && kb.root === kb.repo) {
-    const meta = await readHubMetadata(kb.repo).catch(() => null);
-    for (const p of meta?.projects ?? []) {
-      if (!p.name) continue;
-      try {
-        roots.push(hubProjectDocsRoot(kb.repo, p.name));
-      } catch {
-        // hostile project name rejected by assertSafeName — skip it.
-      }
-    }
-  }
-  return roots;
 }
 
 /** True iff any owned docs root still holds a pre-fold dir or a `.redactignore`. */

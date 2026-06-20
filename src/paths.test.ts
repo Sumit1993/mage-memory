@@ -15,6 +15,7 @@ import {
   metadataPath,
   normalizeHubMetadata,
   normalizeMetadata,
+  ownedDocsRoots,
   readHubMetadata,
   readMetadata,
   resolveDocsRoot,
@@ -292,5 +293,54 @@ describe("paths — schema migration (Dec 9 / v1 → v2)", () => {
     await writeHubMetadata(hub, { schema: "mage.v1", name: "h", created_at: "t", projects: [] });
     const raw = JSON.parse(await readFile(hubMetadataPath(hub), "utf8"));
     expect(raw.schema).toBe("mage.v2");
+  });
+
+  describe("ownedDocsRoots (the shared hub fan-out enumerator)", () => {
+    async function hubWithProjects(names: string[]): Promise<string> {
+      const hub = await tmp("mage-owned-");
+      await mkdir(join(hub, "projects"), { recursive: true });
+      const projects = names.map((name) => ({
+        name,
+        storage: "hub-owned",
+        code_repo_path: "",
+        code_repo_url: "",
+      }));
+      await writeFile(
+        join(hub, "metadata.json"),
+        JSON.stringify({ schema: METADATA_SCHEMA, name: "h", created_at: "", projects }),
+      );
+      return hub;
+    }
+
+    it("a repo KB owns only its own docs root", async () => {
+      const dir = await tmp("mage-ownrepo-");
+      const root = join(dir, "mage");
+      expect(await ownedDocsRoots({ root, kind: "repo", repo: dir })).toEqual([root]);
+    });
+
+    it("a hub root owns its root PLUS every registered project, in order", async () => {
+      const hub = await hubWithProjects(["engine", "platform"]);
+      expect(await ownedDocsRoots({ root: hub, kind: "hub", repo: hub })).toEqual([
+        hub,
+        hubProjectDocsRoot(hub, "engine"),
+        hubProjectDocsRoot(hub, "platform"),
+      ]);
+    });
+
+    it("a hub-owned project (root ≠ repo) owns only itself — never recurses", async () => {
+      const hub = await hubWithProjects(["engine"]);
+      const proj = hubProjectDocsRoot(hub, "engine");
+      expect(await ownedDocsRoots({ root: proj, kind: "hub", repo: hub })).toEqual([proj]);
+    });
+
+    it("a hub root with no registered projects owns just the root", async () => {
+      const hub = await hubWithProjects([]);
+      expect(await ownedDocsRoots({ root: hub, kind: "hub", repo: hub })).toEqual([hub]);
+    });
+
+    it("fails open to just the root when hub metadata is absent/unreadable", async () => {
+      const dir = await tmp("mage-ownmissing-");
+      expect(await ownedDocsRoots({ root: dir, kind: "hub", repo: dir })).toEqual([dir]);
+    });
   });
 });
