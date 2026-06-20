@@ -386,4 +386,97 @@ describe("rankArcs", () => {
     expect(ranked).toHaveLength(1);
     expect(ranked[0]?.pattern).toBe("correction-reset");
   });
+
+  it("never lets a huge local grind out-rank an env failure (saturating cost — review #8/#21)", () => {
+    const envFail = arc("failure-pivot", { cost: 4, failures: ["403 Forbidden"], onset: 1, resolution: 5 });
+    const hugeGrind = arc("grind", { cost: 500, onset: 10, resolution: 400 });
+    expect(rankArcs([hugeGrind, envFail])[0]?.pattern).toBe("failure-pivot");
+  });
+});
+
+// ─── regression: review-confirmed fixes ───────────────────────────────────────
+
+function shell(tool: string, detail: string, ok = true): ObserveEvent {
+  return { v: 1, ts: "t", session: "s", type: "tool_use", tool, paths: [], detail, ok, error_summary: ok ? null : "boom" };
+}
+
+describe("review fixes (regression)", () => {
+  it("sees the external command inside $(...) / backticks / assignments (review #1/#6)", () => {
+    expect(approachKey(bash("echo $(curl https://x)"))).toBe("Bash:curl");
+    expect(approachKey(bash("RESULT=$(gh api repos/acme/widgets)"))).toBe("Bash:gh");
+    expect(toolExternality(bash("RESULT=$(gh api widgets)"))).toBe("external");
+    expect(commandVerbs("Y=$(curl https://api/widgets)")).toEqual(["curl"]); // no trailing ')'
+  });
+
+  it("strips quotes and skips a wrapper's args (review #13/#14)", () => {
+    expect(approachKey(bash('"gh" api foo'))).toBe("Bash:gh");
+    expect(approachKey(bash("timeout 30 curl https://x"))).toBe("Bash:curl");
+    expect(toolExternality(bash("timeout 30 curl https://x"))).toBe("external");
+    expect(approachKey(bash("nice -n 10 node build.js"))).toBe("Bash:node");
+  });
+
+  it("handles trailing-slash directory paths without a degenerate key (review #15)", () => {
+    expect(approachKey(pathTool("Grep", "src/distill/"))).toBe("Grep:distill"); // dir name, not "Grep:"
+    expect(approachKey(pathTool("Glob", "/"))).toBe("Glob"); // pure slash → bare-tool fallback
+  });
+
+  it("parses a custom shell tool when bashTools is overridden (review #6 portability)", () => {
+    const opts = { bashTools: new Set(["shell"]) };
+    expect(approachKey(shell("shell", "gh pr create"), opts)).toBe("shell:gh");
+    expect(toolExternality(shell("shell", "gh pr create"), opts)).toBe("external");
+  });
+
+  it("does not alias two verbless commands as the same approach (review #11)", () => {
+    // Before the fix, the verbless `mkdir` success would be read as a same-key retry of the
+    // verbless `cd` failure and DROP it, suppressing the real curl pivot.
+    const arcs = computeFrictionArcs([
+      bash("cd /nonexistent/widgets", false, "no such directory widgets"),
+      bash("mkdir -p build"),
+      bash("curl https://api/widgets"),
+      compact(),
+    ]);
+    expect(arcs).toHaveLength(1);
+    expect(arcs[0]?.worked).toBe("Bash:curl");
+  });
+
+  it("anchors a long same-key failure run at the FIRST failure, pivot beyond the window (review #9)", () => {
+    const events: ObserveEvent[] = [bash("gh api widgets", false, "403 widgets")];
+    for (let n = 0; n < 8; n++) events.push(bash(`gh api widgets --page ${n}`, false, "403 widgets"));
+    events.push(bash("curl https://api/widgets")); // 9 tool-steps after the first failure
+    events.push(compact());
+    const arcs = computeFrictionArcs(events);
+    expect(arcs).toHaveLength(1);
+    expect(arcs[0]?.onset).toBe(1); // the FIRST failure, not a later one
+    expect(arcs[0]?.tried).toBe("Bash:gh");
+    expect(arcs[0]?.worked).toBe("Bash:curl");
+  });
+
+  it("does not record a failing or protocol-rejected next action as correction-reset 'worked' (review #2)", () => {
+    expect(
+      computeFrictionArcs([
+        pathTool("Edit", "src/foo.ts"),
+        prompt("use the gh CLI"),
+        bash("gh api repos/acme/foo", false, "403 Forbidden"),
+        compact(),
+      ]),
+    ).toHaveLength(0);
+    expect(
+      computeFrictionArcs([
+        pathTool("Edit", "src/foo.ts"),
+        prompt("use the gh CLI"),
+        pathTool("Read", "src/bar.ts", false, "File has not been read yet"),
+        compact(),
+      ]),
+    ).toHaveLength(0);
+  });
+
+  it("respects a topicStopwords override (drops the only shared link → no arc) (review #7)", () => {
+    const events = [
+      bash("gh api repos/acme/widgets", false, "403 widgets"),
+      bash("curl https://api/widgets"),
+      compact(),
+    ];
+    expect(computeFrictionArcs(events)).toHaveLength(1); // links on 'widgets'
+    expect(computeFrictionArcs(events, { topicStopwords: new Set(["widgets"]) })).toHaveLength(0);
+  });
 });

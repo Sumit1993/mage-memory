@@ -9,10 +9,12 @@
 //   - TOOL EXTERNALITY: a two-bucket "is the knowledge recoverable from the repo?" signal
 //     (local file/Bash vs an external CLI), the multiplier in the cost-to-re-derive proxy.
 //
-// Harness-specific knowledge stays OUT of here (ADR-0027 §8): the external-verb / skip-verb /
-// external-tool sets are DEFAULTS, overridable via opts so another harness brings its own
-// without forking the detector. `computeFrictionArcs` (the pattern detection + ranking)
-// builds on these in the next slice.
+// Harness-specific knowledge stays OUT of the detector LOGIC (ADR-0027 §8): the external-verb /
+// wrapper / tool / protocol / env-error / stopword sets are DEFAULTS, overridable via opts so
+// another harness brings its own without forking. The DEFAULT_* sets below are the Claude-Code
+// "adapter profile" — kept here so the detector works out-of-box and the unit tests are
+// self-contained; they should be relocated into the ADR-0017 adapter when the nudge integration
+// lands (post-gate). The PURE detector itself makes no model/network/fs call.
 
 import type { DistillCluster } from "./types.js";
 import type { ObserveEvent } from "../observe/types.js";
@@ -69,7 +71,8 @@ export const EXTERNAL_VERBS: ReadonlySet<string> = new Set([
  * `systemctl`). Skipped while scanning, but scanning continues past them.
  */
 export const WRAPPER_VERBS: ReadonlySet<string> = new Set([
-  "sudo", "env", "time", "nice", "command", "exec", "eval", "xargs", "nohup", "stdbuf", "watch",
+  "sudo", "doas", "env", "time", "timeout", "nice", "ionice", "command", "exec", "eval",
+  "xargs", "nohup", "stdbuf", "unbuffer", "setsid", "watch",
 ]);
 
 /**
@@ -91,6 +94,13 @@ export const PATH_TOOLS: ReadonlySet<string> = new Set([
   "Read", "Write", "Edit", "MultiEdit", "NotebookEdit", "NotebookRead", "Glob", "Grep", "LS",
 ]);
 
+/**
+ * Tools parsed as a SHELL COMMAND LINE (verb extraction + externality OR). Default: just `Bash`.
+ * A harness whose shell tool is `shell`/`run_command`/`terminal` overrides this so the §6
+ * parsing machinery applies to it too (otherwise it would degrade to a single constant key).
+ */
+export const BASH_TOOLS: ReadonlySet<string> = new Set(["Bash"]);
+
 /** Overridable knowledge sets — a harness with different tools/CLIs supplies its own. */
 export interface KeyOpts {
   externalVerbs?: ReadonlySet<string>;
@@ -98,30 +108,48 @@ export interface KeyOpts {
   nullVerbs?: ReadonlySet<string>;
   externalTools?: ReadonlySet<string>;
   pathTools?: ReadonlySet<string>;
+  /** Tools treated as a shell command line. Default {@link BASH_TOOLS}. */
+  bashTools?: ReadonlySet<string>;
 }
 
 // ─── command parsing (composite-aware, NOT a shell parser, ADR-0027 §6) ───────
 
-/** Command name from a token: the part after the last `/`, stripped of leading punctuation. */
+/** Command name from a token: after the last `/`, stripped of leading + trailing shell punctuation. */
 function cmdName(token: string): string {
-  const noPunct = token.replace(/^[({`$]+/, "");
-  const slash = noPunct.lastIndexOf("/");
-  return slash >= 0 ? noPunct.slice(slash + 1) : noPunct;
+  const trimmed = token.replace(/^[("'`$\\]+/, "").replace(/[)"'`;]+$/, "");
+  const slash = trimmed.lastIndexOf("/");
+  return slash >= 0 ? trimmed.slice(slash + 1) : trimmed;
 }
 
-/** Path stem for a path-tool key: basename without its extension. */
+/** Path stem for a path-tool key: basename (trailing slashes dropped) without its extension. */
 function pathStem(p: string): string {
-  const slash = Math.max(p.lastIndexOf("/"), p.lastIndexOf("\\"));
-  const base = slash >= 0 ? p.slice(slash + 1) : p;
+  const cleaned = p.replace(/[/\\]+$/, "");
+  const slash = Math.max(cleaned.lastIndexOf("/"), cleaned.lastIndexOf("\\"));
+  const base = slash >= 0 ? cleaned.slice(slash + 1) : cleaned;
   const dot = base.lastIndexOf(".");
   return dot > 0 ? base.slice(0, dot) : base;
 }
 
 /**
+ * Flatten subshell / command-substitution wrappers — `$( )`, backticks, and `<( ` / `>( `
+ * process substitutions — into plain segment separators, so the inner command's verb is
+ * reachable (e.g. `RESULT=$(gh api …)` must expose `gh`, the most common external idiom).
+ * Coarse: no nesting-depth tracking, every `)` becomes a separator — but recall-first, a
+ * mis-split degrades to a coarse key (ADR-0027 §5).
+ */
+function expandSubshells(command: string): string {
+  return command
+    .replace(/\$\(/g, " ; ")
+    .replace(/[<>]\(/g, " ; ")
+    .replace(/`/g, " ; ")
+    .replace(/\)/g, " ; ");
+}
+
+/**
  * Split a command into top-level segments at `&&`, `||`, `|`, `;`, and newlines. `||` is
- * matched before a single `|` so a logical-OR is one split, not two. We do NOT parse
- * subshells/heredocs/loops — a mis-split degrades to a coarse key, which is safe under the
- * recall-first stance (ADR-0027 §5: the agent culls).
+ * matched before a single `|` so a logical-OR is one split, not two. Subshells are flattened
+ * first ({@link expandSubshells}); we do NOT parse heredocs/loops — a mis-split degrades to a
+ * coarse key, which is safe under the recall-first stance (ADR-0027 §5: the agent culls).
  */
 function splitSegments(command: string): string[] {
   return command.split(/\s*(?:&&|\|\||[|;\n])\s*/).filter((s) => s.trim().length > 0);
@@ -138,11 +166,28 @@ function segmentVerb(
   nulls: ReadonlySet<string>,
 ): string | null {
   const tokens = segment.trim().split(/\s+/).filter(Boolean);
-  for (const token of tokens) {
-    if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(token)) continue; // FOO=bar prefix
+  let i = 0;
+  while (i < tokens.length) {
+    const token = tokens[i];
+    if (token === undefined) break;
+    if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(token)) {
+      i += 1; // FOO=bar prefix
+      continue;
+    }
     const name = cmdName(token);
-    if (name.length === 0) continue;
-    if (wrappers.has(name)) continue; // transparent prefix — the real command follows
+    if (name.length === 0) {
+      i += 1;
+      continue;
+    }
+    if (wrappers.has(name)) {
+      // Transparent prefix — skip it AND its option flags / numeric-or-duration args (e.g.
+      // `timeout 30 curl`, `nice -n 10 node`) until the real command. NOT a full parser: an
+      // option that takes a separate word value (`sudo -u user cmd`) may mis-key — coarse
+      // fallback, tolerated under recall-first (ADR-0027 §6).
+      i += 1;
+      while (i < tokens.length && /^(-|\d+[smhd]?$)/.test(tokens[i] ?? "")) i += 1;
+      continue;
+    }
     return nulls.has(name) ? null : name; // a trivial standalone command contributes no verb
   }
   return null;
@@ -153,7 +198,7 @@ export function commandVerbs(command: string, opts: KeyOpts = {}): string[] {
   const wrappers = opts.wrapperVerbs ?? WRAPPER_VERBS;
   const nulls = opts.nullVerbs ?? NULL_VERBS;
   const verbs: string[] = [];
-  for (const seg of splitSegments(command)) {
+  for (const seg of splitSegments(expandSubshells(command))) {
     const v = segmentVerb(seg, wrappers, nulls);
     if (v !== null) verbs.push(v);
   }
@@ -174,13 +219,16 @@ export function approachKey(e: ObserveEvent, opts: KeyOpts = {}): string {
   const pathTools = opts.pathTools ?? PATH_TOOLS;
   if (pathTools.has(e.tool)) {
     const first = e.paths[0];
-    return first ? `${e.tool}:${pathStem(first)}` : e.tool;
+    const stem = first ? pathStem(first) : "";
+    return stem.length > 0 ? `${e.tool}:${stem}` : e.tool; // empty stem (trailing slash) → bare tool
   }
-  if (e.tool === "Bash") {
+  if ((opts.bashTools ?? BASH_TOOLS).has(e.tool)) {
     const verbs = commandVerbs(e.detail ?? "", opts);
     const external = opts.externalVerbs ?? EXTERNAL_VERBS;
     const preferred = verbs.find((v) => external.has(v)) ?? verbs[0];
-    return `Bash:${preferred ?? "?"}`;
+    // A verbless command keys to `tool:?` — a sentinel that never matches another (no false
+    // retry/collapse) via {@link sameApproach}.
+    return `${e.tool}:${preferred ?? VERBLESS}`;
   }
   return e.tool;
 }
@@ -195,11 +243,24 @@ export function toolExternality(e: ObserveEvent, opts: KeyOpts = {}): Externalit
   if (e.type !== "tool_use") return "local";
   const externalTools = opts.externalTools ?? EXTERNAL_TOOLS;
   if (externalTools.has(e.tool)) return "external";
-  if (e.tool === "Bash") {
+  if ((opts.bashTools ?? BASH_TOOLS).has(e.tool)) {
     const external = opts.externalVerbs ?? EXTERNAL_VERBS;
     return commandVerbs(e.detail ?? "", opts).some((v) => external.has(v)) ? "external" : "local";
   }
   return "local";
+}
+
+/** Verbless-command suffix: `tool:?`. Equal keys ending in this never count as the SAME approach. */
+const VERBLESS = "?";
+
+/** Same approach iff the keys are equal AND not the verbless sentinel (so `Bash:?` never aliases). */
+function sameApproach(a: string, b: string): boolean {
+  return a === b && !a.endsWith(`:${VERBLESS}`);
+}
+
+/** True iff an approach-key is the verbless sentinel (never a meaningful resolver). */
+function isVerbless(key: string): boolean {
+  return key.endsWith(`:${VERBLESS}`);
 }
 
 // ─── pattern detection (ADR-0027 §4) ──────────────────────────────────────────
@@ -211,8 +272,9 @@ export const EXTERNAL_COST_WEIGHT = 2;
 
 /**
  * Claude Code "tool-protocol" failures: the harness scolding you for using a tool wrong, NOT
- * a domain problem (Phase 0's #1 noise source). DROPPED as non-failures. DEFAULT set — a
- * different harness supplies its own via {@link FrictionOpts.protocolPatterns} (ADR-0027 §8).
+ * a domain problem (Phase 0's #1 noise source). DROPPED as non-failures. CLAUDE-CODE ADAPTER
+ * PROFILE (ADR-0027 §8) — relocate into the ADR-0017 adapter at integration; a different
+ * harness supplies its own via {@link FrictionOpts.protocolPatterns}.
  */
 export const DEFAULT_PROTOCOL_PATTERNS: readonly RegExp[] = [
   /file has not been read yet/i,
@@ -224,8 +286,12 @@ export const DEFAULT_PROTOCOL_PATTERNS: readonly RegExp[] = [
   /input validation error/i,
 ];
 
-/** Boilerplate tokens excluded from the same-intent topic link (too generic to mean "same thing"). */
-const TOPIC_STOPWORDS: ReadonlySet<string> = new Set([
+/**
+ * Boilerplate tokens excluded from the same-intent topic link + grind dominance (too generic
+ * to mean "same thing"). CLAUDE-CODE/dev ADAPTER PROFILE — overridable via
+ * {@link FrictionOpts.topicStopwords} (ADR-0027 §8).
+ */
+export const DEFAULT_TOPIC_STOPWORDS: ReadonlySet<string> = new Set([
   "error", "errors", "failed", "failure", "cannot", "command", "file", "files", "line", "lines",
   "code", "exit", "status", "value", "string", "object", "true", "false", "null", "undefined",
   "this", "that", "then", "with", "from", "have", "your", "will", "into", "such", "found", "match",
@@ -240,6 +306,8 @@ export interface FrictionOpts extends KeyOpts {
   protocolPatterns?: readonly RegExp[];
   /** Min token length for the same-intent topic link. Default 4. */
   minTopicLen?: number;
+  /** Boilerplate tokens excluded from the topic link + grind. Default {@link DEFAULT_TOPIC_STOPWORDS}. */
+  topicStopwords?: ReadonlySet<string>;
   /** Enable pattern C (grind). OFF by default — its own sub-switch so the gate scores A+B vs A+B+C (ADR-0027 §4). */
   grind?: boolean;
   /** Min tool_uses sharing one topic to count as a grind. Default 5. */
@@ -269,12 +337,12 @@ function isProtocolFailure(e: Tool, patterns: readonly RegExp[]): boolean {
 }
 
 /** Salient ≥minLen, non-boilerplate tokens from an event's text + paths (the topic fingerprint). */
-function topicsOf(e: Tool, minLen: number): Set<string> {
+function topicsOf(e: Tool, minLen: number, stopwords: ReadonlySet<string>): Set<string> {
   const out = new Set<string>();
   const parts = [e.detail ?? "", e.error_summary ?? "", ...e.paths];
   for (const part of parts) {
     for (const raw of part.toLowerCase().split(/[^a-z0-9]+/)) {
-      if (raw.length >= minLen && !TOPIC_STOPWORDS.has(raw)) out.add(raw);
+      if (raw.length >= minLen && !stopwords.has(raw)) out.add(raw);
     }
   }
   return out;
@@ -341,13 +409,14 @@ function buildArc(
   opts: FrictionOpts,
 ): FrictionArc {
   const span = events.slice(onset, resolution + 1);
-  const externality: Externality = span.some(
-    (e) => toolExternality(e, opts) === "external",
-  )
+  const toolEvents = span.filter((e) => e.type === "tool_use");
+  const externality: Externality = toolEvents.some((e) => toolExternality(e, opts) === "external")
     ? "external"
     : "local";
-  const spanEvents = resolution - onset + 1;
-  const cost = spanEvents * (externality === "external" ? EXTERNAL_COST_WEIGHT : 1);
+  // Cost = ACTIONS taken (tool_uses), not raw events — so verbose prose in the span can't
+  // inflate the re-derivation proxy (ADR-0027 §7). At least 1.
+  const steps = Math.max(1, toolEvents.length);
+  const cost = steps * (externality === "external" ? EXTERNAL_COST_WEIGHT : 1);
   const head = events[onset];
   return {
     session: head?.session ?? "",
@@ -383,6 +452,7 @@ function detectFailurePivots(
   const window = opts.window ?? 8;
   const protocol = opts.protocolPatterns ?? DEFAULT_PROTOCOL_PATTERNS;
   const minLen = opts.minTopicLen ?? 4;
+  const stopwords = opts.topicStopwords ?? DEFAULT_TOPIC_STOPWORDS;
 
   const tus: { e: Tool; idx: number }[] = [];
   for (let k = start; k < end; k++) {
@@ -393,46 +463,53 @@ function detectFailurePivots(
   let p = 0;
   while (p < tus.length) {
     const f = tus[p];
-    if (f !== undefined && f.e.ok === false && !isProtocolFailure(f.e, protocol)) {
-      const kf = approachKey(f.e, opts);
-      const fTopics = topicsOf(f.e, minLen);
-      let resolvedAt = -1; // position in `tus` (advances p)
-      let resolvedIdx = -1; // index in `events` (arc resolution)
-      let worked = "";
-      let link: string | null = null;
-      let retried = false;
+    if (f === undefined || f.e.ok !== false || isProtocolFailure(f.e, protocol)) {
+      p++;
+      continue;
+    }
+    const kf = approachKey(f.e, opts);
+    const fTopics = topicsOf(f.e, minLen, stopwords);
+    let resolvedIdx = -1;
+    let resolveCursor = -1; // `tus` position of the resolver (advances p)
+    let worked = "";
+    let link: string | null = null;
+    let retried = false;
+    let runEnd = p; // last position of the consecutive same-key failure run (onset stays at p)
+    let steps = 0; // look-ahead budget — only NON-same-key steps count (retries don't burn it)
 
-      for (let q = p + 1; q < tus.length && q - p <= window; q++) {
-        const s = tus[q];
-        if (s === undefined) continue;
-        const ks = approachKey(s.e, opts);
-        if (ks === kf) {
-          if (s.e.ok === true) {
-            retried = true; // same-approach retry succeeded → not friction
-            break;
-          }
-          continue; // same-approach repeated failure → collapse, keep scanning
-        }
+    for (let q = p + 1; q < tus.length; q++) {
+      const s = tus[q];
+      if (s === undefined) continue;
+      const ks = approachKey(s.e, opts);
+      if (sameApproach(ks, kf)) {
         if (s.e.ok === true) {
-          const l = sharedTopic(fTopics, topicsOf(s.e, minLen));
-          if (l !== null) {
-            resolvedAt = q;
-            resolvedIdx = s.idx;
-            worked = ks;
-            link = l;
-            break;
-          }
+          retried = true; // same-approach retry succeeded → not friction
+          break;
         }
-        // different-key (failure, or unlinked success): keep scanning within the window
-      }
-
-      if (!retried && resolvedAt >= 0) {
-        out.push(buildArc("failure-pivot", events, f.idx, resolvedIdx, kf, worked, link, opts));
-        p = resolvedAt + 1; // outermost-wins: resume past the resolution
+        runEnd = q; // same-approach repeated failure → collapse; onset stays at the FIRST (p)
         continue;
       }
+      steps += 1;
+      if (steps > window) break; // pivot not found within the window
+      if (s.e.ok === true && !isVerbless(ks)) {
+        const l = sharedTopic(fTopics, topicsOf(s.e, minLen, stopwords));
+        if (l !== null) {
+          resolveCursor = q;
+          resolvedIdx = s.idx;
+          worked = ks;
+          link = l;
+          break;
+        }
+      }
+      // different-key (failure, unlinked success, or verbless): keep scanning within the window
     }
-    p++;
+
+    if (!retried && resolveCursor >= 0) {
+      out.push(buildArc("failure-pivot", events, f.idx, resolvedIdx, kf, worked, link, opts));
+      p = resolveCursor + 1; // outermost-wins: resume past the resolution
+    } else {
+      p = runEnd + 1; // unresolved (or a retry): skip the whole same-key run, never re-anchor
+    }
   }
 }
 
@@ -450,6 +527,7 @@ function detectCorrectionResets(
   opts: FrictionOpts,
   out: FrictionArc[],
 ): void {
+  const protocol = opts.protocolPatterns ?? DEFAULT_PROTOCOL_PATTERNS;
   let prevType: ObserveEvent["type"] | null = null;
   let prevToolIdx = -1;
   let prevToolKey = "";
@@ -469,11 +547,14 @@ function detectCorrectionResets(
           if (s === undefined) continue;
           if (s.type === "user_prompt") break; // a fresh prompt: this correction had no action
           if (s.type !== "tool_use") continue; // skip assistant_msg / skill_load between
+          if (s.ok === false && isProtocolFailure(s, protocol)) continue; // protocol noise: not a real choice
+          // The agent's first REAL post-correction action. `worked` must be a SUCCESS with a
+          // different approach (review finding #2 — a failing/protocol action is not "what worked").
           const ks = approachKey(s, opts);
-          if (ks !== prevToolKey) {
+          if (s.ok === true && !sameApproach(ks, prevToolKey) && !isVerbless(ks)) {
             out.push(buildArc("correction-reset", events, prevToolIdx, j, prevToolKey, ks, null, opts));
           }
-          break; // only the immediate next action matters
+          break; // a real action (success or genuine failure) ends the search
         }
       }
       prevType = "user_prompt";
@@ -489,7 +570,8 @@ function detectCorrectionResets(
  * topic, NO error required (the "extra steps, then the simpler way" case). Fires only when a
  * single topic token dominates a span (≥ grindMin tool_uses AND ≥ grindDensity of the span's
  * tool_uses), which is what distinguishes a focused grind from a whole-chapter grab-bag. At
- * most one grind per chapter; skipped where it overlaps a higher-confidence A/B arc.
+ * most one grind per chapter. Overlap with A/B arcs is NOT resolved here — `rankArcs` is the
+ * single place that suppresses overlapping arcs by score (review finding #19).
  */
 function detectGrinds(
   events: ObserveEvent[],
@@ -501,11 +583,14 @@ function detectGrinds(
   const grindMin = opts.grindMin ?? 5;
   const minDensity = opts.grindDensity ?? 0.5;
   const minLen = opts.minTopicLen ?? 4;
+  const stopwords = opts.topicStopwords ?? DEFAULT_TOPIC_STOPWORDS;
 
   const tus: { idx: number; topics: Set<string> }[] = [];
   for (let k = start; k < end; k++) {
     const e = events[k];
-    if (e !== undefined && e.type === "tool_use") tus.push({ idx: k, topics: topicsOf(e, minLen) });
+    if (e !== undefined && e.type === "tool_use") {
+      tus.push({ idx: k, topics: topicsOf(e, minLen, stopwords) });
+    }
   }
   if (tus.length < grindMin) return;
 
@@ -532,10 +617,6 @@ function detectGrinds(
   const inSpan = tus.filter((t) => t.idx >= first && t.idx <= last).length;
   if (inSpan === 0 || bestCount / inSpan < minDensity) return; // not dominant → a grab-bag, not a grind
 
-  for (const a of out) {
-    if (first <= a.resolution - 1 && last >= a.onset - 1) return; // overlaps an A/B arc → defer to it
-  }
-
   out.push(buildArc("grind", events, first, last, null, null, best, opts));
 }
 
@@ -543,7 +624,8 @@ function detectGrinds(
  * The detector (ADR-0027 §4). A PURE fold over a session's events: chop the CLOSED region at
  * terminators (chapters, mirroring the distill reader), and within each chapter surface
  * friction arcs — A (failure→pivot) and B (correction→reset) always, C (grind) only when the
- * sub-switch is on. Returns arcs in source order; ranking is applied downstream (ADR-0027 §7).
+ * sub-switch is on. Returns arcs in source order; they MAY overlap — `rankArcs` is the required
+ * next stage that scores, dedups overlaps, and caps (ADR-0027 §5, §7).
  */
 export function computeFrictionArcs(events: ObserveEvent[], opts: FrictionOpts = {}): FrictionArc[] {
   const closed = closedCount(events);
@@ -565,9 +647,11 @@ export function computeFrictionArcs(events: ObserveEvent[], opts: FrictionOpts =
 
 // ─── ranking (ADR-0027 §7 — confidence tiers + a cost bonus) ──────────────────
 
-/** Tier bases (provisional, gate-tuned, ADR-0027 §7). A correction outranks an env-error, etc. */
+/** Tier bases + spacing (provisional, gate-tuned, ADR-0027 §7). A correction outranks an env-error, etc. */
 export const TIER_CORRECTION = 200;
 export const TIER_ENV_FAILURE = 100;
+/** Tier spacing. The cost bonus SATURATES below this, so a big grind/generic can never leap a tier. */
+export const TIER_GAP = 100;
 
 /**
  * Environmental-error signatures: failures whose knowledge RECURS and is worth a note (an
@@ -604,16 +688,16 @@ function isEnvFailure(arc: FrictionArc, patterns: readonly RegExp[]): boolean {
 }
 
 /**
- * The hybrid score (ADR-0027 §7): a confidence-tier BASE plus the COST bonus, so a sharp
- * correction tops the list, an environmental gotcha usually beats a generic blip, and a hard
- * grind climbs in proportion to the effort it cost — `cost = steps × externality` (the
- * thesis re-derivation proxy, set at arc-build time).
+ * The hybrid score (ADR-0027 §7): a confidence-tier BASE plus a SATURATING cost bonus, so a
+ * sharp correction always tops an env-gotcha which always tops a generic/grind (hard
+ * invariants — the cost can lift WITHIN a tier but never leap one), while within a tier the
+ * harder-fought arc wins. `cost = actions × externality` (the thesis re-derivation proxy).
  */
 export function rankScore(arc: FrictionArc, patterns: readonly RegExp[] = DEFAULT_ENV_ERROR_PATTERNS): number {
   let base = 0;
   if (arc.pattern === "correction-reset") base = TIER_CORRECTION;
   else if (arc.pattern === "failure-pivot" && isEnvFailure(arc, patterns)) base = TIER_ENV_FAILURE;
-  return base + arc.cost;
+  return base + Math.min(arc.cost, TIER_GAP - 1); // saturate so tiers stay strict
 }
 
 /** Two arcs overlap iff their event spans intersect. */
