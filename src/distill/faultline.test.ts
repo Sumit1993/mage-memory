@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { approachKey, commandVerbs, computeFrictionArcs, toolExternality } from "./faultline.js";
+import {
+  approachKey,
+  commandVerbs,
+  computeFrictionArcs,
+  type FrictionArc,
+  type FrictionPattern,
+  rankArcs,
+  toolExternality,
+} from "./faultline.js";
 import type { ObserveEvent } from "../observe/types.js";
 
 // ─── builders ────────────────────────────────────────────────────────────────
@@ -32,6 +40,14 @@ function webFetch(url: string): ObserveEvent {
 
 function compact(): ObserveEvent {
   return { v: 1, ts: "t", session: "s", type: "compact", trigger: "manual" };
+}
+
+function prompt(text: string): ObserveEvent {
+  return { v: 1, ts: "t", session: "s", type: "user_prompt", text };
+}
+
+function assistantMsg(text: string): ObserveEvent {
+  return { v: 1, ts: "t", session: "s", type: "assistant_msg", text };
 }
 
 // ─── approach-key ──────────────────────────────────────────────────────────────
@@ -207,5 +223,167 @@ describe("computeFrictionArcs — failure→pivot", () => {
       bash("curl https://api/widgets"),
     ]);
     expect(arcs).toHaveLength(0);
+  });
+});
+
+// ─── computeFrictionArcs — pattern B (correction→reset) ────────────────────────
+
+describe("computeFrictionArcs — correction→reset", () => {
+  it("fires when a correction is followed by a different-key action", () => {
+    const arcs = computeFrictionArcs([
+      pathTool("Edit", "src/foo.ts"),
+      prompt("no, use the gh CLI instead"),
+      bash("gh api repos/acme/foo"),
+      compact(),
+    ]);
+    expect(arcs).toHaveLength(1);
+    expect(arcs[0]?.pattern).toBe("correction-reset");
+    expect(arcs[0]?.tried).toBe("Edit:foo");
+    expect(arcs[0]?.worked).toBe("Bash:gh");
+    expect(arcs[0]?.onset).toBe(1);
+    expect(arcs[0]?.resolution).toBe(3);
+  });
+
+  it("does NOT fire when the agent keeps the same approach after the correction", () => {
+    const arcs = computeFrictionArcs([
+      pathTool("Edit", "src/foo.ts"),
+      prompt("fix the typo on line 9"),
+      pathTool("Edit", "src/foo.ts"),
+      compact(),
+    ]);
+    expect(arcs).toHaveLength(0);
+  });
+
+  it("survives an assistant_msg between the tool and the correction (adjacency holds)", () => {
+    const arcs = computeFrictionArcs([
+      pathTool("Edit", "src/foo.ts"),
+      assistantMsg("Done — I edited foo.ts."),
+      prompt("no, that file is generated; use the gh CLI"),
+      bash("gh api repos/acme/foo"),
+      compact(),
+    ]);
+    expect(arcs).toHaveLength(1);
+    expect(arcs[0]?.pattern).toBe("correction-reset");
+  });
+
+  it("does NOT treat a prompt with no preceding tool as a correction", () => {
+    const arcs = computeFrictionArcs([
+      prompt("please add a widgets endpoint"),
+      bash("gh api widgets"),
+      bash("curl https://api/widgets"),
+      compact(),
+    ]);
+    expect(arcs).toHaveLength(0);
+  });
+});
+
+// ─── computeFrictionArcs — pattern C (grind, sub-switch) ───────────────────────
+
+describe("computeFrictionArcs — grind", () => {
+  const grindSession: ObserveEvent[] = [
+    pathTool("Read", "src/prometheus-alert.ts"),
+    pathTool("Edit", "src/prometheus-alert.ts"),
+    bash("node check-prometheus.js"),
+    pathTool("Edit", "src/prometheus-alert.ts"),
+    pathTool("Read", "src/prometheus-rules.ts"),
+    bash("grep prometheus src/"),
+    compact(),
+  ];
+
+  it("fires on a single dominant topic when the sub-switch is on", () => {
+    const arcs = computeFrictionArcs(grindSession, { grind: true });
+    const grind = arcs.find((a) => a.pattern === "grind");
+    expect(grind).toBeDefined();
+    expect(grind?.topic).toBe("prometheus");
+    expect(grind?.tried).toBeNull();
+    expect(grind?.worked).toBeNull();
+  });
+
+  it("does NOT fire when the sub-switch is off (default)", () => {
+    expect(computeFrictionArcs(grindSession)).toHaveLength(0);
+  });
+
+  it("does NOT grind a grab-bag (many distinct topics, none dominant)", () => {
+    const grabBag = computeFrictionArcs(
+      [
+        pathTool("Read", "src/alpha.ts"),
+        pathTool("Edit", "src/bravo.ts"),
+        pathTool("Read", "src/charlie.ts"),
+        pathTool("Edit", "src/delta.ts"),
+        pathTool("Read", "src/echo.ts"),
+        pathTool("Edit", "src/foxtrot.ts"),
+        compact(),
+      ],
+      { grind: true },
+    );
+    expect(grabBag).toHaveLength(0);
+  });
+});
+
+// ─── rankArcs — hybrid (tiers + cost bonus) ────────────────────────────────────
+
+function arc(
+  pattern: FrictionPattern,
+  o: { cost?: number; failures?: string[]; onset?: number; resolution?: number } = {},
+): FrictionArc {
+  const onset = o.onset ?? 1;
+  return {
+    session: "s",
+    span: `L${onset}-L${o.resolution ?? onset + 1}`,
+    signals: { prompts: [], corrections: [], failures: o.failures ?? [], tools: [] },
+    hint: "",
+    pattern,
+    onset,
+    resolution: o.resolution ?? onset + 1,
+    tried: null,
+    worked: null,
+    topic: null,
+    cost: o.cost ?? 2,
+    externality: "local",
+  };
+}
+
+describe("rankArcs", () => {
+  it("orders correction > environmental failure > grind > generic failure", () => {
+    const correction = arc("correction-reset", { cost: 2, onset: 1, resolution: 2 });
+    const envFail = arc("failure-pivot", { cost: 4, failures: ["403 Forbidden"], onset: 10, resolution: 11 });
+    const grind = arc("grind", { cost: 30, onset: 20, resolution: 50 });
+    const generic = arc("failure-pivot", { cost: 2, failures: ["boom"], onset: 60, resolution: 61 });
+    const ranked = rankArcs([generic, grind, correction, envFail]);
+    expect(ranked.map((a) => a.pattern)).toEqual([
+      "correction-reset",
+      "failure-pivot", // env (score 104)
+      "grind", // 30
+      "failure-pivot", // generic (score 2)
+    ]);
+  });
+
+  it("lets a hard grind out-rank a generic failure (the cost bonus)", () => {
+    const grind = arc("grind", { cost: 30, onset: 1, resolution: 40 });
+    const generic = arc("failure-pivot", { cost: 2, failures: ["boom"], onset: 50, resolution: 51 });
+    expect(rankArcs([generic, grind])[0]?.pattern).toBe("grind");
+  });
+
+  it("keeps an external env-error fight above a long local grind (the grill's example)", () => {
+    const envFight = arc("failure-pivot", { cost: 8, failures: ["403 on free plan"], onset: 1, resolution: 5 });
+    const localGrind = arc("grind", { cost: 30, onset: 10, resolution: 40 });
+    expect(rankArcs([localGrind, envFight])[0]?.pattern).toBe("failure-pivot");
+  });
+
+  it("caps the surfaced set", () => {
+    const arcs = [
+      arc("correction-reset", { onset: 1, resolution: 2 }),
+      arc("failure-pivot", { failures: ["403"], onset: 10, resolution: 11 }),
+      arc("grind", { cost: 9, onset: 20, resolution: 30 }),
+    ];
+    expect(rankArcs(arcs, { cap: 2 })).toHaveLength(2);
+  });
+
+  it("drops a lower-scored arc that overlaps a kept one (outermost/highest wins)", () => {
+    const correction = arc("correction-reset", { onset: 5, resolution: 9 });
+    const overlappingFailure = arc("failure-pivot", { failures: ["boom"], onset: 6, resolution: 8 });
+    const ranked = rankArcs([overlappingFailure, correction]);
+    expect(ranked).toHaveLength(1);
+    expect(ranked[0]?.pattern).toBe("correction-reset");
   });
 });
