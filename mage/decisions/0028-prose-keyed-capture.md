@@ -4,7 +4,7 @@ tags: [mage/decisions]
 created: "2026-06-20"
 updated: "2026-06-20"
 last_reviewed: "2026-06-20"
-status: active
+status: superseded
 provenance:
   repo: mage-memory
   work: prose-keyed-capture
@@ -24,10 +24,12 @@ sources:
 
 # 0028 — Prose-keyed capture: corrections + recurrent failures (supersedes Faultline)
 
-> Status: supersedes [ADR-0027](0027-faultline-friction-capture-trigger.md)'s tool-transition
-> detector, which its own pre-registered gate KILLED (0/62). This records the prose-keyed pivot the
-> gate's diagnosis pointed to. Success criterion = **the same replay gate** (keep ≥1/3 ship, <1/5 kill).
-> Not yet built; re-runs the gate before any default flips.
+> Status: **SUPERSEDED** by [ADR-0029](0029-digest-to-agent-capture.md). It superseded
+> [ADR-0027](0027-faultline-friction-capture-trigger.md)'s tool-transition detector (gate-KILLED
+> 0/62); it was then BUILT and run through the same pre-registered gate, which **KILLED it too**
+> (0/55) — see [Gate outcome](#gate-outcome-2026-06-20--kill). Kept as the honest record of a second
+> pre-registered, gated, falsified design; the digest→agent pivot the diagnosis pointed to is
+> ADR-0029. The build lives on the documented dead-end branch `feat/prose-keyed-capture` (not wired).
 
 ## Context
 
@@ -115,8 +117,38 @@ noise filter.
   boundary-capture line is killed rather than iterated — corrections fall to the **inline** path
   (ADR-0024 inline-primary; the agent knows in-flow when it was corrected).
 
+## Gate outcome (2026-06-20) — KILL
+
+The prose-keyed capture was BUILT (`src/distill/prose.ts` — `failureSkeleton`, the correction
+noise-filter + contradiction cues, `correctionCandidates`, `recurrentFailures` distinct-chapter ≥K,
+ranking; 33 unit tests) and replayed through the SAME gate as Faultline (harness:
+`~/ai-context/mage-prove-20260619/prose-gate-replay.mts`) over the SAME 5 ops + 3 control sessions:
+55 candidates (ops 37 / control 18; 53 corrections [34 cued] + **2 recurrent-failure gems** — the
+`--no-verify` hook block and the context-mode `curl/wget→ctx_*` redirect, both invisible to Faultline),
+judged blind + strict + adversarially refuted + per-session recall (a 68-agent workflow).
+
+- **0/55 confirmed keeps — ops 0/37, control 0/18, corrections 0/53, recurrent-failures 0/2.** A
+  decisive KILL (bar was ≥1/3 ship, <1/5 kill). Per §8's pre-registration this **kills the
+  deterministic boundary-capture LINE** (don't iterate the deterministic selector).
+- **Control 0/18 validates the judge** (strict, not lenient); even the 2 real gems were rejected as
+  self-documenting (the error message states the rule → re-derivation cost ≈ 0).
+- **Diagnosis (triangulated with Faultline's 0/62):** the prose key surfaced cheap conversational
+  *steering* (scoping questions, product direction) and starved the failure/command stream where the
+  real lessons live. Recall found the gems the surfaced set missed — every one a **single-session
+  friction/derivation ARC in the failure + external-command stream** (a WebFetch→curl→render→PNG
+  pipeline; a 6-command npm/GH name+identity recon; the act_runner empty-token fix; GitHub-Free blocks
+  branch-protection; an f-string-in-heredoc trap). External commands got **no candidate at all**; the
+  cross-session K=3 gate starved single-session and variant-split gems. The recall agents (models
+  reading the digest) FOUND the gems → the bottleneck is deterministic SELECTION of a purely-semantic
+  property (durability), which a model-free core cannot do.
+- The detector is a documented dead-end (`feat/prose-keyed-capture`, not wired); the gate methodology +
+  harness are the reusable assets. The pivot is **[ADR-0029](0029-digest-to-agent-capture.md)**
+  (deterministic narrowing → digest → host-agent judgment).
+
 ## Relations
 
+- **superseded_by** [ADR-0029](0029-digest-to-agent-capture.md) — the digest→agent pivot (deterministic
+  narrowing + host-model judgment) the gate's diagnosis pointed to; same model-swept gate is its bar.
 - **supersedes** [ADR-0027](0027-faultline-friction-capture-trigger.md) — the tool-transition detector,
   killed by its own pre-registered gate.
 - **amends** [ADR-0024](0024-organic-grooming-loop.md) — same organic loop (inline-primary + boundary

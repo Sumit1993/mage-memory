@@ -17,13 +17,24 @@ sources:
 
 # Faultline — friction/derivation capture trigger (Phase 1 plan)
 
-> Status: **BUILT → GATE-KILLED → SUPERSEDED.** Grilled 2026-06-20 → ADR-0027 → built
-> (`feat/faultline-detector`, 42 tests) → the pre-registered replay gate **KILLED it (0/62 keeps)**.
-> Diagnosis: the tool-transition detector captured friction *position* but not *content*; the real
-> lessons live in **correction prose + recurrent-failure strings**. The pivot is
-> **[ADR-0028 — prose-keyed capture](../decisions/0028-prose-keyed-capture.md)** (supersedes ADR-0027).
-> This note + ADR-0027 are kept as the honest record of a falsified design; **ADR-0028 governs going
-> forward.** Gate detail in [ADR-0027 Gate outcome](../decisions/0027-faultline-friction-capture-trigger.md#gate-outcome-2026-06-20--kill).
+> Status: **TWO deterministic detectors BUILT, GATED, KILLED → pivot to digest→agent.** This note
+> opened the arc; the honest record now spans three ADRs:
+> 1. **[ADR-0027 Faultline](../decisions/0027-faultline-friction-capture-trigger.md)** — tool-transition
+>    detector, built (`feat/faultline-detector`, 42 tests), gate **KILLED 0/62** (captured friction
+>    *position*, discarded *content*).
+> 2. **[ADR-0028 prose-keyed](../decisions/0028-prose-keyed-capture.md)** — correction prose +
+>    recurrent-failure strings, built (`feat/prose-keyed-capture`, 33 tests), gate **KILLED 0/55** (kept
+>    *content*, surfaced the wrong *unit* — conversational steering; starved the failure/command arcs).
+> 3. **[ADR-0029 digest→agent](../decisions/0029-digest-to-agent-capture.md)** — GOVERNING. The two
+>    kills triangulated that durable lessons are single-session friction/derivation ARCS in the
+>    failure + external-command stream, needing model synthesis + judgment a deterministic core cannot
+>    do; the recall agents (models reading the digest) FOUND them. So the boundary nudge stops *selecting*
+>    candidates and instead emits a read-only **digest** the host agent mines (`mage stage`); deterministic
+>    work is repositioned from *selector* to *digest-builder*. Success = a NEW model-swept replay gate
+>    (digest → miner, Opus/Sonnet/Haiku sweep, fixed-Opus judge, recall-vs-gold + control). Not yet built.
+>
+> Both detector branches are documented dead-ends (do NOT wire). The gate methodology + harness
+> (`~/ai-context/mage-prove-20260619/`) are the reusable assets + the standing bar.
 
 ## Why
 
