@@ -1,0 +1,21 @@
+# docs/ is a SELF-CONTAINED sub-project, NOT a member of the root pnpm workspace.
+# Install from inside docs/ with `pnpm install --ignore-workspace` so pnpm treats
+# docs/ as its own single-package workspace root (no `packages:` glob) and does not
+# walk up to the repo root's lockfile / .npmrc. This isolates the docs toolchain
+# from the published CLI's supply chain.
+
+# Native-dependency build allow-list (same key the root pnpm-workspace.yaml uses).
+# esbuild (Vite's bundler, transitive under Astro) ships a prebuilt binary; its
+# postinstall may run. sharp is NOT built: Astro uses the noop image service here,
+# so the native image library is unused by the text-first spine.
+allowBuilds:
+  esbuild: true
+  sharp: false
+
+# Keep `pnpm install` green where a dependency build is skipped or denied (e.g. a
+# runner that enforces a stricter supply-chain policy): a skipped build becomes a
+# warning, not the fatal ERR_PNPM_IGNORED_BUILDS. esbuild/sharp ship prebuilt
+# binaries and the build does not depend on a postinstall, so the skip is harmless.
+# verifyDepsBeforeRun:false lets `pnpm build` run without re-verifying the store.
+strictDepBuilds: false
+verifyDepsBeforeRun: false

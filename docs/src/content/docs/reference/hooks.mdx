@@ -1,0 +1,85 @@
+---
+title: Hooks
+description: The capture hooks mage wires into Claude Code, generated from the code.
+sidebar:
+  order: 2
+---
+
+import HooksTable from '../../../components/HooksTable.astro';
+
+# Hooks
+
+mage has no background daemon and no watcher process. Everything it learns, it
+learns by riding the events your coding host already fires. When you run
+[`mage connect`](../reference/commands.mdx), mage writes a small set of `mage:*`
+hook groups into your host's settings (for Claude Code, `.claude/settings.local.json`),
+each tagged with a stable `id` so mage can update or remove exactly its own groups
+and never touch yours. Capture is the host calling these commands at the right
+moment — when nothing happens in the host, nothing runs.
+
+The table below is generated from the `MAGE_HOOKS` list in the code (via
+`pnpm docs:gen`) and guarded by a drift test, so it always matches what
+`mage connect` actually installs.
+
+<HooksTable />
+
+## How to read the table
+
+Each row is one hook group mage owns:
+
+- **Event** — the host lifecycle moment that fires the command (for example
+  `SessionStart`, `PostToolUse`, `Stop`).
+- **Hook id** — the stable `mage:<role>:<event>` tag. mage upserts and removes
+  groups by this id, so re-running `mage connect` is idempotent and self-healing
+  (a drifted command is replaced in place). `mage doctor` compares the installed
+  ids against this list to detect drift.
+- **Command** — the mage CLI invocation the host runs. Most are
+  [`mage observe`](../reference/commands.mdx); these are plumbing you never type
+  by hand.
+- **Purpose** — what that capture point records.
+
+## The capture family
+
+The `mage:observe:*` rows are the workhorses. They fan out across the host's
+lifecycle — session start, each prompt you submit, each tool use, tool failures,
+the pre-compaction boundary, session end, the agent's final reply, and a
+subagent's final reply — and append one event apiece to a gitignored capture
+scratch under your knowledge base. They carry no `matcher`, so they observe every
+tool, not a subset.
+
+Two design rules matter for trust:
+
+- **observe never blocks the host.** Capture is append-only and best-effort: if a
+  capture step errors, it stays out of your way and the host keeps going. mage is
+  memory, not a gate.
+- **Capture rides the host, with no runtime daemon.** There is no separate process
+  to start, supervise, or leak. The hooks are the entire runtime surface.
+
+## The boundary nudge
+
+The one capture-adjacent hook that does more than append is
+**`mage:nudge:SessionStart`** — the *boundary nudge*. A compaction is when your
+host summarizes a long conversation and starts a fresh chapter; the detail of the
+chapter that just closed is exactly what is most at risk of being forgotten.
+
+The nudge runs on `SessionStart` but acts only when the host reports
+`source === "compact"` — a post-compaction restart. On that one trigger it
+distills the just-closed chapter, drafts the lessons worth keeping into
+`.mage/staging/`, and surfaces them back to you as additional context. On every
+other `SessionStart` source (startup, resume, clear) it is a fast no-op.
+
+It lives on `SessionStart`, not `PreCompact` or `SessionEnd`, for two concrete
+reasons baked into the code:
+
+- `PreCompact` fires *before* the chapter closes, so the chapter is not yet
+  complete to distill.
+- `SessionEnd` cannot inject context — its output has nowhere to go because the
+  session is already ending.
+
+`SessionStart` with `source === "compact"` is the first moment that can both see
+the closed chapter and hand text back to you.
+
+See [The boundary nudge](../loop/nudge.md) for how staged drafts then flow into
+[Stage and groom](../loop/stage-groom.md), and the
+[Commands reference](../reference/commands.mdx) for the CLI surface behind these
+hooks.

@@ -1,0 +1,200 @@
+---
+title: Commands
+description: The full mage CLI command inventory, generated from the code.
+sidebar:
+  order: 1
+---
+
+import CommandsTable from '../../../components/CommandsTable.astro';
+
+The `mage` CLI is one binary with two audiences. There are **verbs you type** —
+`init`, `connect`, `skills`, `dream`, `dashboard`, and friends — and there is
+**hidden plumbing** that mage's hooks and `mage:*` skills run for you. You never
+type the plumbing by hand; it is listed below for transparency so you can see
+exactly what the machinery does on your behalf.
+
+The full inventory at the bottom of this page is generated straight from the CLI
+definition and guarded by a drift test, so it can never fall out of sync with the
+code. The hand-written examples here cover the verbs you actually run; everything
+else is reference.
+
+Every command accepts `--help`:
+
+```bash
+mage --help
+mage init --help
+```
+
+## Setting up a knowledge base
+
+`mage init` creates a knowledge base. With no arguments it detects what you want
+from where you run it: inside a git repo it scaffolds an **in-repo** knowledge
+base under `mage/`; otherwise it creates a standalone **hub**. You can force
+either shape.
+
+```bash
+# In-repo: a knowledge base under mage/, committed alongside the code
+mage init --in-repo
+
+# Hub: a standalone knowledge base that can span many repos.
+# A bare name creates ./<name>, like `git init`.
+mage init <your-hub> --hub
+```
+
+By default an in-repo `init` also wires the capture hooks for you. Pass
+`--no-connect` to skip that and run `mage connect` yourself later. For the full
+walkthrough see [Install and Quickstart](../start/quickstart.md). For when to
+pick in-repo, hub, or hybrid, see [Modes](../model/modes.md).
+
+## Wiring up capture
+
+`mage connect` opts this repo into capture by writing mage's hooks into Claude
+Code's per-repo `.claude/settings.local.json` (which is personal and gitignored).
+It is idempotent and backs up the file before touching it. `mage disconnect`
+removes exactly what `connect` added.
+
+```bash
+# Wire capture hooks into this repo (.claude/settings.local.json)
+mage connect
+
+# Wire them into your personal settings instead (~/.claude/settings.json)
+mage connect --user
+
+# Remove mage's capture hooks again (host hooks stay intact)
+mage disconnect
+```
+
+Capture is strictly opt-in — it is not bundled with the skills plugin. For what
+the hooks actually capture, see [Capture](../loop/capture.md) and the
+[Hooks reference](./hooks.mdx).
+
+## Regenerating the index and skills
+
+Two generated artifacts keep agents oriented. `mage index` rebuilds
+`mage/INDEX.md`, the always-loaded map of every note (deterministic and
+idempotent — never hand-edit the output). `mage skills` regenerates one
+auto-loaded skill per wing into `.claude/skills/` and `.agents/skills/` so agents
+discover your knowledge base.
+
+```bash
+# Rebuild the always-loaded index after adding or editing notes
+mage index
+
+# Regenerate the per-wing skills (run this after a new wing appears)
+mage skills
+```
+
+`mage index` is plumbing — the hooks and the `mage:learn` flow (the
+deliberate-capture skill that drafts a note for you and writes it after you
+confirm) run it for you — but it is safe to run yourself. `mage skills` also carries a read-only metrics
+mode that reports context-match (whether the skills that auto-loaded matched the
+work that followed):
+
+```bash
+# Read-only context-match report for your generated skills
+mage skills --metrics
+
+# Same report as JSON, for tooling
+mage skills --metrics --json
+```
+
+See [Optimize](../loop/optimize.md) for how those match rates drive reword and
+demote decisions, and [Thresholds and the dial](./thresholds.mdx) for the rates
+involved.
+
+## Checking knowledge-base health
+
+`mage dream` reports knowledge-base health, read-only: stale notes,
+superseded-but-active notes, dangling links, and orphans. It writes nothing.
+
+```bash
+# Read-only health report
+mage dream
+
+# Flag notes whose last_reviewed is older than 90 days (default is 180)
+mage dream --stale-days 90
+
+# Exit non-zero if there are any findings (useful in CI or a hook)
+mage dream --strict
+```
+
+`mage dream` also carries the `--apply` and `--reject` plumbing flags — the
+single-writer seam the grooming skills drive. You do not type those by hand; they
+are covered under the plumbing table below and in
+[Promote and graduate](../loop/promote-graduate.md).
+
+## Linking to a hub
+
+If your durable knowledge lives in a hub, `mage link <hub-path>` registers this
+code repo with it. `mage unlink` removes the linkage again.
+
+```bash
+# Register this repo's knowledge base with an existing hub
+mage link /path/to/hub
+
+# Use a different project name inside the hub
+mage link /path/to/hub --project my-service
+
+# Remove the linkage
+mage unlink
+```
+
+`mage list`, `mage verify`, and `mage status` are the read-only companions: list
+the projects in a hub, sanity-check a hub's structure, and check per-machine link
+health for one or more code repos.
+
+```bash
+# List the projects registered in a hub
+mage list --hub /path/to/hub
+
+# Sanity-check a hub's structure
+mage verify --hub /path/to/hub
+
+# Check link health for one or more code repos
+mage status /path/to/repo
+```
+
+## Generating the dashboard
+
+`mage dashboard` renders the knowledge base for a human — without a server. It is
+a generated artifact, not a service.
+
+```bash
+# Generate Dashboard.md + an Obsidian-core Knowledge.base
+mage dashboard
+
+# Also generate the self-contained dashboard.html cockpit
+mage dashboard --html
+
+# Print the command to open the generated html
+mage dashboard --open
+```
+
+## Diagnosing and migrating
+
+`mage doctor` diagnoses environment, knowledge-base, and connection health.
+`--fix` repairs missing capture-sink ignore rules; `--report` prints a redacted,
+content-free support bundle to attach to bug reports. `mage migrate` upgrades a
+knowledge base's metadata to the current schema (idempotent; it never commits).
+
+```bash
+# Diagnose env + KB + connection health
+mage doctor
+
+# Repair any missing capture-sink ignore rules
+mage doctor --fix
+
+# Print a redacted, content-free support bundle for an issue
+mage doctor --report
+
+# Upgrade this KB's metadata to the current schema
+mage migrate
+```
+
+## The full inventory
+
+Every command, alias, and flag below is generated from the CLI itself. The
+**plumbing (hidden)** commands carry a `plumbing` badge — those are run by mage's
+hooks and `mage:*` skills, not typed by hand.
+
+<CommandsTable showHidden={true} />

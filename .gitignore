@@ -21,3 +21,7 @@ mage/.mage/
 # repo-root Obsidian UI state (the tracked KB vault config lives at mage/.obsidian/)
 /.obsidian/
 mage/dashboard.html
+# Astro/Starlight generated cache + types for the docs/ sub-project
+# (docs/node_modules and docs/dist are covered by the patterns above;
+# docs/pnpm-lock.yaml is intentionally committed).
+docs/.astro/

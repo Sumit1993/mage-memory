@@ -1,0 +1,44 @@
+/* mage brand tokens — a violet/purple accent ramp (on-theme for "mage").
+ * The maintainer can swap the hue by editing the three accent stops per mode.
+ * Anchor hue: violet (#a78bfa is the mark's primary node colour). */
+
+/* Dark mode (Starlight default) */
+:root {
+  --sl-color-accent-low: #2a1d54;
+  --sl-color-accent: #8b5cf6;
+  --sl-color-accent-high: #d4c4fb;
+}
+
+/* Light mode */
+:root[data-theme='light'] {
+  --sl-color-accent-low: #e7defc;
+  --sl-color-accent: #7c3aed;
+  --sl-color-accent-high: #36206b;
+}
+
+/* Generated-table polish: keep wide reference tables readable. */
+.mage-table-wrap {
+  overflow-x: auto;
+}
+
+.mage-table-wrap table {
+  width: 100%;
+}
+
+.mage-table-wrap code {
+  white-space: nowrap;
+}
+
+/* A subtle marker for hidden / plumbing commands. */
+.mage-plumbing-badge {
+  display: inline-block;
+  font-size: var(--sl-text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.05em 0.45em;
+  border-radius: 0.4em;
+  border: 1px solid var(--sl-color-accent);
+  color: var(--sl-color-accent-high);
+  vertical-align: middle;
+}
