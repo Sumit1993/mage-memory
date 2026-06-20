@@ -17,9 +17,14 @@ sources:
 
 # Faultline — friction/derivation capture trigger (Phase 1 plan)
 
-> Status: ready to build, NOT yet grilled/ADR'd. The reframe below ("prefilter, not
-> autonomous miner") is grounded in a Phase 0 replay experiment (summarized in
-> [The evidence](#the-evidence-phase-0)); lock it in a grill → ADR before building.
+> Status: GRILLED 2026-06-20 → decisions locked in
+> [ADR-0027](../decisions/0027-faultline-friction-capture-trigger.md) (the decision of record).
+> The grill **refined this plan**: added trigger **C** (grind/effort-spike, no error needed),
+> a **hybrid ranking** with **cost = steps × tool-externality**, **composite-command-aware**
+> approach-key + externality, **portable** harness-pattern lists, and a **pre-registered replay
+> gate** (keep ≥1 in 3; replay kills, live crowns; detector-first). Where this note and ADR-0027
+> differ, ADR-0027 wins. The reframe ("prefilter, not autonomous miner") is grounded in a Phase 0
+> replay experiment (see [The evidence](#the-evidence-phase-0)).
 
 ## Why
 
