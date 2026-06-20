@@ -2,7 +2,7 @@
 
 # mage
 
-> 44 notes. Part of the [index](INDEX.md).
+> 45 notes. Part of the [index](INDEX.md).
 
 ### build
 
@@ -44,7 +44,8 @@
 - `decision` [0024 — Organic grooming loop: the lesson path (inline-primary + boundary nudge)](decisions/0024-organic-grooming-loop.md) — 0024, organic, grooming, loop, lesson, path, inline, primary, boundary, nudge, context, decision _(reviewed 2026-06-16)_
 - `decision` [0025 — One transient-state home (`.mage/`) + redact config in `metadata.json`](decisions/0025-one-transient-state-home.md) — 0025, one, transient, state, home, mage, redact, config, metadata, json, context, artifact _(reviewed 2026-06-18)_
 - `decision` [0026 — A hosted documentation website, generated from code](decisions/0026-hosted-docs-website.md) — 0026, hosted, documentation, website, generated, code, context, model, isn, answerable, docs, decision _(accepted · reviewed 2026-06-18)_
-- `decision` [0027 — Faultline: a friction/derivation capture trigger (prefilter, not miner)](decisions/0027-faultline-friction-capture-trigger.md) — 0027, faultline, friction, derivation, capture, trigger, prefilter, miner, context, decision, consequences, relations _(reviewed 2026-06-20)_
+- `decision` [0027 — Faultline: a friction/derivation capture trigger (prefilter, not miner)](decisions/0027-faultline-friction-capture-trigger.md) — 0027, faultline, friction, derivation, capture, trigger, prefilter, miner, context, decision, consequences, gate _(superseded · reviewed 2026-06-20)_
+- `decision` [0028 — Prose-keyed capture: corrections + recurrent failures (supersedes Faultline)](decisions/0028-prose-keyed-capture.md) — 0028, prose, keyed, capture, corrections, recurrent, failures, supersedes, faultline, context, decision, consequences _(reviewed 2026-06-20)_
 
 ### design
 

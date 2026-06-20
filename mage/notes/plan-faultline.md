@@ -17,14 +17,13 @@ sources:
 
 # Faultline — friction/derivation capture trigger (Phase 1 plan)
 
-> Status: GRILLED 2026-06-20 → decisions locked in
-> [ADR-0027](../decisions/0027-faultline-friction-capture-trigger.md) (the decision of record).
-> The grill **refined this plan**: added trigger **C** (grind/effort-spike, no error needed),
-> a **hybrid ranking** with **cost = steps × tool-externality**, **composite-command-aware**
-> approach-key + externality, **portable** harness-pattern lists, and a **pre-registered replay
-> gate** (keep ≥1 in 3; replay kills, live crowns; detector-first). Where this note and ADR-0027
-> differ, ADR-0027 wins. The reframe ("prefilter, not autonomous miner") is grounded in a Phase 0
-> replay experiment (see [The evidence](#the-evidence-phase-0)).
+> Status: **BUILT → GATE-KILLED → SUPERSEDED.** Grilled 2026-06-20 → ADR-0027 → built
+> (`feat/faultline-detector`, 42 tests) → the pre-registered replay gate **KILLED it (0/62 keeps)**.
+> Diagnosis: the tool-transition detector captured friction *position* but not *content*; the real
+> lessons live in **correction prose + recurrent-failure strings**. The pivot is
+> **[ADR-0028 — prose-keyed capture](../decisions/0028-prose-keyed-capture.md)** (supersedes ADR-0027).
+> This note + ADR-0027 are kept as the honest record of a falsified design; **ADR-0028 governs going
+> forward.** Gate detail in [ADR-0027 Gate outcome](../decisions/0027-faultline-friction-capture-trigger.md#gate-outcome-2026-06-20--kill).
 
 ## Why
 

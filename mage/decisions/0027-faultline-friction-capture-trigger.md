@@ -4,7 +4,7 @@ tags: [mage/decisions]
 created: "2026-06-20"
 updated: "2026-06-20"
 last_reviewed: "2026-06-20"
-status: active
+status: superseded
 provenance:
   repo: mage-memory
   work: faultline-friction-trigger
@@ -24,9 +24,12 @@ sources:
 
 # 0027 — Faultline: a friction/derivation capture trigger (prefilter, not miner)
 
-> Status: this records the locked DESIGN and the validation GATE (grilled 2026-06-20). The
-> ship/kill OUTCOME is pending the replay gate (§8) — Faultline is built to be killable by data.
-> The full plan + Phase 0 evidence live in [plan-faultline](../notes/plan-faultline.md).
+> Status: **SUPERSEDED** by [ADR-0028](0028-prose-keyed-capture.md). The pre-registered gate (§9)
+> RAN and **KILLED this detector** (0/62 keeps) — see [Gate outcome](#gate-outcome-2026-06-20--kill).
+> This ADR is kept as the honest record of a design that was pre-registered, gated, and falsified;
+> the prose-keyed pivot the gate's diagnosis pointed to is ADR-0028. The build lives on the
+> documented dead-end branch `feat/faultline-detector` (not wired). Plan:
+> [plan-faultline](../notes/plan-faultline.md).
 
 ## Context
 
@@ -145,8 +148,30 @@ never an autonomous miner — judgment belongs to the agent.
   recall surface. Agent-agnostic capture continues to ride the documented `mage observe` stdin
   contract — the Claude-Code hook is just the first adapter.
 
+## Gate outcome (2026-06-20) — KILL
+
+The pre-registered gate (§9) ran as a replay over 5 ops/infra sessions (sreforge ×3, prismalens,
+todo-app) + 3 mage-dev control sessions, chapter-windowed at cap:3, with 62 surfaced candidates
+judged by blind, strict, thesis-anchored agents, every keep adversarially refuted, plus a
+per-session recall check (a 68-agent workflow; harness in `~/ai-context/mage-prove-20260619/`):
+
+- **0/62 confirmed keeps — ops 0/48, control 0/14, every pattern 0.** A decisive KILL (bar was
+  ≥1/3 ship, <1/5 kill).
+- **Control 0/14 validates the judge** (it wasn't lenient); **recall confirmed the gems exist and
+  were missed** → a SENSOR mismatch, not a threshold/judge artifact.
+- **Diagnosis:** Faultline detected friction *position* but discarded *content* — it emitted
+  `tried→worked` tool-pairs with `topic:null` + boilerplate hints. The real earned lessons live in
+  **correction prose + recurrent-failure strings** (context-mode WebFetch→`ctx_*` recurred 7×;
+  `git --no-verify` hard-blocked across 4 sessions; "copy git history not fork"; app/load
+  separation) — which leave NO tool-swap signature, so a `tried→worked`-pair detector is
+  structurally blind to them. Topic extraction was also broken (cwd noise).
+- The detector code is a documented dead-end (not wired); the gate methodology + harness are the
+  reusable assets. The pivot is **[ADR-0028](0028-prose-keyed-capture.md)**.
+
 ## Relations
 
+- **superseded_by** [ADR-0028](0028-prose-keyed-capture.md) — the prose-keyed pivot (corrections +
+  recurrent failures) the gate's diagnosis pointed to; same gate is its success criterion.
 - **extends** [ADR-0024](0024-organic-grooming-loop.md) — changes what the boundary nudge surfaces
   (friction arcs, not chapter clusters) and **grounds** its "no embedded judge" in Phase 0 evidence.
 - **relates_to** [ADR-0018](0018-mage-distill-observed-scratch-reader.md) — replaces the
