@@ -6,6 +6,7 @@ import {
   isExternalCommand,
   isProtocolFailure,
   isSubstantiveCorrection,
+  lastClosedChapter,
   renderDigest,
 } from "./digest.js";
 import type { ObserveEvent } from "../observe/types.js";
@@ -21,6 +22,9 @@ function fail(error_summary: string, tool = "Bash"): ObserveEvent {
 }
 function prompt(text: string): ObserveEvent {
   return { v: 1, ts: `t${seq++}`, session: "s", type: "user_prompt", text };
+}
+function term(): ObserveEvent {
+  return { v: 1, ts: `t${seq++}`, session: "s", type: "session_end", reason: "eof" };
 }
 
 // ─── isExternalCommand (the new first-class channel) ────────────────────────────
@@ -147,5 +151,23 @@ describe("renderDigest", () => {
     const out = renderDigest(computeDigest(events, { failureCap: 100 }), 300);
     expect(out.length).toBeLessThanOrEqual(360);
     expect(out).toContain("truncated");
+  });
+});
+
+// ─── lastClosedChapter ───────────────────────────────────────────────────────
+
+describe("lastClosedChapter", () => {
+  it("returns the run between the last two terminators (inclusive of the last)", () => {
+    const events = [bash("a"), term(), fail("boom"), bash("b"), term(), bash("openTail")];
+    const ch = lastClosedChapter(events);
+    expect(ch).toHaveLength(3); // fail, bash b, terminator — the open tail is excluded
+    expect(ch.at(-1)?.type).toBe("session_end");
+    expect(computeDigest(ch).failures.items).toHaveLength(1); // the just-closed chapter's failure
+  });
+  it("returns the first chapter when there is only one terminator", () => {
+    expect(lastClosedChapter([fail("x"), term()])).toHaveLength(2);
+  });
+  it("returns [] when nothing has closed", () => {
+    expect(lastClosedChapter([bash("a"), fail("b")])).toEqual([]);
   });
 });

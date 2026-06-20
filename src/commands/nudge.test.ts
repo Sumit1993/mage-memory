@@ -43,8 +43,7 @@ function toJsonl(events: ObserveEvent[]): string {
   return `${events.map((e) => JSON.stringify(e)).join("\n")}\n`;
 }
 
-/** A CLOSED chapter (terminated by session_end) carrying a correction + a failure —
- *  distinct per `topic` so distinct chapters don't dedup into one draft. */
+/** A CLOSED chapter (terminated by session_end) carrying a correction + a failure. */
 async function seedChapter(learnings: string, session: string, topic: string): Promise<void> {
   const events: ObserveEvent[] = [
     buildUserPrompt(base(session), `add the ${topic} flow`),
@@ -86,109 +85,69 @@ describe("mage nudge — gating", () => {
   });
 });
 
-describe("mage nudge — boundary distill → staging", () => {
-  it("on compact, distills the closed chapter and drafts a lesson into .mage/staging/", async () => {
+describe("mage nudge — digest path (ADR-0029)", () => {
+  it("on compact, surfaces the just-closed chapter's earned-signal DIGEST and writes NO drafts", async () => {
     const { dir, mage, learnings } = await makeKb();
     await seedChapter(learnings, "s1", "alpha");
 
     const r = await nudgeCmd({ cwd: dir, source: "compact", force: true });
 
     expect(r.ran).toBe(true);
-    expect(r.drafted).toBeGreaterThanOrEqual(1);
-    expect(r.pending).toBe(r.drafted);
-    expect(r.nudge).toContain("mage:groom");
-
-    const drafts = await readStagedDrafts(stagingPath(mage));
-    expect(drafts).toHaveLength(r.drafted);
-    expect(drafts[0]?.body).toContain("Drafted by mage at a session boundary");
-    expect(drafts[0]?.frontmatter.type).toBe("gotcha");
+    expect(r.drafted).toBe(0); // the digest path never drafts
+    expect(r.nudge).toContain("Raw material, NOT lessons"); // the non-claim banner
+    expect(r.nudge).toContain("Corrections"); // the seeded correction surfaced
+    expect(r.nudge).toContain("reuse the existing alpha helper");
+    // .mage/staging/ stays empty — only agent-initiated `mage stage` writes there.
+    expect(await readStagedDrafts(stagingPath(mage))).toHaveLength(0);
   });
 
-  it("re-running drafts nothing new (the staged batch dedups it)", async () => {
+  it("surfaces the most-recently-closed chapter across sessions", async () => {
     const { dir, learnings } = await makeKb();
-    await seedChapter(learnings, "s1", "alpha");
-
-    const first = await nudgeCmd({ cwd: dir, source: "compact", force: true });
-    expect(first.drafted).toBeGreaterThanOrEqual(1);
-
-    const second = await nudgeCmd({ cwd: dir, source: "compact", force: true });
-    expect(second.drafted).toBe(0); // already staged → deduped, never re-drafted
-    expect(second.pending).toBe(first.pending); // no growth
-  });
-
-  it("caps newly-drafted lessons at the staging budget", async () => {
-    const { dir, learnings } = await makeKb();
-    // Five distinct chapters → five distinct candidate clusters.
-    for (const i of [1, 2, 3, 4, 5]) await seedChapter(learnings, `s${i}`, `topic${i}`);
+    await seedChapter(learnings, "s1", "alpha"); // earlier ts
+    await seedChapter(learnings, "s2", "betazoid"); // later ts wins
 
     const r = await nudgeCmd({ cwd: dir, source: "compact", force: true });
-    expect(r.drafted).toBe(3); // BASE_THRESHOLDS.stagingBudget; the rest defer
+    expect(r.nudge).toContain("betazoid");
+    expect(r.nudge).not.toContain("alpha");
   });
 
-  it("does not silently drop two distinct chapters that share a generic lead (collision guard)", async () => {
-    const { dir, mage, learnings } = await makeKb();
-    // Two sessions whose most-salient signal is IDENTICAL text → identical title-derived
-    // dedup key. The stable per-cluster slug must still yield TWO distinct drafts.
-    for (const s of ["s1", "s2"]) {
-      const events: ObserveEvent[] = [
-        buildUserPrompt(base(s), "start"),
-        buildToolUse(base(s), { tool: "Read", paths: ["x.ts"], detail: "read x", ok: true, error_summary: null }),
-        buildUserPrompt(base(s), "no, use the shared helper"), // identical correction in both
-        buildSessionEnd(base(s)),
-      ];
-      await writeFile(join(learnings, `${s}.jsonl`), toJsonl(events), "utf8");
-    }
-
+  it("emits nothing when no chapter has closed and nothing is pending", async () => {
+    const { dir, learnings } = await makeKb();
+    // An OPEN chapter (no terminator) → nothing closed to digest.
+    await writeFile(
+      join(learnings, "s1.jsonl"),
+      toJsonl([
+        buildUserPrompt(base("s1"), "start the work"),
+        buildToolUse(base("s1"), { tool: "Bash", paths: [], detail: "npm test", ok: true, error_summary: null }),
+      ]),
+      "utf8",
+    );
     const r = await nudgeCmd({ cwd: dir, source: "compact", force: true });
-    expect(r.drafted).toBe(2); // both distinct chapters drafted, not collapsed to one
-    expect(await readStagedDrafts(stagingPath(mage))).toHaveLength(2);
+    expect(r.ran).toBe(true);
+    expect(r.nudge).toBeNull();
   });
 
-  it("a secret in observed scratch never reaches the staged draft (nudge re-scrubs)", async () => {
-    const { dir, mage, learnings } = await makeKb();
-    // Write RAW scratch (bypassing capture-time scrub) so the nudge's OWN scrub is the
-    // only defense — a planted AWS key must not survive into the draft.
+  it("a secret in observed scratch never reaches the digest (nudge re-scrubs)", async () => {
+    const { dir, learnings } = await makeKb();
+    // RAW scratch (bypassing capture-time scrub) so the nudge's OWN scrub is the only defense.
     const events: ObserveEvent[] = [
-      buildUserPrompt(base("s"), "the key is AKIAIOSFODNN7EXAMPLE — do not commit it"),
+      buildToolUse(base("s"), { tool: "Bash", paths: [], detail: "deploy", ok: true, error_summary: null }),
+      buildUserPrompt(base("s"), "the key is AKIAIOSFODNN7EXAMPLE — rotate it and never commit it"),
       buildToolUse(base("s"), {
         tool: "Bash",
         paths: [],
         detail: "deploy",
         ok: false,
-        error_summary: "AKIAIOSFODNN7EXAMPLE rejected",
+        error_summary: "auth failed: AKIAIOSFODNN7EXAMPLE rejected by the provider",
       }),
       buildSessionEnd(base("s")),
     ];
     await writeFile(join(learnings, "s.jsonl"), toJsonl(events), "utf8");
 
     const r = await nudgeCmd({ cwd: dir, source: "compact", force: true });
-    expect(r.drafted).toBeGreaterThanOrEqual(1);
-    const drafts = await readStagedDrafts(stagingPath(mage));
-    const allText = drafts.map((d) => `${d.title}\n${d.body}`).join("\n");
-    expect(allText).not.toContain("AKIAIOSFODNN7EXAMPLE");
-    expect(allText).toContain("[REDACTED:");
-  });
-});
-
-describe("mage nudge — anti-nag throttle", () => {
-  it("throttles a pending-only reminder but always surfaces a fresh draft", async () => {
-    const { dir, learnings } = await makeKb();
-    await seedChapter(learnings, "s1", "alpha");
-
-    // First compact: a fresh draft → always surfaced (no throttle on new work).
-    const first = await nudgeCmd({ cwd: dir, source: "compact" });
-    expect(first.drafted).toBeGreaterThanOrEqual(1);
-    expect(first.nudge).not.toBeNull();
-
-    // Second compact: nothing new (deduped) AND the window has not elapsed → silent.
-    const second = await nudgeCmd({ cwd: dir, source: "compact" });
-    expect(second.drafted).toBe(0);
-    expect(second.nudge).toBeNull();
-
-    // force bypasses the throttle (still surfaces the pending batch).
-    const forced = await nudgeCmd({ cwd: dir, source: "compact", force: true });
-    expect(forced.nudge).not.toBeNull();
-    expect(forced.nudge).toContain("pending");
+    expect(r.nudge).not.toBeNull();
+    expect(r.nudge).not.toContain("AKIAIOSFODNN7EXAMPLE");
+    expect(r.nudge).toContain("[REDACTED:");
   });
 });
 

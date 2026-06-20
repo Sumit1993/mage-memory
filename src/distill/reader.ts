@@ -310,6 +310,23 @@ export async function readDistill(
 }
 
 /**
+ * Read every per-session stream into parsed events (ADR-0029): the digest path needs the raw
+ * events, not chapter clusters. Reuses the same listing + fail-open parse as {@link readDistill}.
+ * READ-ONLY. Returns `[]` on a missing `.learnings/` dir.
+ */
+export async function readSessionStreams(
+  learningsDir: string,
+): Promise<Array<{ session: string; events: ObserveEvent[] }>> {
+  const files = await listSessionStreams(learningsDir);
+  const out: Array<{ session: string; events: ObserveEvent[] }> = [];
+  for (const file of files) {
+    const session = basename(file, ".jsonl");
+    out.push({ session, events: await parseStream(join(learningsDir, file)) });
+  }
+  return out;
+}
+
+/**
  * The full per-session streams to read: top-level `*.jsonl`, EXCLUDING the
  * `*.skills.jsonl` sidecars (the endswith check is ordered FIRST — a sidecar's
  * basename would corrupt the session key) and the `.archive` subdir (only files,

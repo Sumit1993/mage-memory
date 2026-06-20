@@ -206,6 +206,34 @@ export interface DigestOptions {
   protocolPatterns?: readonly RegExp[];
 }
 
+// ─── chapter selection (the boundary nudge mines the just-closed chapter) ──────────────────────
+
+/** True iff an event is a chapter terminator (compact / session_end). */
+function isTerminator(e: ObserveEvent): boolean {
+  return e.type === "compact" || e.type === "session_end";
+}
+
+/**
+ * The events of the LAST CLOSED chapter in a stream — the run between the second-to-last and the
+ * last terminator, inclusive of the last terminator (computeDigest ignores terminators). This is
+ * "what just compacted", the unit the boundary nudge surfaces. Returns `[]` when the stream has no
+ * terminator (nothing has closed yet). PURE.
+ */
+export function lastClosedChapter(events: ObserveEvent[]): ObserveEvent[] {
+  let last = -1;
+  for (let i = events.length - 1; i >= 0; i--) {
+    const e = events[i];
+    if (e !== undefined && isTerminator(e)) { last = i; break; }
+  }
+  if (last < 0) return [];
+  let prev = -1;
+  for (let i = last - 1; i >= 0; i--) {
+    const e = events[i];
+    if (e !== undefined && isTerminator(e)) { prev = i; break; }
+  }
+  return events.slice(prev + 1, last + 1);
+}
+
 // ─── computeDigest — PURE narrowing of one chapter's events into the digest ────────────────────
 
 interface Agg {

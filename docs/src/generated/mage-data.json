@@ -101,7 +101,7 @@
       "event": "SessionStart",
       "id": "mage:nudge:SessionStart",
       "command": "mage nudge",
-      "purpose": "The boundary nudge: on a post-compaction SessionStart, distill the closed chapter, draft forgotten lessons into .mage/staging/, and surface them. Gates on source===\"compact\" itself — a fast no-op on startup/resume/clear."
+      "purpose": "The boundary nudge: on a post-compaction SessionStart, surface the just-closed chapter's earned-signal digest (failures, external commands, corrections) as additionalContext for the agent to mine and `mage stage` (ADR-0029). Gates on source===\"compact\" itself — a fast no-op on startup/resume/clear."
     },
     {
       "event": "UserPromptSubmit",
@@ -407,7 +407,7 @@
     },
     {
       "name": "nudge",
-      "summary": "Hook-fired boundary nudge: on a post-compaction SessionStart, distill the closed chapter, draft forgotten lessons to .mage/staging/, and surface them (ADR-0009 §24; never blocks the host)",
+      "summary": "Hook-fired boundary nudge: on a post-compaction SessionStart, surface the closed chapter's earned-signal digest (failures, external commands, corrections) for the agent to mine and `mage stage` (ADR-0029; never blocks the host)",
       "aliases": [],
       "hidden": true,
       "options": [
