@@ -207,7 +207,7 @@ async function initInRepo(codeRepo: string, project: string): Promise<void> {
   logger.success(`Initialized in-repo mage knowledge base for project '${project}'.`);
   logger.detail(`Knowledge base: ${docsRoot}`);
   logger.detail(`Add notes under notes/, capture work in work/<slug>/, then run \`mage index\`.`);
-  printPluginSkillsHint();
+  printSkillsInstallHint();
   logger.blank();
   logger.info("Suggested commit (run yourself; mage never auto-commits):");
   logger.detail(`  git -C ${codeRepo} add mage AGENTS.md CLAUDE.md .gitignore`);
@@ -338,7 +338,7 @@ async function initStandaloneHub(args: HubArgs): Promise<string> {
   logger.blank();
   logger.success(`Initialized standalone mage hub '${hubName}'.`);
   logger.detail(`Link a code repo with: mage link ${hubDir}`);
-  printPluginSkillsHint();
+  printSkillsInstallHint();
   logger.blank();
   logger.info("Suggested commits (run yourself; mage never auto-commits):");
   logger.detail(`  git -C ${hubDir} add .`);
@@ -384,15 +384,21 @@ TODO — naming, wings in use, voice.
 // ─── utilities ───────────────────────────────────────────────────────────
 
 /**
- * Point the user at mage's skills, which ship as a Claude Code plugin (the
- * `mage:` namespace keeps names clean — `mage:learn`, `mage:groom`, …). Install
- * is user-driven; mage never runs the slash commands for you.
+ * Show the TWO user-driven ways to install mage's skills — the user picks one; mage
+ * never runs either for them. (1) the Claude Code PLUGIN (namespaced `mage:learn`/
+ * `mage:groom`, one install for that agent); (2) the open `skills` CLI (any agent),
+ * project-level by default or `--global` for user-level (every repo). Both serve the
+ * same `skills/` dir — the plugin adds the `mage:` namespace, the CLI the bare names.
  */
-function printPluginSkillsHint(): void {
+function printSkillsInstallHint(): void {
   logger.blank();
-  logger.info("mage's skills (Claude Code) — add the marketplace, then install the group:");
+  logger.info("mage's skills — two user-driven ways (pick one; mage never runs these for you):");
+  logger.detail("Claude Code plugin — namespaced mage:learn / mage:groom:");
   logger.detail("  /plugin marketplace add Sumit1993/mage-memory");
   logger.detail("  /plugin install mage@mage");
+  logger.detail("Open skills CLI (any agent) — this project, or --global for every repo:");
+  logger.detail("  npx skills add Sumit1993/mage-memory");
+  logger.detail("  npx skills add Sumit1993/mage-memory --global");
 }
 
 async function detectGhOwner(): Promise<string | null> {
