@@ -78,13 +78,17 @@ not to archive what you already read.
 npm i -g mage-memory
 ```
 
-mage's skills ship as a **Claude Code plugin** so they group under a clean
-`mage:` namespace. `mage init` prints the two install lines for you (it never
-runs slash commands):
+mage's skills install **two user-driven ways — pick one** (`mage init` prints both;
+it never runs them for you):
 
 ```text
+# Claude Code plugin — namespaced mage:learn / mage:groom, one install for that agent
 /plugin marketplace add Sumit1993/mage-memory
 /plugin install mage@mage
+
+# Or the open skills CLI (any agent) — project-level, or --global for every repo
+npx skills add Sumit1993/mage-memory
+npx skills add Sumit1993/mage-memory --global
 ```
 
 You get `mage:guide` (how to use the base), `mage:learn` (capture a note), and
