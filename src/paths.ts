@@ -14,20 +14,29 @@ export const WORK_DIR = "work";
 export const DECISIONS_DIR = "decisions";
 export const INDEX_FILE = "INDEX.md";
 export const IDENTITY_FILE = "IDENTITY.md";
-/** Pre-promotion scratch (git-ignored). */
-export const LEARNINGS_DIR = ".learnings";
-/** Read-only context-match rollup dir (git-ignored, sibling of LEARNINGS_DIR). */
-export const METRICS_DIR = ".metrics";
 /**
- * Judged-but-uncommitted lesson drafts of the organic grooming loop (git-ignored,
- * sibling of LEARNINGS_DIR/METRICS_DIR — 0.0.12). A third epistemic state between
- * `.learnings/` (raw, auto-pruned) and `notes/` (committed, indexed-live): drafts
- * wait here, OUT of the live index, until `mage groom` promotes them to `notes/`.
+ * The single git-ignored home for ALL machine-written transient state (ADR-0025).
+ * Every regenerable/rebuildable runtime artifact lives under `<docsRoot>/.mage/`,
+ * via the LEARNINGS_DIR/METRICS_DIR/STAGING_DIR leaves below — one gitignore line,
+ * one scan-skip, one doctor probe. New runtime state has exactly one home and is
+ * never a new top-level entry at the docs root.
  */
-export const STAGING_DIR = ".staging";
-/** Rotated `.learnings/` archives (git-ignored, lives inside LEARNINGS_DIR). */
+export const STATE_DIR = ".mage";
+/** Pre-promotion scratch leaf under STATE_DIR (git-ignored): `.mage/learnings/`. */
+export const LEARNINGS_DIR = "learnings";
+/** Read-only context-match rollup leaf under STATE_DIR (git-ignored): `.mage/metrics/`. */
+export const METRICS_DIR = "metrics";
+/**
+ * Judged-but-uncommitted lesson drafts of the organic grooming loop — leaf under
+ * STATE_DIR (git-ignored): `.mage/staging/` (0.0.12). A third epistemic state
+ * between `.mage/learnings/` (raw, auto-pruned) and `notes/` (committed,
+ * indexed-live): drafts wait here, OUT of the live index, until `mage groom`
+ * promotes them to `notes/`.
+ */
+export const STAGING_DIR = "staging";
+/** Rotated learnings archives (git-ignored, lives inside the learnings leaf). */
 export const LEARNINGS_ARCHIVE_DIR = ".archive";
-/** Once-per-day age-purge throttle marker (inside LEARNINGS_DIR). */
+/** Once-per-day age-purge throttle marker (inside the learnings leaf). */
 export const LEARNINGS_PURGE_MARKER = ".last-purge";
 /** Per-work-unit raw materials dir name (git-ignored wherever it appears). */
 export const ARTIFACTS_DIRNAME = "artifacts";
@@ -46,13 +55,6 @@ export const AGENTS_SKILLS_DIR = ".agents";
 export const AGENTS_FILE = "AGENTS.md";
 export const CLAUDE_FILE = "CLAUDE.md";
 export const GITIGNORE_FILE = ".gitignore";
-/**
- * The Gate-2 false-positive allowlist (0.0.12). A COMMITTED (not git-ignored),
- * shared file at the docs root that lets a strict, no-`--no-verify` environment
- * confirm a false positive without disabling the redaction hook. Path globs skip a
- * staged file; `literal:<value>` lines whitelist an exact matched value.
- */
-export const REDACTIGNORE_FILE = ".redactignore";
 
 // ─── schema ──────────────────────────────────────────────────────────────
 /** Current on-disk schema version — what every writer stamps. */
@@ -62,6 +64,22 @@ export const METADATA_SCHEMA = "mage.v2";
  * (Dec 9 migration): never throws on a v1 file. `mage migrate` rewrites eagerly.
  */
 export const METADATA_SCHEMA_V1 = "mage.v1";
+
+/**
+ * The Gate-2 false-positive allowlist (ADR-0025), folded into `metadata.json` as
+ * the `redact` field (was a `.redactignore` file before the state fold). Two kinds
+ * of confirmed false positive let a strict, no-`--no-verify` environment override a
+ * redaction match without disabling the pre-commit hook:
+ *   - `ignore` — path GLOBs (relative to the docs root) whose staged file is not scanned;
+ *   - `allow` — exact matched VALUES that are never treated as a secret.
+ * Compiled by {@link redactIgnoreFromMetadata} (see redactignore.ts), fed from here.
+ */
+export interface RedactConfig {
+  /** Path globs (docs-root-relative) whose staged files are skipped by Gate-2. */
+  ignore?: string[];
+  /** Exact matched values to whitelist as confirmed false positives. */
+  allow?: string[];
+}
 
 /**
  * Code-repo-side metadata. Lives at `<code-repo>/mage/metadata.json`.
@@ -85,6 +103,8 @@ export interface MageMetadata {
   linked_at: string;
   /** 0.0.8 self-grooming dial (ADR-0019 §7); absent ⇒ "normal". */
   grooming?: { sensitivity?: "low" | "normal" | "high" };
+  /** Gate-2 false-positive allowlist (ADR-0025); absent ⇒ no allowances. */
+  redact?: RedactConfig;
 }
 
 /**
@@ -110,6 +130,8 @@ export interface HubMetadata {
   projects: HubProject[];
   /** 0.0.8 self-grooming dial (ADR-0019 §7); absent ⇒ "normal". */
   grooming?: { sensitivity?: "low" | "normal" | "high" };
+  /** Gate-2 false-positive allowlist (ADR-0025); absent ⇒ no allowances. */
+  redact?: RedactConfig;
 }
 
 export interface HubProject {
@@ -173,13 +195,41 @@ export function hubProjectDocsRoot(hubRoot: string, projectName: string): string
 }
 
 /**
+ * The single transient-state home for a resolved docs root (ADR-0025) —
+ * `<docsRoot>/.mage`. Git-ignored, per-KB. Parent of the learnings/metrics/staging
+ * leaves; the {@link learningsPath}/{@link metricsPath}/{@link stagingPath} helpers
+ * resolve those — prefer them over re-joining STATE_DIR at the call site.
+ */
+export function stateDir(docsRoot: string): string {
+  return join(docsRoot, STATE_DIR);
+}
+
+/**
+ * The pre-promotion scratch dir for a resolved docs root —
+ * `<docsRoot>/.mage/learnings`. Git-ignored, per-KB. Holds the raw, auto-pruned
+ * per-session capture `*.jsonl` streams (ADR-0018) that distill folds.
+ */
+export function learningsPath(docsRoot: string): string {
+  return join(stateDir(docsRoot), LEARNINGS_DIR);
+}
+
+/**
+ * The metrics dir for a resolved docs root — `<docsRoot>/.mage/metrics`.
+ * Git-ignored, per-KB. Holds the rollups, distill/promote watermarks, and the
+ * accept/reject ledgers (ADR-0021).
+ */
+export function metricsPath(docsRoot: string): string {
+  return join(stateDir(docsRoot), METRICS_DIR);
+}
+
+/**
  * The grooming-loop staging dir for a resolved docs root (0.0.12) —
- * `<docsRoot>/.staging`. Git-ignored, per-KB (in a hub, each project gets its own,
- * since the docs root IS the project dir). Holds `<slug>.md` lesson drafts that
- * `mage stage` writes and `mage groom` promotes.
+ * `<docsRoot>/.mage/staging`. Git-ignored, per-KB (in a hub, each project gets its
+ * own, since the docs root IS the project dir). Holds `<slug>.md` lesson drafts
+ * that `mage stage` writes and `mage groom` promotes.
  */
 export function stagingPath(docsRoot: string): string {
-  return join(docsRoot, STAGING_DIR);
+  return join(stateDir(docsRoot), STAGING_DIR);
 }
 
 // ─── reading ─────────────────────────────────────────────────────────────

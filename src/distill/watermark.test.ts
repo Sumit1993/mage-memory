@@ -34,14 +34,14 @@ describe("readWatermark — fresh empty on missing/corrupt (fail-open)", () => {
 
   it("returns a fresh empty watermark when the file is corrupt JSON", async () => {
     const dir = await tmp();
-    await mkdir(join(dir, ".metrics"), { recursive: true });
+    await mkdir(join(dir, ".mage", "metrics"), { recursive: true });
     await writeFile(distillWatermarkPath(dir), "{ not json", "utf8");
     expect(await readWatermark(dir)).toEqual({ v: DISTILL_VERSION, cursors: {} });
   });
 
   it("drops a non-number cursor record (fail-open to empty cursors)", async () => {
     const dir = await tmp();
-    await mkdir(join(dir, ".metrics"), { recursive: true });
+    await mkdir(join(dir, ".mage", "metrics"), { recursive: true });
     await writeFile(
       distillWatermarkPath(dir),
       JSON.stringify({ v: 1, cursors: { s: "oops" } }),
@@ -52,7 +52,7 @@ describe("readWatermark — fresh empty on missing/corrupt (fail-open)", () => {
 
   it("defaults a missing version to DISTILL_VERSION but keeps valid cursors", async () => {
     const dir = await tmp();
-    await mkdir(join(dir, ".metrics"), { recursive: true });
+    await mkdir(join(dir, ".mage", "metrics"), { recursive: true });
     await writeFile(distillWatermarkPath(dir), JSON.stringify({ cursors: { s: 3 } }), "utf8");
     expect(await readWatermark(dir)).toEqual({ v: DISTILL_VERSION, cursors: { s: 3 } });
   });

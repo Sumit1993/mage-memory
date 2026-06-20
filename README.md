@@ -171,14 +171,13 @@ mage/
 ├── archive/            retired notes
 ├── INDEX.md            GENERATED always-loaded index (run `mage index`)
 ├── _index.<wing>.md    GENERATED per-wing index (hierarchical mode) — reserved name
-├── .learnings/         GENERATED capture scratch (git-ignored; `mage observe`)
-├── .metrics/           GENERATED context-match rollup (git-ignored; `mage skills --metrics`)
+├── .mage/              GENERATED machine state (git-ignored): learnings/ metrics/ staging/ (ADR-0025)
 ├── .obsidian/          Obsidian vault config
 └── metadata.json       schema "mage.v2"; mode "in-repo" | "hybrid" | "external"
 ```
 
 The scanner recurses the **whole** KB and indexes every note except a fixed
-skip-set (`.obsidian/`, `.git/`, `node_modules/`, `artifacts/`, `.learnings/`,
+skip-set (`.obsidian/`, `.git/`, `node_modules/`, `artifacts/`, `.mage/`,
 `archive/`) and mage's own generated/scaffolding files (`INDEX.md`,
 `_index.*.md`, `AGENTS.md`, `CLAUDE.md`, `IDENTITY.md`) — so "folders are
 conventions" is literal. A hub's `projects/<name>/` notes are indexed for free.
@@ -224,12 +223,12 @@ listed for transparency). The deterministic/judgment split behind this is
 
 | Command | Invoked by | Purpose |
 |---------|-----------|---------|
-| `mage observe` | capture hooks (`mage connect`) | Read a Claude Code hook event on stdin, append one normalized event to `.learnings/`. Never blocks the host. |
+| `mage observe` | capture hooks (`mage connect`) | Read a Claude Code hook event on stdin, append one normalized event to `.mage/learnings/`. Never blocks the host. |
 | `mage index` | `Stop` hook · after `mage:learn` | Regenerate the always-loaded `INDEX.md` (+ per-wing indexes). Never hand-edit the output. |
 | `mage skills` | after a new wing appears | Regenerate the per-wing `mage-wing-<x>` skills into `.claude/skills/` + `.agents/skills/`. `--metrics --quiet` folds the metrics rollup at `Stop`. |
 | `mage ingest <dir>` | `mage:learn --from` | Enumerate + classify ingestable sources under a foreign `<dir>` (read-only) — what bulk-import distills into notes. |
-| `mage distill --json` | `mage:groom` (Phase 1) | Read `.learnings/` events into note candidates (first-sight insight). |
-| `mage promote --json` / `--seen <s>:<o>` | `mage:groom` (Phase 2) | Fold `.learnings/` into a **recurrence** manifest of `note`/`graduate` proposals; `--seen` advances the per-session watermark after the human dispositions a batch. |
+| `mage distill --json` | `mage:groom` (Phase 1) | Read `.mage/learnings/` events into note candidates (first-sight insight). |
+| `mage promote --json` / `--seen <s>:<o>` | `mage:groom` (Phase 2) | Fold `.mage/learnings/` into a **recurrence** manifest of `note`/`graduate` proposals; `--seen` advances the per-session watermark after the human dispositions a batch. |
 | `mage dream --apply` / `--reject` | `mage:groom` · `mage:graduate` · `mage:optimize` | The **single writer**: reads ONE Proposal JSON on stdin and applies it through the applier — `graduate` / `demote` / `merge` / `split` / `reword` — enforcing the four ceilings (never auto-commit, never touch a bespoke skill, never hard-delete, never write past a Gate-2 secret block). `--reject` buffers a proposal so it backs off and won't be re-surfaced. |
 | `mage redact <file>` | `mage:learn` · `mage:groom` · `mage:graduate` · git pre-commit | Scan/strip secrets from a file or stdin — redaction Gate 2 before a tracked note/skill is written. |
 
@@ -241,7 +240,7 @@ From 0.0.5–0.0.6 mage can **learn from what agents actually do** — with no s
 and no background process. It rides the host agent's **hooks**:
 
 - **`mage observe`** is a hook-fired seam that turns one Claude Code hook event
-  into one normalized line in a git-ignored `mage/.learnings/<session>.jsonl`
+  into one normalized line in a git-ignored `mage/.mage/learnings/<session>.jsonl`
   scratch — a *salient extract* (which tool, which files, which skill loaded, the
   prompt's intent), **never a transcript copy**. Free-text fields are scrubbed at
   capture (redaction **Gate 1** — fail-open, it never blocks the host).
@@ -252,19 +251,19 @@ and no background process. It rides the host agent's **hooks**:
   removes exactly what it added.
 - **`mage skills --metrics`** reports **context-match**, read-only: when a skill
   auto-loaded, did the work that followed actually touch its wing/keywords? The
-  tally lives in a git-ignored `mage/.metrics/` rollup that outlives the scratch
+  tally lives in a git-ignored `mage/.mage/metrics/` rollup that outlives the scratch
   purge. It only *flags* a weak trigger (`reword-suggested` / `demote-suggested`)
   — it never edits a skill. Acting on those flags is **`mage:optimize`** (reword
   / demote, below), and writing happens only through the applier.
 
-The `.learnings/` schema is harness-neutral, so other agents become additive
+The `.mage/learnings/` schema is harness-neutral, so other agents become additive
 capture adapters later; Claude Code ships first. **Metrics and raw capture never
 enter git** — only the human-committed notes they motivate do.
 
 ### Redaction — two gates
 
 mage scrubs secrets and PII at every write that could escape the machine.
-**Gate 1** is the fast scrub at capture (`mage observe` → `.learnings/`,
+**Gate 1** is the fast scrub at capture (`mage observe` → `.mage/learnings/`,
 fail-open); **Gate 2** (`mage redact`) is a stronger deterministic scan at the
 commit boundary, where a miss becomes shared. The detector covers private keys,
 cloud and provider tokens (AWS, GitHub, GitLab, Stripe, Google, npm, OpenAI,
@@ -350,7 +349,7 @@ mage dashboard --open   # print the command to open the html
   you confirm, and nothing is committed — ever.**
 
 The knowledge dashboard (over *tracked* notes) may be committed; the grooming
-view (over the gitignored `.metrics/`) is itself gitignored — *metrics never
+view (over the gitignored `.mage/metrics/`) is itself gitignored — *metrics never
 enter git*.
 
 ## Reporting issues
@@ -396,7 +395,7 @@ then `/plugin install mage@mage` (`mage init` prints both lines).
 |-------|---------|
 | `mage:guide` | Awareness — teaches agents to detect `mage/`, read the index first, capture by pointer, and never auto-commit. |
 | `mage:learn` | Capture a durable note (insight + procedure + pointers) from the work just done; `mage:learn --from <dir>` bulk-imports existing docs/skills. |
-| `mage:groom` | Mine the observed scratch (`.learnings/`) into notes — two phases: **first sight** (a striking insight earns a note the first time it is seen) then **recurrence** (a pattern across ≥ K distinct sessions with no covering note → draft or `merge`). |
+| `mage:groom` | Mine the observed scratch (`.mage/learnings/`) into notes — two phases: **first sight** (a striking insight earns a note the first time it is seen) then **recurrence** (a pattern across ≥ K distinct sessions with no covering note → draft or `merge`). |
 | `mage:graduate` | A proven procedural note recurring across enough sessions → its own loadable `mage-skill-<slug>` (the note stays the substrate). |
 | `mage:optimize` | Reword a generated skill's trigger when context-match shows it mis-fires — or demote it back to its note. Bounded per pass. |
 | `mage-wing-<x>` | Per-wing skill **generated** by `mage skills` into `.claude/skills/` + `.agents/skills/`, scoped to one wing's rooms. |
@@ -442,12 +441,12 @@ reflect the actual CLI. Recent releases:
   reword) with four hard ceilings (never auto-commit, never touch a bespoke
   skill, never hard-delete, never write past Gate 2).
 - **0.0.7** — `mage distill` — the observed-scratch reader (`mage distill --json`)
-  + `mage:distill` skill: mine `.learnings/` into notes on first sight.
+  + `mage:distill` skill: mine `.mage/learnings/` into notes on first sight.
 - **0.0.6** — `mage connect` / `mage disconnect` (opt-in host-hook adapter) +
-  read-only context-match metrics (`mage skills --metrics`, `mage/.metrics/`
+  read-only context-match metrics (`mage skills --metrics`, `mage/.mage/metrics/`
   rollup) + a dedicated Anthropic-key redaction detector.
 - **0.0.5** — `mage observe`, the hook-fired capture seam
-  (`.learnings/*.jsonl`) + redaction **Gate 1** (scrub at capture).
+  (`.mage/learnings/*.jsonl`) + redaction **Gate 1** (scrub at capture).
 - **0.0.4** — `mage ingest`: deterministic enumeration of ingestable sources
   behind `mage:learn --from`.
 - **0.0.3** — skills ship as a Claude Code **plugin** (the `mage:` namespace) +

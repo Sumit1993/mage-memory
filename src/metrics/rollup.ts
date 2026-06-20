@@ -20,14 +20,19 @@ import {
   MIN_LOADS_FOR_SUGGESTION,
   type MatchDimension,
 } from "./context-match.js";
+import { metricsPath } from "../paths.js";
 import type { ObserveEvent } from "../observe/types.js";
 
 // ─── consts ────────────────────────────────────────────────────────────────────
 
 /** Bump when the on-disk rollup shape changes (a fresh empty rollup re-stamps). */
 export const ROLLUP_VERSION = 1;
-/** The git-ignored metrics dir, sibling of `.learnings/` inside a docs root. */
-export const METRICS_DIR = ".metrics";
+/**
+ * The git-ignored metrics leaf, sibling of `.mage/learnings/` (re-exported from
+ * paths.ts so the boundary has a single home; index.ts re-exports it as
+ * ROLLUP_METRICS_DIR). Prefer {@link metricsPath} over re-joining it.
+ */
+export { METRICS_DIR } from "../paths.js";
 /** The single rollup file the read-only context-match metric lives in. */
 export const ROLLUP_FILE = "context-match.json";
 
@@ -71,7 +76,7 @@ function emptyRollup(): Rollup {
 
 /** The on-disk rollup file path under a docs root. */
 export function rollupPath(docsRoot: string): string {
-  return join(docsRoot, METRICS_DIR, ROLLUP_FILE);
+  return join(metricsPath(docsRoot), ROLLUP_FILE);
 }
 
 // ─── readRollup — fail-open on missing/corrupt ──────────────────────────────────
@@ -219,9 +224,9 @@ function freshStat(): SkillStat {
 
 // ─── writeRollup ─────────────────────────────────────────────────────────────
 
-/** Persist the rollup (creating `.metrics/`), pretty-printed with trailing NL. */
+/** Persist the rollup (creating `.mage/metrics/`), pretty-printed with trailing NL. */
 export async function writeRollup(docsRoot: string, rollup: Rollup): Promise<void> {
-  await mkdir(join(docsRoot, METRICS_DIR), { recursive: true });
+  await mkdir(metricsPath(docsRoot), { recursive: true });
   await writeFile(rollupPath(docsRoot), JSON.stringify(rollup, null, 2) + "\n", "utf8");
 }
 

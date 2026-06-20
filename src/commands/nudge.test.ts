@@ -19,7 +19,7 @@ afterEach(async () => {
   vi.restoreAllMocks();
 });
 
-/** An in-repo KB at `<dir>/mage` with an empty `.learnings/`. */
+/** An in-repo KB at `<dir>/mage` with an empty `.mage/learnings/`. */
 async function makeKb(): Promise<{ dir: string; mage: string; learnings: string }> {
   const dir = await mkdtemp(join(tmpdir(), "mage-nudge-"));
   made.push(dir);
@@ -29,7 +29,7 @@ async function makeKb(): Promise<{ dir: string; mage: string; learnings: string 
     join(mage, "metadata.json"),
     `${JSON.stringify({ schema: "mage.v2", mode: "in-repo", project: "t" })}\n`,
   );
-  const learnings = join(mage, ".learnings");
+  const learnings = join(mage, ".mage", "learnings");
   await mkdir(learnings, { recursive: true });
   return { dir, mage, learnings };
 }

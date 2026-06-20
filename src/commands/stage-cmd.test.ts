@@ -22,7 +22,7 @@ async function makeKb(): Promise<string> {
   return dir;
 }
 
-const staged = (dir: string, slug: string) => join(dir, "mage", ".staging", `${slug}.md`);
+const staged = (dir: string, slug: string) => join(dir, "mage", ".mage", "staging", `${slug}.md`);
 
 describe("mage stage", () => {
   it("writes a redacted draft to .staging/ with a gotcha type + H1", async () => {

@@ -8,11 +8,16 @@ coverage/
 .vitest-cache/
 .tsbuildinfo
 mage/**/artifacts/
+# Machine state: post-fold KBs keep everything under one `mage/.mage/` home (ADR-0025).
+# This repo predates the fold — its (still-0.0.11) hooks write the legacy top-level dirs
+# until the binary is upgraded and `mage migrate` relocates them — so keep BOTH ignored
+# (the legacy lines are harmless once those dirs are gone).
 mage/.learnings/
 mage/.metrics/
+mage/.staging/
+mage/.mage/
 # `mage connect` writes an advisory .bak beside the (already-ignored) local settings.
 .claude/settings.local.json.bak
 # repo-root Obsidian UI state (the tracked KB vault config lives at mage/.obsidian/)
 /.obsidian/
 mage/dashboard.html
-mage/.staging/

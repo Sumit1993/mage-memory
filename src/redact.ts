@@ -35,7 +35,7 @@ const ENV_PLACEHOLDER = /^\$\{[A-Za-z0-9_:.-]{1,200}\}$/;
  * A matched value that must NOT be treated as a secret, regardless of which
  * detector fired: an already-redacted marker (keeps redact() idempotent), an
  * `${ENV}` placeholder, or a caller-supplied allowlist literal (a confirmed false
- * positive from `mage/.redactignore`). Applied uniformly across both scan passes.
+ * positive from `metadata.redact.allow`). Applied uniformly across both scan passes.
  */
 function suppressed(raw: string, allow?: ReadonlySet<string>): boolean {
   return REDACTION_MARKER.test(raw) || ENV_PLACEHOLDER.test(raw) || (allow?.has(raw) ?? false);

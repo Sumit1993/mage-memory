@@ -35,9 +35,9 @@ async function note(
   await writeFile(abs, `---\n${yaml}\n---\n\n${body}\n`, "utf8");
 }
 
-/** Write a `.metrics/<file>` JSON payload under the docs root. */
+/** Write a `.mage/metrics/<file>` JSON payload under the docs root. */
 async function metrics(root: string, file: string, payload: unknown): Promise<void> {
-  const dir = join(root, ".metrics");
+  const dir = join(root, ".mage", "metrics");
   await mkdir(dir, { recursive: true });
   await writeFile(join(dir, file), JSON.stringify(payload, null, 2) + "\n", "utf8");
 }
@@ -144,9 +144,9 @@ describe("collectDashboardData — populated KB", () => {
       sessions: {},
     });
 
-    // .learnings scratch — two JSONL streams with a few lines each (+ a sidecar
+    // .mage/learnings scratch — two JSONL streams with a few lines each (+ a sidecar
     // that must be EXCLUDED from the scratch tally).
-    const learnings = join(root, ".learnings");
+    const learnings = join(root, ".mage", "learnings");
     await mkdir(learnings, { recursive: true });
     await writeFile(join(learnings, "s1.jsonl"), '{"a":1}\n{"a":2}\n{"a":3}\n', "utf8");
     await writeFile(join(learnings, "s2.jsonl"), '{"b":1}\n{"b":2}\n', "utf8");

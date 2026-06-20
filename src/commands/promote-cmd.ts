@@ -17,9 +17,8 @@
 // This mirrors `mage distill` EXACTLY (distill-cmd.ts): the CLI does the determinism,
 // the skill does the judgment. No model lives here (ADR-0009).
 
-import { join } from "node:path";
 import { logger } from "../logger.js";
-import { absolutePath, LEARNINGS_DIR, resolveDocsRoot } from "../paths.js";
+import { absolutePath, learningsPath, resolveDocsRoot } from "../paths.js";
 import { scanNotes } from "../scan.js";
 import { scanSecrets } from "../redact.js";
 import { buildManifest } from "../grooming/promote.js";
@@ -144,7 +143,7 @@ async function readAndReport(
 
   // Fold + persist the derived tally (the read path writes it — a derived cache, like
   // the rollup Stop fold). repoRoot mirrors readDistill: the resolved code repo / hub.
-  const tally = await foldTally(root, join(root, LEARNINGS_DIR), repo);
+  const tally = await foldTally(root, learningsPath(root), repo);
   await writeTally(root, tally);
 
   const sensitivity = await readSensitivity(resolved);

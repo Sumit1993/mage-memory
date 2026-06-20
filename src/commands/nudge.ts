@@ -29,7 +29,7 @@ import {
   writeDraft,
 } from "../grooming/staging.js";
 import { BASE_THRESHOLDS } from "../grooming/thresholds.js";
-import { LEARNINGS_DIR, METRICS_DIR, absolutePath, resolveDocsRoot, stagingPath } from "../paths.js";
+import { absolutePath, learningsPath, metricsPath, resolveDocsRoot, stagingPath } from "../paths.js";
 import { redact } from "../redact.js";
 import { type ScannedNote, scanNotes } from "../scan.js";
 
@@ -77,7 +77,7 @@ export async function nudgeCmd(opts: NudgeOptions): Promise<NudgeResult> {
 
   // Distill the NEW (un-disposed) segment since the watermark. We never write the
   // watermark — dedup makes a re-offered chapter idempotent.
-  const manifest = await readDistill(root, join(root, LEARNINGS_DIR), repo).catch(() => null);
+  const manifest = await readDistill(root, learningsPath(root), repo).catch(() => null);
   const clusters = manifest?.clusters ?? [];
 
   const [notes, rejects, staged] = await Promise.all([
@@ -191,7 +191,7 @@ async function decideNudge(
   force: boolean,
 ): Promise<string | null> {
   if (drafted === 0 && pending === 0) return null; // nothing to say.
-  const throttlePath = join(root, METRICS_DIR, NUDGE_THROTTLE_FILE);
+  const throttlePath = join(metricsPath(root), NUDGE_THROTTLE_FILE);
   if (drafted === 0 && !force) {
     const last = await readThrottle(throttlePath);
     if (Date.now() - last < NUDGE_THROTTLE_MS) return null; // a recent reminder already fired.

@@ -5,8 +5,9 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   globToRegExp,
   matchesRedactGlob,
-  parseRedactIgnore,
-  readRedactIgnore,
+  parseRedactIgnoreFile,
+  readRedactIgnoreFile,
+  redactIgnoreFromMetadata,
 } from "./redactignore.js";
 
 const made: string[] = [];
@@ -20,26 +21,51 @@ async function tmp(): Promise<string> {
   return d;
 }
 
-describe("parseRedactIgnore", () => {
-  it("splits globs from literal: allows and ignores comments + blanks", () => {
-    const { globs, literals } = parseRedactIgnore(
+describe("parseRedactIgnoreFile", () => {
+  it("splits globs into ignore[] from literal: lines into allow[], dropping comments + blanks", () => {
+    const { ignore, allow } = parseRedactIgnoreFile(
       ["# a comment", "", "  notes/generated/**  ", "literal:AKIAFAKE123", "*.fixture.md", "   "].join(
         "\n",
       ),
     );
-    expect(globs).toHaveLength(2); // the two glob lines
-    expect(literals).toEqual(new Set(["AKIAFAKE123"]));
+    expect(ignore).toEqual(["notes/generated/**", "*.fixture.md"]);
+    expect(allow).toEqual(["AKIAFAKE123"]);
   });
 
   it("trims a literal value and drops an empty one", () => {
-    const { literals } = parseRedactIgnore(["literal:  sk-ant-foo  ", "literal:"].join("\n"));
-    expect(literals).toEqual(new Set(["sk-ant-foo"]));
+    const { allow } = parseRedactIgnoreFile(["literal:  sk-ant-foo  ", "literal:"].join("\n"));
+    expect(allow).toEqual(["sk-ant-foo"]);
   });
 
   it("tolerates CRLF line endings", () => {
-    const { globs, literals } = parseRedactIgnore("notes/x.md\r\nliteral:abc\r\n");
-    expect(globs).toHaveLength(1);
-    expect(literals).toEqual(new Set(["abc"]));
+    const { ignore, allow } = parseRedactIgnoreFile("notes/x.md\r\nliteral:abc\r\n");
+    expect(ignore).toEqual(["notes/x.md"]);
+    expect(allow).toEqual(["abc"]);
+  });
+});
+
+describe("redactIgnoreFromMetadata", () => {
+  it("compiles ignore globs and collects allow literals", () => {
+    const { globs, literals } = redactIgnoreFromMetadata({
+      ignore: ["  notes/generated/**  ", "", "*.fixture.md"],
+      allow: ["  AKIAFAKE123  ", ""],
+    });
+    expect(globs).toHaveLength(2); // the two non-blank globs
+    expect(literals).toEqual(new Set(["AKIAFAKE123"]));
+  });
+
+  it("fail-open: absent/empty config compiles to an empty allowlist", () => {
+    expect(redactIgnoreFromMetadata()).toEqual({ globs: [], literals: new Set() });
+    expect(redactIgnoreFromMetadata({})).toEqual({ globs: [], literals: new Set() });
+  });
+
+  it("returns a FRESH empty each time (mutating one result never poisons the next)", () => {
+    const first = redactIgnoreFromMetadata();
+    first.literals.add("leaked");
+    first.globs.push(/x/);
+    const second = redactIgnoreFromMetadata();
+    expect(second.literals).toEqual(new Set());
+    expect(second.globs).toEqual([]);
   });
 });
 
@@ -58,7 +84,7 @@ describe("globToRegExp", () => {
   });
 
   it("compiles a bare '**' to match-all (an intentionally very permissive allowlist)", () => {
-    // Documents the danger: a lone ** in .redactignore disables the gate for every
+    // Documents the danger: a lone ** in the allowlist disables the gate for every
     // file. Kept as a deliberate (rare) escape hatch, not an accident.
     const re = globToRegExp("**");
     expect(re.test("a.md")).toBe(true);
@@ -91,39 +117,58 @@ describe("globToRegExp", () => {
     expect(re.test("deep/notes/a.md")).toBe(false);
     expect(re.test("notes/a.md.bak")).toBe(false);
   });
+
+  it("stays linear on adversarial wildcard-heavy globs (no catastrophic backtracking)", () => {
+    // Latent ReDoS from #26: a naive `*`→`[^/]*` emission lets `('a*'×12)+'!'` =>
+    // `a[^/]*a[^/]*…!` backtrack for ~60s against a long non-matching input — and the
+    // compile is reachable from the live pre-commit hook (matchesRedactGlob). The
+    // adjacency-collapse + atomic-run shape must keep `.test()` in a small budget.
+    const long = "a".repeat(40);
+    const deep = `notes/${"a/".repeat(40)}nope.md`;
+    const budgetMs = 50;
+
+    for (const [glob, input, expected] of [
+      ["a*".repeat(12) + "!", long, false],
+      ["notes/" + "**/".repeat(8) + "x.md", deep, false],
+    ] as const) {
+      const re = globToRegExp(glob);
+      const start = process.hrtime.bigint();
+      const matched = re.test(input);
+      const elapsedMs = Number(process.hrtime.bigint() - start) / 1e6;
+      expect(matched).toBe(expected);
+      expect(elapsedMs).toBeLessThan(budgetMs);
+    }
+
+    // Legitimate (real-world) matches/non-matches are unchanged by the hardening:
+    // a `*` run followed by a literal suffix, and a `**` run spanning segments.
+    expect(globToRegExp("notes/*.md").test("notes/draft.md")).toBe(true);
+    expect(globToRegExp("notes/*.md").test("notes/sub/draft.md")).toBe(false);
+    expect(globToRegExp("notes/generated/**").test("notes/generated/deep/dump.md")).toBe(true);
+    expect(globToRegExp("notes/generated/**").test("notes/real.md")).toBe(false);
+  });
 });
 
 describe("matchesRedactGlob", () => {
   it("is true iff any compiled glob matches", () => {
-    const ignore = parseRedactIgnore(["notes/generated/**", "literal:x"].join("\n"));
+    const ignore = redactIgnoreFromMetadata({ ignore: ["notes/generated/**"], allow: ["x"] });
     expect(matchesRedactGlob("notes/generated/dump.md", ignore)).toBe(true);
     expect(matchesRedactGlob("notes/real.md", ignore)).toBe(false);
   });
 });
 
-describe("readRedactIgnore — fail-open", () => {
-  it("returns an empty allowlist when the file is absent", async () => {
+describe("readRedactIgnoreFile — fail-open (mage migrate fold)", () => {
+  it("returns null when the legacy file is absent", async () => {
     const dir = await tmp();
-    const ignore = await readRedactIgnore(dir);
-    expect(ignore.globs).toEqual([]);
-    expect(ignore.literals).toEqual(new Set());
+    expect(await readRedactIgnoreFile(dir)).toBeNull();
   });
 
-  it("returns a FRESH empty each time (mutating one result never poisons the next)", async () => {
-    const dir = await tmp(); // no .redactignore → fail-open path
-    const first = await readRedactIgnore(dir);
-    first.literals.add("leaked");
-    first.globs.push(/x/);
-    const second = await readRedactIgnore(dir);
-    expect(second.literals).toEqual(new Set()); // not polluted by `first`
-    expect(second.globs).toEqual([]);
-  });
-
-  it("reads and parses a present file", async () => {
+  it("reads and parses a present legacy file into a RedactConfig", async () => {
     const dir = await tmp();
     await writeFile(join(dir, ".redactignore"), "notes/x.md\nliteral:secret-foo\n");
-    const ignore = await readRedactIgnore(dir);
-    expect(ignore.globs).toHaveLength(1);
+    const config = await readRedactIgnoreFile(dir);
+    expect(config).toEqual({ ignore: ["notes/x.md"], allow: ["secret-foo"] });
+    // Round-trips through the live compiler.
+    const ignore = redactIgnoreFromMetadata(config ?? undefined);
     expect(ignore.literals).toEqual(new Set(["secret-foo"]));
     expect(matchesRedactGlob("notes/x.md", ignore)).toBe(true);
   });

@@ -1,5 +1,5 @@
 {
-  "schema": "mage.v1",
+  "schema": "mage.v2",
   "mode": "in-repo",
   "project": "mage-memory",
   "hub_path": null,

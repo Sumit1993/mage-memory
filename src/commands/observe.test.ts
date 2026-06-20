@@ -5,7 +5,7 @@ import { PassThrough, type Readable } from "node:stream";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as redactMod from "../redact.js";
 import { buildObserveCommand, observeCmd } from "./observe.js";
-import { LEARNINGS_DIR } from "../paths.js";
+import { STATE_DIR, LEARNINGS_DIR } from "../paths.js";
 import type { ObserveEvent } from "../observe/types.js";
 
 const SECRET = "ghp_0123456789abcdefghijklmnopqrstuvwx";
@@ -45,7 +45,7 @@ async function run(
 
 /** Read the single session jsonl back as parsed events. */
 async function readEvents(repo: string, session: string): Promise<ObserveEvent[]> {
-  const file = join(repo, "mage", LEARNINGS_DIR, `${session}.jsonl`);
+  const file = join(repo, "mage", STATE_DIR, LEARNINGS_DIR, `${session}.jsonl`);
   const raw = await readFile(file, "utf8");
   return raw.split("\n").filter(Boolean).map((l) => JSON.parse(l) as ObserveEvent);
 }

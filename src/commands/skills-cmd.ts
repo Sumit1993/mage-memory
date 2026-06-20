@@ -8,7 +8,7 @@ import {
   summarize,
   writeRollup,
 } from "../metrics/rollup.js";
-import { absolutePath, LEARNINGS_DIR, resolveDocsRoot } from "../paths.js";
+import { absolutePath, learningsPath, resolveDocsRoot } from "../paths.js";
 import { type ScannedNote, scanNotes } from "../scan.js";
 import { GEN_MARKER, TARGET_AGENT_DIRS, WING_PREFIX } from "../skills-shared.js";
 
@@ -102,7 +102,7 @@ async function skillsMetrics(start: string, opts: SkillsOptions): Promise<Skills
   // Fold + write are wrapped so the Stop hook survives ANY fs/parse error.
   let rows: SkillMetricRow[] = [];
   try {
-    const learningsDir = join(root, LEARNINGS_DIR);
+    const learningsDir = learningsPath(root);
     const rollup = await foldRollup(root, learningsDir, repo);
     await writeRollup(root, rollup);
     rows = summarize(rollup);

@@ -10,7 +10,7 @@ import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { platform, release } from "node:os";
 import type { DoctorCheck } from "../commands/doctor.js";
-import { LEARNINGS_DIR, NOTES_DIR } from "../paths.js";
+import { learningsPath, NOTES_DIR } from "../paths.js";
 import { redact } from "../redact.js";
 import { readRollup, summarize } from "../metrics/rollup.js";
 import { mageVersion } from "../version.js";
@@ -136,7 +136,7 @@ async function countNotes(dir: string): Promise<number> {
  * error_summary), and bounded by only reading top-level `.jsonl` files. 0 on miss.
  */
 async function countRecentErrors(docsRoot: string): Promise<number> {
-  const learnings = join(docsRoot, LEARNINGS_DIR);
+  const learnings = learningsPath(docsRoot);
   let entries: Dirent[];
   try {
     entries = await readdir(learnings, { withFileTypes: true });

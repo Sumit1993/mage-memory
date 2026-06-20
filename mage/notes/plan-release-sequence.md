@@ -87,7 +87,11 @@ ADR-0009/0021); the host-skill IS the judge.
 **BUILD STATUS (2026-06-16):** shipped as 3 reviewable PRs (release-please rolls them into 0.0.12) —
 **portable core = PR #25** (mage stage/groom + `.staging`), **redact false-positives = PR #26** (off main,
 independent), **Claude-Code capture adapter = PR (this)** (`mage nudge` + inline instruction). Each
-dogfooded + adversarially reviewed. Pending: user merges + a multi-KB soak before npm publish.
+dogfooded + adversarially reviewed. The **`.mage/` state fold ([ADR-0025](../decisions/0025-one-transient-state-home.md))
+is now BUILT as the final 0.0.12 PR (2026-06-18)** — all machine-written transient state folds under one
+gitignored `.mage/` dir (`.learnings`/`.metrics`/`.staging` → `.mage/learnings`/`metrics`/`staging`) and the
+redact allowlist moves from `.redactignore` into `metadata.json` (`redact: { ignore, allow }`), with a layout
+migration via `mage migrate`/`doctor --fix`. Pending: user merges + a multi-KB soak before npm publish.
 
 ## Critical path (what gates everything)
 

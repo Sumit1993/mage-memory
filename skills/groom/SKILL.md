@@ -1,7 +1,7 @@
 ---
 name: groom
 description: |
-  Groom mage's own observed scratch (`.learnings/*.jsonl`) into durable notes —
+  Groom mage's own observed scratch (`.mage/learnings/*.jsonl`) into durable notes —
   the judgment tier of the self-grooming loop. Runs the two deterministic engines
   in sequence: `mage distill` (FIRST SIGHT — a striking insight earns a note the
   first time it is seen) then `mage promote` (RECURRENCE — a pattern that kept
@@ -16,7 +16,7 @@ allowed-tools: Read, Grep, Glob, Write, Edit, Bash
 # mage:groom — mine the observed scratch into notes
 
 `mage observe` writes a scratch record of every session to mage's own
-`.learnings/*.jsonl` (the ADR-0015 schema). **groom turns that scratch into
+`.mage/learnings/*.jsonl` (the ADR-0015 schema). **groom turns that scratch into
 durable notes.** It is the back half of the loop `mage:learn` serves, fired once
 a stretch of work has closed: `learn` captures *this one finding now*; `groom`
 mines *the accumulated record*.
@@ -34,7 +34,7 @@ complementary gates:
 
 **Phase 0 — pending inline drafts (`mage groom`, 0.0.12).** Before the two mining
 phases, dispose of lessons captured INLINE during work. `mage stage` parks short,
-redacted drafts in `.staging/` with no per-note confirm (and the boundary nudge
+redacted drafts in `.mage/staging/` with no per-note confirm (and the boundary nudge
 distills forgotten ones there too); your job is the batch human-confirm:
 
 - `mage groom --json` surfaces the pending, deduped batch (capped at the staging
@@ -45,11 +45,11 @@ distills forgotten ones there too); your job is the batch human-confirm:
 
 These drafts are the freshest, highest-signal material (the agent chose to stage
 them) — clear them first, THEN run the mining phases below for what inline capture
-missed. (`mage groom` the COMMAND manages `.staging/`; the two phases below are the
-deeper `.learnings/` mining that the `mage:groom` SKILL also runs.)
+missed. (`mage groom` the COMMAND manages `.mage/staging/`; the two phases below are the
+deeper `.mage/learnings/` mining that the `mage:groom` SKILL also runs.)
 
 Notes are the reusable **insight + procedure + pointers**, never a copy of the
-source (see `CONVENTIONS.md`). groom mines **only mage's own** `.learnings/` —
+source (see `CONVENTIONS.md`). groom mines **only mage's own** `.mage/learnings/` —
 foreign memory stores (ECC instincts, Claude `MEMORY.md`) are not harvested
 (ADR-0018 §8).
 
@@ -67,7 +67,7 @@ If none is found and the cwd is not a hub, you are not in a knowledge base —
 itself neither. Don't groom; tell the user to `cd` into a project or `mage init`.
 
 **At a hub root, fan out (Decision 1).** A hub is one KB *and* a registry of
-project KBs, so groom the hub's OWN `.learnings/` (at the hub root) **and every
+project KBs, so groom the hub's OWN `.mage/learnings/` (at the hub root) **and every
 registered project**. Read the hub's `metadata.json` registry and derive each
 project's docs root from its `storage`:
 
@@ -89,7 +89,7 @@ groom just the hub root and skip the fan-out.
    ```bash
    mage distill --json
    ```
-   It reads mage's own `.learnings/*.jsonl` from the **last watermark forward**,
+   It reads mage's own `.mage/learnings/*.jsonl` from the **last watermark forward**,
    chops un-distilled events at `compact`/session boundaries (the natural
    "chapters"), keeps only salient events, and emits a `DistillManifest`:
    ```jsonc
@@ -153,7 +153,7 @@ to note once.
    ```bash
    mage promote --json
    ```
-   It folds every CLOSED `.learnings/` segment from the last watermark forward
+   It folds every CLOSED `.mage/learnings/` segment from the last watermark forward
    into a per-`(wing + keywords)` signature tally (distinct-session counts,
    never-regress, survives the raw-event purge), persists the tally, and emits a
    `PromoteManifest`:
@@ -240,6 +240,6 @@ mage never commits for you — it suggests, you run.
   recurrence tally, distinct-session counting, the K/M thresholds, and the
   note/graduate ladder rungs.
 - **ADR-0015** (`mage/decisions/0015-mage-observe-capture-schema.md`) — the
-  `.learnings/*.jsonl` event schema the readers consume.
+  `.mage/learnings/*.jsonl` event schema the readers consume.
 - **ADR-0014** (`mage/decisions/0014-two-gate-redaction.md`) — `mage redact`
   Gate 2 before any tracked write.

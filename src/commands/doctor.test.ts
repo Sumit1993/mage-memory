@@ -54,7 +54,7 @@ async function makeInRepoKb(
     await writeFile(join(dir, "mage", "INDEX.md"), "# Index\n");
   }
   if (opts.gitignoreSinks) {
-    await writeFile(join(dir, ".gitignore"), "mage/.learnings/\nmage/.metrics/\nmage/.staging/\n");
+    await writeFile(join(dir, ".gitignore"), "mage/.mage/\n");
   }
 }
 
@@ -173,8 +173,7 @@ describe("doctor KB health", () => {
     expect(giAfter?.ok).toBe(true);
 
     const gi = await readFile(join(dir, ".gitignore"), "utf8");
-    expect(gi).toContain("mage/.learnings/");
-    expect(gi).toContain("mage/.metrics/");
+    expect(gi).toContain("mage/.mage/");
     // --fix also establishes the cockpit ignore (safe-by-default, ADR-0020 §6).
     expect(gi).toContain("mage/dashboard.html");
   });
@@ -224,8 +223,8 @@ describe("doctor KB health", () => {
     const dir = await freshDir();
     await makeInRepoKb(dir, { gitignoreSinks: true });
     // It WAS capturing (a session stream exists) but no hooks are wired now.
-    await mkdir(join(dir, "mage", ".learnings"), { recursive: true });
-    await writeFile(join(dir, "mage", ".learnings", "s1.jsonl"), '{"v":1,"type":"session_start"}\n');
+    await mkdir(join(dir, "mage", ".mage", "learnings"), { recursive: true });
+    await writeFile(join(dir, "mage", ".mage", "learnings", "s1.jsonl"), '{"v":1,"type":"session_start"}\n');
     const r = await doctor({ cwd: dir });
     const conn = check(r.checks, "connection");
     expect(conn?.ok).toBe(false);
@@ -287,9 +286,9 @@ describe("doctor --report", () => {
       `---\nkeywords: [${KEYWORD}]\n---\n# Note\ntoken = ${SECRET}\n`,
     );
     // Plant a learnings stream with an error event carrying the secret + keyword.
-    await mkdir(join(dir, "mage", ".learnings"), { recursive: true });
+    await mkdir(join(dir, "mage", ".mage", "learnings"), { recursive: true });
     await writeFile(
-      join(dir, "mage", ".learnings", "s1.jsonl"),
+      join(dir, "mage", ".mage", "learnings", "s1.jsonl"),
       `${JSON.stringify({ v: 1, ts: "t", session: "s1", type: "tool_use", tool: "Bash", paths: [], detail: `${KEYWORD} ${SECRET}`, ok: false, error_summary: SECRET })}\n`,
     );
 
@@ -684,7 +683,7 @@ describe("doctor — metadata schema drift", () => {
     };
     await writeFile(join(dir, "mage", "metadata.json"), `${JSON.stringify(meta, null, 2)}\n`);
     await writeFile(join(dir, "mage", "INDEX.md"), "# Index\n");
-    await writeFile(join(dir, ".gitignore"), "mage/.learnings/\nmage/.metrics/\nmage/.staging/\n");
+    await writeFile(join(dir, ".gitignore"), "mage/.mage/\n");
   }
 
   it("v2 metadata → schema check passes", async () => {

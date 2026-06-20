@@ -232,8 +232,7 @@ describe("connect", () => {
 
     const gi = await readGitignore(dir);
     const lines = gi.split(/\r?\n/);
-    expect(lines).toContain("mage/.learnings/");
-    expect(lines).toContain("mage/.metrics/");
+    expect(lines).toContain("mage/.mage/");
   });
 
   it("in-repo KB: re-running connect is idempotent (no duplicate sink patterns)", async () => {
@@ -249,8 +248,7 @@ describe("connect", () => {
     expect(after2).toBe(after1);
     const count = (pat: string) =>
       after2.split(/\r?\n/).filter((l) => l === pat).length;
-    expect(count("mage/.learnings/")).toBe(1);
-    expect(count("mage/.metrics/")).toBe(1);
+    expect(count("mage/.mage/")).toBe(1);
   });
 
   it("in-repo KB under --user: sink self-heal still runs when cwd is inside the KB", async () => {
@@ -274,8 +272,7 @@ describe("connect", () => {
     }
 
     const lines = (await readGitignore(dir)).split(/\r?\n/);
-    expect(lines).toContain("mage/.learnings/");
-    expect(lines).toContain("mage/.metrics/");
+    expect(lines).toContain("mage/.mage/");
   });
 
   it("hub KB: connect gitignores the hub capture-sink patterns at the hub root", async () => {
@@ -287,7 +284,7 @@ describe("connect", () => {
     await connect({ cwd: dir, yes: true, gitHook: false });
 
     const lines = (await readGitignore(dir)).split(/\r?\n/);
-    for (const pat of [".learnings/", "**/.learnings/", ".metrics/", "**/.metrics/"]) {
+    for (const pat of [".mage/", "**/.mage/"]) {
       expect(lines).toContain(pat);
     }
   });

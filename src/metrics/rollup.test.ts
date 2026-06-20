@@ -2,6 +2,7 @@ import { describe, expect, it, afterEach } from "vitest";
 import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { STATE_DIR, LEARNINGS_DIR, METRICS_DIR } from "../paths.js";
 import {
   buildCompact,
   buildSessionEnd,
@@ -87,7 +88,7 @@ describe("readRollup — fresh empty rollup on missing/corrupt", () => {
 
   it("returns a fresh empty rollup when the file is corrupt JSON (fail-open)", async () => {
     const dir = await tmp();
-    await mkdir(join(dir, ".metrics"), { recursive: true });
+    await mkdir(join(dir, STATE_DIR, METRICS_DIR), { recursive: true });
     await writeFile(rollupPath(dir), "{ not json", "utf8");
     const r = await readRollup(dir);
     expect(r).toEqual({ v: ROLLUP_VERSION, skills: {}, watermarks: {} });
@@ -112,7 +113,7 @@ describe("readRollup — fresh empty rollup on missing/corrupt", () => {
 describe("foldRollup — folds closed loads into per-skill stats", () => {
   it("folds one session of skill_load + tool_use into correct loads/matches/dims", async () => {
     const dir = await tmp();
-    const learnings = join(dir, ".learnings");
+    const learnings = join(dir, STATE_DIR, LEARNINGS_DIR);
     await mkdir(learnings, { recursive: true });
 
     const skillLoad = load(WING_MATCH);
@@ -138,7 +139,7 @@ describe("foldRollup — folds closed loads into per-skill stats", () => {
 
   it("a second fold of the SAME unchanged file adds nothing (watermark idempotency)", async () => {
     const dir = await tmp();
-    const learnings = join(dir, ".learnings");
+    const learnings = join(dir, STATE_DIR, LEARNINGS_DIR);
     await mkdir(learnings, { recursive: true });
 
     const events: ObserveEvent[] = [load(WING_MATCH), prompt("webhook"), buildSessionEnd(base())];
@@ -154,7 +155,7 @@ describe("foldRollup — folds closed loads into per-skill stats", () => {
 
   it("appending more events then re-folding only adds the newly-closed loads", async () => {
     const dir = await tmp();
-    const learnings = join(dir, ".learnings");
+    const learnings = join(dir, STATE_DIR, LEARNINGS_DIR);
     await mkdir(learnings, { recursive: true });
     const file = join(learnings, `${SESSION}.jsonl`);
 
@@ -177,7 +178,7 @@ describe("foldRollup — folds closed loads into per-skill stats", () => {
 
   it("ignores *.skills.jsonl sidecars and the .archive dir", async () => {
     const dir = await tmp();
-    const learnings = join(dir, ".learnings");
+    const learnings = join(dir, STATE_DIR, LEARNINGS_DIR);
     await mkdir(join(learnings, ".archive"), { recursive: true });
 
     const events: ObserveEvent[] = [load(WING_MATCH), prompt("webhook"), buildSessionEnd(base())];
@@ -207,7 +208,7 @@ describe("foldRollup — folds closed loads into per-skill stats", () => {
 
   it("skips unparseable lines and returns a fresh rollup on an empty learnings dir", async () => {
     const dir = await tmp();
-    const learnings = join(dir, ".learnings");
+    const learnings = join(dir, STATE_DIR, LEARNINGS_DIR);
     await mkdir(learnings, { recursive: true });
 
     const events: ObserveEvent[] = [load(WING_MATCH), prompt("webhook"), buildSessionEnd(base())];
@@ -224,7 +225,7 @@ describe("foldRollup — folds closed loads into per-skill stats", () => {
 describe("writeRollup — JSON shape + trailing newline", () => {
   it("writes pretty JSON with a trailing newline and the locked shape", async () => {
     const dir = await tmp();
-    const learnings = join(dir, ".learnings");
+    const learnings = join(dir, STATE_DIR, LEARNINGS_DIR);
     await mkdir(learnings, { recursive: true });
     const events: ObserveEvent[] = [load(WING_MATCH), prompt("webhook"), buildSessionEnd(base())];
     await writeFile(join(learnings, `${SESSION}.jsonl`), toJsonl(events), "utf8");

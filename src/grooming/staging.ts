@@ -22,11 +22,11 @@ import {
   parseNote,
   writeNote,
 } from "../note.js";
-import { METRICS_DIR, NOTES_DIR } from "../paths.js";
+import { metricsPath, NOTES_DIR } from "../paths.js";
 import type { ScannedNote } from "../scan.js";
 import { coveringNoteMin } from "./covering-note.js";
 
-/** The lesson reject ledger — distinct from the recurrence-path `.metrics/rejected.json`. */
+/** The lesson reject ledger — distinct from the recurrence-path `.mage/metrics/rejected.json`. */
 const REJECTS_FILE = "staged-rejects.json";
 const REJECTS_VERSION = 1;
 const SLUG_MAX = 60;
@@ -269,7 +269,7 @@ export async function discardDraft(draft: StagedDraft): Promise<void> {
   await rm(draft.path, { force: true });
 }
 
-// ─── reject ledger (.metrics/staged-rejects.json, fail-open) ─────────────────────
+// ─── reject ledger (.mage/metrics/staged-rejects.json, fail-open) ────────────────
 
 interface StagedRejects {
   v: number;
@@ -277,7 +277,7 @@ interface StagedRejects {
 }
 
 function rejectsPath(docsRoot: string): string {
-  return join(docsRoot, METRICS_DIR, REJECTS_FILE);
+  return join(metricsPath(docsRoot), REJECTS_FILE);
 }
 
 /** The set of rejected draft keys; missing/corrupt → empty (fail-open). */
@@ -299,6 +299,6 @@ export async function addStagedRejects(docsRoot: string, keys: string[]): Promis
   const existing = await readStagedRejects(docsRoot);
   for (const k of keys) existing.add(k);
   const payload: StagedRejects = { v: REJECTS_VERSION, keys: [...existing].sort() };
-  await mkdir(join(docsRoot, METRICS_DIR), { recursive: true });
+  await mkdir(metricsPath(docsRoot), { recursive: true });
   await writeFile(rejectsPath(docsRoot), JSON.stringify(payload, null, 2) + "\n");
 }

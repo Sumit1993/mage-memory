@@ -34,8 +34,8 @@ import { readNote, type NoteFrontmatter } from "../note.js";
 import {
   type HubMetadata,
   type HubProject,
-  LEARNINGS_DIR,
   exists,
+  learningsPath,
   readHubMetadata,
 } from "../paths.js";
 import { run } from "../shell.js";
@@ -106,7 +106,7 @@ export async function collectDashboardData(
     readRollup(root), // fail-open → empty rollup
     readProposals(root), // fail-open → []
     readTally(root), // fail-open → empty tally
-    countScratch(join(root, LEARNINGS_DIR)), // fail-open → 0
+    countScratch(learningsPath(root)), // fail-open → 0
     lastCommitOf(root), // fail-open → null
     analyzeDream(root, { now, staleDays, hubMeta }), // pure fs; reuses scan internally
   ]);

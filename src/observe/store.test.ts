@@ -14,6 +14,8 @@ import {
   LEARNINGS_ARCHIVE_DIR,
   LEARNINGS_DIR,
   LEARNINGS_PURGE_MARKER,
+  learningsPath,
+  STATE_DIR,
 } from "../paths.js";
 import {
   buildSessionStart,
@@ -61,14 +63,14 @@ const skillEvent = (): ObserveEvent =>
   buildSkillLoad(BASE, { skill: "mage-wing-mage", args: null, match: null, trigger_hash: "h" });
 
 describe("resolveLearningsDir", () => {
-  it("returns <repo>/mage/.learnings for an in-repo KB", async () => {
+  it("returns <repo>/mage/.mage/learnings for an in-repo KB", async () => {
     const repo = await inRepoKb();
-    expect(await resolveLearningsDir(repo)).toBe(join(repo, "mage", LEARNINGS_DIR));
+    expect(await resolveLearningsDir(repo)).toBe(learningsPath(join(repo, "mage")));
   });
 
-  it("returns <hub>/.learnings for a hub KB", async () => {
+  it("returns <hub>/.mage/learnings for a hub KB", async () => {
     const hub = await hubKb();
-    expect(await resolveLearningsDir(hub)).toBe(join(hub, LEARNINGS_DIR));
+    expect(await resolveLearningsDir(hub)).toBe(learningsPath(hub));
   });
 
   it("returns null when no KB is found", async () => {
@@ -252,6 +254,6 @@ describe("age-purge — retention split (skill_load retained longer)", () => {
   });
 
   it("swallows fs errors (points at a non-existent dir → resolves, no throw)", async () => {
-    await expect(maybePurge(join("/nope-does-not-exist", LEARNINGS_DIR))).resolves.toBeUndefined();
+    await expect(maybePurge(join("/nope-does-not-exist", STATE_DIR, LEARNINGS_DIR))).resolves.toBeUndefined();
   });
 });

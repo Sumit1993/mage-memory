@@ -6,7 +6,6 @@
 // (fail-closed redaction) without leaking the raw value.
 
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import { Command } from "commander";
 import {
   buildAssistantMsg,
@@ -33,7 +32,7 @@ import {
   type ObserveEventType,
   USER_PROMPT_MAX,
 } from "../observe/types.js";
-import { LEARNINGS_DIR, resolveDocsRoot } from "../paths.js";
+import { learningsPath, resolveDocsRoot } from "../paths.js";
 import { mageVersion } from "../version.js";
 
 export interface ObserveOptions {
@@ -67,7 +66,7 @@ export async function observeCmd(opts: ObserveOptions): Promise<void> {
     // avoids 2–3 redundant filesystem walks per event.
     const resolved = await resolveDocsRoot(cwd).catch(() => null);
     if (resolved === null) return; // no KB → write nothing.
-    const learningsDir = join(resolved.root, LEARNINGS_DIR);
+    const learningsDir = learningsPath(resolved.root);
     const repoRoot = resolved.repo;
 
     const base: EventBase = { ts: new Date().toISOString(), session };

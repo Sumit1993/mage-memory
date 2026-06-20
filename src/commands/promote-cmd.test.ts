@@ -46,7 +46,7 @@ async function tmpRepo(grooming?: { sensitivity?: string }): Promise<{
     }),
     "utf8",
   );
-  const learnings = join(docsRoot, ".learnings");
+  const learnings = join(docsRoot, ".mage", "learnings");
   await mkdir(learnings, { recursive: true });
   return { repo, docsRoot, learnings };
 }

@@ -98,10 +98,10 @@ export async function connect(opts: ConnectOptions): Promise<ConnectResult> {
 }
 
 /**
- * Gitignore the capture sinks (.learnings/, .metrics/) at the right root so they
- * can never be committed — even on a public KB with an empty .gitignore. Mirrors
- * the capture-sink patterns `mage init` writes (init.ts):
- *   - in-repo: code-repo root, mage/-prefixed patterns.
+ * Gitignore the capture sink (`.mage/`) at the right root so it can never be
+ * committed — even on a public KB with an empty .gitignore. Mirrors the
+ * capture-sink patterns `mage init` writes (init.ts):
+ *   - in-repo: code-repo root, mage/-prefixed pattern.
  *   - hub:     hub root, bare + glob-recursive patterns.
  * Resolves the KB from `startDir` only. A null result means no KB was found walking
  * up from cwd (a fresh non-KB dir, OR connect run from outside any KB) — we skip the
@@ -124,18 +124,8 @@ async function ensureSinkIgnores(startDir: string): Promise<void> {
   // mirroring init's `mage/`-prefixed sink patterns. hub: ignore at the hub root.
   const { root, patterns } =
     kb.kind === "repo"
-      ? { root: kb.repo, patterns: ["mage/.learnings/", "mage/.metrics/", "mage/.staging/"] }
-      : {
-          root: kb.root,
-          patterns: [
-            ".learnings/",
-            "**/.learnings/",
-            ".metrics/",
-            "**/.metrics/",
-            ".staging/",
-            "**/.staging/",
-          ],
-        };
+      ? { root: kb.repo, patterns: ["mage/.mage/"] }
+      : { root: kb.root, patterns: [".mage/", "**/.mage/"] };
 
   const added = await ensureGitignored(root, patterns);
   if (added.length > 0) {

@@ -14,19 +14,19 @@ import {
   upsertMageHooks,
   writeClaudeSettings,
 } from "../claude-settings.js";
-import { mageMigrate } from "../commands/migrate.js";
+import { LAYOUT_LEAVES, mageMigrate } from "../commands/migrate.js";
 import type { DoctorCheck, DoctorOptions } from "../commands/doctor.js";
 import { detectRedactHook } from "../git-hooks.js";
 import { ensureGitignored } from "../gitignore.js";
 import {
   INDEX_FILE,
-  LEARNINGS_DIR,
   META_DIR,
   META_FILE,
   METADATA_SCHEMA,
-  METRICS_DIR,
-  STAGING_DIR,
+  STATE_DIR,
   exists,
+  hubProjectDocsRoot,
+  learningsPath,
   looksLikeHub,
   readHubMetadata,
   readMetadata,
@@ -65,6 +65,9 @@ export async function pushKbChecks(
   // metadata schema drift (advisory; --fix migrates in place). Both fail-open.
   await pushRedactHookCheck(checks, kb, conn.diff.connected);
   await pushSchemaDriftCheck(checks, kb, opts);
+  // Pre-fold state layout drift (ADR-0025): an OLD `.learnings`/`.metrics`/`.staging`
+  // dir at a docs root; --fix relocates it under `.mage/`.
+  await pushLayoutDriftCheck(checks, kb, opts);
   // Hub-aware: a per-project liveness rollup when run AT a hub (Decision 11B).
   if (kb.kind === "hub") await pushHubProjectsCheck(checks, kb.repo);
 }
@@ -182,10 +185,10 @@ async function pushHubProjectsCheck(checks: DoctorCheck[], hub: string): Promise
  */
 async function learningsHasHistory(root: string): Promise<boolean> {
   try {
-    const entries = await readdir(join(root, LEARNINGS_DIR));
+    const entries = await readdir(learningsPath(root));
     return entries.some((e) => e.endsWith(".jsonl"));
   } catch {
-    return false; // no .learnings/ dir → never captured.
+    return false; // no .mage/learnings/ dir → never captured.
   }
 }
 
@@ -202,11 +205,11 @@ function pushKbStructureChecks(checks: DoctorCheck[], kb: Kb, hasIndex: boolean)
 }
 
 /**
- * THE leak guard. Verify each capture sink (.learnings/, .metrics/) is git-ignored
- * by querying a FILE PATH under the dir (a bare-dir `check-ignore` won't match a
- * `dir/` pattern when the dir doesn't exist — the gotcha). On a miss the check
- * fails and nudges `--fix`. With `opts.fix` we call ensureGitignored (the same
- * patterns connect/init write) and re-evaluate so a fixed run passes.
+ * THE leak guard. Verify the capture sink (`.mage/`) is git-ignored by querying a
+ * FILE PATH under the dir (a bare-dir `check-ignore` won't match a `dir/` pattern
+ * when the dir doesn't exist — the gotcha). On a miss the check fails and nudges
+ * `--fix`. With `opts.fix` we call ensureGitignored (the same patterns connect/init
+ * write) and re-evaluate so a fixed run passes.
  *
  * Severity tracks real risk: an un-ignored sink only leaks once capture is ON, so
  * a miss is a REQUIRED failure when `connected`, but an advisory (optional) warn
@@ -220,11 +223,7 @@ async function pushSinkIgnoreCheck(
 ): Promise<void> {
   const { root, patterns } = sinkIgnoreSpec(kb);
   const prefix = kb.kind === "repo" ? "mage/" : "";
-  const probes = [
-    `${prefix}${LEARNINGS_DIR}/probe`,
-    `${prefix}${METRICS_DIR}/probe`,
-    `${prefix}${STAGING_DIR}/probe`,
-  ];
+  const probes = [`${prefix}${STATE_DIR}/probe`];
 
   // Guard the write on the root existing: an external repo can resolve to a hub
   // project dir not yet materialized on disk — writing a .gitignore there would
@@ -253,32 +252,19 @@ async function pushSinkIgnoreCheck(
  * The (root, patterns) the layout ignores — mirrors connect.ts/init.ts exactly.
  * Includes the gitignored cockpit (`dashboard.html`, ADR-0020 §6) so `--fix`
  * establishes it safe-by-default. The sink-coverage CHECK probes only the capture
- * sinks (.learnings/.metrics) — a missing cockpit ignore is not a failure (it's
- * only written on `--html`) — but `--fix` adds it here for completeness.
+ * sink (`.mage/`) — a missing cockpit ignore is not a failure (it's only written
+ * on `--html`) — but `--fix` adds it here for completeness.
  */
 export function sinkIgnoreSpec(kb: Kb): { root: string; patterns: string[] } {
   if (kb.kind === "repo") {
     return {
       root: kb.repo,
-      patterns: [
-        `mage/${LEARNINGS_DIR}/`,
-        `mage/${METRICS_DIR}/`,
-        `mage/${STAGING_DIR}/`,
-        "mage/dashboard.html",
-      ],
+      patterns: [`mage/${STATE_DIR}/`, "mage/dashboard.html"],
     };
   }
   return {
     root: kb.root,
-    patterns: [
-      `${LEARNINGS_DIR}/`,
-      `**/${LEARNINGS_DIR}/`,
-      `${METRICS_DIR}/`,
-      `**/${METRICS_DIR}/`,
-      `${STAGING_DIR}/`,
-      `**/${STAGING_DIR}/`,
-      "dashboard.html",
-    ],
+    patterns: [`${STATE_DIR}/`, `**/${STATE_DIR}/`, "dashboard.html"],
   };
 }
 
@@ -549,6 +535,88 @@ async function pushSchemaDriftCheck(
     optional: true, // the lenient reader keeps a v1 KB fully working.
     detail: `metadata is ${onDisk} (current ${METADATA_SCHEMA}) — run \`mage migrate\` or \`mage doctor --fix\``,
   });
+}
+
+/**
+ * The pre-fold transient dot-dirs (ADR-0025); a leftover one is layout drift. Derived
+ * from {@link LAYOUT_LEAVES} (migrate.ts) — the single source of the pre-fold names —
+ * so the drift probe and the mover can never disagree on which dirs to relocate.
+ */
+const OLD_LAYOUT_DIRS = LAYOUT_LEAVES.map((l) => l.from);
+
+/**
+ * Detect pre-fold state-layout drift (ADR-0025): an OLD `.learnings`/`.metrics`/
+ * `.staging` dir, or a leftover `.redactignore` file, at any docs root this KB owns
+ * (the resolved root, plus every hub `projects/<name>/` when run at a hub). The state
+ * fold moves them under `.mage/` and into `metadata.redact`. With `--fix` we route
+ * through {@link mageMigrate} (which relocates dirs fail-safe and folds the file) and
+ * re-probe so a fixed run passes. Advisory (optional): the runtime reads from the new
+ * paths, so a leftover old dir is `ls -a` clutter, not a functional break. Fail-open:
+ * an unreadable root or a migrate error degrades to the nudge — doctor never throws.
+ */
+async function pushLayoutDriftCheck(
+  checks: DoctorCheck[],
+  kb: Kb,
+  opts: DoctorOptions,
+): Promise<void> {
+  const roots = await ownedDocsRoots(kb);
+  let drift = await anyOldLayout(roots);
+  if (!drift) return; // already folded (or never had pre-fold artifacts).
+
+  if (opts.fix) {
+    try {
+      await mageMigrate({ dir: kb.repo });
+      drift = await anyOldLayout(roots); // re-probe: a clean migrate clears the drift.
+    } catch {
+      // Fall through to the advisory nudge — doctor never throws.
+    }
+  }
+
+  checks.push(
+    drift
+      ? {
+          name: "state layout",
+          ok: false,
+          optional: true, // runtime uses the new paths; this is tidiness + future-proofing.
+          detail:
+            "pre-fold state at the docs root (.learnings/.metrics/.staging or .redactignore) — " +
+            "run `mage migrate` or `mage doctor --fix` to move it under `.mage/`",
+        }
+      : { name: "state layout", ok: true, detail: "state consolidated under `.mage/`" },
+  );
+}
+
+/**
+ * The docs roots this KB owns, for the layout-drift probe: the resolved root, plus —
+ * when run AT a hub root — every registered `projects/<name>/`. Mirrors the set
+ * {@link mageMigrate} relocates. Fail-open: an unreadable hub metadata yields just the
+ * root.
+ */
+async function ownedDocsRoots(kb: Kb): Promise<string[]> {
+  const roots = [kb.root];
+  if (kb.kind === "hub" && kb.root === kb.repo) {
+    const meta = await readHubMetadata(kb.repo).catch(() => null);
+    for (const p of meta?.projects ?? []) {
+      if (!p.name) continue;
+      try {
+        roots.push(hubProjectDocsRoot(kb.repo, p.name));
+      } catch {
+        // hostile project name rejected by assertSafeName — skip it.
+      }
+    }
+  }
+  return roots;
+}
+
+/** True iff any owned docs root still holds a pre-fold dir or a `.redactignore`. */
+async function anyOldLayout(roots: string[]): Promise<boolean> {
+  for (const root of roots) {
+    for (const dir of OLD_LAYOUT_DIRS) {
+      if (await exists(join(root, dir))) return true;
+    }
+    if (await exists(join(root, ".redactignore"))) return true;
+  }
+  return false;
 }
 
 /**

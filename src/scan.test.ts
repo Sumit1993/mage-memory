@@ -47,7 +47,7 @@ describe("scanNotes — recursive deny-list walk (ADR-0011 §2)", () => {
 
   it("excludes the whole deny-list skip-set", async () => {
     const root = await mkVault();
-    for (const d of [".obsidian", ".git", "node_modules", "artifacts", ".learnings"]) {
+    for (const d of [".obsidian", ".git", "node_modules", "artifacts", ".mage"]) {
       await put(root, `${d}/junk.md`, note(["x/y"]));
     }
     await put(root, "notes/real.md", note(["x/y"]));

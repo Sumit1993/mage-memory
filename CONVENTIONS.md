@@ -139,7 +139,7 @@ not `#billing/payments`). The `#` form is how they read inside Obsidian.
 its **first tag, not its file path** — a note can live **anywhere** in the
 knowledge base and still group correctly. `mage index`, `mage skills`, and
 `mage dream` **recurse the whole tree** and index every `.md` except a fixed
-skip-set: `.obsidian/`, `.git/`, `node_modules/`, `artifacts/`, `.learnings/`,
+skip-set: `.obsidian/`, `.git/`, `node_modules/`, `artifacts/`, `.mage/` (covers learnings, metrics, staging),
 `archive/`, and mage's own generated/scaffolding files (`INDEX.md`,
 `_index.*.md`, `AGENTS.md`, `CLAUDE.md`, `IDENTITY.md`). So `notes/`,
 `decisions/`, and `work/` are *recommended* homes, not magic — a note in a
@@ -288,7 +288,7 @@ mage's CLI is one binary but **three tiers**, sorted by the deterministic/judgme
 - **Never auto-commit.** Hook-fired `index`/`skills`/`verify` *write* files (auto-write
   is allowed, [ADR-0013](mage/decisions/0013-procedure-skills-self-grooming-loop.md) §4);
   the human always commits the diff. The `Stop` metrics fold writes only the gitignored
-  `mage/.metrics/` cache (ADR-0016 §2) — never the catalog, never a commit.
+  `mage/.mage/metrics/` cache (ADR-0016 §2) — never the catalog, never a commit.
 - **Double-observe is tolerated, not policed** *(amended, [ADR-0017](mage/decisions/0017-mage-connect-host-hook-adapter.md) §5)*:
   mage and a host's own observer (e.g. ECC homunculus) may coexist — separate files,
   separate consumers, zero added cost. mage reads only its **own** artifacts and ignores
@@ -319,7 +319,7 @@ a `.bak` is written first. `mage disconnect` removes only the `mage:*` entries.
 block: refuse-don't-clobber an existing hook, idempotent by marker, `.bak` first. This is
 the deterministic, un-skippable backstop the skill-step `mage redact` (judgment-tier) can't be.
 
-There is **no `mage clean`** — `.learnings/` rotation + purge are internal to `mage observe`.
+There is **no `mage clean`** — `.mage/learnings/` rotation + purge are internal to `mage observe`.
 
 ---
 
