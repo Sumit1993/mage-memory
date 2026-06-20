@@ -464,6 +464,32 @@ async function externalDocsRoot(dir: string): Promise<ResolvedDocsRoot | null> {
   };
 }
 
+/**
+ * Every docs root a resolved KB OWNS — the canonical hub fan-out set (Decision 1 /
+ * ADR-0011). For a repo KB, or a hub-owned PROJECT (root ≠ repo), just `[root]`. At a
+ * hub ROOT (kind "hub", root === repo): the hub's own docs root PLUS every registered
+ * `projects/<name>/`. This is the ONE enumerator the groom fan-out grooms, doctor's
+ * layout-drift probe checks, and `mage migrate` relocates — sharing it is what keeps
+ * those three from drifting apart. Fail-open: unreadable/absent hub metadata yields
+ * just `[root]`; a registered project whose name is path-hostile (rejected by
+ * {@link assertSafeName}) is skipped, never thrown.
+ */
+export async function ownedDocsRoots(kb: ResolvedDocsRoot): Promise<string[]> {
+  const roots = [kb.root];
+  if (kb.kind === "hub" && kb.root === kb.repo) {
+    const meta = await readHubMetadata(kb.repo).catch(() => null);
+    for (const p of meta?.projects ?? []) {
+      if (!p.name) continue;
+      try {
+        roots.push(hubProjectDocsRoot(kb.repo, p.name));
+      } catch {
+        // assertSafeName rejected a hostile project name — skip it, never throw.
+      }
+    }
+  }
+  return roots;
+}
+
 /** Resolve a path (relative → absolute relative to cwd). */
 export function absolutePath(p: string): string {
   return isAbsolute(p) ? p : resolve(process.cwd(), p);

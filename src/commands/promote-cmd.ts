@@ -19,6 +19,7 @@
 
 import { logger } from "../logger.js";
 import { absolutePath, learningsPath, resolveDocsRoot } from "../paths.js";
+import { reportHubFanout } from "./fanout-hint.js";
 import { scanNotes } from "../scan.js";
 import { scanSecrets } from "../redact.js";
 import { buildManifest } from "../grooming/promote.js";
@@ -159,6 +160,7 @@ async function readAndReport(
   }
 
   reportHuman(manifest);
+  await reportHubFanout(resolved, "promote");
   return { manifest };
 }
 
