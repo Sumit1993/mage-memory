@@ -2,7 +2,7 @@
 
 # mage
 
-> 40 notes. Part of the [index](INDEX.md).
+> 42 notes. Part of the [index](INDEX.md).
 
 ### build
 
@@ -43,6 +43,7 @@
 - `decision` [0023 — A hub keeps its own notes AND flat per-project subdirs (ratification)](decisions/0023-hub-own-notes-and-flat-projects.md) — 0023, hub, keeps, own, notes, flat, per, project, subdirs, ratification, scope, separation _(reviewed 2026-06-14)_
 - `decision` [0024 — Organic grooming loop: the lesson path (inline-primary + boundary nudge)](decisions/0024-organic-grooming-loop.md) — 0024, organic, grooming, loop, lesson, path, inline, primary, boundary, nudge, context, decision _(reviewed 2026-06-16)_
 - `decision` [0025 — One transient-state home (`.mage/`) + redact config in `metadata.json`](decisions/0025-one-transient-state-home.md) — 0025, one, transient, state, home, mage, redact, config, metadata, json, context, artifact _(reviewed 2026-06-18)_
+- `decision` [0026 — A hosted documentation website, generated from code](decisions/0026-hosted-docs-website.md) — 0026, hosted, documentation, website, generated, code, context, model, isn, answerable, docs, decision _(accepted · reviewed 2026-06-18)_
 
 ### design
 
@@ -71,5 +72,6 @@
 
 - `reference` [Mining agentmemory's design into mage — files-native translation map](notes/agentmemory-mining-map.md) — agentmemory, iii, server-inverse, obsidian-ui, import-harvest, consolidation, auto-capture, dream, feeder, connect, mining, roadmap _(reviewed 2026-06-09)_
 - `reference` [Field notes — first external migrations (v0.1 dogfood)](notes/migration-field-notes.md) — field-test, migration, hub-indexing, link-awareness, bulk-import, dream, onboarding, v0.2 _(reviewed 2026-06-02)_
+- `plan` [mage — hosted documentation website (GRILLED, ready to build)](notes/plan-docs-site.md) — documentation, website, docs-site, astro, starlight, generated-docs, drift, github-pages, onboarding, reference, buildProgram _(reviewed 2026-06-18)_
 - `plan` [mage — release sequence (0.0.x → 0.1.0)](notes/plan-release-sequence.md) — release, sequence, backlog, 0.1.0, self-grooming, procedure-skill, redaction, skillopt, observe, optimize, promotion _(reviewed 2026-06-08)_
 - `plan` [mage — roadmap](notes/roadmap.md) — roadmap, v0.1, v0.2, dream, scope, deferred, release, mcp, hub _(reviewed 2026-06-05)_
