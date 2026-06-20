@@ -230,8 +230,11 @@ one positive read against two kills, with a known under-count caveat.
 **Next actions (a PASS flips the flag for a LIVE trial; replay can pass, only the live reject-ledger
 crowns):**
 
-1. **Wire the digest into `nudgeCmd` behind a flag** and run a live dogfood trial; the reject-ledger
-   is the real arbiter (Decision §2/§9).
+1. **DONE (2026-06-20):** the digest is wired as the boundary nudge's behavior and the deterministic
+   drafting (`draftCluster`/`clusterToDraft`) removed — the "full flip" of Decision §1. Shipped
+   **flagless** (no `thresholds.digestNudge`): the author is the sole creator/tester, so the live
+   dogfood IS the trial and the reject-ledger is the arbiter. (`feat/digest-capture`: b311aed builder,
+   239efef wiring; `nudgeCmd` → digest, 956 tests green.)
 2. **Fix the forward-value lens's project-locality criterion** (judge value to the session's *own*
    project, not to mage-memory) — the single highest-leverage precision/coverage fix.
 3. *(Optional, cheap rigor)* re-judge Faultline's 62 + prose's 55 extractions through the same balanced
