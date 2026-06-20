@@ -1,0 +1,87 @@
+---
+title: Thresholds and the sensitivity dial
+description: The threshold values and the sensitivity dial that tune mage's grooming loop, generated from the code.
+sidebar:
+  order: 3
+---
+
+import ThresholdsTable from '../../../components/ThresholdsTable.astro';
+
+# Thresholds and the sensitivity dial
+
+mage's grooming loop is governed by a handful of numbers — how often a pattern
+must recur before it becomes a note, how long a note's body can grow, how many
+candidates surface per pass. They all live in one place in the code, so there is
+nothing to scatter and nothing to drift.
+
+The table below is generated from that single source (via `pnpm docs:gen`) and
+guarded by a drift test, so it always matches the running code.
+
+<ThresholdsTable />
+
+## The two recurrence gates: K and M
+
+Two of these thresholds are *gates* on mage's recurrence path — the spine of how
+durable knowledge is born and grows:
+
+- **K** (`promoteSessions`) is the gate for **promote**. When a pattern recurs
+  across K distinct compact-chapters with no note already covering it, `mage
+  promote` drafts a new note candidate for you to confirm.
+- **M** (`graduateSessions`) is the gate for **graduate**. When a proven
+  procedural note recurs across M distinct compact-chapters, it can graduate into
+  its own loadable `mage-skill-<slug>`.
+
+Both gates count *compact-chapters*, not session ids. A chapter is the slice of
+work between compactions, so a single long chat that you keep compacting still
+accrues recurrence — you do not need to start fresh sessions to make a pattern
+count. See [Promote and graduate](../loop/promote-graduate.md) for the full path.
+
+## What the sensitivity dial does
+
+The **sensitivity dial** is the one human knob over this loop. It lives in your
+knowledge base's tracked `metadata.json` (under `grooming.sensitivity`), so the
+setting travels with the KB and is shared by everyone who clones it. It takes one
+of three values — `low`, `normal`, or `high` — and `normal` is the default. A
+missing or unrecognized value falls back to `normal`, so a bad edit never silently
+shifts behaviour.
+
+The dial scales **only the two recurrence gates, K and M, together**:
+
+- `high` makes patterns surface sooner (fewer chapters needed).
+- `normal` is the shipped baseline.
+- `low` makes patterns surface later (more chapters needed).
+
+The exact K/M values per dial position are in the sensitivity table the component
+renders above.
+
+## Quality floors the dial never moves
+
+Every other threshold in the table is a **quality floor**, not a measure of
+eagerness — so the dial leaves it fixed regardless of sensitivity:
+
+- `noteSizeCap` — the authored-note body character cap; past it `mage groom`
+  proposes a split.
+- `lessonNoteCap` — a soft target size for an organic lesson draft from
+  `mage stage`; it warns past this but never blocks, keeping inline capture
+  frictionless.
+- `stagingBudget` — the most staged lesson drafts `mage groom` surfaces per pass
+  (anti-flood).
+- `promotionBudget` — the most note candidates `mage promote` surfaces per pass,
+  ranked strongest-first; the rest defer.
+- `editBudget` — the most edits the optimize pass applies per run, a bounded
+  textual learning rate so a skill never thrashes.
+- `rewordRate` and `demoteRate` — the context-match rates below which a generated
+  skill is flagged for reword or demote (single-sourced from the context-match
+  metric).
+- `minLoads` — the minimum number of times a skill must auto-load before
+  context-match is allowed to judge it, so no verdict rests on thin evidence.
+
+One more structural floor sits alongside the gates but is **not** dial-scaled:
+`minChapterWorkEvents` (the trailing sentence below the dial table states its
+value). A compact-chapter must carry at least that many work events to count as
+one recurrence unit, so a trivial `/compact` with no real work cannot manufacture
+recurrence.
+
+For where these gates and budgets fire across the whole loop, see the
+[Loop overview](../loop/overview.md). For the CLI surface, see the
+[Commands reference](../reference/commands.mdx).

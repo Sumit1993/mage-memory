@@ -1,7 +1,7 @@
 // `mage nudge` (0.0.12, plan-0.0.12 §B / ADR-0009 §24 step 2). The Claude-Code
 // adapter's boundary SAFETY-NET for the organic grooming loop. Fired from a
 // SessionStart hook; on `source: "compact"` it distills the just-closed chapter's
-// `.learnings/`, drafts up to N FORGOTTEN lessons into `.staging/` (the same engine
+// `.mage/learnings/`, drafts up to N FORGOTTEN lessons into `.mage/staging/` (the same engine
 // `mage stage` uses), and surfaces a ONE-LINE `additionalContext` nudge pointing the
 // agent at `mage:groom`. Inline capture is PRIMARY (the AGENTS.md instruction); this
 // only catches what the agent forgot. Verified hook contract: SessionStart carries
@@ -49,9 +49,9 @@ export interface NudgeOptions {
 export interface NudgeResult {
   /** True when the nudge acted (source was "compact" and a KB resolved). */
   ran: boolean;
-  /** Drafts newly written to `.staging/` this run. */
+  /** Drafts newly written to `.mage/staging/` this run. */
   drafted: number;
-  /** Total drafts pending in `.staging/` after the run. */
+  /** Total drafts pending in `.mage/staging/` after the run. */
   pending: number;
   /** The one-line additionalContext nudge, or null when nothing was surfaced. */
   nudge: string | null;
@@ -60,7 +60,7 @@ export interface NudgeResult {
 const NONE: NudgeResult = { ran: false, drafted: 0, pending: 0, nudge: null };
 
 /**
- * Distill the just-closed chapter, draft forgotten lessons to `.staging/` (bounded
+ * Distill the just-closed chapter, draft forgotten lessons to `.mage/staging/` (bounded
  * by the staging budget + dedup), and COMPUTE the one-line nudge. Pure of stdout —
  * the caller (the hook command) emits `nudge` as additionalContext — so this is
  * directly unit-testable. May throw in tests; the command wraps it fail-open.
@@ -199,7 +199,7 @@ async function decideNudge(
   const line =
     drafted > 0
       ? `mage: drafted ${drafted} lesson${plural(drafted)} from the last chapter (${pending} pending) — review with \`mage:groom\`.`
-      : `mage: ${pending} lesson draft${plural(pending)} pending in .staging/ — review with \`mage:groom\`.`;
+      : `mage: ${pending} lesson draft${plural(pending)} pending in .mage/staging/ — review with \`mage:groom\`.`;
   await writeThrottle(throttlePath, Date.now());
   return line;
 }
@@ -299,7 +299,7 @@ function str(v: unknown): string | undefined {
 export function buildNudgeCommand(): Command {
   return new Command("nudge")
     .description(
-      "Hook-fired boundary nudge: on a post-compaction SessionStart, distill the closed chapter, draft forgotten lessons to .staging/, and surface them (ADR-0009 §24; never blocks the host)",
+      "Hook-fired boundary nudge: on a post-compaction SessionStart, distill the closed chapter, draft forgotten lessons to .mage/staging/, and surface them (ADR-0009 §24; never blocks the host)",
     )
     .option(
       "--cwd <dir>",

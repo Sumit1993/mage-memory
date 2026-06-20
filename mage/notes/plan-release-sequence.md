@@ -42,6 +42,7 @@ splits collapsed). **Status** tracks where each release stands.
 | **0.0.10** | **coherence**: vocabulary ADR (*every flavor is a knowledge base*; de-overload "hub") + **hub flat-vs-nested grill** → ADR + the `mage link` scaffold-consistency fix + **SDD skills removed** (the deferred ADR-0001/0002 prune) | **0022, 0023** | 0.0.9 | grilled⁷ | **shipped** |
 | **0.0.11** | **signal quality + autonomous capture** (de-noise signatures · project wings · SubagentStop · bounded ranked promotion) + **release-please adoption** (first bot-managed release) + **security cleanup** (drop gray-matter→yaml; esbuild pin) + **test-typecheck gate** | 0015, 0018, 0019 | 0.0.10 | locked | **shipped⁸** |
 | **0.0.12** | **organic grooming loop** — the *lesson path* (`mage stage`/`mage groom` + gitignored `.staging/` + boundary-nudge adapter via `mage connect` + always-on inline capture) + bundled **redact false-positives** fix | **0024** | 0.0.11 | grilled⁹ | **building** |
+| **Docs site** | Hosted, navigable **documentation website** generated from code (drift-tested) + README reconciliation — a 0.1.0 credibility-push track | **0026** | — | grilled¹⁰ | ready |
 | **→ 0.1.0** | **Milestone: portable, self-grooming memory — the cut** (announced once a1 bakes) | — | all | — | — |
 
 ¹ tagged + GitHub-released; npm still at 0.0.3. · *Status legend:* **shipped · next · planned** (add `building`/`grilled`/`built` in flight).
@@ -92,6 +93,19 @@ is now BUILT as the final 0.0.12 PR (2026-06-18)** — all machine-written trans
 gitignored `.mage/` dir (`.learnings`/`.metrics`/`.staging` → `.mage/learnings`/`metrics`/`staging`) and the
 redact allowlist moves from `.redactignore` into `metadata.json` (`redact: { ignore, allow }`), with a layout
 migration via `mage migrate`/`doctor --fix`. Pending: user merges + a multi-KB soak before npm publish.
+
+¹⁰ **Docs site** — **GRILLED 2026-06-18**, decisions locked in [plan-docs-site](plan-docs-site.md) → **[ADR-0026](../decisions/0026-hosted-docs-website.md)** (accepted).
+A hosted, navigable **documentation website** whose volatile facts (thresholds/`MAGE_HOOKS`/commands) are
+**generated from the live code and drift-tested in CI**, so the docs can't silently diverge — motivated by the
+README's already-drifted pre-0.0.12 loop section (no `nudge`/`stage`/`groom`, never states K=3/M=5). Locked: **Astro
+Starlight → GitHub Pages** (default subpath, no-server ADR-0020); new-user-first manual built **spine-first**; generation
+reach **maximal** (commands via an importable **`buildProgram()`** refactor); README **fixed+slimmed when the site lands**;
+Mermaid + a few designed pieces; **latest-only**. It changes **no published npm artifact** (separate sub-project + Pages),
+so it is a 0.1.0 **credibility-push track** that targets the announcement but does **not** gate the code cut. Ships as **4
+focused PRs off `main`** (rebased after the `.mage/` fold #31): (1) `buildProgram()` refactor · (2) generator + drift test
+· (3) Starlight site + Pages workflow · (4) README slim. A prototype on `feat/docs-site` proved the drift test catches a
+tampered value. **Glossary gap flagged:** `context.md` predates 0.0.12 and lacks `nudge`/`stage`/`groom`/`lesson` — a
+separate cleanup the site will pressure-test.
 
 ## Critical path (what gates everything)
 
@@ -146,7 +160,7 @@ file rotation — only reveals bugs when actually run. **Definition of done, per
    also pre-validates connect's payload→event mapping). Remove the temp hook after.
 4. Only then tag + `npm publish`.
 
-## Grills to run (remaining: 0 — the **0.0.12 organic-grooming-loop grill** closed 2026-06-15, see ⁹; the **0.0.10 coherence grill** closed + shipped, see ⁷; 0.0.9 readiness grilled + closed 2026-06-09, see ⁵; the path to 0.1.0 is now pure build + the a1 bake)
+## Grills to run (remaining: 0 — the **docs-site grill** closed 2026-06-18, see ¹⁰; the **0.0.12 organic-grooming-loop grill** closed 2026-06-15, see ⁹; the **0.0.10 coherence grill** closed + shipped, see ⁷; 0.0.9 readiness grilled + closed 2026-06-09, see ⁵; the CLI path to 0.1.0 is otherwise pure build + the a1 bake)
 
 The 2026-06-06 observe grill ([ADR-0015](../decisions/0015-mage-observe-capture-schema.md)
 + [ADR-0016](../decisions/0016-context-match-confidence-ladder-applier.md)) pre-resolved

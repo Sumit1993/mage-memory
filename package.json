@@ -31,6 +31,7 @@
     "prebuild": "node scripts/vendor-graph.mjs",
     "build": "tsup",
     "dev": "tsup --watch",
+    "docs:gen": "pnpm build && node scripts/gen-docs.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",

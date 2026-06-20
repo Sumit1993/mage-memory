@@ -1,0 +1,11 @@
+---
+// Wraps Starlight's default Head and adds the client-side Mermaid init.
+// Astro/Vite bundles the imported module below into a hashed, base-aware asset,
+// so there is NO headless browser and NO build-time diagram render.
+import Default from '@astrojs/starlight/components/Head.astro';
+---
+
+<Default><slot /></Default>
+<script>
+  import '../mermaid.client.js';
+</script>

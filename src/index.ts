@@ -2,6 +2,13 @@
 // their own scripts. CLI in src/cli.ts wraps these with commander.
 
 export { type AgentsMdOptions, writeAgentsMd } from "./agents-md.js";
+export { buildProgram } from "./cli-program.js";
+export {
+  buildGeneratedDocsData,
+  DOCS_DATA_SCHEMA,
+  type GeneratedDocsData,
+  serializeGeneratedDocsData,
+} from "./docs/generated-data.js";
 export {
   type ClaudeSettings,
   type HookCommand,

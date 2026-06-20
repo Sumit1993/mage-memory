@@ -1,0 +1,97 @@
+name: Docs
+
+on:
+  # Per-PR / per-push astro-build check (no deploy) when docs or the code that
+  # feeds the generated data changes. (The drift test itself runs in `pnpm test`
+  # in ci.yml; here we just keep the generated data fresh and prove the site
+  # builds.)
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'src/**'
+      - '.github/workflows/docs.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'src/**'
+      - '.github/workflows/docs.yml'
+  # Deploy the docs that match the latest PUBLISHED release.
+  release:
+    types: [published]
+  # Manual redeploy escape hatch (e.g. an urgent prose-only fix between releases,
+  # or re-running after enabling Pages).
+  workflow_dispatch:
+
+concurrency:
+  group: docs-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Build the static site. Runs on every trigger; it is the per-PR astro-build
+  # check and also the build half of the release deploy.
+  build:
+    name: build docs
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install root deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Regenerate the code-derived docs data
+        # Belt-and-suspenders (decision 9): the committed JSON is the contract the
+        # site renders; regenerate so the build always reflects current code.
+        run: pnpm docs:gen
+
+      - name: Install docs deps (isolated sub-project)
+        # --ignore-workspace keeps the docs toolchain off the root workspace.
+        # --config.strict-dep-builds=false makes a SKIPPED dependency build script
+        # a warning, not a fatal error (esbuild/sharp ship prebuilt binaries and
+        # Astro uses the noop image service, so a skipped build is harmless). It
+        # mirrors docs/pnpm-workspace.yaml's strictDepBuilds: false for runners
+        # whose policy ignores the file-level setting.
+        run: pnpm --dir docs install --frozen-lockfile --ignore-workspace --config.strict-dep-builds=false
+
+      - name: Build the docs site
+        run: pnpm --dir docs build
+
+      - name: Upload Pages artifact
+        # Only needed when we are going to deploy (release / manual). Harmless
+        # otherwise, but skip on PRs to keep them a pure build check.
+        if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: docs/dist
+
+  # Deploy to GitHub Pages — only on a published release or a manual dispatch.
+  deploy:
+    name: deploy to Pages
+    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Configure Pages
+        uses: actions/configure-pages@v6
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
