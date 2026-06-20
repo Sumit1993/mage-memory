@@ -87,7 +87,7 @@ describe("mage nudge — gating", () => {
 });
 
 describe("mage nudge — boundary distill → staging", () => {
-  it("on compact, distills the closed chapter and drafts a lesson into .staging/", async () => {
+  it("on compact, distills the closed chapter and drafts a lesson into .mage/staging/", async () => {
     const { dir, mage, learnings } = await makeKb();
     await seedChapter(learnings, "s1", "alpha");
 

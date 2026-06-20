@@ -1,7 +1,7 @@
 // `mage observe` — the hook-fired capture seam (ADR-0015, CONVENTIONS §10,
 // plumbing tier). Reads a Claude Code hook JSON on stdin, maps it to ONE
 // ObserveEvent, scrubs the free-text fields (Gate-1), and appends it to
-// `.learnings/`. NEVER throws to the host: every path resolves to exit 0
+// `.mage/learnings/`. NEVER throws to the host: every path resolves to exit 0
 // (fail-open observe), and a redactor throw degrades a field to the sentinel
 // (fail-closed redaction) without leaking the raw value.
 
@@ -390,7 +390,7 @@ function errorFromResponse(response: unknown): string | null {
 export function buildObserveCommand(): Command {
   return new Command("observe")
     .description(
-      "Hook-fired capture seam: read a Claude Code hook JSON on stdin and append one event to .learnings/ (ADR-0015; never blocks the host)",
+      "Hook-fired capture seam: read a Claude Code hook JSON on stdin and append one event to .mage/learnings/ (ADR-0015; never blocks the host)",
     )
     .option("--session <id>", "session id (overrides the session field in the hook JSON)")
     .option(

@@ -1,0 +1,620 @@
+{
+  "schema": 2,
+  "thresholds": {
+    "rows": [
+      {
+        "key": "promoteSessions",
+        "symbol": "K",
+        "value": 3,
+        "dialScaled": true,
+        "meaning": "Distinct compact-chapters a pattern must recur across (with no covering note) before `mage promote` drafts a NEW note candidate. Counts chapters, not session ids — one continuously-compacted chat still accrues recurrence."
+      },
+      {
+        "key": "graduateSessions",
+        "symbol": "M",
+        "value": 5,
+        "dialScaled": true,
+        "meaning": "Distinct compact-chapters a proven procedural note must recur across before it can graduate into its own loadable `mage-skill-<slug>`."
+      },
+      {
+        "key": "noteSizeCap",
+        "symbol": "",
+        "value": 6000,
+        "dialScaled": false,
+        "meaning": "Authored-note body char cap; past it `mage groom` proposes a split. A quality floor — the dial never moves it."
+      },
+      {
+        "key": "rewordRate",
+        "symbol": "",
+        "value": 0.4,
+        "dialScaled": false,
+        "meaning": "Context-match rate below which a generated skill's trigger is flagged for reword (imported from context-match.ts; single-sourced)."
+      },
+      {
+        "key": "demoteRate",
+        "symbol": "",
+        "value": 0.2,
+        "dialScaled": false,
+        "meaning": "Context-match rate below which a generated skill is flagged for demote back to its note (imported from context-match.ts)."
+      },
+      {
+        "key": "minLoads",
+        "symbol": "",
+        "value": 5,
+        "dialScaled": false,
+        "meaning": "Minimum skill auto-loads before context-match is allowed to suggest reword/demote — no judgement on thin evidence."
+      },
+      {
+        "key": "editBudget",
+        "symbol": "",
+        "value": 3,
+        "dialScaled": false,
+        "meaning": "Max edits `mage:optimize` applies per pass — a bounded textual learning rate so a skill never thrashes."
+      },
+      {
+        "key": "promotionBudget",
+        "symbol": "",
+        "value": 5,
+        "dialScaled": false,
+        "meaning": "Max note candidates `mage promote` surfaces per pass (ranked strongest-first); the rest defer to the next pass."
+      },
+      {
+        "key": "lessonNoteCap",
+        "symbol": "",
+        "value": 1200,
+        "dialScaled": false,
+        "meaning": "SOFT target size for an organic lesson draft (`mage stage`) — one distilled fact + Why/How. `mage stage` warns past it but never blocks (frictionless inline capture)."
+      },
+      {
+        "key": "stagingBudget",
+        "symbol": "",
+        "value": 3,
+        "dialScaled": false,
+        "meaning": "Max staged lesson drafts `mage groom` surfaces per pass (anti-flood); the rest defer."
+      }
+    ],
+    "sensitivities": {
+      "low": {
+        "promoteSessions": 4,
+        "graduateSessions": 7
+      },
+      "normal": {
+        "promoteSessions": 3,
+        "graduateSessions": 5
+      },
+      "high": {
+        "promoteSessions": 2,
+        "graduateSessions": 4
+      }
+    },
+    "defaultSensitivity": "normal",
+    "minChapterWorkEvents": 2
+  },
+  "hooks": [
+    {
+      "event": "SessionStart",
+      "id": "mage:observe:SessionStart",
+      "command": "mage observe",
+      "purpose": "Capture session-start context into the git-ignored learnings scratch."
+    },
+    {
+      "event": "SessionStart",
+      "id": "mage:nudge:SessionStart",
+      "command": "mage nudge",
+      "purpose": "The boundary nudge: on a post-compaction SessionStart, distill the closed chapter, draft forgotten lessons into .mage/staging/, and surface them. Gates on source===\"compact\" itself — a fast no-op on startup/resume/clear."
+    },
+    {
+      "event": "UserPromptSubmit",
+      "id": "mage:observe:UserPromptSubmit",
+      "command": "mage observe",
+      "purpose": "Capture the prompt's intent."
+    },
+    {
+      "event": "PostToolUse",
+      "id": "mage:observe:PostToolUse",
+      "command": "mage observe",
+      "purpose": "Capture each tool use — which tool, which files, which skill loaded."
+    },
+    {
+      "event": "PostToolUseFailure",
+      "id": "mage:observe:PostToolUseFailure",
+      "command": "mage observe",
+      "purpose": "Capture tool failures (a distinct salient signal)."
+    },
+    {
+      "event": "PreCompact",
+      "id": "mage:observe:PreCompact",
+      "command": "mage observe",
+      "purpose": "Mark the chapter boundary just before the host compacts."
+    },
+    {
+      "event": "SessionEnd",
+      "id": "mage:observe:SessionEnd",
+      "command": "mage observe",
+      "purpose": "Capture session end."
+    },
+    {
+      "event": "Stop",
+      "id": "mage:metrics:Stop",
+      "command": "mage skills --metrics --quiet",
+      "purpose": "Roll up context-match: did the skills that auto-loaded actually match the work that followed?"
+    },
+    {
+      "event": "Stop",
+      "id": "mage:observe:Stop",
+      "command": "mage observe",
+      "purpose": "Capture the agent's final reply (ADR-0019 amendment to ADR-0015)."
+    },
+    {
+      "event": "SubagentStop",
+      "id": "mage:observe:SubagentStop",
+      "command": "mage observe",
+      "purpose": "Capture autonomous subagent work — a Task subagent's final reply, the one capture point for multi-agent workflows."
+    }
+  ],
+  "commands": [
+    {
+      "name": "init",
+      "summary": "Initialize mage: an in-repo knowledge base, or a standalone hub",
+      "aliases": [],
+      "hidden": false,
+      "options": [
+        {
+          "flags": "--in-repo",
+          "description": "scaffold the knowledge base inside this code repo's mage/"
+        },
+        {
+          "flags": "--hub",
+          "description": "create a standalone hub (vs an in-repo KB) at the current dir or <name>"
+        },
+        {
+          "flags": "--external",
+          "description": "removed in 0.0.10 — use --hub"
+        },
+        {
+          "flags": "--name <name>",
+          "description": "deprecated: pass the hub name as the positional argument instead"
+        },
+        {
+          "flags": "-d, --dir <path>",
+          "description": "hub mode: explicit hub directory (overrides <name>)"
+        },
+        {
+          "flags": "--private",
+          "description": "hub mode: create as private GitHub repo (requires gh)"
+        },
+        {
+          "flags": "--public",
+          "description": "hub mode: create as public GitHub repo (requires gh)"
+        },
+        {
+          "flags": "--local",
+          "description": "hub mode: skip GitHub — local-only hub"
+        },
+        {
+          "flags": "--owner <user>",
+          "description": "hub mode: GitHub owner (auto-detected via `gh api user`)"
+        },
+        {
+          "flags": "--project <name>",
+          "description": "in-repo mode: project name (default: basename of code repo)"
+        },
+        {
+          "flags": "-y, --yes",
+          "description": "non-interactive: use defaults (detect in-repo vs hub from the cwd)"
+        },
+        {
+          "flags": "--no-connect",
+          "description": "skip auto-wiring capture hooks after an in-repo init"
+        }
+      ]
+    },
+    {
+      "name": "index",
+      "summary": "(Re)generate INDEX.md — the always-loaded index of notes (deterministic, idempotent)",
+      "aliases": [],
+      "hidden": true,
+      "options": [
+        {
+          "flags": "-d, --dir <path>",
+          "description": "where to look for the knowledge base (default: cwd; walks up for in-repo)"
+        }
+      ]
+    },
+    {
+      "name": "skills",
+      "summary": "(Re)generate one auto-loaded skill per wing into .claude/skills/ and .agents/skills/",
+      "aliases": [],
+      "hidden": false,
+      "options": [
+        {
+          "flags": "-d, --dir <path>",
+          "description": "where to look for the knowledge base (default: cwd; walks up for in-repo)"
+        },
+        {
+          "flags": "--metrics",
+          "description": "read-only: fold the context-match rollup and report skill-load match rates (never regenerates skills)"
+        },
+        {
+          "flags": "--json",
+          "description": "metrics mode: emit the rows as JSON instead of a table"
+        },
+        {
+          "flags": "--quiet",
+          "description": "metrics mode: fold + write the rollup silently (the Stop-hook path)"
+        }
+      ]
+    },
+    {
+      "name": "dream",
+      "summary": "Report knowledge-base health, read-only: stale, superseded-but-active, dangling links, orphans",
+      "aliases": [],
+      "hidden": false,
+      "options": [
+        {
+          "flags": "-d, --dir <path>",
+          "description": "where to look for the knowledge base (default: cwd; walks up for in-repo)"
+        },
+        {
+          "flags": "--stale-days <n>",
+          "description": "flag notes whose last_reviewed is older than N days (default 180)"
+        },
+        {
+          "flags": "--strict",
+          "description": "exit non-zero if any findings (for hooks/CI)"
+        },
+        {
+          "flags": "--apply",
+          "description": "apply ONE confirmed Proposal JSON from stdin (the single writer; never commits)"
+        },
+        {
+          "flags": "--reject",
+          "description": "append ONE Proposal JSON from stdin to the rejected-edit buffer (back off)"
+        }
+      ]
+    },
+    {
+      "name": "ingest",
+      "summary": "Enumerate + classify ingestable sources under <dir> (read-only) — what `mage:learn --from` distills.",
+      "aliases": [],
+      "hidden": true,
+      "options": [
+        {
+          "flags": "--json",
+          "description": "emit the manifest as JSON to stdout (machine-readable)"
+        }
+      ]
+    },
+    {
+      "name": "distill",
+      "summary": "Read observed .mage/learnings into note candidates (plumbing behind mage:groom Phase 1)",
+      "aliases": [],
+      "hidden": true,
+      "options": [
+        {
+          "flags": "-d, --dir <path>",
+          "description": "where to look for the knowledge base (default: cwd; walks up for in-repo)"
+        },
+        {
+          "flags": "--json",
+          "description": "emit the candidate manifest as JSON"
+        },
+        {
+          "flags": "--seen <session:offset>",
+          "description": "advance the distill watermark after a batch is dispositioned"
+        }
+      ]
+    },
+    {
+      "name": "promote",
+      "summary": "Fold observed .mage/learnings into recurring note candidates (plumbing behind mage:groom Phase 2)",
+      "aliases": [],
+      "hidden": true,
+      "options": [
+        {
+          "flags": "-d, --dir <path>",
+          "description": "where to look for the knowledge base (default: cwd; walks up for in-repo)"
+        },
+        {
+          "flags": "--json",
+          "description": "emit the note-candidate manifest as JSON"
+        },
+        {
+          "flags": "--seen <session:offset>",
+          "description": "advance the promote offset after a batch is dispositioned"
+        }
+      ]
+    },
+    {
+      "name": "stage",
+      "summary": "Stage a short lesson draft into .mage/staging/ (frictionless inline capture — the organic grooming loop)",
+      "aliases": [],
+      "hidden": true,
+      "options": [
+        {
+          "flags": "-d, --dir <path>",
+          "description": "where to look for the knowledge base (default: cwd; walks up for in-repo)"
+        },
+        {
+          "flags": "-t, --title <title>",
+          "description": "lesson title (required — drives the H1 and slug)"
+        },
+        {
+          "flags": "--type <type>",
+          "description": "note type (default: gotcha)"
+        },
+        {
+          "flags": "--tags <wing/room,...>",
+          "description": "comma-separated wing/room tags"
+        },
+        {
+          "flags": "--wing <wing>",
+          "description": "convenience wing (prepended as a tag when none homes there)"
+        },
+        {
+          "flags": "--body <text>",
+          "description": "lesson body (else read from stdin)"
+        },
+        {
+          "flags": "--json",
+          "description": "emit the result as JSON"
+        }
+      ]
+    },
+    {
+      "name": "groom",
+      "summary": "Surface / accept / reject the staged lesson batch (plumbing behind the mage:groom skill)",
+      "aliases": [],
+      "hidden": true,
+      "options": [
+        {
+          "flags": "-d, --dir <path>",
+          "description": "where to look for the knowledge base (default: cwd; walks up for in-repo)"
+        },
+        {
+          "flags": "--json",
+          "description": "emit the batch / disposition as JSON"
+        },
+        {
+          "flags": "--accept <slugs|all>",
+          "description": "promote these staged drafts to notes/ and re-index"
+        },
+        {
+          "flags": "--reject <slugs|all>",
+          "description": "discard these staged drafts and record their keys"
+        }
+      ]
+    },
+    {
+      "name": "observe",
+      "summary": "Hook-fired capture seam: read a Claude Code hook JSON on stdin and append one event to .mage/learnings/ (ADR-0015; never blocks the host)",
+      "aliases": [],
+      "hidden": true,
+      "options": [
+        {
+          "flags": "--session <id>",
+          "description": "session id (overrides the session field in the hook JSON)"
+        },
+        {
+          "flags": "--event <type>",
+          "description": "force the event type (session_start|user_prompt|assistant_msg|skill_load|tool_use|compact|session_end); default: inferred from the hook payload"
+        },
+        {
+          "flags": "--cwd <dir>",
+          "description": "working directory used to locate the knowledge base (overrides the hook JSON cwd; defaults to it, then process.cwd())"
+        }
+      ]
+    },
+    {
+      "name": "nudge",
+      "summary": "Hook-fired boundary nudge: on a post-compaction SessionStart, distill the closed chapter, draft forgotten lessons to .mage/staging/, and surface them (ADR-0009 §24; never blocks the host)",
+      "aliases": [],
+      "hidden": true,
+      "options": [
+        {
+          "flags": "--cwd <dir>",
+          "description": "working directory used to locate the knowledge base (overrides the hook JSON cwd; defaults to it, then process.cwd())"
+        }
+      ]
+    },
+    {
+      "name": "redact",
+      "summary": "Deterministically scan a file or stdin for secrets/PII (ADR-0014 Gate 2); --strip emits redacted text",
+      "aliases": [],
+      "hidden": true,
+      "options": [
+        {
+          "flags": "--strip",
+          "description": "print the redacted text to stdout (secret values → [REDACTED:<kind>])"
+        },
+        {
+          "flags": "--quiet",
+          "description": "suppress the findings report"
+        },
+        {
+          "flags": "--staged",
+          "description": "scan staged git changes (the pre-commit gate)"
+        },
+        {
+          "flags": "--check",
+          "description": "report-only intent for hooks"
+        }
+      ]
+    },
+    {
+      "name": "link",
+      "summary": "Link this code repo to an existing hub (auto-detects storage based on mage/ content)",
+      "aliases": [],
+      "hidden": false,
+      "options": [
+        {
+          "flags": "--project <name>",
+          "description": "project name in the hub (default: basename of code repo)"
+        },
+        {
+          "flags": "--storage <kind>",
+          "description": "override auto-detected storage: 'repo-owned' (hybrid; the repo keeps its docs) or 'hub-owned' (the hub owns the docs)"
+        },
+        {
+          "flags": "-y, --yes",
+          "description": "non-interactive: auto-confirm prompts"
+        },
+        {
+          "flags": "--no-connect",
+          "description": "skip auto-wiring capture hooks after link"
+        }
+      ]
+    },
+    {
+      "name": "unlink",
+      "summary": "Remove a mage linkage from this code repo (updates both metadata files)",
+      "aliases": [],
+      "hidden": false,
+      "options": [
+        {
+          "flags": "--hub <path>",
+          "description": "specific hub to unlink from (default: primary hub or the only hub_ref)"
+        },
+        {
+          "flags": "--delete-hub-side",
+          "description": "for hub-owned slots: also delete <hub>/projects/<project>/ dir"
+        },
+        {
+          "flags": "-y, --yes",
+          "description": "non-interactive: auto-confirm prompts"
+        }
+      ]
+    },
+    {
+      "name": "verify",
+      "summary": "Sanity-check a hub's structure (and optionally linked code repos)",
+      "aliases": [],
+      "hidden": false,
+      "options": [
+        {
+          "flags": "--hub <path>",
+          "description": "hub root (default: cwd)"
+        }
+      ]
+    },
+    {
+      "name": "list",
+      "summary": "List the projects in this hub",
+      "aliases": [],
+      "hidden": false,
+      "options": [
+        {
+          "flags": "--hub <path>",
+          "description": "hub root (default: cwd)"
+        }
+      ]
+    },
+    {
+      "name": "migrate",
+      "summary": "Upgrade this KB's metadata to the current schema (idempotent; never commits)",
+      "aliases": [],
+      "hidden": false,
+      "options": [
+        {
+          "flags": "--dir <path>",
+          "description": "where to look for the knowledge base (default: cwd; walks up)"
+        }
+      ]
+    },
+    {
+      "name": "status",
+      "summary": "Check per-machine link health for one or more code repos",
+      "aliases": [],
+      "hidden": false,
+      "options": []
+    },
+    {
+      "name": "doctor",
+      "summary": "Diagnose env + KB & connection health; --fix repairs ignores; --report bundles logs",
+      "aliases": [],
+      "hidden": false,
+      "options": [
+        {
+          "flags": "--hub <path>",
+          "description": "hub root (default: cwd if it looks like a hub)"
+        },
+        {
+          "flags": "--fix",
+          "description": "add any missing capture-sink ignore rules"
+        },
+        {
+          "flags": "--report",
+          "description": "print a redacted, content-free support bundle for issues"
+        }
+      ]
+    },
+    {
+      "name": "dashboard",
+      "summary": "Generate this KB's dashboard (Dashboard.md + Knowledge.base; --html adds the interactive cockpit)",
+      "aliases": [],
+      "hidden": false,
+      "options": [
+        {
+          "flags": "--html",
+          "description": "also generate the self-contained dashboard.html cockpit"
+        },
+        {
+          "flags": "--hub <path>",
+          "description": "hub root"
+        },
+        {
+          "flags": "--open",
+          "description": "print the command to open the html"
+        },
+        {
+          "flags": "--open-with <target>",
+          "description": "where clicking a note opens it: file (relative link, works anywhere) | obsidian | vscode"
+        }
+      ]
+    },
+    {
+      "name": "connect",
+      "summary": "Wire mage capture hooks into this repo's Claude Code settings (.claude/settings.local.json; personal + gitignored)",
+      "aliases": [],
+      "hidden": false,
+      "options": [
+        {
+          "flags": "--user",
+          "description": "target the personal ~/.claude/settings.json instead of the repo-local file"
+        },
+        {
+          "flags": "--all-projects",
+          "description": "from a hub: wire every registered project's code repo (repo-local each)"
+        },
+        {
+          "flags": "--no-git-hook",
+          "description": "skip installing the redaction pre-commit hook"
+        },
+        {
+          "flags": "-y, --yes",
+          "description": "non-interactive: skip the confirmation prompt"
+        }
+      ]
+    },
+    {
+      "name": "disconnect",
+      "summary": "Remove mage's capture hooks from this repo's Claude Code settings (leaves host hooks intact)",
+      "aliases": [],
+      "hidden": false,
+      "options": [
+        {
+          "flags": "--user",
+          "description": "target the personal ~/.claude/settings.json instead of the repo-local file"
+        },
+        {
+          "flags": "--no-git-hook",
+          "description": "skip removing the redaction pre-commit hook"
+        },
+        {
+          "flags": "-y, --yes",
+          "description": "non-interactive: accepted for symmetry (no destructive prompt)"
+        }
+      ]
+    }
+  ]
+}
