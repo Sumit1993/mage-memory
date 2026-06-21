@@ -17,27 +17,16 @@
 // becomes context; SessionEnd cannot inject context, so it is NOT used here. NEVER throws to the
 // host (fail-open, exit 0).
 
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
 import { Command } from "commander";
 import { computeDigest, lastClosedChapter, renderDigest } from "../distill/digest.js";
-import { distillWatermarkPath } from "../distill/watermark.js";
 import { readSessionStreams } from "../distill/reader.js";
 import { type BacklogTally, computeBacklog } from "../grooming/backlog.js";
 import { type Autonomy, mandateFor } from "../grooming/autonomy-ladder.js";
 import { readGrooming } from "../grooming/config.js";
 import type { ObserveEvent } from "../observe/types.js";
-import {
-  type ResolvedDocsRoot,
-  absolutePath,
-  learningsPath,
-  metricsPath,
-  resolveDocsRoot,
-  stagingPath,
-} from "../paths.js";
+import { type ResolvedDocsRoot, absolutePath, learningsPath, resolveDocsRoot } from "../paths.js";
+import { cacheTally, cachedTally, elapsedSince, markReminded, scratchFingerprint } from "./nudge-state.js";
 
-/** Anti-nag throttle + mtime cache: the backlog reminder fires at most once per window. */
-const NUDGE_THROTTLE_FILE = "nudge-throttle.json";
 /** Fallback backlog-reminder window when `grooming.nudgeThrottleHours` is absent/junk (ADR-0030 §5). */
 const DEFAULT_THROTTLE_MS = 4 * 60 * 60 * 1000; // 4 hours
 const MS_PER_HOUR = 60 * 60 * 1000;
@@ -112,11 +101,10 @@ async function digestNudge(resolved: ResolvedDocsRoot, source: string, force: bo
   const pending = tally.staged;
 
   // The backlog line is throttled (once per window, all sources); the digest is not.
-  const throttlePath = join(metricsPath(root), NUDGE_THROTTLE_FILE);
   const windowMs = throttleWindowMs(nudgeThrottleHours);
-  const showBacklog = hasBacklog(tally) && (force || (await throttleElapsed(throttlePath, windowMs)));
+  const showBacklog = hasBacklog(tally) && (force || (await elapsedSince(root, windowMs)));
   const mandate = showBacklog ? renderMandate(level, tally) : "";
-  if (showBacklog) await writeThrottle(throttlePath, Date.now());
+  if (showBacklog) await markReminded(root);
 
   const nudge = composeNudge(rendered, mandate);
   if (nudge === null) return { ran: true, drafted: 0, pending, nudge: null };
@@ -163,41 +151,13 @@ function hasBacklog(t: BacklogTally): boolean {
  */
 async function backlogTally(root: string, sensitivity: "low" | "normal" | "high"): Promise<BacklogTally> {
   const fp = await scratchFingerprint(root);
-  const cached = await readThrottle(join(metricsPath(root), NUDGE_THROTTLE_FILE));
-  if (fp.length > 0 && cached.fp === fp && cached.tally) return cached.tally;
+  const cached = await cachedTally(root, fp);
+  if (cached) return cached;
   const tally = await computeBacklog(root, sensitivity);
-  // Persist the fresh fingerprint + tally so a later no-change startup skips the scan. The
-  // throttle timestamp is written separately when the backlog line actually surfaces.
-  await writeThrottle(join(metricsPath(root), NUDGE_THROTTLE_FILE), undefined, fp, tally);
+  // Pin the fresh fingerprint + tally so a later no-change startup skips the scan (the reminder
+  // clock is stamped separately, by markReminded, when the backlog line actually surfaces).
+  await cacheTally(root, fp, tally);
   return tally;
-}
-
-/**
- * An mtime fingerprint of the scratch that feeds the backlog scan: the `.learnings/` dir mtime
- * (new/removed/rewritten session streams bump it), the distill watermark file mtime (a `mage
- * distill --seen` advances the unmined cursor), and the `.mage/staging/` dir mtime (a `mage stage`
- * adds a draft / a groom drains one — the staged count must not go stale across a stage/groom that
- * never touched `.learnings/`). "" when none can be stat'd → never gate (always recompute), the
- * safe-open behaviour.
- */
-async function scratchFingerprint(root: string): Promise<string> {
-  const parts: string[] = [];
-  try {
-    parts.push(String((await stat(learningsPath(root))).mtimeMs));
-  } catch {
-    // No `.learnings/` yet — leave it out; the watermark/staging may still pin the fingerprint.
-  }
-  try {
-    parts.push(String((await stat(distillWatermarkPath(root))).mtimeMs));
-  } catch {
-    // No watermark yet — distill has not run; fine.
-  }
-  try {
-    parts.push(String((await stat(stagingPath(root))).mtimeMs));
-  } catch {
-    // No `.mage/staging/` yet — nothing staged; fine.
-  }
-  return parts.join(":");
 }
 
 // ─── per-level mandate templating (ADR-0030 §5) ──────────────────────────────────
@@ -227,77 +187,12 @@ function backlogLine(t: BacklogTally): string {
   return `mage: ${parts.join(" · ")} → mage:groom`;
 }
 
-// ─── throttle + mtime-cache file I/O ─────────────────────────────────────────────
+// ─── throttle window ─────────────────────────────────────────────────────────────
 
 /** The throttle window in ms: a positive `nudgeThrottleHours` (from {@link readGrooming}) → ms, else the 4h default. */
 function throttleWindowMs(hours: number | undefined): number {
   if (typeof hours === "number" && Number.isFinite(hours) && hours > 0) return hours * MS_PER_HOUR;
   return DEFAULT_THROTTLE_MS;
-}
-
-/** True iff the backlog window has elapsed since the last surfaced reminder (fail-open: yes). */
-async function throttleElapsed(path: string, windowMs: number): Promise<boolean> {
-  const { lastNudge } = await readThrottle(path);
-  return Date.now() - lastNudge >= windowMs;
-}
-
-interface ThrottleState {
-  /** Epoch ms of the last surfaced backlog reminder (0 = never). */
-  lastNudge: number;
-  /** The scratch mtime fingerprint at the last tally compute ("" = none cached). */
-  fp: string;
-  /** The cached three-part tally, when a fingerprint pinned it. */
-  tally?: BacklogTally;
-}
-
-async function readThrottle(path: string): Promise<ThrottleState> {
-  try {
-    const parsed = JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>;
-    const lastNudge = typeof parsed.lastNudge === "number" ? parsed.lastNudge : 0;
-    const fp = typeof parsed.fp === "string" ? parsed.fp : "";
-    const tally = isBacklogTally(parsed.tally) ? parsed.tally : undefined;
-    return { lastNudge, fp, tally };
-  } catch {
-    return { lastNudge: 0, fp: "" }; // missing/corrupt → never throttled, no cache.
-  }
-}
-
-/** Narrow a parsed value to a BacklogTally (drops a partial/corrupt cache). */
-function isBacklogTally(v: unknown): v is BacklogTally {
-  if (v === null || typeof v !== "object") return false;
-  const t = v as Record<string, unknown>;
-  return (
-    typeof t.staged === "number" &&
-    typeof t.unmined === "number" &&
-    typeof t.unminedCapped === "boolean" &&
-    typeof t.graduable === "number"
-  );
-}
-
-/**
- * Persist the throttle/cache file. When `lastNudge` is given it stamps the reminder time; the `fp` +
- * `tally` (mtime cache) are merged with whatever is already on disk so a tally recompute does not
- * reset the throttle clock and vice versa. Fail-open: a write failure must never break session start.
- */
-async function writeThrottle(
-  path: string,
-  lastNudge?: number,
-  fp?: string,
-  tally?: BacklogTally,
-): Promise<void> {
-  try {
-    const prev = await readThrottle(path);
-    const next: ThrottleState & { v: number } = {
-      v: 2,
-      lastNudge: lastNudge ?? prev.lastNudge,
-      fp: fp ?? prev.fp,
-      tally: tally ?? prev.tally,
-    };
-    await mkdir(dirname(path), { recursive: true });
-    await writeFile(path, `${JSON.stringify(next)}\n`);
-  } catch {
-    // Fail-open: a throttle write failure must never break the host session start.
-  }
 }
 
 // ─── stdout contract ─────────────────────────────────────────────────────────────
