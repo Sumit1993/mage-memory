@@ -1,21 +1,11 @@
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { mkdir } from "node:fs/promises";
+import { describe, expect, it } from "vitest";
 import type { BacklogTally } from "../grooming/backlog.js";
 import { learningsPath } from "../paths.js";
+import { tmpDir } from "../../test/fixtures/kb.js";
 import { cacheTally, cachedTally, elapsedSince, markReminded, scratchFingerprint } from "./nudge-state.js";
 
-const made: string[] = [];
-afterEach(async () => {
-  for (const d of made.splice(0)) await rm(d, { recursive: true, force: true });
-});
-
-async function tmpRoot(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "mage-nudge-state-"));
-  made.push(dir);
-  return dir;
-}
+const tmpRoot = (): Promise<string> => tmpDir("mage-nudge-state-");
 
 const TALLY: BacklogTally = { staged: 3, unmined: 1, unminedCapped: false, graduable: 0 };
 

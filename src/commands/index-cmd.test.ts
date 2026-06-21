@@ -1,19 +1,13 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
+import { tmpDir } from "../../test/fixtures/kb.js";
 import type { HubProject } from "../paths.js";
 import { index } from "./index-cmd.js";
 import { init } from "./init.js";
 
-const made: string[] = [];
-afterEach(async () => {
-  for (const d of made.splice(0)) await rm(d, { recursive: true, force: true });
-});
-
 async function vault(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "mage-idx-"));
-  made.push(dir);
+  const dir = await tmpDir("mage-idx-");
   await init({ mode: "in-repo", yes: true, codeRepo: dir, project: "t" });
   return dir;
 }
@@ -27,13 +21,13 @@ async function note(dir: string, rel: string, content: string): Promise<void> {
 // The on-disk metadata.json may carry the legacy v1 `storage: "in-repo"` alias,
 // which readHubMetadata normalizes to "repo-owned" on read. Model that raw shape
 // so a fixture can exercise the normalization path (the `schema: "mage.v1"` file
-// written below is exactly where the legacy value is valid).
+// written below is exactly where the legacy value is valid). withKb refuses the
+// legacy `in-repo` storage alias, so this foreign-schema writer stays local.
 type RawHubProject = Omit<HubProject, "storage"> & { storage: HubProject["storage"] | "in-repo" };
 
 /** A hub root (kind=hub): projects/ dir + a top-level metadata.json registry. */
 async function hub(projects: RawHubProject[] = []): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "mage-hub-"));
-  made.push(dir);
+  const dir = await tmpDir("mage-hub-");
   await mkdir(join(dir, "projects"), { recursive: true });
   const meta = { schema: "mage.v1", name: "myhub", created_at: "2026-06-03", projects };
   await writeFile(join(dir, "metadata.json"), `${JSON.stringify(meta, null, 2)}\n`);
@@ -100,8 +94,7 @@ describe("mage index", () => {
   });
 
   it("throws when there is no knowledge base", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "mage-none-"));
-    made.push(dir);
+    const dir = await tmpDir("mage-none-");
     await expect(index({ dir })).rejects.toThrow(/No mage knowledge base/);
   });
 

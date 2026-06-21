@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { tmpDir, withKb } from "../../test/fixtures/kb.js";
+import { type GroomingConfig, learningsPath } from "../paths.js";
 import {
   buildSessionEnd,
   buildToolUse,
@@ -16,39 +17,20 @@ import { promoteCmd } from "./promote-cmd.js";
 
 // ─── tmp fixture plumbing (mirrors distill-cmd.test.ts) ───────────────────────
 
-const made: string[] = [];
-afterEach(async () => {
-  for (const d of made.splice(0)) await rm(d, { recursive: true, force: true });
+afterEach(() => {
   vi.restoreAllMocks();
 });
 
 /** A docs root with a `mage/metadata.json` so resolveDocsRoot finds an in-repo KB. */
-async function tmpRepo(grooming?: { sensitivity?: string }): Promise<{
+async function tmpRepo(grooming?: GroomingConfig): Promise<{
   repo: string;
   docsRoot: string;
   learnings: string;
 }> {
-  const repo = await mkdtemp(join(tmpdir(), "mage-promote-cmd-"));
-  made.push(repo);
-  const docsRoot = join(repo, "mage");
-  await mkdir(docsRoot, { recursive: true });
-  await writeFile(
-    join(docsRoot, "metadata.json"),
-    JSON.stringify({
-      schema: "mage.v1",
-      mode: "in-repo",
-      project: "t",
-      hub_path: null,
-      hub_repo: null,
-      hub_refs: [],
-      linked_at: "2026-06-08",
-      ...(grooming ? { grooming } : {}),
-    }),
-    "utf8",
-  );
-  const learnings = join(docsRoot, ".mage", "learnings");
-  await mkdir(learnings, { recursive: true });
-  return { repo, docsRoot, learnings };
+  const kb = await withKb({ kind: "repo", schema: 1, grooming });
+  const learnings = learningsPath(kb.root);
+  await mkdir(learnings, { recursive: true }); // fixture does not pre-create .mage/learnings
+  return { repo: kb.dir, docsRoot: kb.root, learnings };
 }
 
 let clock = 0;
@@ -95,8 +77,7 @@ function captureStdout(): string[] {
 
 describe("promoteCmd — no knowledge base", () => {
   it("throws a friendly error when no mage KB is found", async () => {
-    const empty = await mkdtemp(join(tmpdir(), "mage-promote-nokb-"));
-    made.push(empty);
+    const empty = await tmpDir();
     await expect(promoteCmd({ dir: empty })).rejects.toThrow(/No mage knowledge base found/);
   });
 });

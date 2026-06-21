@@ -1,9 +1,9 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { STATE_DIR, METRICS_DIR, STAGING_DIR } from "../paths.js";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { ScannedNote } from "../scan.js";
+import { tmpDir } from "../../test/fixtures/kb.js";
 import {
   type DraftSig,
   addStagedRejects,
@@ -21,17 +21,6 @@ import {
   uniqueSlug,
   writeDraft,
 } from "./staging.js";
-
-const made: string[] = [];
-afterEach(async () => {
-  for (const d of made.splice(0)) await rm(d, { recursive: true, force: true });
-});
-
-async function tmp(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "mage-stg-"));
-  made.push(dir);
-  return dir;
-}
 
 /** A minimal ScannedNote for dedup tests. */
 function note(partial: Partial<ScannedNote> & { wing: string; keywords: string[] }): ScannedNote {
@@ -119,7 +108,7 @@ describe("composeDraft", () => {
 
 describe("writeDraft / readStagedDrafts", () => {
   it("round-trips a draft and is fail-open on a missing dir", async () => {
-    const root = await tmp();
+    const root = await tmpDir();
     const staging = join(root, STATE_DIR, STAGING_DIR);
     expect(await readStagedDrafts(staging)).toEqual([]); // missing dir → []
 
@@ -173,7 +162,7 @@ describe("dedupDraft", () => {
 
 describe("reject ledger", () => {
   it("reads fail-open and persists deduped, sorted keys", async () => {
-    const root = await tmp();
+    const root = await tmpDir();
     expect(await readStagedRejects(root)).toEqual(new Set()); // no file → empty
 
     await addStagedRejects(root, ["b::y", "a::x"]);
@@ -184,7 +173,7 @@ describe("reject ledger", () => {
     expect(raw).toEqual({ v: 1, keys: ["a::x", "b::y"] });
   });
   it("tolerates a corrupt ledger", async () => {
-    const root = await tmp();
+    const root = await tmpDir();
     await mkdir(join(root, STATE_DIR, METRICS_DIR), { recursive: true });
     await writeFile(join(root, STATE_DIR, METRICS_DIR, "staged-rejects.json"), "{ not json");
     expect(await readStagedRejects(root)).toEqual(new Set());
@@ -195,7 +184,7 @@ describe("reject ledger", () => {
 
 describe("promoteDraft / discardDraft", () => {
   it("moves a draft into notes/, de-colliding the slug", async () => {
-    const root = await tmp();
+    const root = await tmpDir();
     const staging = join(root, STATE_DIR, STAGING_DIR);
     const { frontmatter, body } = composeDraft({ title: "Lesson", tags: ["mage/x"], body: "b" });
     await writeDraft(staging, "lesson", frontmatter, body);
@@ -210,7 +199,7 @@ describe("promoteDraft / discardDraft", () => {
     expect(await readStagedDrafts(staging)).toEqual([]); // moved out of staging
   });
   it("discardDraft removes the file (idempotent)", async () => {
-    const root = await tmp();
+    const root = await tmpDir();
     const staging = join(root, STATE_DIR, STAGING_DIR);
     const { frontmatter, body } = composeDraft({ title: "X", body: "b" });
     await writeDraft(staging, "x", frontmatter, body);

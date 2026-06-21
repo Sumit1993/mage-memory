@@ -1,23 +1,14 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
+import { tmpDir } from "../test/fixtures/kb.js";
 import { writeAgentsMd } from "./agents-md.js";
 
-const made: string[] = [];
-afterEach(async () => {
-  for (const d of made.splice(0)) await rm(d, { recursive: true, force: true });
-});
-async function tmp(): Promise<string> {
-  const d = await mkdtemp(join(tmpdir(), "mage-agents-"));
-  made.push(d);
-  return d;
-}
 const readAgents = (d: string) => readFile(join(d, "AGENTS.md"), "utf8");
 
 describe("writeAgentsMd — KB shape blocks (kind repo/hub · mode in-repo/hybrid/external) (ADR-0011/0012)", () => {
   it("routes an external code repo to the hub index + names its wing (flat-safe)", async () => {
-    const repo = await tmp();
+    const repo = await tmpDir();
     await writeAgentsMd(repo, { kind: "repo", mode: "external", docsRel: "mage", hubPath: "/abs/hub", project: "engine" });
     const agents = await readAgents(repo);
     expect(agents).toContain("/abs/hub/INDEX.md"); // always-present entry (flat or hierarchical)
@@ -26,7 +17,7 @@ describe("writeAgentsMd — KB shape blocks (kind repo/hub · mode in-repo/hybri
   });
 
   it("does NOT reference the retired per-project entry path", async () => {
-    const repo = await tmp();
+    const repo = await tmpDir();
     await writeAgentsMd(repo, { kind: "repo", mode: "external", docsRel: "mage", hubPath: "/abs/hub", project: "engine" });
     const agents = await readAgents(repo);
     expect(agents).not.toContain("projects/engine/mage/INDEX.md");
@@ -34,7 +25,7 @@ describe("writeAgentsMd — KB shape blocks (kind repo/hub · mode in-repo/hybri
   });
 
   it("is idempotent (a second write replaces, not appends, the block)", async () => {
-    const repo = await tmp();
+    const repo = await tmpDir();
     const opts = {
       kind: "repo" as const,
       mode: "external" as const,
@@ -51,20 +42,20 @@ describe("writeAgentsMd — KB shape blocks (kind repo/hub · mode in-repo/hybri
   });
 
   it("adds the @AGENTS.md import to CLAUDE.md", async () => {
-    const repo = await tmp();
+    const repo = await tmpDir();
     await writeAgentsMd(repo, { kind: "repo", mode: "external", docsRel: "mage", hubPath: "/abs/hub", project: "engine" });
     expect(await readFile(join(repo, "CLAUDE.md"), "utf8")).toContain("@AGENTS.md");
   });
 
   it("rejects an unsafe project name and writes nothing", async () => {
-    const repo = await tmp();
+    const repo = await tmpDir();
     await expect(
       writeAgentsMd(repo, { kind: "repo", mode: "external", docsRel: "mage", hubPath: "/abs/hub", project: "../evil" }),
     ).rejects.toThrow();
   });
 
   it("leaves the in-repo mode unchanged", async () => {
-    const repo = await tmp();
+    const repo = await tmpDir();
     await writeAgentsMd(repo, { kind: "repo", mode: "in-repo", docsRel: "mage" });
     const agents = await readAgents(repo);
     expect(agents).toContain("knowledge base at `mage/`");
@@ -76,7 +67,7 @@ describe("writeAgentsMd — KB shape blocks (kind repo/hub · mode in-repo/hybri
       { kind: "repo", mode: "in-repo", docsRel: "mage" },
       { kind: "repo", mode: "external", docsRel: "mage", hubPath: "/abs/hub", project: "engine" },
     ] as const) {
-      const repo = await tmp();
+      const repo = await tmpDir();
       await writeAgentsMd(repo, opts);
       const agents = await readAgents(repo);
       expect(agents).toContain("mage:learn");
@@ -91,7 +82,7 @@ describe("writeAgentsMd — KB shape blocks (kind repo/hub · mode in-repo/hybri
       { kind: "hub", mode: "in-repo", docsRel: "." },
       { kind: "repo", mode: "external", docsRel: "mage", hubPath: "/abs/hub", project: "engine" },
     ] as const) {
-      const repo = await tmp();
+      const repo = await tmpDir();
       await writeAgentsMd(repo, opts);
       const agents = await readAgents(repo);
       // The inline-primary path: capture at first sight via `mage stage` → `.staging/`.

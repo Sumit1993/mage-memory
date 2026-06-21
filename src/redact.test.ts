@@ -1,5 +1,4 @@
-import { mkdtemp, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { redactCmd } from "./commands/redact.js";
@@ -9,6 +8,7 @@ import {
   type SecretFinding,
   scanSecrets,
 } from "./redact.js";
+import { tmpDir } from "../test/fixtures/kb.js";
 
 /**
  * Assemble a provider-token fixture from parts so the committed source contains no
@@ -471,7 +471,7 @@ describe("scanSecrets — ReDoS resistance", () => {
 
 describe("redactCmd — temp-file integration", () => {
   async function tmpFile(content: string): Promise<string> {
-    const dir = await mkdtemp(join(tmpdir(), "mage-redact-"));
+    const dir = await tmpDir("mage-redact-");
     const p = join(dir, "input.txt");
     await writeFile(p, content);
     return p;
@@ -523,7 +523,7 @@ describe("redactCmd — report mode (non-quiet)", () => {
   let errSpy: ReturnType<typeof vi.spyOn>;
 
   async function tmpFile(content: string): Promise<string> {
-    const dir = await mkdtemp(join(tmpdir(), "mage-redact-rep-"));
+    const dir = await tmpDir("mage-redact-rep-");
     const p = join(dir, "in.txt");
     await writeFile(p, content);
     return p;

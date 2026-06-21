@@ -1,19 +1,16 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { tmpDir } from "../../test/fixtures/kb.js";
 import { init } from "./init.js";
 import { skills } from "./skills-cmd.js";
 
-const made: string[] = [];
-afterEach(async () => {
-  for (const d of made.splice(0)) await rm(d, { recursive: true, force: true });
+afterEach(() => {
   vi.restoreAllMocks();
 });
 
 async function vault(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "mage-skills-"));
-  made.push(dir);
+  const dir = await tmpDir("mage-skills-");
   await init({ mode: "in-repo", yes: true, codeRepo: dir, project: "t" });
   return dir;
 }
@@ -141,8 +138,7 @@ describe("mage skills --metrics (read-only)", () => {
   });
 
   it("--metrics with no knowledge base prints the empty-state and does not throw", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "mage-skills-nokb-"));
-    made.push(dir);
+    const dir = await tmpDir("mage-skills-nokb-");
     const lines: string[] = [];
     vi.spyOn(console, "log").mockImplementation((m?: unknown) => {
       lines.push(String(m));

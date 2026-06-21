@@ -1,6 +1,5 @@
-import { afterEach, describe, expect, it } from "vitest";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { describe, expect, it } from "vitest";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   advanceWatermark,
@@ -10,18 +9,12 @@ import {
   writeWatermark,
   type DistillWatermark,
 } from "./watermark.js";
+import { tmpDir } from "../../test/fixtures/kb.js";
 
 // ─── tmp fixture plumbing ─────────────────────────────────────────────────────
 
-const made: string[] = [];
-afterEach(async () => {
-  for (const d of made.splice(0)) await rm(d, { recursive: true, force: true });
-});
-
 async function tmp(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "mage-distill-wm-"));
-  made.push(dir);
-  return dir;
+  return tmpDir("mage-distill-wm-");
 }
 
 // ─── readWatermark — fail-open on missing/corrupt ─────────────────────────────

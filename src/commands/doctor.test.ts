@@ -1,5 +1,4 @@
-import { chmod, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { chmod, mkdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -11,17 +10,11 @@ import {
 import { gitInit } from "../git.js";
 import { detectRedactHook, installRedactHook } from "../git-hooks.js";
 import { METADATA_SCHEMA, METADATA_SCHEMA_V1, exists } from "../paths.js";
+import { tmpDir } from "../../test/fixtures/kb.js";
 import { type DoctorCheck, doctor } from "./doctor.js";
 
-const made: string[] = [];
-afterEach(async () => {
-  for (const d of made.splice(0)) await rm(d, { recursive: true, force: true });
-});
-
 async function freshDir(prefix = "mage-doctor-"): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), prefix));
-  made.push(dir);
-  return dir;
+  return tmpDir(prefix);
 }
 
 /** Find a check by name in a DoctorResult. */

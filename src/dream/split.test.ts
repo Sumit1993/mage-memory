@@ -1,20 +1,14 @@
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { parseNote, writeNote } from "../note.js";
+import { tmpDir } from "../../test/fixtures/kb.js";
 import { type SplitNewNote, planSplit } from "./split.js";
 
 // ─── tmp fixture plumbing (house pattern; the executor is a read-only planner) ──
 
-const made: string[] = [];
-afterEach(async () => {
-  for (const d of made.splice(0)) await rm(d, { recursive: true, force: true });
-});
-
 async function docsRoot(): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), "mage-split-"));
-  made.push(root);
+  const root = await tmpDir("mage-split-");
   await mkdir(join(root, "notes"), { recursive: true });
   return root;
 }

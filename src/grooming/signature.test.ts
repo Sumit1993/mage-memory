@@ -1,7 +1,5 @@
-import { afterEach, describe, expect, it } from "vitest";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+import { tmpDir } from "../../test/fixtures/kb.js";
 import {
   buildAssistantMsg,
   buildSessionEnd,
@@ -13,18 +11,6 @@ import {
 } from "../observe/events.js";
 import type { ObserveEvent } from "../observe/types.js";
 import { keywordsFromText, segmentSignatures, SIG_KEYWORDS, wingFromSegment } from "./signature.js";
-
-// ─── tmp fixture plumbing (no fs here, but the house pattern stays) ───────────
-
-const made: string[] = [];
-afterEach(async () => {
-  for (const d of made.splice(0)) await rm(d, { recursive: true, force: true });
-});
-async function tmp(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "mage-promote-sig-"));
-  made.push(dir);
-  return dir;
-}
 
 // ─── ObserveEvent builders (monotonic clock) ──────────────────────────────────
 
@@ -113,7 +99,7 @@ describe("wingFromSegment — first touched-path wing", () => {
   });
 
   it("strips repoRoot from an absolute path before reading the wing", async () => {
-    const root = await tmp();
+    const root = await tmpDir();
     const events = [tool({ paths: [`${root}/billing/charge.ts`] }), sessionEnd()];
     expect(wingFromSegment(events, whole(events), root)).toBe("billing");
   });
@@ -133,7 +119,7 @@ describe("wingFromSegment — first touched-path wing", () => {
   it("is '' for a repo-ROOT file (absolute → single segment after stripping repoRoot)", async () => {
     // The exact dogfood shape: an absolute path to a file at the repo root resolves to a
     // single segment once repoRoot is stripped → no directory → no wing.
-    const root = await tmp();
+    const root = await tmpDir();
     const events = [tool({ paths: [`${root}/toplevel-file.md`] }), sessionEnd()];
     expect(wingFromSegment(events, whole(events), root)).toBe("");
   });

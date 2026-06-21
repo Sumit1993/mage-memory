@@ -1,22 +1,11 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { gitInit } from "../git.js";
 import { resolveHooksDir } from "../git-hooks.js";
 import { connect } from "./connect.js";
 import { disconnect } from "./disconnect.js";
-
-const made: string[] = [];
-afterEach(async () => {
-  for (const d of made.splice(0)) await rm(d, { recursive: true, force: true });
-});
-
-async function freshDir(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "mage-disconnect-"));
-  made.push(dir);
-  return dir;
-}
+import { tmpDir } from "../../test/fixtures/kb.js";
 
 function localPath(dir: string): string {
   return join(dir, ".claude", "settings.local.json");
@@ -33,7 +22,7 @@ async function exists(p: string): Promise<boolean> {
 
 describe("disconnect", () => {
   it("removes exactly the mage groups and leaves the rest", async () => {
-    const dir = await freshDir();
+    const dir = await tmpDir("mage-disconnect-");
     await mkdir(join(dir, ".claude"), { recursive: true });
     const pre = {
       permissions: { allow: ["Bash(ls)"] },
@@ -67,7 +56,7 @@ describe("disconnect", () => {
   });
 
   it("disconnect on a missing file is a clean no-op", async () => {
-    const dir = await freshDir();
+    const dir = await tmpDir("mage-disconnect-");
     const r = await disconnect({ cwd: dir, yes: true });
 
     expect(r.removed).toBe(0);
@@ -79,7 +68,7 @@ describe("disconnect", () => {
   });
 
   it("malformed JSON -> disconnect throws and does NOT write", async () => {
-    const dir = await freshDir();
+    const dir = await tmpDir("mage-disconnect-");
     await mkdir(join(dir, ".claude"), { recursive: true });
     await writeFile(localPath(dir), "{ not json");
 
@@ -89,7 +78,7 @@ describe("disconnect", () => {
   });
 
   it("disconnect with no mage groups present does not rewrite the file", async () => {
-    const dir = await freshDir();
+    const dir = await tmpDir("mage-disconnect-");
     await mkdir(join(dir, ".claude"), { recursive: true });
     const pre = { permissions: { allow: ["Bash(ls)"] } };
     await writeFile(localPath(dir), `${JSON.stringify(pre, null, 2)}\n`);
@@ -104,7 +93,7 @@ describe("disconnect", () => {
   // ─── Gate-2 redaction pre-commit hook (ADR-0018 §7) ─────────────────────────
 
   it("in a git repo, disconnect removes the mage-installed pre-commit hook", async () => {
-    const dir = await freshDir();
+    const dir = await tmpDir("mage-disconnect-");
     await gitInit(dir);
 
     await connect({ cwd: dir, yes: true });
@@ -118,7 +107,7 @@ describe("disconnect", () => {
   });
 
   it("disconnect leaves a foreign pre-commit hook untouched", async () => {
-    const dir = await freshDir();
+    const dir = await tmpDir("mage-disconnect-");
     await gitInit(dir);
 
     const hooksDir = await resolveHooksDir(dir);
@@ -133,7 +122,7 @@ describe("disconnect", () => {
   });
 
   it("gitHook:false skips hook removal entirely", async () => {
-    const dir = await freshDir();
+    const dir = await tmpDir("mage-disconnect-");
     await gitInit(dir);
 
     await connect({ cwd: dir, yes: true });

@@ -1,11 +1,11 @@
-import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
 import { CROSS, isGeneratedArtifact, scanNotes } from "./scan.js";
+import { tmpDir } from "../test/fixtures/kb.js";
 
 async function mkVault(): Promise<string> {
-  return mkdtemp(join(tmpdir(), "mage-scan-"));
+  return tmpDir("mage-scan-");
 }
 
 async function put(root: string, rel: string, content: string): Promise<void> {

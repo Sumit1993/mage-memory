@@ -1,24 +1,17 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { logger } from "../logger.js";
+import { tmpDir, withKb } from "../../test/fixtures/kb.js";
 import { stageCmd } from "./stage-cmd.js";
 
-const made: string[] = [];
-afterEach(async () => {
-  for (const d of made.splice(0)) await rm(d, { recursive: true, force: true });
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
-/** A minimal in-repo KB: <dir>/mage/{metadata.json,notes/}. */
+/** A minimal in-repo KB: <dir>/mage/{metadata.json}. */
 async function makeKb(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "mage-stage-"));
-  made.push(dir);
-  await mkdir(join(dir, "mage", "notes"), { recursive: true });
-  await writeFile(
-    join(dir, "mage", "metadata.json"),
-    `${JSON.stringify({ schema: "mage.v2", mode: "in-repo", project: "t" })}\n`,
-  );
+  const { dir } = await withKb();
   return dir;
 }
 
@@ -95,6 +88,7 @@ describe("mage stage", () => {
 
   it("skips a lesson already covered by a committed note", async () => {
     const dir = await makeKb();
+    await mkdir(join(dir, "mage", "notes"), { recursive: true });
     await writeFile(
       join(dir, "mage", "notes", "existing.md"),
       "---\ntype: gotcha\ntags: [mage/release]\nkeywords: [release, badge]\n---\n# Release badge\n",
@@ -121,8 +115,7 @@ describe("mage stage", () => {
   });
 
   it("errors with a friendly message when there is no KB", async () => {
-    const empty = await mkdtemp(join(tmpdir(), "mage-nokb-"));
-    made.push(empty);
+    const empty = await tmpDir("mage-nokb-");
     await expect(stageCmd({ dir: empty, title: "X", body: "y" })).rejects.toThrow(/No mage knowledge base/);
   });
 });

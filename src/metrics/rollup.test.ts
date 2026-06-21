@@ -1,6 +1,5 @@
-import { describe, expect, it, afterEach } from "vitest";
-import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { describe, expect, it } from "vitest";
+import { mkdir, writeFile, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { STATE_DIR, LEARNINGS_DIR, METRICS_DIR } from "../paths.js";
 import {
@@ -21,19 +20,7 @@ import {
   ROLLUP_VERSION,
   type Rollup,
 } from "./rollup.js";
-
-// ─── tmp fixture plumbing ─────────────────────────────────────────────────────
-
-const made: string[] = [];
-afterEach(async () => {
-  for (const d of made.splice(0)) await rm(d, { recursive: true, force: true });
-});
-
-async function tmp(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "mage-rollup-"));
-  made.push(dir);
-  return dir;
-}
+import { tmpDir } from "../../test/fixtures/kb.js";
 
 // ─── ObserveEvent builders (monotonic clock → lexical-max(ts) is last) ────────
 
@@ -81,13 +68,13 @@ function toJsonl(events: ObserveEvent[]): string {
 
 describe("readRollup — fresh empty rollup on missing/corrupt", () => {
   it("returns a fresh empty rollup when no file exists", async () => {
-    const dir = await tmp();
+    const dir = await tmpDir("mage-rollup-");
     const r = await readRollup(dir);
     expect(r).toEqual({ v: ROLLUP_VERSION, skills: {}, watermarks: {} });
   });
 
   it("returns a fresh empty rollup when the file is corrupt JSON (fail-open)", async () => {
-    const dir = await tmp();
+    const dir = await tmpDir("mage-rollup-");
     await mkdir(join(dir, STATE_DIR, METRICS_DIR), { recursive: true });
     await writeFile(rollupPath(dir), "{ not json", "utf8");
     const r = await readRollup(dir);
@@ -95,7 +82,7 @@ describe("readRollup — fresh empty rollup on missing/corrupt", () => {
   });
 
   it("round-trips a written rollup", async () => {
-    const dir = await tmp();
+    const dir = await tmpDir("mage-rollup-");
     const r: Rollup = {
       v: ROLLUP_VERSION,
       skills: {
@@ -112,7 +99,7 @@ describe("readRollup — fresh empty rollup on missing/corrupt", () => {
 
 describe("foldRollup — folds closed loads into per-skill stats", () => {
   it("folds one session of skill_load + tool_use into correct loads/matches/dims", async () => {
-    const dir = await tmp();
+    const dir = await tmpDir("mage-rollup-");
     const learnings = join(dir, STATE_DIR, LEARNINGS_DIR);
     await mkdir(learnings, { recursive: true });
 
@@ -138,7 +125,7 @@ describe("foldRollup — folds closed loads into per-skill stats", () => {
   });
 
   it("a second fold of the SAME unchanged file adds nothing (watermark idempotency)", async () => {
-    const dir = await tmp();
+    const dir = await tmpDir("mage-rollup-");
     const learnings = join(dir, STATE_DIR, LEARNINGS_DIR);
     await mkdir(learnings, { recursive: true });
 
@@ -154,7 +141,7 @@ describe("foldRollup — folds closed loads into per-skill stats", () => {
   });
 
   it("appending more events then re-folding only adds the newly-closed loads", async () => {
-    const dir = await tmp();
+    const dir = await tmpDir("mage-rollup-");
     const learnings = join(dir, STATE_DIR, LEARNINGS_DIR);
     await mkdir(learnings, { recursive: true });
     const file = join(learnings, `${SESSION}.jsonl`);
@@ -177,7 +164,7 @@ describe("foldRollup — folds closed loads into per-skill stats", () => {
   });
 
   it("ignores *.skills.jsonl sidecars and the .archive dir", async () => {
-    const dir = await tmp();
+    const dir = await tmpDir("mage-rollup-");
     const learnings = join(dir, STATE_DIR, LEARNINGS_DIR);
     await mkdir(join(learnings, ".archive"), { recursive: true });
 
@@ -207,7 +194,7 @@ describe("foldRollup — folds closed loads into per-skill stats", () => {
   });
 
   it("skips unparseable lines and returns a fresh rollup on an empty learnings dir", async () => {
-    const dir = await tmp();
+    const dir = await tmpDir("mage-rollup-");
     const learnings = join(dir, STATE_DIR, LEARNINGS_DIR);
     await mkdir(learnings, { recursive: true });
 
@@ -224,7 +211,7 @@ describe("foldRollup — folds closed loads into per-skill stats", () => {
 
 describe("writeRollup — JSON shape + trailing newline", () => {
   it("writes pretty JSON with a trailing newline and the locked shape", async () => {
-    const dir = await tmp();
+    const dir = await tmpDir("mage-rollup-");
     const learnings = join(dir, STATE_DIR, LEARNINGS_DIR);
     await mkdir(learnings, { recursive: true });
     const events: ObserveEvent[] = [load(WING_MATCH), prompt("webhook"), buildSessionEnd(base())];

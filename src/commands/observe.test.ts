@@ -1,5 +1,4 @@
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { PassThrough, type Readable } from "node:stream";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -7,9 +6,9 @@ import * as redactMod from "../redact.js";
 import { buildObserveCommand, observeCmd } from "./observe.js";
 import { STATE_DIR, LEARNINGS_DIR } from "../paths.js";
 import type { ObserveEvent } from "../observe/types.js";
+import { tmpDir, withKb } from "../../test/fixtures/kb.js";
 
 const SECRET = "ghp_0123456789abcdefghijklmnopqrstuvwx";
-const META = JSON.stringify({ schema: "mage.v1", mode: "in-repo", project: "x" });
 
 const realStdin = process.stdin;
 function withStdin(fake: Readable): void {
@@ -24,10 +23,8 @@ afterEach(() => {
 });
 
 async function mkRepo(): Promise<string> {
-  const repo = await mkdtemp(join(tmpdir(), "mage-observe-cmd-"));
-  await mkdir(join(repo, "mage"), { recursive: true });
-  await writeFile(join(repo, "mage", "metadata.json"), META);
-  return repo;
+  const { dir } = await withKb({ kind: "repo", prefix: "mage-observe-cmd-" });
+  return dir;
 }
 
 /** Feed `json` on stdin and run observeCmd; resolves after the command settles. */
@@ -340,7 +337,7 @@ describe("observeCmd — fail-open contract (never throws to the host hook)", ()
   });
 
   it("no KB found → resolves, writes nothing", async () => {
-    const plain = await mkdtemp(join(tmpdir(), "mage-observe-nokb-"));
+    const plain = await tmpDir("mage-observe-nokb-");
     await expect(
       run(JSON.stringify({ hook_event_name: "SessionStart", session_id: "s1", cwd: plain }), { cwd: plain }),
     ).resolves.toBeUndefined();

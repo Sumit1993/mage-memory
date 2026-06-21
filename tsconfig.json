@@ -6,7 +6,10 @@
     "lib": ["ES2022"],
     "types": ["node"],
     "outDir": "dist",
-    "rootDir": "src",
+    // rootDir is the repo root (not src) so `tsc --noEmit` can type-check the
+    // shared test fixtures under test/ alongside the src they import. The build
+    // (tsup) bundles from explicit src entries and is unaffected by rootDir.
+    "rootDir": ".",
 
     "strict": true,
     "noImplicitAny": true,
@@ -32,9 +35,9 @@
 
     "ignoreDeprecations": "6.0"
   },
-  "include": ["src/**/*"],
-  // Test files are intentionally INCLUDED so `tsc --noEmit` (the typecheck
-  // script + CI) and the editor both type-check them. The build (tsup) bundles
-  // from explicit entries and is unaffected.
+  // Test specs (src/**/*.test.ts) and the shared fixtures (test/**) are intentionally
+  // INCLUDED so `tsc --noEmit` (the typecheck script + CI) and the editor type-check
+  // them. The build (tsup) bundles from explicit src entries and is unaffected.
+  "include": ["src/**/*", "test/**/*"],
   "exclude": ["node_modules", "dist"]
 }

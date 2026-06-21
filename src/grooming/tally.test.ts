@@ -1,7 +1,7 @@
-import { afterEach, describe, expect, it } from "vitest";
-import { mkdtemp, mkdir, readFile, rm, unlink, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { describe, expect, it } from "vitest";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { tmpDir } from "../../test/fixtures/kb.js";
 import { STATE_DIR, LEARNINGS_DIR, METRICS_DIR } from "../paths.js";
 import {
   buildCompact,
@@ -20,18 +20,6 @@ import {
   readTally,
   writeTally,
 } from "./tally.js";
-
-// ─── tmp fixture plumbing ─────────────────────────────────────────────────────
-
-const made: string[] = [];
-afterEach(async () => {
-  for (const d of made.splice(0)) await rm(d, { recursive: true, force: true });
-});
-async function tmp(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "mage-promote-tally-"));
-  made.push(dir);
-  return dir;
-}
 
 // ─── ObserveEvent builders (monotonic clock) ──────────────────────────────────
 
@@ -76,19 +64,19 @@ const SIG_KEY = "payments::always,idempotency,validate,webhook";
 
 describe("readTally — fresh empty on missing/corrupt (fail-open)", () => {
   it("returns a fresh empty tally when no file exists", async () => {
-    const dir = await tmp();
+    const dir = await tmpDir();
     expect(await readTally(dir)).toEqual({ v: PROMOTE_VERSION, signatures: {}, sessions: {} });
   });
 
   it("returns a fresh empty tally when the file is corrupt JSON (fail-open)", async () => {
-    const dir = await tmp();
+    const dir = await tmpDir();
     await mkdir(join(dir, STATE_DIR, METRICS_DIR), { recursive: true });
     await writeFile(promoteTallyPath(dir), "{ not json", "utf8");
     expect(await readTally(dir)).toEqual({ v: PROMOTE_VERSION, signatures: {}, sessions: {} });
   });
 
   it("round-trips a written tally with a trailing newline", async () => {
-    const dir = await tmp();
+    const dir = await tmpDir();
     const t: PromoteTally = {
       v: PROMOTE_VERSION,
       signatures: {
@@ -129,7 +117,7 @@ describe("(a) idempotency — re-folding an unchanged stream is a no-op", () => 
   });
 
   it("foldTally twice over an unchanged file leaves counts stable", async () => {
-    const dir = await tmp();
+    const dir = await tmpDir();
     const learnings = join(dir, STATE_DIR, LEARNINGS_DIR);
     await mkdir(learnings, { recursive: true });
     await writeFile(join(learnings, "s-1.jsonl"), toJsonl(correctionSegment("s-1")), "utf8");
@@ -203,7 +191,7 @@ describe("(b2) min-work floor — a chapter below the work floor is skipped", ()
 
 describe("(b3) version migration — readTally discards an older-version tally", () => {
   it("an older-version tally is reset to fresh so it re-folds under the current chapter + de-noised-key unit", async () => {
-    const dir = await tmp();
+    const dir = await tmpDir();
     await mkdir(join(dir, STATE_DIR, METRICS_DIR), { recursive: true });
     const old = {
       v: 1,
@@ -230,7 +218,7 @@ describe("(c) two distinct sessions with the same signature → sessions === 2",
   });
 
   it("foldTally over two session files yields sessions === 2", async () => {
-    const dir = await tmp();
+    const dir = await tmpDir();
     const learnings = join(dir, STATE_DIR, LEARNINGS_DIR);
     await mkdir(learnings, { recursive: true });
     await writeFile(join(learnings, "s-1.jsonl"), toJsonl(correctionSegment("s-1")), "utf8");
@@ -245,7 +233,7 @@ describe("(c) two distinct sessions with the same signature → sessions === 2",
 
 describe("(d) purge-survival — signature counts survive a pruned session fold", () => {
   it("foldTally prunes a vanished session's fold but keeps its global contribution", async () => {
-    const dir = await tmp();
+    const dir = await tmpDir();
     const learnings = join(dir, STATE_DIR, LEARNINGS_DIR);
     await mkdir(learnings, { recursive: true });
     const f1 = join(learnings, "s-1.jsonl");
@@ -293,7 +281,7 @@ describe("never-regress offset", () => {
 
 describe("foldTally — fs orchestration", () => {
   it("ignores *.skills.jsonl sidecars and the .archive dir", async () => {
-    const dir = await tmp();
+    const dir = await tmpDir();
     const learnings = join(dir, STATE_DIR, LEARNINGS_DIR);
     await mkdir(join(learnings, ".archive"), { recursive: true });
     await writeFile(join(learnings, "s-1.jsonl"), toJsonl(correctionSegment("s-1")), "utf8");
@@ -308,7 +296,7 @@ describe("foldTally — fs orchestration", () => {
   });
 
   it("skips torn lines and an empty learnings dir (fail-open)", async () => {
-    const dir = await tmp();
+    const dir = await tmpDir();
     const learnings = join(dir, STATE_DIR, LEARNINGS_DIR);
     await mkdir(learnings, { recursive: true });
     const body = "{ garbage\n" + toJsonl(correctionSegment("s-1")) + "also not json\n";
@@ -319,7 +307,7 @@ describe("foldTally — fs orchestration", () => {
   });
 
   it("returns a fresh empty tally when the learnings dir does not exist", async () => {
-    const dir = await tmp();
+    const dir = await tmpDir();
     const t = await foldTally(dir, join(dir, STATE_DIR, LEARNINGS_DIR), null);
     expect(t).toEqual({ v: PROMOTE_VERSION, signatures: {}, sessions: {} });
   });

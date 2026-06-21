@@ -1,6 +1,5 @@
-import { afterEach, describe, expect, it } from "vitest";
-import { access, mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { describe, expect, it } from "vitest";
+import { access, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   buildCompact,
@@ -13,18 +12,12 @@ import {
 import type { ObserveEvent } from "../observe/types.js";
 import { computeDistillClusters, readDistill, SALIENCE_CAP } from "./reader.js";
 import { writeWatermark, DISTILL_VERSION } from "./watermark.js";
+import { tmpDir } from "../../test/fixtures/kb.js";
 
 // ─── tmp fixture plumbing ─────────────────────────────────────────────────────
 
-const made: string[] = [];
-afterEach(async () => {
-  for (const d of made.splice(0)) await rm(d, { recursive: true, force: true });
-});
-
 async function tmp(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "mage-distill-reader-"));
-  made.push(dir);
-  return dir;
+  return tmpDir("mage-distill-reader-");
 }
 
 // ─── ObserveEvent builders (monotonic clock) ──────────────────────────────────
