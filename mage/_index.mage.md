@@ -2,7 +2,7 @@
 
 # mage
 
-> 43 notes. Part of the [index](INDEX.md).
+> 47 notes. Part of the [index](INDEX.md).
 
 ### build
 
@@ -44,6 +44,9 @@
 - `decision` [0024 — Organic grooming loop: the lesson path (inline-primary + boundary nudge)](decisions/0024-organic-grooming-loop.md) — 0024, organic, grooming, loop, lesson, path, inline, primary, boundary, nudge, context, decision _(reviewed 2026-06-16)_
 - `decision` [0025 — One transient-state home (`.mage/`) + redact config in `metadata.json`](decisions/0025-one-transient-state-home.md) — 0025, one, transient, state, home, mage, redact, config, metadata, json, context, artifact _(reviewed 2026-06-18)_
 - `decision` [0026 — A hosted documentation website, generated from code](decisions/0026-hosted-docs-website.md) — 0026, hosted, documentation, website, generated, code, context, model, isn, answerable, docs, decision _(accepted · reviewed 2026-06-18)_
+- `decision` [0027 — Faultline: a friction/derivation capture trigger (prefilter, not miner)](decisions/0027-faultline-friction-capture-trigger.md) — 0027, faultline, friction, derivation, capture, trigger, prefilter, miner, context, decision, consequences, gate _(superseded · reviewed 2026-06-20)_
+- `decision` [0028 — Prose-keyed capture: corrections + recurrent failures (supersedes Faultline)](decisions/0028-prose-keyed-capture.md) — 0028, prose, keyed, capture, corrections, recurrent, failures, supersedes, faultline, context, decision, consequences _(superseded · reviewed 2026-06-20)_
+- `decision` [0029 — Digest-to-agent capture: deterministic narrowing, agent judgment (supersedes prose-keyed)](decisions/0029-digest-to-agent-capture.md) — 0029, digest, agent, capture, deterministic, narrowing, judgment, supersedes, prose, keyed, context, decision _(reviewed 2026-06-20)_
 
 ### design
 
@@ -53,6 +56,7 @@
 
 - `plan` [0.0.11 — "signal quality + autonomous capture"](notes/plan-0.0.11-signal-and-capture.md) — signal, quality, autonomous, capture, candidate, blocker, count, compact, chapters, session, ids, serves _(reviewed 2026-06-14)_
 - `plan` [Organic grooming loop (0.0.12) — the lesson path](notes/plan-0.0.12-organic-grooming-loop.md) — grooming, organic, lesson, first-sight, distill, staging, nudge, inline, claude-code-memory, redact, 0.0.12 _(reviewed 2026-06-15)_
+- `plan` [Faultline — friction/derivation capture trigger (Phase 1 plan)](notes/plan-faultline.md) — faultline, friction, derivation, capture, trigger, phase, plan, one, change, detector, src, distill _(reviewed 2026-06-20)_
 - `reference` [Replay-gate methodology — does a capture mechanism produce USEFUL knowledge?](notes/replay-gate-methodology.md) — replay, gate, methodology, capture, mechanism, produce, useful, knowledge, end, calibration, lessons, meta _(reviewed 2026-06-20)_
 
 ### plan
