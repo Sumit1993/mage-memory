@@ -15,9 +15,9 @@ import {
   metadataPath,
   writeHubMetadata,
 } from "../paths.js";
+import { DEFAULT_AUTONOMY } from "./autonomy-ladder.js";
 import {
   BASE_THRESHOLDS,
-  DEFAULT_AUTONOMY,
   DEFAULT_SENSITIVITY,
   readAutonomy,
   readSensitivity,

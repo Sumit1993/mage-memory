@@ -24,7 +24,8 @@ import { computeDigest, lastClosedChapter, renderDigest } from "../distill/diges
 import { distillWatermarkPath } from "../distill/watermark.js";
 import { readSessionStreams } from "../distill/reader.js";
 import { type BacklogTally, computeBacklog } from "../grooming/backlog.js";
-import { type Autonomy, readAutonomy, readSensitivity } from "../grooming/thresholds.js";
+import { type Autonomy, mandateFor } from "../grooming/autonomy-ladder.js";
+import { readAutonomy, readSensitivity } from "../grooming/thresholds.js";
 import type { ObserveEvent } from "../observe/types.js";
 import {
   type ResolvedDocsRoot,
@@ -200,30 +201,11 @@ async function scratchFingerprint(root: string): Promise<string> {
 
 /**
  * Template the autonomy-scaled mandate: the one-line backlog tally + the level-specific instruction.
- * Operator = a human reminder; Approver = authorized to groom + write durable notes uncommitted
- * (Gate-2 runs); Overseer = + dispose the borderline tier and graduate eligible notes. PURE.
+ * The per-level prose lives in the {@link mandateFor autonomy ladder}; the nudge owns only the tally
+ * line it feeds in.
  */
 function renderMandate(level: Autonomy, t: BacklogTally): string {
-  const line = backlogLine(t);
-  if (level === "approver") {
-    return (
-      `${line}\n` +
-      "You are authorized (autonomy: approver) to run `mage:groom` now and write the clearly-durable " +
-      "notes into the working tree, UNCOMMITTED (Gate-2 redaction runs); leave borderline drafts staged. " +
-      "Reviewing the diff is the review; the human's `git commit` is the confirm — mage never commits."
-    );
-  }
-  if (level === "overseer") {
-    return (
-      `${line}\n` +
-      "You are authorized (autonomy: overseer) to run `mage:groom` now: write durable notes, merge related " +
-      "lessons into existing notes, dispose the borderline tier, and `mage:graduate` eligible notes (Gate-2 " +
-      "runs; recurrence-gated). All writes land UNCOMMITTED in the working tree — the human audits `git log` " +
-      "and `git commit`s; mage never commits."
-    );
-  }
-  // operator (default) — a human reminder, no autonomous-write authorization.
-  return `${line}\nReview with \`mage:groom\` (autonomy: operator).`;
+  return mandateFor(level, backlogLine(t));
 }
 
 /**

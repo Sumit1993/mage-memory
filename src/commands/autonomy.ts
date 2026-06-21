@@ -22,7 +22,8 @@ import {
   writeHubMetadata,
   writeMetadata,
 } from "../paths.js";
-import { type Autonomy, DEFAULT_AUTONOMY, readAutonomy } from "../grooming/thresholds.js";
+import { readAutonomy } from "../grooming/thresholds.js";
+import { DEFAULT_AUTONOMY, coerceAutonomy, meaningOf } from "../grooming/autonomy-ladder.js";
 
 export interface AutonomyOptions {
   /** The level to set; omit to read the current level. */
@@ -30,16 +31,6 @@ export interface AutonomyOptions {
   /** Working directory used to resolve the KB (default: cwd; walks up). */
   dir?: string;
 }
-
-/** The three levels, in ladder order — the source for the error list and the meaning lookup. */
-const LEVELS: readonly Autonomy[] = ["operator", "approver", "overseer"];
-
-/** One-line meaning per level (ADR-0030 §1) — the human-role summary printed by the get path. */
-const MEANING: Record<Autonomy, string> = {
-  operator: "you run mage:groom, judge each draft, write + commit (HITL; the default)",
-  approver: "the agent grooms + writes clearly-durable notes uncommitted (Gate-2 runs); you review the diff + commit",
-  overseer: "as approver + the agent disposes the borderline tier and graduates eligible notes; you audit git log + commit",
-};
 
 /**
  * Get or set the autonomy level for the KB resolved from `dir`. With no `level`, prints the
@@ -61,7 +52,7 @@ export async function autonomy(opts: AutonomyOptions = {}): Promise<void> {
     const path = resolved.kind === "hub" ? hubMetadataPath(resolved.repo) : metadataPath(resolved.repo);
     const set = await isExplicitlySet(resolved);
     logger.info(`autonomy: ${level}`);
-    logger.detail(MEANING[level]);
+    logger.detail(meaningOf(level));
     logger.detail(set ? `set in ${path}` : `default (unset; absent ⇒ ${DEFAULT_AUTONOMY}) — would be set in ${path}`);
     return;
   }
@@ -81,12 +72,6 @@ export async function autonomy(opts: AutonomyOptions = {}): Promise<void> {
     await writeMetadata(resolved.repo, { ...meta, grooming });
     logger.success(`autonomy set to ${next} in ${metadataPath(resolved.repo)}; mage never commits; git add it to track`);
   }
-}
-
-/** Validate a user-supplied level against the three; throw (listing them) on anything else. */
-export function coerceAutonomy(value: string): Autonomy {
-  if (value === "operator" || value === "approver" || value === "overseer") return value;
-  throw new Error(`Unknown autonomy level '${value}'. Use one of: ${LEVELS.join(", ")}.`);
 }
 
 /** True iff `grooming.autonomy` is explicitly present on disk (vs. the unset default). */

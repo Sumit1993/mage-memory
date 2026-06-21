@@ -19,14 +19,12 @@ import {
   MIN_LOADS_FOR_SUGGESTION,
 } from "../metrics/context-match.js";
 import { readHubMetadata, readMetadata } from "../paths.js";
+import { type Autonomy, DEFAULT_AUTONOMY, narrowAutonomy } from "./autonomy-ladder.js";
 
 // ─── types ───────────────────────────────────────────────────────────────────
 
 /** The human dial (ADR-0019 §7): scales the recurrence gates together. */
 export type Sensitivity = "low" | "normal" | "high";
-
-/** The opt-in autonomy ladder (ADR-0030): how much of the grooming ladder the host agent drains. */
-export type Autonomy = "operator" | "approver" | "overseer";
 
 /** The full thresholds seam — every provisional grooming constant in one place. */
 export interface Thresholds {
@@ -46,13 +44,6 @@ export interface Thresholds {
 
 /** The dial's default when metadata is absent / invalid (ADR-0019 §7). */
 export const DEFAULT_SENSITIVITY: Sensitivity = "normal";
-
-/**
- * The autonomy default when metadata is absent / invalid (ADR-0030): "operator" —
- * the dial is opt-IN, so a fresh KB gets no surprise autonomous writes (it still gets
- * the new backlog signal). The maintainer raises their own repos to approver/overseer.
- */
-export const DEFAULT_AUTONOMY: Autonomy = "operator";
 
 /**
  * BASE = the @normal thresholds. These FINALIZE the provisional 0.0.6 numbers:
@@ -194,17 +185,11 @@ export async function readAutonomy(resolved: {
   } catch {
     return DEFAULT_AUTONOMY; // unreadable / unknown-schema metadata → safe default.
   }
-  return validateAutonomy(raw);
+  return narrowAutonomy(raw);
 }
 
 /** Narrow an untrusted value to a Sensitivity; anything else ⇒ DEFAULT_SENSITIVITY. */
 function validateSensitivity(v: unknown): Sensitivity {
   if (v === "low" || v === "normal" || v === "high") return v;
   return DEFAULT_SENSITIVITY;
-}
-
-/** Narrow an untrusted value to an Autonomy level; anything else ⇒ DEFAULT_AUTONOMY. */
-function validateAutonomy(v: unknown): Autonomy {
-  if (v === "operator" || v === "approver" || v === "overseer") return v;
-  return DEFAULT_AUTONOMY;
 }
