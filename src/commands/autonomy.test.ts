@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { META_DIR, METADATA_SCHEMA, metadataPath } from "../paths.js";
-import { autonomy, coerceAutonomy } from "./autonomy.js";
+import { autonomy } from "./autonomy.js";
 
 const made: string[] = [];
 afterEach(async () => {
@@ -35,18 +35,6 @@ async function readGrooming(dir: string): Promise<Record<string, unknown> | unde
   const parsed = JSON.parse(await readFile(metadataPath(dir), "utf8")) as Record<string, unknown>;
   return parsed.grooming as Record<string, unknown> | undefined;
 }
-
-describe("coerceAutonomy", () => {
-  it("accepts the three levels", () => {
-    expect(coerceAutonomy("operator")).toBe("operator");
-    expect(coerceAutonomy("approver")).toBe("approver");
-    expect(coerceAutonomy("overseer")).toBe("overseer");
-  });
-
-  it("throws on junk, listing all three", () => {
-    expect(() => coerceAutonomy("autopilot")).toThrow(/operator, approver, overseer/);
-  });
-});
 
 describe("mage autonomy — get", () => {
   it("prints the default (operator) when unset", async () => {

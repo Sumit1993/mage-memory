@@ -4,7 +4,7 @@ import type { ApplyResult } from "../dream/types.js";
 import { isRejected, readRejected, writeRejected } from "../grooming/proposals.js";
 import type { Proposal, ProposalAction } from "../grooming/types.js";
 import { logger } from "../logger.js";
-import { absolutePath, readHubMetadata, resolveDocsRoot } from "../paths.js";
+import { readHubMetadata, requireDocsRoot } from "../paths.js";
 
 /** The proposal actions the applier (`--apply`) accepts. */
 const VALID_ACTIONS: ReadonlySet<ProposalAction> = new Set<ProposalAction>([
@@ -45,11 +45,7 @@ export interface DreamResult extends DreamReport {
  * partial apply.
  */
 export async function dream(opts: DreamCmdOptions = {}): Promise<DreamResult> {
-  const start = absolutePath(opts.dir ?? process.cwd());
-  const resolved = await resolveDocsRoot(start);
-  if (!resolved) {
-    throw new Error(`No mage knowledge base found at or above ${start}. Run \`mage init\` first.`);
-  }
+  const resolved = await requireDocsRoot(opts.dir);
 
   // ── --apply: the single serialized writer (ADR-0016 §4). ──
   if (opts.apply) {

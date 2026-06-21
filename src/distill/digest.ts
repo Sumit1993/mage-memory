@@ -17,7 +17,7 @@
 // landed; adds the external-command channel (the richest missed gems lived there, surfaced by neither
 // dead detector).
 
-import type { ObserveEvent } from "../observe/types.js";
+import { type ObserveEvent, isTerminator } from "../observe/types.js";
 import { redact } from "../redact.js";
 
 // ─── tunable bounds (provisional; soak/gate-tunable — belong in thresholds.ts when wired) ──────
@@ -207,11 +207,6 @@ export interface DigestOptions {
 }
 
 // ─── chapter selection (the boundary nudge mines the just-closed chapter) ──────────────────────
-
-/** True iff an event is a chapter terminator (compact / session_end). */
-export function isTerminator(e: ObserveEvent): boolean {
-  return e.type === "compact" || e.type === "session_end";
-}
 
 /**
  * The events of the LAST CLOSED chapter in a stream — the run between the second-to-last and the

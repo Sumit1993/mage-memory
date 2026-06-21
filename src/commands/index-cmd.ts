@@ -5,9 +5,8 @@ import { updateGraphColorGroups } from "../obsidian.js";
 import {
   INDEX_FILE,
   type HubProject,
-  absolutePath,
   readHubMetadata,
-  resolveDocsRoot,
+  requireDocsRoot,
 } from "../paths.js";
 import { type ScannedNote, scanNotes } from "../scan.js";
 
@@ -34,11 +33,7 @@ export interface IndexResult {
  * and idempotent: same notes → identical output, re-run → no diff (ADR-0006).
  */
 export async function index(opts: IndexOptions = {}): Promise<IndexResult> {
-  const start = absolutePath(opts.dir ?? process.cwd());
-  const resolved = await resolveDocsRoot(start);
-  if (!resolved) {
-    throw new Error(`No mage knowledge base found at or above ${start}. Run \`mage init\` first.`);
-  }
+  const resolved = await requireDocsRoot(opts.dir);
   const root = resolved.root;
 
   const entries = await scanNotes(root);

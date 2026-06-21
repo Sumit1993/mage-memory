@@ -447,6 +447,23 @@ export async function resolveDocsRoot(startDir: string): Promise<ResolvedDocsRoo
 }
 
 /**
+ * Resolve the docs root to operate on, or THROW the canonical "no knowledge base" error. The
+ * resolve-or-throw every interactive command opens with: `dir` defaults to cwd and walks up
+ * ({@link resolveDocsRoot}). The hook path (the boundary nudge) must NOT use this — it pairs
+ * resolveDocsRoot with a fail-open `.catch(() => null)` so a missing KB never breaks session start.
+ */
+export async function requireDocsRoot(dir?: string): Promise<ResolvedDocsRoot> {
+  const start = absolutePath(dir ?? process.cwd());
+  const resolved = await resolveDocsRoot(start);
+  if (!resolved) {
+    throw new Error(
+      `No mage knowledge base found at or above ${start}. Run \`mage init\` or \`mage link\` first.`,
+    );
+  }
+  return resolved;
+}
+
+/**
  * Resolve a docs root given that `hub` is a hub root and `abs` is at or below it.
  * Inside `<hub>/projects/<name>/…` → that project's flat docs root; the hub root
  * itself or anywhere else under it → the hub root. Always kind "hub" (the hub repo

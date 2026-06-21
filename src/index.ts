@@ -253,11 +253,31 @@ export type {
 export {
   BASE_THRESHOLDS,
   DEFAULT_SENSITIVITY,
-  readSensitivity,
+  narrowSensitivity,
   type Sensitivity,
   type Thresholds,
   thresholdsFor,
 } from "./grooming/thresholds.js";
+// The grooming-config seam (ADR-0030): one read locates metadata.json → grooming; every
+// field narrows off it and the writer rides the same path. Replaces the per-field readers.
+export {
+  groomingFieldIsSet,
+  readAutonomy,
+  readGrooming,
+  readSensitivity,
+  type ResolvedGrooming,
+  writeGroomingField,
+} from "./grooming/config.js";
+// The opt-in autonomy ladder (ADR-0030): Operator → Approver → Overseer.
+export {
+  type Autonomy,
+  DEFAULT_AUTONOMY,
+  LEVELS as AUTONOMY_LEVELS,
+  coerceAutonomy,
+  mandateFor,
+  meaningOf,
+  narrowAutonomy,
+} from "./grooming/autonomy-ladder.js";
 export {
   keywordsFromText,
   segmentSignatures,
