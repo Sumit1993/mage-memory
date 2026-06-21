@@ -60,4 +60,14 @@ describe("withKb — each shape builds a resolvable KB", () => {
     expect(dir).toBe(root);
     expect((await readHubMetadata(repo))?.grooming?.autonomy).toBe("overseer");
   });
+
+  it("external: a code repo resolves through hub_path into the hub-owned project", async () => {
+    const { dir, root, repo, resolved } = await withKb({ kind: "external", grooming: { sensitivity: "low" } });
+    expect(resolved.kind).toBe("hub");
+    expect(resolved.repo).toBe(repo); // the hub
+    expect(resolved.root).toBe(root); // the hub-owned project dir
+    expect(dir).not.toBe(repo); // dir is the external code repo, distinct from the hub
+    expect((await readMetadata(dir))?.mode).toBe("external");
+    expect((await readHubMetadata(repo))?.grooming?.sensitivity).toBe("low");
+  });
 });

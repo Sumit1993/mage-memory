@@ -13,9 +13,9 @@
 // Auto-clean rides vitest's onTestFinished, so a test needs no `made[]` + afterEach of its own;
 // N builds in one test register N cleanups for free.
 //
-// Shapes covered: in-repo ("repo", default), hub ("hub", incl. registered projects), and a
-// hub-owned project ("project", the root != repo case). External-mode code repos are a low-
-// frequency shape (a handful of doctor/connect/verify tests) deferred to the sweep, by design.
+// Shapes covered: in-repo ("repo", default), hub ("hub", incl. registered projects), a hub-owned
+// project ("project", the root != repo case), and an external-mode code repo ("external") that
+// resolves through its hub_path into the hub-owned project.
 
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -44,19 +44,26 @@ export async function tmpDir(prefix = "mage-test-"): Promise<string> {
   return dir;
 }
 
-/** The KB layout to build. "repo" (default) = in-repo; "hub" = a hub root; "project" = a hub-owned project (root != repo). */
-export type KbKind = "repo" | "hub" | "project";
+/**
+ * The KB layout to build:
+ *   "repo" (default) — an in-repo code-repo KB.
+ *   "hub"            — a hub root (dir == root == repo).
+ *   "project"        — a hub-owned project, resolved as root (the project dir) != repo (the hub).
+ *   "external"       — an external-mode code repo pointing at a hub; resolves into the hub-owned
+ *                      project (root = <hub>/projects/<name>, repo = the hub). `dir` is the code repo.
+ */
+export type KbKind = "repo" | "hub" | "project" | "external";
 
 export interface WithKbOptions {
   /** The KB layout (default "repo"). */
   kind?: KbKind;
-  /** The grooming sub-object to write into metadata (omit ⇒ none). For "project" it lands in the HUB's metadata. */
+  /** The grooming sub-object to write into metadata (omit ⇒ none). For "project"/"external" it lands in the HUB's metadata. */
   grooming?: GroomingConfig;
   /** Metadata schema version (default 2). schema 1 exercises the migrate/normalize paths. */
   schema?: 1 | 2;
-  /** Hub projects to register ("hub" only). */
+  /** Hub projects to register ("hub"/"external"). */
   projects?: HubProject[];
-  /** The hub-owned project name ("project" only; default "p"). */
+  /** The hub-owned project name ("project"/"external"; default "p"). */
   project?: string;
   /** A temp-dir prefix override (debugging aid). */
   prefix?: string;
@@ -103,8 +110,33 @@ function hubMeta(schema: 1 | 2, grooming?: GroomingConfig, projects: HubProject[
   return meta;
 }
 
+function externalRepoMeta(schema: 1 | 2, hubPath: string, project: string): Record<string, unknown> {
+  return {
+    schema: schemaTag(schema),
+    mode: "external",
+    project,
+    hub_path: hubPath,
+    hub_repo: null,
+    hub_refs: [],
+    linked_at: "2026-06-08T00:00:00.000Z",
+  };
+}
+
 async function writeJson(path: string, value: unknown): Promise<void> {
   await writeFile(path, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+}
+
+/** Scaffold a hub root (projects/ dir + hub metadata) and return its path. */
+async function buildHub(
+  schema: 1 | 2,
+  grooming: GroomingConfig | undefined,
+  projects: HubProject[] | undefined,
+  prefix?: string,
+): Promise<string> {
+  const hub = await tmpDir(prefix);
+  await mkdir(join(hub, PROJECTS_DIR), { recursive: true }); // looksLikeHub needs projects/
+  await writeJson(hubMetadataPath(hub), hubMeta(schema, grooming, projects));
+  return hub;
 }
 
 async function mustResolve(dir: string): Promise<ResolvedDocsRoot> {
@@ -116,28 +148,38 @@ async function mustResolve(dir: string): Promise<ResolvedDocsRoot> {
 /** Build a temp KB of the requested shape, resolve it, and return a uniform handle. Auto-cleaned. */
 export async function withKb(opts: WithKbOptions = {}): Promise<KbHandle> {
   const { kind = "repo", grooming, schema = 2, projects, project = "p", prefix } = opts;
-  const base = await tmpDir(prefix);
 
   if (kind === "repo") {
+    const base = await tmpDir(prefix);
     await mkdir(join(base, META_DIR), { recursive: true });
     await writeJson(metadataPath(base), inRepoMeta(schema, grooming));
     const resolved = await mustResolve(base);
     return { dir: base, root: resolved.root, repo: base, resolved };
   }
 
+  if (kind === "external") {
+    // An external-mode code repo whose metadata points at a hub; resolution follows hub_path into
+    // the hub-owned project. The hub owns the docs + grooming (repo == hub); dir is the code repo.
+    const hub = await buildHub(schema, grooming, projects, prefix);
+    await mkdir(hubProjectDocsRoot(hub, project), { recursive: true });
+    const repoDir = await tmpDir(prefix);
+    await mkdir(join(repoDir, META_DIR), { recursive: true });
+    await writeJson(metadataPath(repoDir), externalRepoMeta(schema, hub, project));
+    const resolved = await mustResolve(repoDir);
+    return { dir: repoDir, root: resolved.root, repo: hub, resolved };
+  }
+
   // "hub" / "project": grooming + projects live in the hub's own metadata at the hub root.
-  // looksLikeHub requires a projects/ dir alongside the metadata, so create it.
-  await mkdir(join(base, PROJECTS_DIR), { recursive: true });
-  await writeJson(hubMetadataPath(base), hubMeta(schema, grooming, projects));
+  const hub = await buildHub(schema, grooming, projects, prefix);
 
   if (kind === "hub") {
-    const resolved = await mustResolve(base);
-    return { dir: base, root: base, repo: base, resolved };
+    const resolved = await mustResolve(hub);
+    return { dir: hub, root: hub, repo: hub, resolved };
   }
 
   // "project": a hub-owned project subdir, resolved as root (the project dir) != repo (the hub).
-  const projectDir = hubProjectDocsRoot(base, project);
+  const projectDir = hubProjectDocsRoot(hub, project);
   await mkdir(projectDir, { recursive: true });
   const resolved = await mustResolve(projectDir);
-  return { dir: projectDir, root: projectDir, repo: base, resolved };
+  return { dir: projectDir, root: projectDir, repo: hub, resolved };
 }
