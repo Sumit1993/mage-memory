@@ -1,7 +1,7 @@
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
+import { tmpDir } from "../test/fixtures/kb.js";
 import {
   type ClaudeSettings,
   MAGE_HOOKS,
@@ -13,16 +13,7 @@ import {
   writeClaudeSettings,
 } from "./claude-settings.js";
 
-const made: string[] = [];
-afterEach(async () => {
-  for (const d of made.splice(0)) await rm(d, { recursive: true, force: true });
-});
-
-async function tmp(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "mage-settings-"));
-  made.push(dir);
-  return dir;
-}
+const tmp = (): Promise<string> => tmpDir("mage-settings-");
 
 describe("MAGE_HOOKS table", () => {
   it("wires exactly the ten expected event/id/command rows", () => {

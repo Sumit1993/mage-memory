@@ -1,7 +1,7 @@
-import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { tmpDir, withKb } from "../../test/fixtures/kb.js";
 import * as pathsMod from "../paths.js";
 import {
   hubMetadataPath,
@@ -12,17 +12,9 @@ import {
 } from "../paths.js";
 import { mageMigrate } from "./migrate.js";
 
-const made: string[] = [];
-afterEach(async () => {
+afterEach(() => {
   vi.restoreAllMocks();
-  for (const d of made.splice(0)) await rm(d, { recursive: true, force: true });
 });
-
-async function tmp(prefix: string): Promise<string> {
-  const d = await mkdtemp(join(tmpdir(), prefix));
-  made.push(d);
-  return d;
-}
 
 /** True iff `p` exists on disk (file or dir). */
 async function present(p: string): Promise<boolean> {
@@ -36,7 +28,8 @@ async function present(p: string): Promise<boolean> {
 
 describe("mage migrate", () => {
   it("upgrades a v1 code-repo metadata file to v2 on disk (mode normalized + persisted)", async () => {
-    const code = await tmp("mage-mig-code-");
+    // Bespoke v1 metadata: hub_refs populated so v1 in-repo+hub_refs normalizes to "hybrid".
+    const code = await tmpDir("mage-mig-code-");
     await mkdir(join(code, "mage"), { recursive: true });
     await writeFile(
       metadataPath(code),
@@ -60,7 +53,9 @@ describe("mage migrate", () => {
   });
 
   it("upgrades a v1 hub metadata file (storage in-repo → repo-owned, schema v2)", async () => {
-    const hub = await tmp("mage-mig-hub-");
+    // Bespoke v1 hub: project storage "in-repo" is a foreign-schema value (withKb types
+    // HubProject.storage as the v2 union), so the v1 hub shape stays a local writer.
+    const hub = await tmpDir("mage-mig-hub-");
     await mkdir(join(hub, "projects"), { recursive: true }); // makes looksLikeHub() true
     await writeFile(
       hubMetadataPath(hub),
@@ -79,65 +74,26 @@ describe("mage migrate", () => {
   });
 
   it("is idempotent: a v2 KB reports already-current and rewrites nothing", async () => {
-    const code = await tmp("mage-mig-v2-");
-    await mkdir(join(code, "mage"), { recursive: true });
-    await writeFile(
-      metadataPath(code),
-      JSON.stringify({
-        schema: "mage.v2",
-        mode: "in-repo",
-        project: "x",
-        hub_path: null,
-        hub_repo: null,
-        hub_refs: [],
-        linked_at: "t",
-      }),
-    );
+    const { dir: code } = await withKb({ kind: "repo", schema: 2 });
     const result = await mageMigrate({ dir: code });
     expect(result.migrated).toHaveLength(0);
     expect(result.alreadyCurrent).toHaveLength(1);
   });
 
   it("walks up from a subdir to find the code repo", async () => {
-    const code = await tmp("mage-mig-walk-");
-    await mkdir(join(code, "mage"), { recursive: true });
-    await writeFile(
-      metadataPath(code),
-      JSON.stringify({
-        schema: "mage.v1",
-        mode: "in-repo",
-        project: "x",
-        hub_path: null,
-        hub_repo: null,
-        hub_refs: [],
-        linked_at: "t",
-      }),
-    );
+    const { dir: code } = await withKb({ kind: "repo", schema: 1 });
     const sub = join(code, "src", "deep");
     await mkdir(sub, { recursive: true });
     expect((await mageMigrate({ dir: sub })).migrated).toHaveLength(1);
   });
 
   it("throws when there is no KB at or above dir", async () => {
-    const empty = await tmp("mage-mig-none-");
+    const empty = await tmpDir("mage-mig-none-");
     await expect(mageMigrate({ dir: empty })).rejects.toThrow(/no mage knowledge base/i);
   });
 });
 
 // ─── state-fold layout migration (ADR-0025) ──────────────────────────────────
-
-/** A v1 in-repo code-repo metadata (drives the v1→v2 bump alongside the fold). */
-function v1CodeMeta(): string {
-  return JSON.stringify({
-    schema: "mage.v1",
-    mode: "in-repo",
-    project: "x",
-    hub_path: null,
-    hub_repo: null,
-    hub_refs: [],
-    linked_at: "t",
-  });
-}
 
 /**
  * Seed the pre-fold transient dirs at `docsRoot` with sentinel content:
@@ -161,10 +117,7 @@ async function seedOldLayout(
 
 describe("mage migrate — state fold (ADR-0025)", () => {
   it("folds an old code-repo layout under .mage/ byte-identically + folds .redactignore + bumps schema", async () => {
-    const code = await tmp("mage-fold-code-");
-    const docs = join(code, "mage");
-    await mkdir(docs, { recursive: true });
-    await writeFile(metadataPath(code), v1CodeMeta());
+    const { dir: code, root: docs } = await withKb({ kind: "repo", schema: 1 });
     const seed = await seedOldLayout(docs);
     // One glob (→ ignore) and one literal: line (→ allow).
     await writeFile(
@@ -205,10 +158,7 @@ describe("mage migrate — state fold (ADR-0025)", () => {
   });
 
   it("is idempotent: a second run moves nothing and leaves content unchanged", async () => {
-    const code = await tmp("mage-fold-idem-");
-    const docs = join(code, "mage");
-    await mkdir(docs, { recursive: true });
-    await writeFile(metadataPath(code), v1CodeMeta());
+    const { dir: code, root: docs } = await withKb({ kind: "repo", schema: 1 });
     const seed = await seedOldLayout(docs);
 
     await mageMigrate({ dir: code }); // first run does the fold
@@ -223,21 +173,14 @@ describe("mage migrate — state fold (ADR-0025)", () => {
   });
 
   it("moves each hub project's dirs under projects/<name>/.mage/", async () => {
-    const hub = await tmp("mage-fold-hub-");
-    await mkdir(join(hub, "projects", "alpha"), { recursive: true });
-    await mkdir(join(hub, "projects", "beta"), { recursive: true });
-    await writeFile(
-      hubMetadataPath(hub),
-      JSON.stringify({
-        schema: "mage.v2",
-        name: "h",
-        created_at: "t",
-        projects: [
-          { name: "alpha", storage: "repo-owned", code_repo_path: "/a", code_repo_url: "u" },
-          { name: "beta", storage: "repo-owned", code_repo_path: "/b", code_repo_url: "u" },
-        ],
-      }),
-    );
+    const { dir: hub } = await withKb({
+      kind: "hub",
+      schema: 2,
+      projects: [
+        { name: "alpha", storage: "repo-owned", code_repo_path: "/a", code_repo_url: "u" },
+        { name: "beta", storage: "repo-owned", code_repo_path: "/b", code_repo_url: "u" },
+      ],
+    });
     const alpha = join(hub, "projects", "alpha");
     const beta = join(hub, "projects", "beta");
     const seedA = await seedOldLayout(alpha);
@@ -260,20 +203,15 @@ describe("mage migrate — state fold (ADR-0025)", () => {
   });
 
   it("folds a .redactignore found at a hub project into the hub's single metadata", async () => {
-    const hub = await tmp("mage-fold-hubredact-");
-    await mkdir(join(hub, "projects", "alpha"), { recursive: true });
-    await writeFile(
-      hubMetadataPath(hub),
-      JSON.stringify({
-        schema: "mage.v2",
-        name: "h",
-        created_at: "t",
-        projects: [
-          { name: "alpha", storage: "repo-owned", code_repo_path: "/a", code_repo_url: "u" },
-        ],
-      }),
-    );
+    const { dir: hub } = await withKb({
+      kind: "hub",
+      schema: 2,
+      projects: [
+        { name: "alpha", storage: "repo-owned", code_repo_path: "/a", code_repo_url: "u" },
+      ],
+    });
     const alpha = join(hub, "projects", "alpha");
+    await mkdir(alpha, { recursive: true });
     await writeFile(join(alpha, ".redactignore"), "work/**\nliteral:ghp_exampletoken\n");
 
     await mageMigrate({ dir: hub });
@@ -286,10 +224,7 @@ describe("mage migrate — state fold (ADR-0025)", () => {
   });
 
   it("fail-safe: a pre-existing .mage/learnings target leaves the old .learnings intact (no data lost)", async () => {
-    const code = await tmp("mage-fold-failsafe-");
-    const docs = join(code, "mage");
-    await mkdir(docs, { recursive: true });
-    await writeFile(metadataPath(code), v1CodeMeta());
+    const { dir: code, root: docs } = await withKb({ kind: "repo", schema: 1 });
     const seed = await seedOldLayout(docs);
 
     // Simulate a partial prior run: the target already holds a draft of its own.
@@ -317,10 +252,7 @@ describe("mage migrate — state fold (ADR-0025)", () => {
   });
 
   it("never loses data: every leaf's bytes are reachable at exactly one location after the fold", async () => {
-    const code = await tmp("mage-fold-nodata-");
-    const docs = join(code, "mage");
-    await mkdir(docs, { recursive: true });
-    await writeFile(metadataPath(code), v1CodeMeta());
+    const { dir: code, root: docs } = await withKb({ kind: "repo", schema: 1 });
     const seed = await seedOldLayout(docs);
 
     await mageMigrate({ dir: code });
@@ -347,10 +279,7 @@ describe("mage migrate — state fold (ADR-0025)", () => {
   });
 
   it("never loses the allowlist: a failed metadata write leaves .redactignore intact for a retry", async () => {
-    const code = await tmp("mage-fold-writefail-");
-    const docs = join(code, "mage");
-    await mkdir(docs, { recursive: true });
-    await writeFile(metadataPath(code), v1CodeMeta());
+    const { dir: code, root: docs } = await withKb({ kind: "repo", schema: 1 });
     const ignoreText = "notes/generated/**\nliteral:AKIAEXAMPLENOTREAL\n";
     await writeFile(join(docs, ".redactignore"), ignoreText);
 
@@ -379,7 +308,9 @@ describe("mage migrate — state fold (ADR-0025)", () => {
   });
 
   it("unions a .redactignore over existing metadata.redact (base-first, deduped)", async () => {
-    const code = await tmp("mage-fold-union-");
+    // Bespoke v2 metadata carrying a pre-existing redact allowlist (withKb's inRepoMeta
+    // has no redact knob), so the base-redact shape stays a local writer.
+    const code = await tmpDir("mage-fold-union-");
     const docs = join(code, "mage");
     await mkdir(docs, { recursive: true });
     // v2 metadata already carrying a redact allowlist (base).

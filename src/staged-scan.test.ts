@@ -1,7 +1,7 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
+import { tmpDir, withKb } from "../test/fixtures/kb.js";
 import { run } from "./shell.js";
 import { scanStaged } from "./staged-scan.js";
 
@@ -12,18 +12,6 @@ const SECRET = "sk-ant-api03-" + "AbCdEf0123456789AbCdEf0123456789AbCdEf";
 // Plain prose: no key=value, no high-entropy blob, no email — stays clean.
 const CLEAN = "just some ordinary notes about the weather today\n";
 
-const made: string[] = [];
-afterEach(async () => {
-  for (const d of made.splice(0)) await rm(d, { recursive: true, force: true });
-});
-
-/** A temp dir cleaned up after each test. */
-async function tmp(): Promise<string> {
-  const d = await mkdtemp(join(tmpdir(), "mage-staged-"));
-  made.push(d);
-  return d;
-}
-
 /** Init a git repo with a committer identity so `git add` works deterministically. */
 async function initRepo(dir: string): Promise<void> {
   await run("git", ["-C", dir, "init", "--quiet"], { throwOnError: true });
@@ -31,20 +19,6 @@ async function initRepo(dir: string): Promise<void> {
     throwOnError: true,
   });
   await run("git", ["-C", dir, "config", "user.name", "Test"], { throwOnError: true });
-}
-
-/**
- * A git repo that is ALSO a mage in-repo KB: Gate-2 is SCOPED to the docs root
- * (`mage/`), so the staged secret must live under it to be in scope. Without a KB,
- * scanStaged is a no-op gate (see the dedicated test).
- */
-async function initMageRepo(dir: string): Promise<void> {
-  await initRepo(dir);
-  await mkdir(join(dir, "mage"), { recursive: true });
-  await writeFile(
-    join(dir, "mage", "metadata.json"),
-    JSON.stringify({ schema: "mage.v1", mode: "in-repo", project: "t" }),
-  );
 }
 
 /** Write `content` to repo-relative `name` (creating parents) and stage it. */
@@ -57,8 +31,8 @@ async function addFile(dir: string, name: string, content: string): Promise<void
 
 describe("scanStaged — blocks on a staged secret UNDER the docs root, file-attributed, never raw", () => {
   it("flags a planted secret in a mage/ note as blocked and attributes it to its file", async () => {
-    const dir = await tmp();
-    await initMageRepo(dir);
+    const { dir } = await withKb();
+    await initRepo(dir);
     await addFile(dir, "mage/notes/leak.md", `ANTHROPIC_API_KEY=${SECRET}\n`);
 
     const { findings, blocked, scannedFiles } = await scanStaged(dir);
@@ -80,8 +54,8 @@ describe("scanStaged — blocks on a staged secret UNDER the docs root, file-att
     // With git's default core.quotePath, `git diff --name-only` C-quotes this
     // name to `"mage/notes/caf\303\251.md"`, which `git show :<quoted>` rejects — the
     // file would be silently SKIPPED and its secret committed. `-z` emits the raw path.
-    const dir = await tmp();
-    await initMageRepo(dir);
+    const { dir } = await withKb();
+    await initRepo(dir);
     await addFile(dir, "mage/notes/café.md", `ANTHROPIC_API_KEY=${SECRET}\n`);
 
     const { findings, blocked, scannedFiles } = await scanStaged(dir);
@@ -93,8 +67,8 @@ describe("scanStaged — blocks on a staged secret UNDER the docs root, file-att
   });
 
   it("attributes findings across multiple staged files under mage/", async () => {
-    const dir = await tmp();
-    await initMageRepo(dir);
+    const { dir } = await withKb();
+    await initRepo(dir);
     await addFile(dir, "mage/notes/a.md", `API_KEY=${SECRET}\n`);
     await addFile(dir, "mage/notes/clean.md", CLEAN);
 
@@ -108,8 +82,8 @@ describe("scanStaged — blocks on a staged secret UNDER the docs root, file-att
 
 describe("scanStaged — SCOPE: only the knowledge base is gated, never app source", () => {
   it("does NOT scan a staged secret OUTSIDE the docs root (e.g. src/ test fixtures)", async () => {
-    const dir = await tmp();
-    await initMageRepo(dir);
+    const { dir } = await withKb();
+    await initRepo(dir);
     // A secret-shaped fixture in application source — exactly mage's own redaction
     // tests. Gate-2 protects `mage/`, not `src/`, so this must NOT block.
     await addFile(dir, "src/redact.test.ts", `const fixture = "${SECRET}";\n`);
@@ -122,8 +96,8 @@ describe("scanStaged — SCOPE: only the knowledge base is gated, never app sour
   });
 
   it("scans only the mage/ file when both a mage/ note and a src/ file are staged", async () => {
-    const dir = await tmp();
-    await initMageRepo(dir);
+    const { dir } = await withKb();
+    await initRepo(dir);
     await addFile(dir, "src/leak.test.ts", `const fixture = "${SECRET}";\n`); // out of scope
     await addFile(dir, "mage/notes/clean.md", CLEAN); // in scope, clean
 
@@ -137,12 +111,8 @@ describe("scanStaged — SCOPE: only the knowledge base is gated, never app sour
     // A standalone hub: top-level metadata.json + projects/ registry → resolveDocsRoot
     // returns kind=hub with root=repo, so the scope prefix is "" (everything). A hub is
     // a pure notes vault (ADR-0011), so "scan all staged" == "scan the whole KB".
-    const dir = await tmp();
+    const { dir } = await withKb({ kind: "hub" });
     await initRepo(dir);
-    await writeFile(
-      join(dir, "metadata.json"),
-      JSON.stringify({ schema: "mage.v1", name: "h", created_at: "2026-06-08", projects: [] }),
-    );
     await addFile(dir, "projects/p/notes/leak.md", `API_KEY=${SECRET}\n`);
 
     const { blocked, findings } = await scanStaged(dir);
@@ -154,8 +124,8 @@ describe("scanStaged — SCOPE: only the knowledge base is gated, never app sour
 
 describe("scanStaged — clean / empty / no-KB do not block", () => {
   it("returns blocked=false with a clean staged file under mage/", async () => {
-    const dir = await tmp();
-    await initMageRepo(dir);
+    const { dir } = await withKb();
+    await initRepo(dir);
     await addFile(dir, "mage/notes/notes.md", CLEAN);
 
     const { findings, blocked, scannedFiles } = await scanStaged(dir);
@@ -166,8 +136,8 @@ describe("scanStaged — clean / empty / no-KB do not block", () => {
   });
 
   it("returns blocked=false with nothing staged", async () => {
-    const dir = await tmp();
-    await initMageRepo(dir);
+    const { dir } = await withKb();
+    await initRepo(dir);
 
     const { findings, blocked, scannedFiles } = await scanStaged(dir);
 
@@ -177,7 +147,7 @@ describe("scanStaged — clean / empty / no-KB do not block", () => {
   });
 
   it("is a no-op gate in a git repo with NO mage KB (nothing tracked-and-shared to protect)", async () => {
-    const dir = await tmp();
+    const dir = await tmpDir();
     await initRepo(dir); // a git repo, but NOT a mage KB.
     await addFile(dir, "leak.env", `API_KEY=${SECRET}\n`);
 
@@ -189,7 +159,7 @@ describe("scanStaged — clean / empty / no-KB do not block", () => {
 
 describe("scanStaged — fail-open on a non-git dir (never throws)", () => {
   it("returns the safe empty result for a plain (non-repo) dir", async () => {
-    const dir = await tmp(); // git init NOT run → not a repo.
+    const dir = await tmpDir(); // git init NOT run → not a repo.
 
     const result = await scanStaged(dir);
 
@@ -199,8 +169,8 @@ describe("scanStaged — fail-open on a non-git dir (never throws)", () => {
 
 describe("scanStaged — 0.0.12 false-positive fixes (generated artifacts + metadata.redact)", () => {
   it("does NOT scan mage's own generated artifacts, even if they carry a secret-shaped string", async () => {
-    const dir = await tmp();
-    await initMageRepo(dir);
+    const { dir } = await withKb();
+    await initRepo(dir);
     // Generated index/scaffolding + host-adapter skill files: skipped wholesale —
     // their content is mage-authored and their path strings trip the detector.
     await addFile(dir, "mage/INDEX.md", `API_KEY=${SECRET}\n`);
@@ -214,8 +184,8 @@ describe("scanStaged — 0.0.12 false-positive fixes (generated artifacts + meta
   });
 
   it("still scans an AUTHORED note alongside skipped generated artifacts", async () => {
-    const dir = await tmp();
-    await initMageRepo(dir);
+    const { dir } = await withKb();
+    await initRepo(dir);
     await addFile(dir, "mage/INDEX.md", `API_KEY=${SECRET}\n`); // generated → skipped
     await addFile(dir, "mage/notes/leak.md", `API_KEY=${SECRET}\n`); // authored → scanned + blocks
 
@@ -226,7 +196,7 @@ describe("scanStaged — 0.0.12 false-positive fixes (generated artifacts + meta
   });
 
   it("skips a file matched by a metadata.redact.ignore glob but scans the rest", async () => {
-    const dir = await tmp();
+    const dir = await tmpDir();
     await initRepo(dir);
     await mkdir(join(dir, "mage"), { recursive: true });
     // Write metadata with a redact.ignore glob covering the generated dump path.
@@ -249,7 +219,7 @@ describe("scanStaged — 0.0.12 false-positive fixes (generated artifacts + meta
   });
 
   it("a metadata.redact.allow literal suppresses an in-note false positive", async () => {
-    const dir = await tmp();
+    const dir = await tmpDir();
     await initRepo(dir);
     await mkdir(join(dir, "mage"), { recursive: true });
     // Write metadata with the secret-shaped string in the allow list.
@@ -271,8 +241,8 @@ describe("scanStaged — 0.0.12 false-positive fixes (generated artifacts + meta
   });
 
   it("DOES scan a user-authored subdir file that merely shares a reserved basename (no bypass)", async () => {
-    const dir = await tmp();
-    await initMageRepo(dir);
+    const { dir } = await withKb();
+    await initRepo(dir);
     // mage generates INDEX.md only at the docs ROOT. A file named INDEX.md inside a
     // subdir is author content — a secret there MUST still block (Gate-2 bypass guard).
     await addFile(dir, "mage/notes/INDEX.md", `API_KEY=${SECRET}\n`);
@@ -284,8 +254,8 @@ describe("scanStaged — 0.0.12 false-positive fixes (generated artifacts + meta
   });
 
   it("still skips a per-wing _index.*.md at any depth (genuinely generated anywhere)", async () => {
-    const dir = await tmp();
-    await initMageRepo(dir);
+    const { dir } = await withKb();
+    await initRepo(dir);
     await addFile(dir, "mage/notes/_index.mage.md", `API_KEY=${SECRET}\n`); // generated per-wing
 
     const { blocked, scannedFiles } = await scanStaged(dir);
@@ -300,7 +270,7 @@ describe("scanStaged — 0.0.12 false-positive fixes (generated artifacts + meta
     // A `redact.allow` literal stored there is secret-shaped (same Anthropic key form
     // as SECRET) — this test pins that it is suppressed (blocked=false) and that BOTH
     // files are counted as scanned (scannedFiles===2).
-    const dir = await tmp();
+    const dir = await tmpDir();
     await initRepo(dir);
     await mkdir(join(dir, "mage"), { recursive: true });
     // Stage metadata.json (via addFile → git add) with the allow literal in it.

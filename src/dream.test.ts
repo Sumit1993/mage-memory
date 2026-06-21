@@ -1,34 +1,26 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
-import { init } from "./commands/init.js";
+import { describe, expect, it } from "vitest";
 import { analyzeDream } from "./dream.js";
 import type { HubMetadata, HubProject } from "./paths.js";
+import { withKb } from "../test/fixtures/kb.js";
 
-const made: string[] = [];
-afterEach(async () => {
-  for (const d of made.splice(0)) await rm(d, { recursive: true, force: true });
-});
-
+/** A built, resolved in-repo KB; returns its docs root (the `mage/` dir). */
 async function vault(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "mage-dream-"));
-  made.push(dir);
-  await init({ mode: "in-repo", yes: true, codeRepo: dir, project: "t" });
-  return dir;
+  const kb = await withKb({ kind: "repo" });
+  return kb.root;
 }
-async function note(dir: string, rel: string, content: string): Promise<void> {
-  const p = join(dir, "mage", "notes", rel);
+async function note(root: string, rel: string, content: string): Promise<void> {
+  const p = join(root, "notes", rel);
   await mkdir(join(p, ".."), { recursive: true });
   await writeFile(p, content);
 }
 /** Write a note at an arbitrary path under the docs root (e.g. projects/...). */
-async function putRaw(dir: string, relUnderRoot: string, content: string): Promise<void> {
-  const p = join(dir, "mage", relUnderRoot);
+async function putRaw(root: string, relUnderRoot: string, content: string): Promise<void> {
+  const p = join(root, relUnderRoot);
   await mkdir(join(p, ".."), { recursive: true });
   await writeFile(p, content);
 }
-const root = (dir: string) => join(dir, "mage");
 const FRESH = "2026-06-01";
 const NOW = new Date("2026-06-10");
 
@@ -37,7 +29,7 @@ describe("mage dream (read-only health report)", () => {
     const dir = await vault();
     await note(dir, "a.md", `---\ntags: [w/r]\nlast_reviewed: "${FRESH}"\n---\n# A\n\n## Relations\n- see_also [B](b.md)\n`);
     await note(dir, "b.md", `---\ntags: [w/r]\nlast_reviewed: "${FRESH}"\n---\n# B\n\n## Relations\n- see_also [A](a.md)\n`);
-    const r = await analyzeDream(root(dir), { now: NOW, staleDays: 180 });
+    const r = await analyzeDream(dir, { now: NOW, staleDays: 180 });
     expect(r.clean).toBe(true);
     expect(r.noteCount).toBe(2);
   });
@@ -46,7 +38,7 @@ describe("mage dream (read-only health report)", () => {
     const dir = await vault();
     await note(dir, "old.md", `---\ntags: [w/r]\nstatus: active\nlast_reviewed: "${FRESH}"\n---\n# Old\n\n## Relations\n- see_also [New](new.md)\n`);
     await note(dir, "new.md", `---\ntags: [w/r]\nlast_reviewed: "${FRESH}"\n---\n# New\n\n## Relations\n- supersedes [Old](old.md)\n`);
-    const r = await analyzeDream(root(dir), { now: NOW });
+    const r = await analyzeDream(dir, { now: NOW });
     expect(r.supersededButActive.map((f) => f.note)).toContain("notes/old.md");
   });
 
@@ -54,7 +46,7 @@ describe("mage dream (read-only health report)", () => {
     const dir = await vault();
     await note(dir, "old.md", `---\ntags: [w/r]\nstatus: active\nlast_reviewed: "${FRESH}"\n---\n# Old\n\n## Relations\n- superseded_by [New](new.md)\n`);
     await note(dir, "new.md", `---\ntags: [w/r]\nlast_reviewed: "${FRESH}"\n---\n# New\n\n## Relations\n- see_also [Old](old.md)\n`);
-    const r = await analyzeDream(root(dir), { now: NOW });
+    const r = await analyzeDream(dir, { now: NOW });
     expect(r.supersededButActive.map((f) => f.note)).toContain("notes/old.md");
   });
 
@@ -62,7 +54,7 @@ describe("mage dream (read-only health report)", () => {
     const dir = await vault();
     await note(dir, "locks.md", `---\ntags: [w/r]\nstatus: active\nlast_reviewed: "${FRESH}"\n---\n# Locks\n\n## Relations\n- revised_by [ADR](adr.md)\n`);
     await note(dir, "adr.md", `---\ntags: [w/r]\nlast_reviewed: "${FRESH}"\n---\n# ADR\n\n## Relations\n- revises [Locks](locks.md)\n`);
-    const r = await analyzeDream(root(dir), { now: NOW });
+    const r = await analyzeDream(dir, { now: NOW });
     expect(r.supersededButActive).toEqual([]);
   });
 
@@ -70,7 +62,7 @@ describe("mage dream (read-only health report)", () => {
     const dir = await vault();
     await note(dir, "a.md", `---\ntags: [w/r]\nlast_reviewed: "${FRESH}"\n---\n# A\nSee [gone](missing.md). Example: \`[x](x.md)\` is not a real link.\n\n## Relations\n- see_also [B](b.md)\n`);
     await note(dir, "b.md", `---\ntags: [w/r]\nlast_reviewed: "${FRESH}"\n---\n# B\n\n## Relations\n- see_also [A](a.md)\n`);
-    const r = await analyzeDream(root(dir), { now: NOW });
+    const r = await analyzeDream(dir, { now: NOW });
     const dangling = r.danglingLinks.filter((f) => f.note === "notes/a.md");
     expect(dangling.length).toBe(1);
     expect(dangling[0]?.detail).toContain("missing.md");
@@ -82,7 +74,7 @@ describe("mage dream (read-only health report)", () => {
     await note(dir, "a.md", `---\ntags: [w/r]\nlast_reviewed: "${FRESH}"\n---\n# A\n\n## Relations\n- see_also [B](b.md)\n`);
     await note(dir, "b.md", `---\ntags: [w/r]\nlast_reviewed: "${FRESH}"\n---\n# B\n\n## Relations\n- see_also [A](a.md)\n`);
     await note(dir, "lonely.md", `---\ntags: [w/r]\nlast_reviewed: "${FRESH}"\n---\n# Lonely\n`);
-    const r = await analyzeDream(root(dir), { now: NOW });
+    const r = await analyzeDream(dir, { now: NOW });
     expect(r.orphans.map((f) => f.note)).toContain("notes/lonely.md");
     expect(r.orphans.map((f) => f.note)).not.toContain("notes/a.md");
   });
@@ -92,7 +84,7 @@ describe("mage dream (read-only health report)", () => {
     await note(dir, "old.md", `---\ntags: [w/r]\nlast_reviewed: "2020-01-01"\n---\n# Old\n\n## Relations\n- see_also [Fresh](fresh.md)\n`);
     await note(dir, "fresh.md", `---\ntags: [w/r]\nlast_reviewed: "${FRESH}"\n---\n# Fresh\n\n## Relations\n- see_also [Old](old.md)\n`);
     await note(dir, "noreview.md", `---\ntags: [w/r]\n---\n# NoReview\n\n## Relations\n- see_also [Fresh](fresh.md)\n`);
-    const r = await analyzeDream(root(dir), { now: NOW, staleDays: 180 });
+    const r = await analyzeDream(dir, { now: NOW, staleDays: 180 });
     const staleNotes = r.stale.map((f) => f.note);
     expect(staleNotes).toContain("notes/old.md");
     expect(staleNotes).toContain("notes/noreview.md");
@@ -103,7 +95,7 @@ describe("mage dream (read-only health report)", () => {
     const dir = await vault();
     await note(dir, "z.md", `---\ntags: [w/r]\n---\n# Z\n`);
     await note(dir, "a.md", `---\ntags: [w/r]\n---\n# A\n`);
-    const r = await analyzeDream(root(dir), { now: NOW });
+    const r = await analyzeDream(dir, { now: NOW });
     const orphans = r.orphans.map((f) => f.note);
     expect(orphans).toEqual([...orphans].sort());
   });
@@ -113,14 +105,14 @@ describe("mage dream (read-only health report)", () => {
   it("counts a projects/ note exactly once (recursion, no duplication)", async () => {
     const dir = await vault();
     await putRaw(dir, "projects/p/notes/n.md", `---\ntags: [eng/api]\nlast_reviewed: "${FRESH}"\n---\n# N\n`);
-    const r = await analyzeDream(root(dir), { now: NOW });
+    const r = await analyzeDream(dir, { now: NOW });
     expect(r.noteCount).toBe(1);
   });
 
   it("counts a multi-homed note once and yields at most one orphan finding", async () => {
     const dir = await vault();
     await note(dir, "multi.md", `---\ntags: [a/x, b/y]\nlast_reviewed: "${FRESH}"\n---\n# Multi\n`);
-    const r = await analyzeDream(root(dir), { now: NOW });
+    const r = await analyzeDream(dir, { now: NOW });
     expect(r.noteCount).toBe(1);
     expect(r.orphans.filter((f) => f.note === "notes/multi.md")).toHaveLength(1);
   });
@@ -128,10 +120,8 @@ describe("mage dream (read-only health report)", () => {
 
 describe("mage dream — info-tier drift signals (never failures)", () => {
   async function hubFixture(): Promise<string> {
-    const dir = await mkdtemp(join(tmpdir(), "mage-dreamhub-"));
-    made.push(dir);
-    await mkdir(join(dir, "projects"), { recursive: true });
-    return dir;
+    const kb = await withKb({ kind: "hub" });
+    return kb.root;
   }
   async function writeAt(rootDir: string, rel: string, content: string): Promise<void> {
     const p = join(rootDir, rel);
@@ -183,7 +173,7 @@ describe("mage dream — info-tier drift signals (never failures)", () => {
   it("an in-repo base (no registry) reports no project drift", async () => {
     const dir = await vault();
     await note(dir, "a.md", `---\ntags: [w/r]\nlast_reviewed: "${FRESH}"\n---\n# A\n`);
-    const r = await analyzeDream(root(dir), { now: NOW });
+    const r = await analyzeDream(dir, { now: NOW });
     expect(r.emptyProjects).toEqual([]);
     expect(r.unregisteredProjectDirs).toEqual([]);
   });

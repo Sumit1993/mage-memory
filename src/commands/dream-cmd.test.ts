@@ -1,8 +1,8 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { PassThrough, type Readable } from "node:stream";
 import { afterEach, describe, expect, it } from "vitest";
+import { tmpDir } from "../../test/fixtures/kb.js";
 import { init } from "./init.js";
 import { dream } from "./dream-cmd.js";
 import { readNote } from "../note.js";
@@ -19,16 +19,13 @@ function restoreStdin(): void {
   Object.defineProperty(process, "stdin", { value: realStdin, configurable: true });
 }
 
-const made: string[] = [];
-afterEach(async () => {
+afterEach(() => {
   restoreStdin();
-  for (const d of made.splice(0)) await rm(d, { recursive: true, force: true });
 });
 
 /** A fresh in-repo mage KB in a tmp dir; returns the code-repo root. */
 async function mkKb(): Promise<string> {
-  const repo = await mkdtemp(join(tmpdir(), "mage-dream-cmd-"));
-  made.push(repo);
+  const repo = await tmpDir("mage-dream-cmd-");
   await init({ mode: "in-repo", yes: true, codeRepo: repo });
   return repo;
 }

@@ -1,8 +1,8 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { PassThrough, type Readable } from "node:stream";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { tmpDir, withKb } from "../../test/fixtures/kb.js";
 import { run } from "../shell.js";
 import { redactCmd } from "./redact.js";
 
@@ -31,9 +31,9 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-/** A temp dir whose lifetime is the test run (vitest tears the OS tmp down). */
+/** A temp dir whose lifetime is the test run (auto-cleaned). */
 async function mkTmp(): Promise<string> {
-  return mkdtemp(join(tmpdir(), "mage-redact-"));
+  return tmpDir("mage-redact-");
 }
 
 describe("redactCmd — stdin path (target undefined or '-')", () => {
@@ -157,25 +157,14 @@ describe("redactCmd — report (non-quiet) prints findings without leaking secre
 // planted secret in a mage/ note with FILE-attributed, masked output, passes a
 // clean note, and fails open on a non-git dir.
 
-const stagedDirs: string[] = [];
-afterEach(async () => {
-  for (const d of stagedDirs.splice(0)) await rm(d, { recursive: true, force: true });
-});
-
 /** A throwaway git repo that is ALSO a mage in-repo KB (Gate-2 is docs-root scoped). */
 async function mkStagedRepo(): Promise<string> {
-  const d = await mkdtemp(join(tmpdir(), "mage-redact-staged-"));
-  stagedDirs.push(d);
+  const { dir: d } = await withKb({ prefix: "mage-redact-staged-" });
   await run("git", ["-C", d, "init", "--quiet"], { throwOnError: true });
   await run("git", ["-C", d, "config", "user.email", "test@example.com"], {
     throwOnError: true,
   });
   await run("git", ["-C", d, "config", "user.name", "Test"], { throwOnError: true });
-  await mkdir(join(d, "mage"), { recursive: true });
-  await writeFile(
-    join(d, "mage", "metadata.json"),
-    JSON.stringify({ schema: "mage.v1", mode: "in-repo", project: "t" }),
-  );
   return d;
 }
 

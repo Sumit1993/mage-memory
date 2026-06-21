@@ -1,19 +1,14 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { Proposal } from "../grooming/types.js";
 import { readNote } from "../note.js";
 import { GEN_MARKER, SKILL_PREFIX, TARGET_AGENT_DIRS } from "../skills-shared.js";
+import { tmpDir } from "../../test/fixtures/kb.js";
 import { applyProposal } from "./applier.js";
 import { planDemote } from "./demote.js";
 
 // ─── tmp fixture plumbing (house pattern; the executor is a read-only planner) ──
-
-const made: string[] = [];
-afterEach(async () => {
-  for (const d of made.splice(0)) await rm(d, { recursive: true, force: true });
-});
 
 interface Fixture {
   repo: string;
@@ -21,8 +16,7 @@ interface Fixture {
 }
 
 async function fixture(): Promise<Fixture> {
-  const root = await mkdtemp(join(tmpdir(), "mage-demote-"));
-  made.push(root);
+  const root = await tmpDir("mage-demote-");
   const repo = join(root, "repo");
   const docsRoot = join(repo, "mage");
   await mkdir(docsRoot, { recursive: true });

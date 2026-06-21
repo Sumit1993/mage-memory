@@ -1,24 +1,13 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { exists } from "../paths.js";
+import { withKb } from "../../test/fixtures/kb.js";
 import { groomCmd } from "./groom-cmd.js";
 import { stageCmd } from "./stage-cmd.js";
 
-const made: string[] = [];
-afterEach(async () => {
-  for (const d of made.splice(0)) await rm(d, { recursive: true, force: true });
-});
-
 async function makeKb(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "mage-groom-"));
-  made.push(dir);
-  await mkdir(join(dir, "mage", "notes"), { recursive: true });
-  await writeFile(
-    join(dir, "mage", "metadata.json"),
-    `${JSON.stringify({ schema: "mage.v2", mode: "in-repo", project: "t" })}\n`,
-  );
+  const { dir } = await withKb();
   return dir;
 }
 
@@ -67,6 +56,7 @@ describe("mage groom — surface", () => {
     // A note covering the lesson lands in notes/ (e.g. another session committed it).
     // The draft's keywords derive from its title + tags → [alpha, redaction, rule,
     // mage, redact]; the note must share >= 3 of them to clear the lesson bar.
+    await mkdir(join(dir, "mage", "notes"), { recursive: true });
     await writeFile(
       join(dir, "mage", "notes", "covers.md"),
       "---\ntype: gotcha\ntags: [mage/redact]\nkeywords: [alpha, redaction, rule, mage]\n---\n# Alpha redaction\n",

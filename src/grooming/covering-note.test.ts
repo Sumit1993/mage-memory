@@ -1,21 +1,7 @@
-import { afterEach, describe, expect, it } from "vitest";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { describe, expect, it } from "vitest";
 import type { ScannedNote } from "../scan.js";
+import { tmpDir } from "../../test/fixtures/kb.js";
 import { coveringNote, coveringNoteMin, isCovered } from "./covering-note.js";
-
-// ─── tmp fixture plumbing (house pattern; this module is pure) ────────────────
-
-const made: string[] = [];
-afterEach(async () => {
-  for (const d of made.splice(0)) await rm(d, { recursive: true, force: true });
-});
-async function tmp(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "mage-promote-cover-"));
-  made.push(dir);
-  return dir;
-}
 
 // ─── ScannedNote fixtures ─────────────────────────────────────────────────────
 
@@ -112,7 +98,7 @@ describe("coveringNoteMin — parameterized overlap threshold (the lesson-path b
 
 describe("coveringNote — returns the FIRST covering note (deterministic)", () => {
   it("returns the covering note, or null when none covers", async () => {
-    await tmp(); // exercise the house tmp pattern
+    await tmpDir(); // exercise the house tmp pattern
     const a = note({ relPath: "notes/a.md", wing: "payments", keywords: ["webhook"] });
     const b = note({ relPath: "notes/b.md", wing: "payments", keywords: ["webhook", "retry"] });
     const found = coveringNote({ wing: "payments", keywords: ["webhook"] }, [a, b]);

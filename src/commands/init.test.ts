@@ -1,20 +1,13 @@
-import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
+import { tmpDir } from "../../test/fixtures/kb.js";
 import { gitInit } from "../git.js";
 import { METADATA_SCHEMA, exists, readHubMetadata } from "../paths.js";
 import { init } from "./init.js";
 
-const made: string[] = [];
-afterEach(async () => {
-  for (const d of made.splice(0)) await rm(d, { recursive: true, force: true });
-});
-
 async function fresh(): Promise<string> {
-  const d = await mkdtemp(join(tmpdir(), "mage-init-"));
-  made.push(d);
-  return d;
+  return tmpDir("mage-init-");
 }
 
 describe("mage init --in-repo", () => {

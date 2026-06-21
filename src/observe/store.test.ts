@@ -1,15 +1,14 @@
 import {
   mkdir,
-  mkdtemp,
   readFile,
   readdir,
   stat,
   utimes,
   writeFile,
 } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { tmpDir, withKb } from "../../test/fixtures/kb.js";
 import {
   LEARNINGS_ARCHIVE_DIR,
   LEARNINGS_DIR,
@@ -33,28 +32,7 @@ import {
 } from "./store.js";
 import type { ObserveEvent } from "./types.js";
 
-const META = JSON.stringify({ schema: "mage.v1", mode: "in-repo", project: "x" });
 const BASE = { ts: "2026-06-06T00:00:00.000Z", session: "sess-1" };
-
-async function mkTmp(): Promise<string> {
-  return mkdtemp(join(tmpdir(), "mage-observe-store-"));
-}
-
-/** A code repo with an in-repo mage KB (mage/metadata.json present). */
-async function inRepoKb(): Promise<string> {
-  const repo = await mkTmp();
-  await mkdir(join(repo, "mage"), { recursive: true });
-  await writeFile(join(repo, "mage", "metadata.json"), META);
-  return repo;
-}
-
-/** A hub root (projects/ + metadata.json). */
-async function hubKb(): Promise<string> {
-  const hub = await mkTmp();
-  await mkdir(join(hub, "projects"), { recursive: true });
-  await writeFile(join(hub, "metadata.json"), JSON.stringify({ schema: "mage.v1", name: "h" }));
-  return hub;
-}
 
 const toolEvent = (): ObserveEvent =>
   buildToolUse(BASE, { tool: "Read", paths: ["/a.ts"], detail: null, ok: true, error_summary: null });
@@ -64,17 +42,17 @@ const skillEvent = (): ObserveEvent =>
 
 describe("resolveLearningsDir", () => {
   it("returns <repo>/mage/.mage/learnings for an in-repo KB", async () => {
-    const repo = await inRepoKb();
-    expect(await resolveLearningsDir(repo)).toBe(learningsPath(join(repo, "mage")));
+    const { dir, root } = await withKb();
+    expect(await resolveLearningsDir(dir)).toBe(learningsPath(root));
   });
 
   it("returns <hub>/.mage/learnings for a hub KB", async () => {
-    const hub = await hubKb();
-    expect(await resolveLearningsDir(hub)).toBe(learningsPath(hub));
+    const { dir, root } = await withKb({ kind: "hub" });
+    expect(await resolveLearningsDir(dir)).toBe(learningsPath(root));
   });
 
   it("returns null when no KB is found", async () => {
-    const plain = await mkTmp();
+    const plain = await tmpDir();
     expect(await resolveLearningsDir(plain)).toBeNull();
   });
 });
@@ -104,7 +82,7 @@ describe("sessionFilePath — session-id sanitization", () => {
 
 describe("appendEvent — append-only (O_APPEND, no read-before-append)", () => {
   it("creates the dir + file and writes exactly one JSON line per append", async () => {
-    const repo = await inRepoKb();
+    const { dir: repo } = await withKb();
     await appendEvent(repo, BASE.session, toolEvent());
     await appendEvent(repo, BASE.session, toolEvent());
     const dir = (await resolveLearningsDir(repo)) as string;
@@ -119,7 +97,7 @@ describe("appendEvent — append-only (O_APPEND, no read-before-append)", () => 
   });
 
   it("preserves causal order (line order == append order)", async () => {
-    const repo = await inRepoKb();
+    const { dir: repo } = await withKb();
     await appendEvent(
       repo,
       BASE.session,
@@ -133,7 +111,7 @@ describe("appendEvent — append-only (O_APPEND, no read-before-append)", () => 
   });
 
   it("concurrent appends produce two well-formed parseable lines (no interleaving)", async () => {
-    const repo = await inRepoKb();
+    const { dir: repo } = await withKb();
     await Promise.all([
       appendEvent(repo, BASE.session, toolEvent()),
       appendEvent(repo, BASE.session, toolEvent()),
@@ -145,7 +123,7 @@ describe("appendEvent — append-only (O_APPEND, no read-before-append)", () => 
   });
 
   it("keeps each serialized line under the atomic-write threshold (< PIPE_BUF 4096)", async () => {
-    const repo = await inRepoKb();
+    const { dir: repo } = await withKb();
     // A tool_use whose detail/error are at their caps — the largest line shape.
     const big = buildToolUse(BASE, {
       tool: "Bash",
@@ -161,7 +139,7 @@ describe("appendEvent — append-only (O_APPEND, no read-before-append)", () => 
   });
 
   it("writes skill_load events to a per-session sidecar (.skills.jsonl) for longer retention", async () => {
-    const repo = await inRepoKb();
+    const { dir: repo } = await withKb();
     await appendEvent(repo, BASE.session, skillEvent());
     const dir = (await resolveLearningsDir(repo)) as string;
     const sidecar = join(dir, `${BASE.session}.skills.jsonl`);
@@ -171,7 +149,7 @@ describe("appendEvent — append-only (O_APPEND, no read-before-append)", () => 
   });
 
   it("does NOT write a tool_use to the skills sidecar", async () => {
-    const repo = await inRepoKb();
+    const { dir: repo } = await withKb();
     await appendEvent(repo, BASE.session, toolEvent());
     const dir = (await resolveLearningsDir(repo)) as string;
     const sidecar = join(dir, `${BASE.session}.skills.jsonl`);
@@ -179,14 +157,14 @@ describe("appendEvent — append-only (O_APPEND, no read-before-append)", () => 
   });
 
   it("fails open (does not throw) when no KB is found", async () => {
-    const plain = await mkTmp();
+    const plain = await tmpDir();
     await expect(appendEvent(plain, BASE.session, toolEvent())).resolves.toBeUndefined();
   });
 });
 
 describe("rotation — size cap (ECC parity)", () => {
   it("rotates a file >= ROTATE_MAX_BYTES into .archive and starts fresh", async () => {
-    const repo = await inRepoKb();
+    const { dir: repo } = await withKb();
     const dir = (await resolveLearningsDir(repo)) as string;
     await mkdir(dir, { recursive: true });
     const file = sessionFilePath(dir, BASE.session);
@@ -217,7 +195,7 @@ describe("age-purge — retention split (skill_load retained longer)", () => {
   }
 
   it("deletes full archives older than TOOL_USE_PURGE_DAYS while a same-age .skills.jsonl survives", async () => {
-    const repo = await inRepoKb();
+    const { dir: repo } = await withKb();
     const dir = (await resolveLearningsDir(repo)) as string;
     await mkdir(dir, { recursive: true });
     const full = await seedArchive(dir, "sess-1-old.jsonl", TOOL_USE_PURGE_DAYS + 5);
@@ -230,7 +208,7 @@ describe("age-purge — retention split (skill_load retained longer)", () => {
   });
 
   it("deletes a .skills.jsonl only past SKILL_LOAD_PURGE_DAYS", async () => {
-    const repo = await inRepoKb();
+    const { dir: repo } = await withKb();
     const dir = (await resolveLearningsDir(repo)) as string;
     await mkdir(dir, { recursive: true });
     const skills = await seedArchive(dir, "sess-1-veryold.skills.jsonl", SKILL_LOAD_PURGE_DAYS + 5);
@@ -241,7 +219,7 @@ describe("age-purge — retention split (skill_load retained longer)", () => {
   });
 
   it("is throttled once-per-day by a fresh .last-purge marker (old archive survives)", async () => {
-    const repo = await inRepoKb();
+    const { dir: repo } = await withKb();
     const dir = (await resolveLearningsDir(repo)) as string;
     await mkdir(dir, { recursive: true });
     const full = await seedArchive(dir, "sess-1-old.jsonl", TOOL_USE_PURGE_DAYS + 5);

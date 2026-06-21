@@ -1,7 +1,7 @@
-import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
+import { tmpDir } from "../test/fixtures/kb.js";
 import { gitInit } from "./git.js";
 import {
   REDACT_HOOK_BODY,
@@ -11,17 +11,8 @@ import {
   resolveHooksDir,
 } from "./git-hooks.js";
 
-const made: string[] = [];
-afterEach(async () => {
-  for (const d of made.splice(0)) await rm(d, { recursive: true, force: true });
-});
-
 /** A plain (non-git) temp dir. */
-async function freshDir(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "mage-githooks-"));
-  made.push(dir);
-  return dir;
-}
+const freshDir = (): Promise<string> => tmpDir("mage-githooks-");
 
 /** A temp dir that is an initialized git repo. */
 async function freshRepo(): Promise<string> {

@@ -1,25 +1,17 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { HubProject } from "../paths.js";
 import { verify } from "./verify.js";
-
-const made: string[] = [];
-afterEach(async () => {
-  for (const d of made.splice(0)) await rm(d, { recursive: true, force: true });
-});
+import { withKb } from "../../test/fixtures/kb.js";
 
 /** A minimally-valid hub root (passes the structure checks) + a registry. */
 async function makeHub(projects: HubProject[]): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "mage-verify-"));
-  made.push(dir);
-  for (const d of ["projects", "notes", "archive"]) await mkdir(join(dir, d), { recursive: true });
+  const { dir } = await withKb({ kind: "hub", projects, prefix: "mage-verify-" });
+  // verify requires notes/ + archive/ on disk (the fixture only builds projects/),
+  // and INDEX.md is the recommended hub index.
+  for (const d of ["notes", "archive"]) await mkdir(join(dir, d), { recursive: true });
   await writeFile(join(dir, "INDEX.md"), "# Index\n");
-  await writeFile(
-    join(dir, "metadata.json"),
-    `${JSON.stringify({ schema: "mage.v1", name: "h", created_at: "2026-06-03", projects }, null, 2)}\n`,
-  );
   return dir;
 }
 const project = (name: string, storage: HubProject["storage"]): HubProject => ({

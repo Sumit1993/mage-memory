@@ -1,31 +1,17 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { tmpDir, withKb } from "../../test/fixtures/kb.js";
 import { logger } from "../logger.js";
 import { exists, readHubMetadata, readMetadata } from "../paths.js";
 import { init } from "./init.js";
 import { link } from "./link.js";
 
-const made: string[] = [];
-afterEach(async () => {
-  for (const d of made.splice(0)) await rm(d, { recursive: true, force: true });
-});
-
 async function makeHub(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "mage-hub-"));
-  made.push(dir);
-  await mkdir(join(dir, "projects"), { recursive: true });
-  await writeFile(
-    join(dir, "metadata.json"),
-    `${JSON.stringify({ schema: "mage.v1", name: "h", created_at: "2026-06-03", projects: [] }, null, 2)}\n`,
-  );
-  return dir;
+  return (await withKb({ kind: "hub" })).dir;
 }
 async function emptyRepo(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "mage-code-"));
-  made.push(dir);
-  return dir;
+  return tmpDir("mage-code-");
 }
 
 describe("mage link", () => {

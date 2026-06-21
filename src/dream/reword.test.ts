@@ -1,20 +1,13 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
+import { tmpDir } from "../../test/fixtures/kb.js";
 import { parseNote } from "../note.js";
 import { GEN_MARKER, TARGET_AGENT_DIRS } from "../skills-shared.js";
 import { planReword } from "./reword.js";
 
-const made: string[] = [];
-afterEach(async () => {
-  for (const d of made.splice(0)) await rm(d, { recursive: true, force: true });
-});
-
 async function tmpRepo(): Promise<string> {
-  const repo = await mkdtemp(join(tmpdir(), "mage-reword-"));
-  made.push(repo);
-  return repo;
+  return tmpDir("mage-reword-");
 }
 
 function skillMd(name: string, description: string, wing = "billing"): string {

@@ -1,24 +1,11 @@
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { collectDashboardData } from "./collect.js";
 import { PROMOTE_VERSION } from "../grooming/tally.js";
+import { tmpDir } from "../../test/fixtures/kb.js";
 
 // ─── fixture plumbing ────────────────────────────────────────────────────────
-
-/** Temp dirs created during a test, cleaned up afterEach. */
-const made: string[] = [];
-
-afterEach(async () => {
-  for (const d of made.splice(0)) await rm(d, { recursive: true, force: true });
-});
-
-async function tmpKb(prefix: string): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), prefix));
-  made.push(root);
-  return root;
-}
 
 /** Write a note with frontmatter + body under the docs root. */
 async function note(
@@ -53,7 +40,7 @@ describe("collectDashboardData — populated KB", () => {
    * promote tally + scratch. Asserts the collected counts/proposals/wings/metrics.
    */
   async function populated(): Promise<string> {
-    const root = await tmpKb("mage-dash-pop-");
+    const root = await tmpDir("mage-dash-pop-");
 
     // wing "alpha": two notes (one links to the other), rooms "core".
     await note(
@@ -247,7 +234,7 @@ describe("collectDashboardData — populated KB", () => {
 
 describe("collectDashboardData — cold KB (no .metrics)", () => {
   it("returns a valid, zeroed snapshot without throwing", async () => {
-    const root = await tmpKb("mage-dash-cold-");
+    const root = await tmpDir("mage-dash-cold-");
     await note(root, "notes/only.md", { type: "note" }, "# Only Note\n\nNothing else.");
 
     const data = await collectDashboardData({ root, kind: "repo" }, FIXED_OPTS);
@@ -274,7 +261,7 @@ describe("collectDashboardData — cold KB (no .metrics)", () => {
   });
 
   it("a completely empty KB (zero notes) still yields a valid snapshot", async () => {
-    const root = await tmpKb("mage-dash-empty-");
+    const root = await tmpDir("mage-dash-empty-");
     const data = await collectDashboardData({ root, kind: "repo" }, FIXED_OPTS);
 
     expect(data.kpis.notes).toBe(0);
@@ -289,7 +276,7 @@ describe("collectDashboardData — cold KB (no .metrics)", () => {
 
 describe("collectDashboardData — hub KB (registry)", () => {
   it("fills registry pointers from hub metadata (names/urls/paths only)", async () => {
-    const root = await tmpKb("mage-dash-hub-");
+    const root = await tmpDir("mage-dash-hub-");
     await mkdir(join(root, "projects"), { recursive: true });
     await writeFile(
       join(root, "metadata.json"),

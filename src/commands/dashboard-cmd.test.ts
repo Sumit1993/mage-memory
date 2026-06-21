@@ -1,20 +1,14 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { dashboard } from "./dashboard-cmd.js";
 import { init } from "./init.js";
 import { codeRepoDocsRoot } from "../paths.js";
-
-const made: string[] = [];
-afterEach(async () => {
-  for (const d of made.splice(0)) await rm(d, { recursive: true, force: true });
-});
+import { tmpDir } from "../../test/fixtures/kb.js";
 
 /** A fresh in-repo mage KB in a tmp dir; returns the code-repo root. */
 async function mkKb(): Promise<string> {
-  const repo = await mkdtemp(join(tmpdir(), "mage-dashboard-cmd-"));
-  made.push(repo);
+  const repo = await tmpDir("mage-dashboard-cmd-");
   await init({ mode: "in-repo", yes: true, codeRepo: repo });
   // Plant one real note so the snapshot is non-trivial.
   const docs = codeRepoDocsRoot(repo);
@@ -75,8 +69,7 @@ describe("dashboard command — cockpit tier (--html)", () => {
 
 describe("dashboard command — no KB", () => {
   it("prints a friendly error and returns no paths (never throws)", async () => {
-    const empty = await mkdtemp(join(tmpdir(), "mage-dashboard-nokb-"));
-    made.push(empty);
+    const empty = await tmpDir("mage-dashboard-nokb-");
     const result = await dashboard({ cwd: empty });
     expect(result.written).toEqual([]);
   });

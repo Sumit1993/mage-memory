@@ -1,21 +1,13 @@
-import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
+import { tmpDir, withKb } from "../../test/fixtures/kb.js";
 import { gitInit } from "../git.js";
 import { REDACT_HOOK_MARKER, resolveHooksDir } from "../git-hooks.js";
-import { METADATA_SCHEMA } from "../paths.js";
 import { connect, connectAllProjects } from "./connect.js";
 
-const made: string[] = [];
-afterEach(async () => {
-  for (const d of made.splice(0)) await rm(d, { recursive: true, force: true });
-});
-
 async function freshDir(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "mage-connect-"));
-  made.push(dir);
-  return dir;
+  return tmpDir("mage-connect-");
 }
 
 function localPath(dir: string): string {
@@ -120,8 +112,7 @@ describe("connect", () => {
   it("--user targets the user path", async () => {
     const dir = await freshDir();
     // resolveSettingsTarget for user maps to homedir()/.claude/settings.json; assert scope + path tail.
-    const home = await mkdtemp(join(tmpdir(), "mage-home-"));
-    made.push(home);
+    const home = await tmpDir("mage-home-");
     const origHome = process.env.HOME;
     process.env.HOME = home;
     try {
@@ -223,10 +214,8 @@ describe("connect", () => {
   }
 
   it("in-repo KB: connect gitignores the mage/-prefixed capture sinks at the repo root", async () => {
-    const dir = await freshDir();
     // A mage/metadata.json makes resolveDocsRoot return kind 'in-repo' (repo = dir).
-    await mkdir(join(dir, "mage"), { recursive: true });
-    await writeFile(join(dir, "mage", "metadata.json"), `${JSON.stringify({ schema: "mage.v1" })}\n`);
+    const { dir } = await withKb({ kind: "repo" });
 
     await connect({ cwd: dir, yes: true, gitHook: false });
 
@@ -236,9 +225,7 @@ describe("connect", () => {
   });
 
   it("in-repo KB: re-running connect is idempotent (no duplicate sink patterns)", async () => {
-    const dir = await freshDir();
-    await mkdir(join(dir, "mage"), { recursive: true });
-    await writeFile(join(dir, "mage", "metadata.json"), `${JSON.stringify({ schema: "mage.v1" })}\n`);
+    const { dir } = await withKb({ kind: "repo" });
 
     await connect({ cwd: dir, yes: true, gitHook: false });
     const after1 = await readGitignore(dir);
@@ -252,14 +239,11 @@ describe("connect", () => {
   });
 
   it("in-repo KB under --user: sink self-heal still runs when cwd is inside the KB", async () => {
-    const dir = await freshDir();
     // A mage/metadata.json makes resolveDocsRoot return kind 'in-repo' (repo = dir).
-    await mkdir(join(dir, "mage"), { recursive: true });
-    await writeFile(join(dir, "mage", "metadata.json"), `${JSON.stringify({ schema: "mage.v1" })}\n`);
+    const { dir } = await withKb({ kind: "repo" });
 
     // Isolate HOME so --user targets a throwaway settings file, not the real one.
-    const home = await mkdtemp(join(tmpdir(), "mage-home-"));
-    made.push(home);
+    const home = await tmpDir("mage-home-");
     const origHome = process.env.HOME;
     process.env.HOME = home;
     try {
@@ -276,10 +260,8 @@ describe("connect", () => {
   });
 
   it("hub KB: connect gitignores the hub capture-sink patterns at the hub root", async () => {
-    const dir = await freshDir();
     // A projects/ dir + root metadata.json makes resolveDocsRoot return kind 'hub'.
-    await mkdir(join(dir, "projects"), { recursive: true });
-    await writeFile(join(dir, "metadata.json"), `${JSON.stringify({ schema: "mage.v1" })}\n`);
+    const { dir } = await withKb({ kind: "hub" });
 
     await connect({ cwd: dir, yes: true, gitHook: false });
 
@@ -304,21 +286,16 @@ describe("connect --all-projects (Decision 11C)", () => {
   async function makeHubWithProjects(
     projects: Array<{ name: string; code_repo_path: string }>,
   ): Promise<string> {
-    const hub = await freshDir();
-    await mkdir(join(hub, "projects"), { recursive: true });
-    const meta = {
-      schema: METADATA_SCHEMA,
-      name: "h",
-      created_at: "",
+    const { dir } = await withKb({
+      kind: "hub",
       projects: projects.map((p) => ({
         name: p.name,
         storage: "hub-owned",
         code_repo_path: p.code_repo_path,
         code_repo_url: "",
       })),
-    };
-    await writeFile(join(hub, "metadata.json"), `${JSON.stringify(meta, null, 2)}\n`);
-    return hub;
+    });
+    return dir;
   }
 
   it("wires every registered project's code repo (repo-local each)", async () => {

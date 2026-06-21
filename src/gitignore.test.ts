@@ -1,18 +1,12 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { ensureGitignored } from "./gitignore.js";
-
-const made: string[] = [];
-afterEach(async () => {
-  for (const d of made.splice(0)) await rm(d, { recursive: true, force: true });
-});
+import { tmpDir } from "../test/fixtures/kb.js";
 
 describe("ensureGitignored", () => {
   it("adds each pattern exactly once (idempotent)", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "mage-gi-"));
-    made.push(dir);
+    const dir = await tmpDir("mage-gi-");
     expect(await ensureGitignored(dir, ["a/", "b/"])).toEqual(["a/", "b/"]);
     expect(await ensureGitignored(dir, ["a/", "b/"])).toEqual([]);
     const gi = await readFile(join(dir, ".gitignore"), "utf8");

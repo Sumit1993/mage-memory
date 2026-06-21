@@ -1,7 +1,7 @@
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { tmpDir, withKb } from "../../test/fixtures/kb.js";
 import { triggerHash } from "./events.js";
 import {
   isMageSkill,
@@ -10,10 +10,6 @@ import {
   normalizeSkillName,
   snapshotSkillMatch,
 } from "./skill-match.js";
-
-async function mkTmp(): Promise<string> {
-  return mkdtemp(join(tmpdir(), "mage-observe-skill-"));
-}
 
 /** Write a generated wing SKILL.md (name + description only — no tags/keywords). */
 async function putWingSkill(repo: string, name: string, description: string): Promise<void> {
@@ -44,7 +40,6 @@ async function putGraduatedSkill(
 async function putWingNote(repo: string, wing: string): Promise<void> {
   const dir = join(repo, "mage", "notes");
   await mkdir(dir, { recursive: true });
-  await writeFile(join(repo, "mage", "metadata.json"), JSON.stringify({ schema: "mage.v1", mode: "in-repo" }));
   await writeFile(
     join(dir, "webhooks.md"),
     `---\ntype: gotcha\ntags: [${wing}/payments]\nkeywords: [webhook, idempotency, retry, stripe]\n---\n# Stripe webhooks\n`,
@@ -66,7 +61,6 @@ async function putNoisyWingNote(
 ): Promise<void> {
   const dir = join(repo, "mage", "notes");
   await mkdir(dir, { recursive: true });
-  await writeFile(join(repo, "mage", "metadata.json"), JSON.stringify({ schema: "mage.v1", mode: "in-repo" }));
   await writeFile(
     join(dir, `${slug}.md`),
     `---\ntype: gotcha\ntags: [${wing}/payments]\nkeywords: [${keywords.join(", ")}]\n---\n# Noisy note\n`,
@@ -97,7 +91,7 @@ describe("isMageSkill / normalizeSkillName (recognition incl. mage: namespace)",
 
 describe("snapshotSkillMatch — wing/keywords sourced correctly (ADR-0016 §1)", () => {
   it("derives wing from the skill NAME (not frontmatter) and keywords from the wing's NOTES", async () => {
-    const repo = await mkTmp();
+    const { dir: repo } = await withKb();
     await putWingNote(repo, "mage");
     await putWingSkill(repo, "mage-wing-mage", "Knowledge for the mage wing. Load when working on mage.");
 
@@ -117,22 +111,18 @@ describe("snapshotSkillMatch — wing/keywords sourced correctly (ADR-0016 §1)"
   });
 
   it("returns null when the SKILL.md is missing (caller records skill-only)", async () => {
-    const repo = await mkTmp();
+    const repo = await tmpDir();
     expect(await snapshotSkillMatch(repo, "mage-wing-ghost")).toBeNull();
   });
 
   it("sanitizes a malicious skill name so it cannot escape the skills dir", async () => {
-    const repo = await mkTmp();
+    const repo = await tmpDir();
     // A traversal in the name must not resolve to a file outside skills/.
     expect(await snapshotSkillMatch(repo, "mage-wing-../../../etc")).toBeNull();
   });
 
   it("still derives a wing for a wing skill even when the wing has no notes (empty keywords, non-empty wing)", async () => {
-    const repo = await mkTmp();
-    await writeFile(
-      join(await ensureMage(repo), "metadata.json"),
-      JSON.stringify({ schema: "mage.v1", mode: "in-repo" }),
-    );
+    const { dir: repo } = await withKb();
     await putWingSkill(repo, "mage-wing-lonely", "A wing with no notes yet.");
     const snap = await snapshotSkillMatch(repo, "mage-wing-lonely");
     expect(snap?.match.wing).toBe("lonely");
@@ -142,7 +132,7 @@ describe("snapshotSkillMatch — wing/keywords sourced correctly (ADR-0016 §1)"
 
 describe("snapshotSkillMatch — graduated mage-skill-* gap (ADR-0016 §3, 0.0.8)", () => {
   it("reads the wing from a graduated skill's frontmatter and aggregates the wing's keywords", async () => {
-    const repo = await mkTmp();
+    const { dir: repo } = await withKb();
     // The wing's notes live under `bar`; the graduated skill is named by its slug, with
     // `wing: bar` in frontmatter (the field graduate.ts writes).
     await putWingNote(repo, "bar");
@@ -159,11 +149,7 @@ describe("snapshotSkillMatch — graduated mage-skill-* gap (ADR-0016 §3, 0.0.8
   });
 
   it("returns null for a graduated skill whose frontmatter has no wing (no notes mapping)", async () => {
-    const repo = await mkTmp();
-    await writeFile(
-      join(await ensureMage(repo), "metadata.json"),
-      JSON.stringify({ schema: "mage.v1", mode: "in-repo" }),
-    );
+    const { dir: repo } = await withKb();
     const dir = join(repo, ".claude", "skills", "mage-skill-nowing");
     await mkdir(dir, { recursive: true });
     await writeFile(
@@ -174,7 +160,7 @@ describe("snapshotSkillMatch — graduated mage-skill-* gap (ADR-0016 §3, 0.0.8
   });
 
   it("returns null for a graduated skill whose SKILL.md is missing", async () => {
-    const repo = await mkTmp();
+    const repo = await tmpDir();
     expect(await snapshotSkillMatch(repo, "mage-skill-ghost")).toBeNull();
   });
 });
@@ -221,7 +207,7 @@ describe("isUsableKeyword (ADR-0017 §8 keyword fix)", () => {
 
 describe("wingKeywords filtering (via snapshotSkillMatch)", () => {
   it("drops numerics + boilerplate from a wing's notes, keeps real domain terms", async () => {
-    const repo = await mkTmp();
+    const { dir: repo } = await withKb();
     await putNoisyWingNote(repo, "mage", [
       "0017",
       "2026",
@@ -258,7 +244,7 @@ describe("wingKeywords filtering (via snapshotSkillMatch)", () => {
   });
 
   it("honors the MAX_KEYWORDS cap after filtering (only usable terms count toward the cap)", async () => {
-    const repo = await mkTmp();
+    const { dir: repo } = await withKb();
     // Spread > MAX_KEYWORDS (12) usable terms across several notes so the wing's
     // aggregate exceeds the cap (deriveKeywords already caps each NOTE at 12, so
     // a single note can't exercise wingKeywords' own MAX_KEYWORDS cap). Each note
@@ -289,9 +275,3 @@ describe("wingKeywords filtering (via snapshotSkillMatch)", () => {
     }
   });
 });
-
-async function ensureMage(repo: string): Promise<string> {
-  const dir = join(repo, "mage");
-  await mkdir(dir, { recursive: true });
-  return dir;
-}

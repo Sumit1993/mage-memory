@@ -1,36 +1,26 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { logger } from "../logger.js";
-import { METADATA_SCHEMA, hubProjectDocsRoot } from "../paths.js";
+import { hubProjectDocsRoot } from "../paths.js";
+import { withKb } from "../../test/fixtures/kb.js";
 import { reportHubFanout } from "./fanout-hint.js";
 
-const made: string[] = [];
-afterEach(async () => {
+afterEach(() => {
   vi.restoreAllMocks();
-  for (const d of made.splice(0)) await rm(d, { recursive: true, force: true });
 });
 
 /** A hub root on disk registering `names` as hub-owned projects. */
 async function hub(names: string[]): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "mage-fanout-"));
-  made.push(dir);
-  await mkdir(join(dir, "projects"), { recursive: true });
-  await writeFile(
-    join(dir, "metadata.json"),
-    JSON.stringify({
-      schema: METADATA_SCHEMA,
-      name: "h",
-      created_at: "",
-      projects: names.map((name) => ({
-        name,
-        storage: "hub-owned",
-        code_repo_path: "",
-        code_repo_url: "",
-      })),
-    }),
-  );
+  const { dir } = await withKb({
+    kind: "hub",
+    prefix: "mage-fanout-",
+    projects: names.map((name) => ({
+      name,
+      storage: "hub-owned",
+      code_repo_path: "",
+      code_repo_url: "",
+    })),
+  });
   return dir;
 }
 

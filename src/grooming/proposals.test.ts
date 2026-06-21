@@ -1,7 +1,7 @@
-import { afterEach, describe, expect, it } from "vitest";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { describe, expect, it } from "vitest";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { tmpDir } from "../../test/fixtures/kb.js";
 import type { Proposal } from "./types.js";
 import {
   isRejected,
@@ -14,19 +14,6 @@ import {
   writeProposals,
   writeRejected,
 } from "./proposals.js";
-
-// ─── tmp fixture plumbing ─────────────────────────────────────────────────────
-
-const made: string[] = [];
-afterEach(async () => {
-  for (const d of made.splice(0)) await rm(d, { recursive: true, force: true });
-});
-
-async function tmp(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "mage-promote-"));
-  made.push(dir);
-  return dir;
-}
 
 // ─── fixtures ──────────────────────────────────────────────────────────────────
 
@@ -53,13 +40,13 @@ describe("paths — gitignored .mage/metrics siblings", () => {
 
 describe("readProposals / readRejected — fail-open to []", () => {
   it("returns [] when the file is absent", async () => {
-    const dir = await tmp();
+    const dir = await tmpDir();
     expect(await readProposals(dir)).toEqual([]);
     expect(await readRejected(dir)).toEqual([]);
   });
 
   it("returns [] on corrupt JSON", async () => {
-    const dir = await tmp();
+    const dir = await tmpDir();
     await mkdir(join(dir, ".mage", "metrics"), { recursive: true });
     await writeFile(proposalsPath(dir), "{ not json", "utf8");
     await writeFile(rejectedPath(dir), "]]", "utf8");
@@ -68,14 +55,14 @@ describe("readProposals / readRejected — fail-open to []", () => {
   });
 
   it("returns [] when the JSON is not an array", async () => {
-    const dir = await tmp();
+    const dir = await tmpDir();
     await mkdir(join(dir, ".mage", "metrics"), { recursive: true });
     await writeFile(proposalsPath(dir), JSON.stringify({ action: "note" }), "utf8");
     expect(await readProposals(dir)).toEqual([]);
   });
 
   it("drops torn entries that aren't proposal-shaped", async () => {
-    const dir = await tmp();
+    const dir = await tmpDir();
     const good = noteProposal("payments::webhook");
     await mkdir(join(dir, ".mage", "metrics"), { recursive: true });
     await writeFile(
@@ -91,14 +78,14 @@ describe("readProposals / readRejected — fail-open to []", () => {
 
 describe("writeProposals / writeRejected — pretty JSON, trailing NL, mkdir", () => {
   it("round-trips through write → read", async () => {
-    const dir = await tmp();
+    const dir = await tmpDir();
     const ps = [noteProposal("a::x"), noteProposal("b::y")];
     await writeProposals(dir, ps);
     expect(await readProposals(dir)).toEqual(ps);
   });
 
   it("creates .metrics/ and emits pretty JSON ending in a newline", async () => {
-    const dir = await tmp();
+    const dir = await tmpDir();
     await writeRejected(dir, [noteProposal("a::x")]);
     const raw = await readFile(rejectedPath(dir), "utf8");
     expect(raw.endsWith("\n")).toBe(true);
@@ -107,7 +94,7 @@ describe("writeProposals / writeRejected — pretty JSON, trailing NL, mkdir", (
   });
 
   it("writes an empty array cleanly", async () => {
-    const dir = await tmp();
+    const dir = await tmpDir();
     await writeProposals(dir, []);
     expect(await readProposals(dir)).toEqual([]);
   });

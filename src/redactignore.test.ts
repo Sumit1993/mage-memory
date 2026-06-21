@@ -1,7 +1,6 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   globToRegExp,
   matchesRedactGlob,
@@ -9,17 +8,7 @@ import {
   readRedactIgnoreFile,
   redactIgnoreFromMetadata,
 } from "./redactignore.js";
-
-const made: string[] = [];
-afterEach(async () => {
-  for (const d of made.splice(0)) await rm(d, { recursive: true, force: true });
-});
-
-async function tmp(): Promise<string> {
-  const d = await mkdtemp(join(tmpdir(), "mage-rign-"));
-  made.push(d);
-  return d;
-}
+import { tmpDir } from "../test/fixtures/kb.js";
 
 describe("parseRedactIgnoreFile", () => {
   it("splits globs into ignore[] from literal: lines into allow[], dropping comments + blanks", () => {
@@ -158,12 +147,12 @@ describe("matchesRedactGlob", () => {
 
 describe("readRedactIgnoreFile — fail-open (mage migrate fold)", () => {
   it("returns null when the legacy file is absent", async () => {
-    const dir = await tmp();
+    const dir = await tmpDir("mage-rign-");
     expect(await readRedactIgnoreFile(dir)).toBeNull();
   });
 
   it("reads and parses a present legacy file into a RedactConfig", async () => {
-    const dir = await tmp();
+    const dir = await tmpDir("mage-rign-");
     await writeFile(join(dir, ".redactignore"), "notes/x.md\nliteral:secret-foo\n");
     const config = await readRedactIgnoreFile(dir);
     expect(config).toEqual({ ignore: ["notes/x.md"], allow: ["secret-foo"] });

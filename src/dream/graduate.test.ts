@@ -1,20 +1,13 @@
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { Note } from "../note.js";
 import { parseNote } from "../note.js";
 import { GEN_MARKER, TARGET_AGENT_DIRS } from "../skills-shared.js";
+import { tmpDir } from "../../test/fixtures/kb.js";
 import { planGraduate, renderProcedureSkill } from "./graduate.js";
 
-const made: string[] = [];
-afterEach(async () => {
-  for (const d of made.splice(0)) await rm(d, { recursive: true, force: true });
-});
-
 async function tmpRepo(): Promise<{ repo: string; docsRoot: string }> {
-  const repo = await mkdtemp(join(tmpdir(), "mage-graduate-"));
-  made.push(repo);
+  const repo = await tmpDir("mage-graduate-");
   return { repo, docsRoot: join(repo, "mage") };
 }
 
