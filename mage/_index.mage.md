@@ -2,7 +2,7 @@
 
 # mage
 
-> 46 notes. Part of the [index](INDEX.md).
+> 47 notes. Part of the [index](INDEX.md).
 
 ### build
 
@@ -57,6 +57,7 @@
 - `plan` [0.0.11 — "signal quality + autonomous capture"](notes/plan-0.0.11-signal-and-capture.md) — signal, quality, autonomous, capture, candidate, blocker, count, compact, chapters, session, ids, serves _(reviewed 2026-06-14)_
 - `plan` [Organic grooming loop (0.0.12) — the lesson path](notes/plan-0.0.12-organic-grooming-loop.md) — grooming, organic, lesson, first-sight, distill, staging, nudge, inline, claude-code-memory, redact, 0.0.12 _(reviewed 2026-06-15)_
 - `plan` [Faultline — friction/derivation capture trigger (Phase 1 plan)](notes/plan-faultline.md) — faultline, friction, derivation, capture, trigger, phase, plan, one, change, detector, src, distill _(reviewed 2026-06-20)_
+- `reference` [Replay-gate methodology — does a capture mechanism produce USEFUL knowledge?](notes/replay-gate-methodology.md) — replay, gate, methodology, capture, mechanism, produce, useful, knowledge, end, calibration, lessons, meta _(reviewed 2026-06-20)_
 
 ### plan
 

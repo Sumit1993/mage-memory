@@ -152,7 +152,7 @@ const THRESHOLD_MEANING: Record<keyof typeof BASE_THRESHOLDS, { symbol: string; 
 const HOOK_PURPOSE: Record<string, string> = {
   "mage:observe:SessionStart": "Capture session-start context into the git-ignored learnings scratch.",
   "mage:nudge:SessionStart":
-    "The boundary nudge: on a post-compaction SessionStart, distill the closed chapter, draft forgotten lessons into .mage/staging/, and surface them. Gates on source===\"compact\" itself — a fast no-op on startup/resume/clear.",
+    "The boundary nudge: on a post-compaction SessionStart, surface the just-closed chapter's earned-signal digest (failures, external commands, corrections) as additionalContext for the agent to mine and `mage stage` (ADR-0029). Gates on source===\"compact\" itself — a fast no-op on startup/resume/clear.",
   "mage:observe:UserPromptSubmit": "Capture the prompt's intent.",
   "mage:observe:PostToolUse": "Capture each tool use — which tool, which files, which skill loaded.",
   "mage:observe:PostToolUseFailure": "Capture tool failures (a distinct salient signal).",
