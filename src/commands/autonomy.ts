@@ -11,18 +11,8 @@
 // not a hook): it throws so the CLI surfaces the error and exits non-zero.
 
 import { logger } from "../logger.js";
-import {
-  type GroomingConfig,
-  absolutePath,
-  hubMetadataPath,
-  metadataPath,
-  readHubMetadata,
-  readMetadata,
-  resolveDocsRoot,
-  writeHubMetadata,
-  writeMetadata,
-} from "../paths.js";
-import { readAutonomy } from "../grooming/thresholds.js";
+import { absolutePath, hubMetadataPath, metadataPath, resolveDocsRoot } from "../paths.js";
+import { groomingFieldIsSet, readAutonomy, writeGroomingField } from "../grooming/config.js";
 import { DEFAULT_AUTONOMY, coerceAutonomy, meaningOf } from "../grooming/autonomy-ladder.js";
 
 export interface AutonomyOptions {
@@ -50,36 +40,16 @@ export async function autonomy(opts: AutonomyOptions = {}): Promise<void> {
   if (opts.level === undefined) {
     const level = await readAutonomy(resolved);
     const path = resolved.kind === "hub" ? hubMetadataPath(resolved.repo) : metadataPath(resolved.repo);
-    const set = await isExplicitlySet(resolved);
+    const set = await groomingFieldIsSet(resolved, "autonomy");
     logger.info(`autonomy: ${level}`);
     logger.detail(meaningOf(level));
     logger.detail(set ? `set in ${path}` : `default (unset; absent ⇒ ${DEFAULT_AUTONOMY}) — would be set in ${path}`);
     return;
   }
 
-  // ── SET: validate, merge into grooming preserving other fields, write, report. ──
+  // ── SET: validate, then read-merge-write the one field through the config seam (other
+  // grooming fields preserved, schema stamped). mage never commits — the write is uncommitted. ──
   const next = coerceAutonomy(opts.level);
-  if (resolved.kind === "hub") {
-    const hub = await readHubMetadata(resolved.repo);
-    if (!hub) throw new Error(`No hub metadata at ${hubMetadataPath(resolved.repo)}.`);
-    const grooming: GroomingConfig = { ...hub.grooming, autonomy: next };
-    await writeHubMetadata(resolved.repo, { ...hub, grooming });
-    logger.success(`autonomy set to ${next} in ${hubMetadataPath(resolved.repo)}; mage never commits; git add it to track`);
-  } else {
-    const meta = await readMetadata(resolved.repo);
-    if (!meta) throw new Error(`No metadata at ${metadataPath(resolved.repo)}.`);
-    const grooming: GroomingConfig = { ...meta.grooming, autonomy: next };
-    await writeMetadata(resolved.repo, { ...meta, grooming });
-    logger.success(`autonomy set to ${next} in ${metadataPath(resolved.repo)}; mage never commits; git add it to track`);
-  }
-}
-
-/** True iff `grooming.autonomy` is explicitly present on disk (vs. the unset default). */
-async function isExplicitlySet(resolved: { root: string; kind: "repo" | "hub"; repo: string }): Promise<boolean> {
-  try {
-    const meta = resolved.kind === "hub" ? await readHubMetadata(resolved.repo) : await readMetadata(resolved.repo);
-    return meta?.grooming?.autonomy !== undefined;
-  } catch {
-    return false;
-  }
+  const path = await writeGroomingField(resolved, { autonomy: next });
+  logger.success(`autonomy set to ${next} in ${path}; mage never commits; git add it to track`);
 }

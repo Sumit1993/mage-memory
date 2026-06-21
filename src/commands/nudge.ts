@@ -25,7 +25,7 @@ import { distillWatermarkPath } from "../distill/watermark.js";
 import { readSessionStreams } from "../distill/reader.js";
 import { type BacklogTally, computeBacklog } from "../grooming/backlog.js";
 import { type Autonomy, mandateFor } from "../grooming/autonomy-ladder.js";
-import { readAutonomy, readSensitivity } from "../grooming/thresholds.js";
+import { readGrooming } from "../grooming/config.js";
 import type { ObserveEvent } from "../observe/types.js";
 import {
   type ResolvedDocsRoot,
@@ -103,14 +103,17 @@ async function digestNudge(resolved: ResolvedDocsRoot, source: string, force: bo
     rendered = chapter.length > 0 ? renderDigest(computeDigest(chapter)) : "";
   }
 
-  const level = await readAutonomy(resolved).catch(() => "operator" as Autonomy);
-  const sensitivity = await readSensitivity(resolved).catch(() => "normal" as const);
+  // One grooming-config read (config.ts) feeds the level, the dial, and the throttle window —
+  // replacing three separate metadata reads (and the old lazy import that dodged a paths cycle).
+  const { autonomy: level, sensitivity, nudgeThrottleHours } = await readGrooming(resolved).catch(
+    () => ({ autonomy: "operator" as Autonomy, sensitivity: "normal" as const, nudgeThrottleHours: undefined }),
+  );
   const tally = await backlogTally(root, sensitivity);
   const pending = tally.staged;
 
   // The backlog line is throttled (once per window, all sources); the digest is not.
   const throttlePath = join(metricsPath(root), NUDGE_THROTTLE_FILE);
-  const windowMs = await throttleWindowMs(resolved);
+  const windowMs = throttleWindowMs(nudgeThrottleHours);
   const showBacklog = hasBacklog(tally) && (force || (await throttleElapsed(throttlePath, windowMs)));
   const mandate = showBacklog ? renderMandate(level, tally) : "";
   if (showBacklog) await writeThrottle(throttlePath, Date.now());
@@ -226,26 +229,10 @@ function backlogLine(t: BacklogTally): string {
 
 // ─── throttle + mtime-cache file I/O ─────────────────────────────────────────────
 
-/** The throttle window in ms: `grooming.nudgeThrottleHours` (positive) → ms, else the 4h default. */
-async function throttleWindowMs(resolved: ResolvedDocsRoot): Promise<number> {
-  try {
-    const hours = await readThrottleHours(resolved);
-    if (typeof hours === "number" && Number.isFinite(hours) && hours > 0) return hours * MS_PER_HOUR;
-  } catch {
-    // fall through to the default.
-  }
+/** The throttle window in ms: a positive `nudgeThrottleHours` (from {@link readGrooming}) → ms, else the 4h default. */
+function throttleWindowMs(hours: number | undefined): number {
+  if (typeof hours === "number" && Number.isFinite(hours) && hours > 0) return hours * MS_PER_HOUR;
   return DEFAULT_THROTTLE_MS;
-}
-
-/** Read the user-set `grooming.nudgeThrottleHours` (hub- or repo-side), or undefined. */
-async function readThrottleHours(resolved: ResolvedDocsRoot): Promise<number | undefined> {
-  // Lazy import avoids a paths.ts cycle in the hot module graph; readMetadata/readHubMetadata
-  // are the same readers thresholds.ts uses.
-  const { readHubMetadata, readMetadata } = await import("../paths.js");
-  const meta =
-    resolved.kind === "hub" ? await readHubMetadata(resolved.repo) : await readMetadata(resolved.repo);
-  const h = meta?.grooming?.nudgeThrottleHours;
-  return typeof h === "number" ? h : undefined;
 }
 
 /** True iff the backlog window has elapsed since the last surfaced reminder (fail-open: yes). */

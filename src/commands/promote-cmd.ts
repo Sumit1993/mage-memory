@@ -25,7 +25,8 @@ import { scanSecrets } from "../redact.js";
 import { buildManifest } from "../grooming/promote.js";
 import { foldTally, readTally, writeTally } from "../grooming/tally.js";
 import { readRejected } from "../grooming/proposals.js";
-import { readSensitivity, thresholdsFor } from "../grooming/thresholds.js";
+import { readSensitivity } from "../grooming/config.js";
+import { thresholdsFor } from "../grooming/thresholds.js";
 import type { PromoteManifest, PromoteTally } from "../grooming/types.js";
 
 /** Options for {@link promoteCmd}. */
