@@ -11,7 +11,7 @@
 // notes/, the staged batch, the reject ledger) → write `.staging/<slug>.md`.
 
 import { logger } from "../logger.js";
-import { absolutePath, resolveDocsRoot, stagingPath } from "../paths.js";
+import { requireDocsRoot, stagingPath } from "../paths.js";
 import { redact } from "../redact.js";
 import { scanNotes } from "../scan.js";
 import { BASE_THRESHOLDS } from "../grooming/thresholds.js";
@@ -69,11 +69,7 @@ export interface StageResult {
  * reports that it was skipped (already covered / rejected / a duplicate).
  */
 export async function stageCmd(opts: StageOptions): Promise<StageResult> {
-  const start = absolutePath(opts.dir ?? process.cwd());
-  const resolved = await resolveDocsRoot(start);
-  if (!resolved) {
-    throw new Error(`No mage knowledge base found at or above ${start}. Run \`mage init\` first.`);
-  }
+  const resolved = await requireDocsRoot(opts.dir);
   const { root } = resolved;
 
   const rawTitle = (opts.title ?? "").trim();

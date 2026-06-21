@@ -10,7 +10,7 @@
 
 import { basename } from "node:path";
 import { logger } from "../logger.js";
-import { absolutePath, resolveDocsRoot, stagingPath } from "../paths.js";
+import { requireDocsRoot, stagingPath } from "../paths.js";
 import { scanNotes } from "../scan.js";
 import { BASE_THRESHOLDS } from "../grooming/thresholds.js";
 import {
@@ -65,11 +65,7 @@ export interface GroomResult {
  * (`--accept` / `--reject`, mutually exclusive) or surfaces the pending batch.
  */
 export async function groomCmd(opts: GroomOptions): Promise<GroomResult> {
-  const start = absolutePath(opts.dir ?? process.cwd());
-  const resolved = await resolveDocsRoot(start);
-  if (!resolved) {
-    throw new Error(`No mage knowledge base found at or above ${start}. Run \`mage init\` first.`);
-  }
+  const resolved = await requireDocsRoot(opts.dir);
   const { root } = resolved;
 
   if (opts.accept !== undefined && opts.reject !== undefined) {

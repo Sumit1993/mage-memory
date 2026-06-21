@@ -11,7 +11,7 @@
 // not a hook): it throws so the CLI surfaces the error and exits non-zero.
 
 import { logger } from "../logger.js";
-import { absolutePath, hubMetadataPath, metadataPath, resolveDocsRoot } from "../paths.js";
+import { hubMetadataPath, metadataPath, requireDocsRoot } from "../paths.js";
 import { groomingFieldIsSet, readAutonomy, writeGroomingField } from "../grooming/config.js";
 import { DEFAULT_AUTONOMY, coerceAutonomy, meaningOf } from "../grooming/autonomy-ladder.js";
 
@@ -28,13 +28,7 @@ export interface AutonomyOptions {
  * three on junk), merges into `grooming` preserving the other fields, writes, and prints the path.
  */
 export async function autonomy(opts: AutonomyOptions = {}): Promise<void> {
-  const resolved = await resolveDocsRoot(absolutePath(opts.dir ?? process.cwd()));
-  if (!resolved) {
-    throw new Error(
-      `No mage knowledge base found at or above ${absolutePath(opts.dir ?? process.cwd())}. ` +
-        "Run `mage init` or `mage link` first.",
-    );
-  }
+  const resolved = await requireDocsRoot(opts.dir);
 
   // ── GET: no level → report the resolved level, its meaning, and where it lives. ──
   if (opts.level === undefined) {

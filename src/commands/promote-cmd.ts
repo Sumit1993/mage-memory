@@ -18,7 +18,7 @@
 // the skill does the judgment. No model lives here (ADR-0009).
 
 import { logger } from "../logger.js";
-import { absolutePath, learningsPath, resolveDocsRoot } from "../paths.js";
+import { learningsPath, requireDocsRoot } from "../paths.js";
 import { reportHubFanout } from "./fanout-hint.js";
 import { scanNotes } from "../scan.js";
 import { scanSecrets } from "../redact.js";
@@ -51,13 +51,7 @@ export interface PromoteResult {
  * offset) or folds the tally + builds the note-candidate manifest.
  */
 export async function promoteCmd(opts: PromoteOptions): Promise<PromoteResult> {
-  const start = absolutePath(opts.dir ?? process.cwd());
-  const resolved = await resolveDocsRoot(start);
-  if (!resolved) {
-    throw new Error(
-      `No mage knowledge base found at or above ${start}. Run \`mage init\` first.`,
-    );
-  }
+  const resolved = await requireDocsRoot(opts.dir);
   if (opts.seen !== undefined) return commitSeen(resolved.root, opts.seen);
   return readAndReport(resolved, Boolean(opts.json));
 }

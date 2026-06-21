@@ -14,7 +14,7 @@
 // the determinism, the skill does the judgment. No model lives here.
 
 import { logger } from "../logger.js";
-import { absolutePath, learningsPath, type ResolvedDocsRoot, resolveDocsRoot } from "../paths.js";
+import { learningsPath, type ResolvedDocsRoot, requireDocsRoot } from "../paths.js";
 import { reportHubFanout } from "./fanout-hint.js";
 import { readDistill } from "../distill/reader.js";
 import type { DistillManifest } from "../distill/types.js";
@@ -43,13 +43,7 @@ export interface DistillResult {
  * reads + reports the candidate-cluster manifest.
  */
 export async function distillCmd(opts: DistillOptions): Promise<DistillResult> {
-  const start = absolutePath(opts.dir ?? process.cwd());
-  const resolved = await resolveDocsRoot(start);
-  if (!resolved) {
-    throw new Error(
-      `No mage knowledge base found at or above ${start}. Run \`mage init\` first.`,
-    );
-  }
+  const resolved = await requireDocsRoot(opts.dir);
   const { root } = resolved;
 
   if (opts.seen !== undefined) return commitSeen(root, opts.seen);
