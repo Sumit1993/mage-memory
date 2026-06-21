@@ -1,7 +1,7 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
+import { tmpDir } from "../test/fixtures/kb.js";
 import {
   type HubMetadata,
   META_DIR,
@@ -23,11 +23,6 @@ import {
   writeMetadata,
 } from "./paths.js";
 
-const made: string[] = [];
-afterEach(async () => {
-  for (const d of made.splice(0)) await rm(d, { recursive: true, force: true });
-});
-
 describe("paths", () => {
   it("uses the mage constants", () => {
     expect(META_DIR).toBe("mage");
@@ -35,8 +30,7 @@ describe("paths", () => {
   });
 
   it("resolveDocsRoot finds a repo KB by walking up", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "mage-paths-"));
-    made.push(dir);
+    const dir = await tmpDir("mage-paths-");
     await mkdir(join(dir, "mage"), { recursive: true });
     await writeFile(
       join(dir, "mage", "metadata.json"),
@@ -50,8 +44,7 @@ describe("paths", () => {
   });
 
   it("detects a hub by projects/ + metadata.json", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "mage-hub-"));
-    made.push(dir);
+    const dir = await tmpDir("mage-hub-");
     await mkdir(join(dir, "projects"), { recursive: true });
     await writeFile(
       join(dir, "metadata.json"),
@@ -66,8 +59,7 @@ describe("paths", () => {
     // metadata.json of its own. Pointing the engine at it (e.g. `distill --dir
     // <hub>/projects/engine`) must resolve to that project so the fan-out can groom
     // its `.learnings/` even when the member code repo is absent on this machine.
-    const hub = await mkdtemp(join(tmpdir(), "mage-projhub-"));
-    made.push(hub);
+    const hub = await tmpDir("mage-projhub-");
     await mkdir(join(hub, "projects", "engine", "notes"), { recursive: true });
     await writeFile(
       join(hub, "metadata.json"),
@@ -84,8 +76,7 @@ describe("paths", () => {
   });
 
   it("resolveDocsRoot resolves a non-project dir inside a hub to the hub root", async () => {
-    const hub = await mkdtemp(join(tmpdir(), "mage-inhub-"));
-    made.push(hub);
+    const hub = await tmpDir("mage-inhub-");
     await mkdir(join(hub, "projects"), { recursive: true });
     await mkdir(join(hub, "notes", "deep"), { recursive: true });
     await writeFile(
@@ -99,16 +90,14 @@ describe("paths", () => {
 
   it("resolveDocsRoot follows an external code repo to its hub project (capture routing)", async () => {
     // A hub that owns the project's notes.
-    const hub = await mkdtemp(join(tmpdir(), "mage-exthub-"));
-    made.push(hub);
+    const hub = await tmpDir("mage-exthub-");
     await mkdir(join(hub, "projects", "engine"), { recursive: true });
     await writeFile(
       join(hub, "metadata.json"),
       JSON.stringify({ schema: METADATA_SCHEMA, name: "h", created_at: "", projects: [] }),
     );
     // A code repo linked in external mode → the hub owns its docs (no in-repo notes).
-    const code = await mkdtemp(join(tmpdir(), "mage-extcode-"));
-    made.push(code);
+    const code = await tmpDir("mage-extcode-");
     await mkdir(join(code, "mage"), { recursive: true });
     await writeFile(
       join(code, "mage", "metadata.json"),
@@ -135,8 +124,7 @@ describe("paths", () => {
 
   it("resolveDocsRoot falls back to repo KB when external metadata is malformed", async () => {
     // mode=external but no hub_path → degrade to the code repo's own mage/ (never null).
-    const code = await mkdtemp(join(tmpdir(), "mage-extbad-"));
-    made.push(code);
+    const code = await tmpDir("mage-extbad-");
     await mkdir(join(code, "mage"), { recursive: true });
     await writeFile(
       join(code, "mage", "metadata.json"),
@@ -148,8 +136,7 @@ describe("paths", () => {
   });
 
   it("returns null when no knowledge base is found", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "mage-none-"));
-    made.push(dir);
+    const dir = await tmpDir("mage-none-");
     expect(await resolveDocsRoot(dir)).toBeNull();
   });
 
@@ -167,19 +154,13 @@ describe("paths", () => {
 });
 
 describe("paths — schema migration (Dec 9 / v1 → v2)", () => {
-  async function tmp(prefix: string): Promise<string> {
-    const d = await mkdtemp(join(tmpdir(), prefix));
-    made.push(d);
-    return d;
-  }
-
   it("METADATA_SCHEMA_V1 is the prior version; current is v2", () => {
     expect(METADATA_SCHEMA_V1).toBe("mage.v1");
     expect(METADATA_SCHEMA).toBe("mage.v2");
   });
 
   it("readMetadata reads v1 leniently: in-repo + hub_refs → hybrid; on-disk schema preserved", async () => {
-    const code = await tmp("mage-v1read-");
+    const code = await tmpDir("mage-v1read-");
     await mkdir(join(code, "mage"), { recursive: true });
     await writeFile(
       metadataPath(code),
@@ -199,7 +180,7 @@ describe("paths — schema migration (Dec 9 / v1 → v2)", () => {
   });
 
   it("readMetadata leaves a pure v1 in-repo (no refs) as in-repo", async () => {
-    const code = await tmp("mage-v1pure-");
+    const code = await tmpDir("mage-v1pure-");
     await mkdir(join(code, "mage"), { recursive: true });
     await writeFile(
       metadataPath(code),
@@ -217,14 +198,14 @@ describe("paths — schema migration (Dec 9 / v1 → v2)", () => {
   });
 
   it("readMetadata throws on a genuinely foreign schema", async () => {
-    const code = await tmp("mage-foreign-");
+    const code = await tmpDir("mage-foreign-");
     await mkdir(join(code, "mage"), { recursive: true });
     await writeFile(metadataPath(code), JSON.stringify({ schema: "mage.v99", mode: "in-repo" }));
     await expect(readMetadata(code)).rejects.toThrow(/schema/i);
   });
 
   it("readHubMetadata reads v1 leniently: storage in-repo → repo-owned; schema preserved", async () => {
-    const hub = await tmp("mage-hubv1-");
+    const hub = await tmpDir("mage-hubv1-");
     await writeFile(
       hubMetadataPath(hub),
       JSON.stringify({
@@ -244,7 +225,7 @@ describe("paths — schema migration (Dec 9 / v1 → v2)", () => {
   });
 
   it("readHubMetadata throws on a foreign schema", async () => {
-    const hub = await tmp("mage-hubforeign-");
+    const hub = await tmpDir("mage-hubforeign-");
     await writeFile(hubMetadataPath(hub), JSON.stringify({ schema: "nope", name: "h", projects: [] }));
     await expect(readHubMetadata(hub)).rejects.toThrow(/schema/i);
   });
@@ -273,7 +254,7 @@ describe("paths — schema migration (Dec 9 / v1 → v2)", () => {
   });
 
   it("writeMetadata stamps the current schema (lazy migration on write)", async () => {
-    const code = await tmp("mage-writestamp-");
+    const code = await tmpDir("mage-writestamp-");
     await mkdir(join(code, "mage"), { recursive: true });
     await writeMetadata(code, {
       schema: "mage.v1",
@@ -289,7 +270,7 @@ describe("paths — schema migration (Dec 9 / v1 → v2)", () => {
   });
 
   it("writeHubMetadata stamps the current schema", async () => {
-    const hub = await tmp("mage-hubwrite-");
+    const hub = await tmpDir("mage-hubwrite-");
     await writeHubMetadata(hub, { schema: "mage.v1", name: "h", created_at: "t", projects: [] });
     const raw = JSON.parse(await readFile(hubMetadataPath(hub), "utf8"));
     expect(raw.schema).toBe("mage.v2");
@@ -297,7 +278,7 @@ describe("paths — schema migration (Dec 9 / v1 → v2)", () => {
 
   describe("ownedDocsRoots (the shared hub fan-out enumerator)", () => {
     async function hubWithProjects(names: string[]): Promise<string> {
-      const hub = await tmp("mage-owned-");
+      const hub = await tmpDir("mage-owned-");
       await mkdir(join(hub, "projects"), { recursive: true });
       const projects = names.map((name) => ({
         name,
@@ -313,7 +294,7 @@ describe("paths — schema migration (Dec 9 / v1 → v2)", () => {
     }
 
     it("a repo KB owns only its own docs root", async () => {
-      const dir = await tmp("mage-ownrepo-");
+      const dir = await tmpDir("mage-ownrepo-");
       const root = join(dir, "mage");
       expect(await ownedDocsRoots({ root, kind: "repo", repo: dir })).toEqual([root]);
     });
@@ -339,7 +320,7 @@ describe("paths — schema migration (Dec 9 / v1 → v2)", () => {
     });
 
     it("fails open to just the root when hub metadata is absent/unreadable", async () => {
-      const dir = await tmp("mage-ownmissing-");
+      const dir = await tmpDir("mage-ownmissing-");
       expect(await ownedDocsRoots({ root: dir, kind: "hub", repo: dir })).toEqual([dir]);
     });
   });
