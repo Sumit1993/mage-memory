@@ -82,6 +82,21 @@ export interface RedactConfig {
 }
 
 /**
+ * The self-grooming dial sub-object on metadata (ADR-0019 §7 + ADR-0030).
+ *   - `sensitivity` — scales the recurrence gates (low | normal | high); absent ⇒ "normal".
+ *   - `autonomy` — how much of the grooming ladder the host agent drains autonomously
+ *     (operator | approver | overseer, ADR-0030); absent ⇒ "operator".
+ *   - `nudgeThrottleHours` — the backlog-reminder window in hours (ADR-0030); absent ⇒ 4h.
+ * Every field is optional so an older metadata file (no grooming, or sensitivity-only)
+ * still validates; defaults live in the readers (thresholds.ts), not here.
+ */
+export interface GroomingConfig {
+  sensitivity?: "low" | "normal" | "high";
+  autonomy?: "operator" | "approver" | "overseer";
+  nudgeThrottleHours?: number;
+}
+
+/**
  * Code-repo-side metadata. Lives at `<code-repo>/mage/metadata.json`.
  *
  * Three modes (the canonical KB-shape axis):
@@ -101,8 +116,8 @@ export interface MageMetadata {
   hub_repo: string | null;
   hub_refs: HubRef[];
   linked_at: string;
-  /** 0.0.8 self-grooming dial (ADR-0019 §7); absent ⇒ "normal". */
-  grooming?: { sensitivity?: "low" | "normal" | "high" };
+  /** Self-grooming dial (ADR-0019 §7 + ADR-0030); absent ⇒ sensitivity "normal", autonomy "operator". */
+  grooming?: GroomingConfig;
   /** Gate-2 false-positive allowlist (ADR-0025); absent ⇒ no allowances. */
   redact?: RedactConfig;
 }
@@ -128,8 +143,8 @@ export interface HubMetadata {
   name: string;
   created_at: string;
   projects: HubProject[];
-  /** 0.0.8 self-grooming dial (ADR-0019 §7); absent ⇒ "normal". */
-  grooming?: { sensitivity?: "low" | "normal" | "high" };
+  /** Self-grooming dial (ADR-0019 §7 + ADR-0030); absent ⇒ sensitivity "normal", autonomy "operator". */
+  grooming?: GroomingConfig;
   /** Gate-2 false-positive allowlist (ADR-0025); absent ⇒ no allowances. */
   redact?: RedactConfig;
 }

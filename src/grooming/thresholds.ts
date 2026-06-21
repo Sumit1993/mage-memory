@@ -25,6 +25,9 @@ import { readHubMetadata, readMetadata } from "../paths.js";
 /** The human dial (ADR-0019 §7): scales the recurrence gates together. */
 export type Sensitivity = "low" | "normal" | "high";
 
+/** The opt-in autonomy ladder (ADR-0030): how much of the grooming ladder the host agent drains. */
+export type Autonomy = "operator" | "approver" | "overseer";
+
 /** The full thresholds seam — every provisional grooming constant in one place. */
 export interface Thresholds {
   promoteSessions: number; // K: distinct CHAPTERS to surface a NEW note candidate (0.0.11)
@@ -43,6 +46,13 @@ export interface Thresholds {
 
 /** The dial's default when metadata is absent / invalid (ADR-0019 §7). */
 export const DEFAULT_SENSITIVITY: Sensitivity = "normal";
+
+/**
+ * The autonomy default when metadata is absent / invalid (ADR-0030): "operator" —
+ * the dial is opt-IN, so a fresh KB gets no surprise autonomous writes (it still gets
+ * the new backlog signal). The maintainer raises their own repos to approver/overseer.
+ */
+export const DEFAULT_AUTONOMY: Autonomy = "operator";
 
 /**
  * BASE = the @normal thresholds. These FINALIZE the provisional 0.0.6 numbers:
@@ -120,10 +130,17 @@ export function thresholdsFor(s: Sensitivity): Thresholds {
 /**
  * Read the tracked sensitivity dial from metadata, defaulting to "normal" and
  * failing open. In-repo → `readMetadata(repo).grooming?.sensitivity`; hub →
- * `readHubMetadata(root).grooming?.sensitivity`. Any read/parse error, a missing
+ * `readHubMetadata(repo).grooming?.sensitivity`. Any read/parse error, a missing
  * file, or a value outside the three-way enum ⇒ DEFAULT_SENSITIVITY. The dial is
  * a CHOICE, not derived data (ADR-0019 §7), so a junk value never silently shifts
  * behaviour — it falls back to the safe normal default.
+ *
+ * HUB SEMANTICS (ADR-0030): the hub dial is a single hub-ROOT setting living in the
+ * hub's own metadata (`resolved.repo` — the hub root, where `mage autonomy` writes it),
+ * applying to the hub + its projects (per-project override is future work). The READ
+ * path MUST match the WRITE path: for a hub-owned/external-mode KB `resolved.root` is
+ * `<hub>/projects/<name>/` (a file nobody writes), so reading there would silently
+ * no-op set-then-read — read `resolved.repo` instead so the round-trip holds.
  */
 export async function readSensitivity(resolved: {
   root: string;
@@ -133,7 +150,7 @@ export async function readSensitivity(resolved: {
   let raw: unknown;
   try {
     if (resolved.kind === "hub") {
-      const meta = await readHubMetadata(resolved.root);
+      const meta = await readHubMetadata(resolved.repo);
       raw = meta?.grooming?.sensitivity;
     } else {
       const meta = await readMetadata(resolved.repo);
@@ -145,8 +162,49 @@ export async function readSensitivity(resolved: {
   return validateSensitivity(raw);
 }
 
+/**
+ * Read the tracked autonomy level from metadata (ADR-0030), mirroring
+ * {@link readSensitivity}: in-repo → `readMetadata(repo).grooming?.autonomy`; hub →
+ * `readHubMetadata(repo).grooming?.autonomy`. Any read/parse error, a missing file, or
+ * a value outside the three-way enum ⇒ DEFAULT_AUTONOMY ("operator"). The level is a
+ * CHOICE, not derived data, so a junk value never silently escalates autonomy — it fails
+ * open to the safe default.
+ *
+ * HUB SEMANTICS (ADR-0030 v1): hub autonomy is a single hub-ROOT setting in the hub's own
+ * metadata (`resolved.repo` — the hub root, where `mage autonomy` SET writes and GET prints),
+ * applying to the hub + its projects; per-project override is future work. The READ path MUST
+ * match the WRITE path: for a hub-owned/external-mode KB `resolved.root` is
+ * `<hub>/projects/<name>/` — a file the writer never touches — so reading there silently
+ * no-ops set-then-read. Read `resolved.repo` so the round-trip holds.
+ */
+export async function readAutonomy(resolved: {
+  root: string;
+  kind: "repo" | "hub";
+  repo: string;
+}): Promise<Autonomy> {
+  let raw: unknown;
+  try {
+    if (resolved.kind === "hub") {
+      const meta = await readHubMetadata(resolved.repo);
+      raw = meta?.grooming?.autonomy;
+    } else {
+      const meta = await readMetadata(resolved.repo);
+      raw = meta?.grooming?.autonomy;
+    }
+  } catch {
+    return DEFAULT_AUTONOMY; // unreadable / unknown-schema metadata → safe default.
+  }
+  return validateAutonomy(raw);
+}
+
 /** Narrow an untrusted value to a Sensitivity; anything else ⇒ DEFAULT_SENSITIVITY. */
 function validateSensitivity(v: unknown): Sensitivity {
   if (v === "low" || v === "normal" || v === "high") return v;
   return DEFAULT_SENSITIVITY;
+}
+
+/** Narrow an untrusted value to an Autonomy level; anything else ⇒ DEFAULT_AUTONOMY. */
+function validateAutonomy(v: unknown): Autonomy {
+  if (v === "operator" || v === "approver" || v === "overseer") return v;
+  return DEFAULT_AUTONOMY;
 }

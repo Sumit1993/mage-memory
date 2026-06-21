@@ -50,6 +50,21 @@ mage has another mode. A **hub** is a standalone knowledge base that spans many 
 
 `mage init` detects your context: run plain `mage init` and, inside a git repo, it scaffolds an in-repo `mage/`; outside one, it creates a hub in the current directory. The `--in-repo` and `--hub` flags force the choice.
 
+### Non-interactive setup
+
+`mage init` prompts when run bare. To scaffold without any prompt — in a script, a CI step, or an agent session — pass `-y` / `--yes`, which uses the detected default (in-repo inside a git repo, hub outside):
+
+```bash
+mage init --in-repo --yes        # in-repo KB, no prompts
+mage init my-hub --yes           # standalone hub named my-hub, no prompts
+```
+
+A hub name is positional and *implies* a hub, so it conflicts with `--in-repo` — pass one or the other, never both (`mage init my-hub --in-repo` errors out). If you skip the auto-connect with `--no-connect`, wire capture later, also non-interactively, with:
+
+```bash
+mage connect --yes               # wire hooks, no confirmation prompt
+```
+
 ## What `mage init` wires for you
 
 After scaffolding an in-repo knowledge base, `mage init` auto-connects capture — an in-repo base is inert until capture is wired. That step (the same one you can run by hand as `mage connect`) does two things:

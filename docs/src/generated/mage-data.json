@@ -101,7 +101,7 @@
       "event": "SessionStart",
       "id": "mage:nudge:SessionStart",
       "command": "mage nudge",
-      "purpose": "The boundary nudge: on a post-compaction SessionStart, surface the just-closed chapter's earned-signal digest (failures, external commands, corrections) as additionalContext for the agent to mine and `mage stage` (ADR-0029). Gates on source===\"compact\" itself — a fast no-op on startup/resume/clear."
+      "purpose": "The boundary nudge: on a post-compaction SessionStart, surface the just-closed chapter's earned-signal digest (failures, external commands, corrections) as additionalContext for the agent to mine and `mage stage` (ADR-0029). The additionalContext is scaled by the per-KB autonomy level (Operator/Approver/Overseer, ADR-0030): at Operator it is a reminder; at Approver/Overseer it becomes the agent's mandate to groom and write durable notes into the working tree (uncommitted, Gate-2 enforced). It also carries a deterministic capped backlog tally — staged drafts, unmined closed chapters (capped at 9+), and graduation-eligible signatures from the persisted promote tally — rendered as one work-list line. Fires on SessionStart source compact/startup/resume (clear stays a fast no-op); the backlog scan is mtime-gated so a no-new-scratch startup/resume stays ~instant."
     },
     {
       "event": "UserPromptSubmit",
@@ -407,7 +407,7 @@
     },
     {
       "name": "nudge",
-      "summary": "Hook-fired boundary nudge: on a post-compaction SessionStart, surface the closed chapter's earned-signal digest (failures, external commands, corrections) for the agent to mine and `mage stage` (ADR-0029; never blocks the host)",
+      "summary": "Hook-fired boundary nudge: on a SessionStart (compact/startup/resume), surface the closed chapter's earned-signal digest plus the autonomy-scaled grooming backlog for the agent to mine and `mage stage`/`mage:groom` (ADR-0029/0030; never blocks the host)",
       "aliases": [],
       "hidden": true,
       "options": [
@@ -527,6 +527,18 @@
       "aliases": [],
       "hidden": false,
       "options": []
+    },
+    {
+      "name": "autonomy",
+      "summary": "Show or set this KB's opt-in grooming autonomy level (operator | approver | overseer; ADR-0030; never commits)",
+      "aliases": [],
+      "hidden": false,
+      "options": [
+        {
+          "flags": "--dir <path>",
+          "description": "where to look for the knowledge base (default: cwd; walks up)"
+        }
+      ]
     },
     {
       "name": "doctor",

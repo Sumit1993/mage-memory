@@ -69,6 +69,7 @@ export default defineConfig({
             { label: 'The boundary nudge', slug: 'loop/nudge' },
             { label: 'Stage and groom (the lesson path)', slug: 'loop/stage-groom' },
             { label: 'Promote and graduate', slug: 'loop/promote-graduate' },
+            { label: 'Autonomy levels', slug: 'loop/autonomy' },
             { label: 'Optimize (context-match)', slug: 'loop/optimize' },
           ],
         },

@@ -207,6 +207,11 @@ async function initInRepo(codeRepo: string, project: string): Promise<void> {
   logger.success(`Initialized in-repo mage knowledge base for project '${project}'.`);
   logger.detail(`Knowledge base: ${docsRoot}`);
   logger.detail(`Add notes under notes/, capture work in work/<slug>/, then run \`mage index\`.`);
+  // ADR-0030 §7: one-line autonomy hint (default Operator; how to raise; docs link).
+  logger.detail(
+    "Grooming autonomy defaults to operator (you confirm each groom); raise with " +
+      "`mage autonomy approver|overseer` — see https://sumit1993.github.io/mage-memory/loop/autonomy/",
+  );
   printSkillsInstallHint();
   logger.blank();
   logger.info("Suggested commit (run yourself; mage never auto-commits):");

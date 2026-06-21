@@ -209,7 +209,7 @@ export interface DigestOptions {
 // ─── chapter selection (the boundary nudge mines the just-closed chapter) ──────────────────────
 
 /** True iff an event is a chapter terminator (compact / session_end). */
-function isTerminator(e: ObserveEvent): boolean {
+export function isTerminator(e: ObserveEvent): boolean {
   return e.type === "compact" || e.type === "session_end";
 }
 
@@ -232,6 +232,27 @@ export function lastClosedChapter(events: ObserveEvent[]): ObserveEvent[] {
     if (e !== undefined && isTerminator(e)) { prev = i; break; }
   }
   return events.slice(prev + 1, last + 1);
+}
+
+/**
+ * Count the CLOSED chapters in `events` that lie past the distill watermark `cursor` (ADR-0030 §2) —
+ * the "unmined" backlog of the boundary nudge. `cursor` is an event OFFSET (count of events already
+ * dispositioned for this session), NOT a chapter index, so we count terminators in the post-cursor
+ * tail (each terminator closes one chapter). Capped at `cap` (early break) so the scan is bounded —
+ * the caller renders the cap as "9+". A trailing OPEN chapter (no terminator after the last) is not
+ * counted, matching {@link lastClosedChapter}. PURE. `events` should be a SINGLE session's stream
+ * (the watermark is keyed per session); a missing/zero cursor counts ALL closed chapters.
+ */
+export function unminedClosedChapters(events: ObserveEvent[], cursor: number, cap = 9): number {
+  let n = 0;
+  for (let i = Math.max(0, cursor); i < events.length; i++) {
+    const e = events[i];
+    if (e !== undefined && isTerminator(e)) {
+      n += 1;
+      if (n >= cap) break;
+    }
+  }
+  return n;
 }
 
 // ─── computeDigest — PURE narrowing of one chapter's events into the digest ────────────────────
