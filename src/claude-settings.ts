@@ -40,11 +40,12 @@ export const MAGE_ID_PREFIX = "mage:";
  */
 export const MAGE_HOOKS: ReadonlyArray<{ event: string; id: string; command: string }> = [
   { event: "SessionStart", id: "mage:observe:SessionStart", command: "mage observe" },
-  // The boundary nudge (0.0.12, ADR-0009 §24 step 2): on a post-compaction
-  // SessionStart it distills the closed chapter and surfaces staged lessons. The
-  // command gates on source==="compact" itself, so other SessionStart sources
-  // (startup/resume/clear) are a fast no-op. SessionEnd is NOT used — a SessionEnd
-  // hook's stdout cannot inject context (the session is already ending).
+  // The boundary nudge (0.0.12, ADR-0009 §24 step 2; ADR-0030 §5): fires on
+  // SessionStart source compact/startup/resume — on compact it distills the just-closed
+  // chapter and surfaces staged lessons + the autonomy-scaled backlog tally; startup/resume
+  // carry the (mtime-gated) backlog reminder. `clear` (and any other source) stays a fast
+  // no-op. SessionEnd is NOT used — a SessionEnd hook's stdout cannot inject context (the
+  // session is already ending).
   { event: "SessionStart", id: "mage:nudge:SessionStart", command: "mage nudge" },
   { event: "UserPromptSubmit", id: "mage:observe:UserPromptSubmit", command: "mage observe" },
   { event: "PostToolUse", id: "mage:observe:PostToolUse", command: "mage observe" },

@@ -1,4 +1,5 @@
 import { Command, Option } from "commander";
+import { autonomy } from "./commands/autonomy.js";
 import { connect, connectAllProjects } from "./commands/connect.js";
 import { dashboard } from "./commands/dashboard-cmd.js";
 import { OPEN_WITH_TARGETS } from "./dashboard/html.js";
@@ -448,6 +449,18 @@ export function buildProgram(): Command {
     .action(async (codeRepos: string[]) => {
       const result = await status({ codeRepos });
       if (!result.passed) process.exit(1);
+    });
+
+  // ─── autonomy ────────────────────────────────────────────────────────────────
+  program
+    .command("autonomy")
+    .description(
+      "Show or set this KB's opt-in grooming autonomy level (operator | approver | overseer; ADR-0030; never commits)",
+    )
+    .argument("[level]", "the level to set: operator | approver | overseer (omit to show the current level)")
+    .option("--dir <path>", "where to look for the knowledge base (default: cwd; walks up)")
+    .action(async (level: string | undefined, opts: { dir?: string }) => {
+      await autonomy({ level, dir: opts.dir });
     });
 
   // ─── doctor ────────────────────────────────────────────────────────────────

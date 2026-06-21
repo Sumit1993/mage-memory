@@ -47,6 +47,7 @@
 - `decision` [0027 — Faultline: a friction/derivation capture trigger (prefilter, not miner)](decisions/0027-faultline-friction-capture-trigger.md) — 0027, faultline, friction, derivation, capture, trigger, prefilter, miner, context, decision, consequences, gate _(superseded · reviewed 2026-06-20)_
 - `decision` [0028 — Prose-keyed capture: corrections + recurrent failures (supersedes Faultline)](decisions/0028-prose-keyed-capture.md) — 0028, prose, keyed, capture, corrections, recurrent, failures, supersedes, faultline, context, decision, consequences _(superseded · reviewed 2026-06-20)_
 - `decision` [0029 — Digest-to-agent capture: deterministic narrowing, agent judgment (supersedes prose-keyed)](decisions/0029-digest-to-agent-capture.md) — 0029, digest, agent, capture, deterministic, narrowing, judgment, supersedes, prose, keyed, context, decision _(reviewed 2026-06-20)_
+- `decision` [0030 — Opt-in agent autonomy ladder for the grooming loop (Operator / Approver / Overseer)](decisions/0030-agent-autonomy-ladder.md) — 0030, opt, agent, autonomy, ladder, grooming, loop, operator, approver, overseer, context, decision _(reviewed 2026-06-21)_
 
 ### design
 

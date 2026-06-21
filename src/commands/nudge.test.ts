@@ -67,13 +67,48 @@ async function seedChapter(learnings: string, session: string, topic: string): P
   await writeFile(join(learnings, `${session}.jsonl`), toJsonl(events), "utf8");
 }
 
+/** Set `grooming.autonomy` in the KB's metadata (mirrors how `mage autonomy` writes it). */
+async function setAutonomy(mage: string, level: string): Promise<void> {
+  await writeFile(
+    join(mage, "metadata.json"),
+    `${JSON.stringify({ schema: "mage.v2", mode: "in-repo", project: "t", grooming: { autonomy: level } })}\n`,
+  );
+}
+
+/** Seed `n` back-to-back CLOSED chapters (each a session_end-terminated work segment) in one stream. */
+async function seedClosedChapters(learnings: string, session: string, n: number): Promise<void> {
+  const events: ObserveEvent[] = [];
+  for (let i = 0; i < n; i++) {
+    events.push(buildUserPrompt(base(session), `work item ${i}`));
+    events.push(
+      buildToolUse(base(session), { tool: "Bash", paths: [], detail: `step ${i}`, ok: true, error_summary: null }),
+    );
+    events.push(buildSessionEnd(base(session)));
+  }
+  await writeFile(join(learnings, `${session}.jsonl`), toJsonl(events), "utf8");
+}
+
 describe("mage nudge — gating", () => {
-  it("does nothing unless the SessionStart source is compact", async () => {
+  it("does nothing on `clear` or a missing source (ADR-0030: clear is excluded)", async () => {
     const { dir, learnings } = await makeKb();
     await seedChapter(learnings, "s1", "alpha");
-    for (const source of ["startup", "resume", "clear", undefined]) {
+    for (const source of ["clear", undefined]) {
       const r = await nudgeCmd({ cwd: dir, source });
       expect(r).toEqual({ ran: false, drafted: 0, pending: 0, nudge: null });
+    }
+  });
+
+  it("fires on startup and resume — surfacing the backlog reminder, not the fresh digest (ADR-0030)", async () => {
+    const { dir, learnings } = await makeKb();
+    await seedChapter(learnings, "s1", "alpha"); // one CLOSED, unmined chapter
+    for (const source of ["startup", "resume"]) {
+      const r = await nudgeCmd({ cwd: dir, source, force: true });
+      expect(r.ran).toBe(true);
+      // startup/resume carry no fresh chapter → no digest banner, just the backlog line.
+      expect(r.nudge).not.toBeNull();
+      expect(r.nudge).not.toContain("Raw material, NOT lessons");
+      expect(r.nudge).toContain("1 chapter unmined");
+      expect(r.nudge).toContain("mage:groom");
     }
   });
 
@@ -148,6 +183,72 @@ describe("mage nudge — digest path (ADR-0029)", () => {
     expect(r.nudge).not.toBeNull();
     expect(r.nudge).not.toContain("AKIAIOSFODNN7EXAMPLE");
     expect(r.nudge).toContain("[REDACTED:");
+  });
+});
+
+describe("mage nudge — autonomy-scaled backlog mandate (ADR-0030)", () => {
+  it("operator (default) prints a plain `mage:groom` reminder, no autonomous-write authorization", async () => {
+    const { dir, mage, learnings } = await makeKb();
+    await setAutonomy(mage, "operator");
+    await seedChapter(learnings, "s1", "alpha");
+    const r = await nudgeCmd({ cwd: dir, source: "startup", force: true });
+    expect(r.nudge).toContain("autonomy: operator");
+    expect(r.nudge).toContain("Review with `mage:groom`");
+    expect(r.nudge).not.toContain("authorized");
+  });
+
+  it("approver authorizes grooming + uncommitted durable-note writes with Gate-2", async () => {
+    const { dir, mage, learnings } = await makeKb();
+    await setAutonomy(mage, "approver");
+    await seedChapter(learnings, "s1", "alpha");
+    const r = await nudgeCmd({ cwd: dir, source: "startup", force: true });
+    expect(r.nudge).toContain("autonomy: approver");
+    expect(r.nudge).toContain("authorized");
+    expect(r.nudge).toContain("UNCOMMITTED");
+    expect(r.nudge).toContain("Gate-2");
+    // The approver mandate stops at writing durable notes — no graduation authorization.
+    expect(r.nudge).not.toContain("mage:graduate");
+    expect(r.nudge).not.toContain("dispose");
+  });
+
+  it("overseer adds dispose-borderline + graduate", async () => {
+    const { dir, mage, learnings } = await makeKb();
+    await setAutonomy(mage, "overseer");
+    await seedChapter(learnings, "s1", "alpha");
+    const r = await nudgeCmd({ cwd: dir, source: "startup", force: true });
+    expect(r.nudge).toContain("autonomy: overseer");
+    expect(r.nudge).toContain("dispose");
+    expect(r.nudge).toContain("graduate");
+    // ADR-0030 §1 lists merge as an Overseer job — the mandate must tell the agent to merge.
+    expect(r.nudge).toContain("merge related lessons into existing notes");
+    expect(r.nudge).toContain("UNCOMMITTED");
+  });
+});
+
+describe("mage nudge — capped backlog tally (ADR-0030 §2)", () => {
+  it("counts unmined closed chapters and caps the count at 9+", async () => {
+    const { dir, learnings } = await makeKb();
+    await seedClosedChapters(learnings, "s1", 12); // 12 closed chapters, none mined
+    const r = await nudgeCmd({ cwd: dir, source: "startup", force: true });
+    expect(r.nudge).toContain("9+ chapters unmined");
+    expect(r.nudge).not.toContain("12 chapters unmined");
+  });
+
+  it("renders an exact (sub-cap) unmined count", async () => {
+    const { dir, learnings } = await makeKb();
+    await seedClosedChapters(learnings, "s1", 3);
+    const r = await nudgeCmd({ cwd: dir, source: "startup", force: true });
+    expect(r.nudge).toContain("3 chapters unmined");
+  });
+
+  it("renders the graduable part as an upper bound, not an exact count", async () => {
+    const { dir, learnings } = await makeKb();
+    await seedClosedChapters(learnings, "s1", 3);
+    const r = await nudgeCmd({ cwd: dir, source: "startup", force: true });
+    // graduableTally is a documented UPPER BOUND (backlog.ts) — the phrasing must say "up to … eligible",
+    // never the exact-reading "N notes ready to graduate".
+    expect(r.nudge).toContain("eligible to graduate");
+    expect(r.nudge).not.toContain("ready to graduate");
   });
 });
 

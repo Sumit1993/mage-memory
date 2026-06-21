@@ -53,6 +53,46 @@ source (see `CONVENTIONS.md`). groom mines **only mage's own** `.mage/learnings/
 foreign memory stores (ECC instincts, Claude `MEMORY.md`) are not harvested
 (ADR-0018 §8).
 
+## Autonomous mode (Approver / Overseer)
+
+By default this skill is **Operator** mode (HITL): you draft each note, show the
+human, and write **only after a yes** (Step 3 / Step 7). That per-note confirm is
+unchanged at Operator.
+
+When the boundary nudge invokes groom under an **Approver** or **Overseer**
+mandate (ADR-0030 — it reads `metadata.json → grooming.autonomy` and templates the
+mandate into the session), that per-note "write only after a yes" prompt is
+**WAIVED**. This does not break the loop's floor: the human's confirm has not
+vanished, it has **relocated to the batch `git commit`** — ADR-0013's invariant
+that *the commit IS the yes*. So in autonomous mode you write without pausing per
+note, and the human reviews the resulting diff and commits (or `git revert`s) once.
+
+The floor never moves, at either level:
+
+- **Gate-2 redaction (ADR-0014) still runs before EVERY write** — a LIVE secret
+  on a draft still stops that one note, exactly as in Operator mode. Autonomy
+  waives the *human prompt*, never the redaction gate.
+- **Writes land UNCOMMITTED in the working tree.** mage never commits (ADR-0009).
+  The uncommitted diff is the review surface; the commit is the human's "yes".
+- Hold the same **quality bar** as a confirmed write — lead with user corrections,
+  prefer a `merge` over a new file early, keep notes to insight + procedure +
+  pointers. The waived prompt is convenience, not a lowered value-bar.
+
+**Approver** — groom the backlog and write the **clearly-durable** notes straight
+into the working tree (run Phase 1 / Phase 2 below, but write the keepers without
+the per-note prompt); leave anything **borderline** staged in `.mage/staging/` for
+a later human pass; run `mage index`. Do **not** graduate.
+
+**Overseer** — everything Approver does, **plus** dispose the borderline tier
+(write or `--reject` it rather than leaving it staged), merge lessons into existing
+notes, and **graduate** eligible notes — route every `action: "graduate"` proposal
+through **`mage:graduate`** as always (recurrence-gated ≥ M, commit-gated). Never
+graduate inline here; the routing is unchanged, only the per-note pause is waived.
+
+Watermarks still advance only after the batch is dispositioned (Step 4 / Step 8) —
+in autonomous mode "dispositioned" means written/merged/rejected into the working
+tree, not a per-note yes.
+
 ## Step 0 — Resolve the roots to groom (once, for both phases)
 
 Find the nearest `mage/metadata.json` (walk up). The docs root to groom is:

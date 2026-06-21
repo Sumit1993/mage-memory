@@ -1,0 +1,209 @@
+---
+title: Autonomy levels
+description: "An opt-in, per-KB dial for how much of the grooming ladder the agent drains on its own — Operator, Approver, Overseer — bounded by the one floor that never moves: nothing is durable until you git commit."
+sidebar:
+  order: 6
+---
+
+Capture is automatic — hooks (wired by [`mage connect`](../start/quickstart.md)) observe your work and the [boundary nudge](./nudge.md) surfaces what to keep. But promotion up the ladder (staged draft -> written note -> indexed -> graduated) used to wait on a human running `mage:groom`, and the maintainer forgets. That is the mechanical reason a knowledge base stalls at raw scratch and never produces notes.
+
+A note on two words used throughout. A **chapter** is one stretch of work as mage sees it — it closes when your host agent **compacts** the conversation (summarizes it to free up context). That compaction boundary is exactly when the nudge fires; see the [boundary nudge](./nudge.md) for why. The **host agent** is the coding assistant mage rides inside — your Claude Code session, for example. mage's engine never calls a model; it is the host agent that does all the judging and writing.
+
+The realization behind ADR-0030: **anything a human does at `mage:groom`, a capable host agent can do** — judge a staged draft, distill a chapter, weigh a recurrence, write the note, re-index. The one irreducible human step is the **commit**. So the fix is not to nudge harder; it is a dial for how much of the ladder the agent drains on its own.
+
+The carrier for that dial is the boundary nudge. The nudge is **text injected into your host agent's session at the chapter boundary** — at Operator it carries a plain reminder; at Approver and Overseer it carries a *mandate* authorizing the agent to groom and write on its own.
+
+That dial has three positions, named for *your* role at each:
+
+- **Operator** (default) — you run the loop; the agent only captures.
+- **Approver** — the agent writes the clearly-durable notes; you review the diff.
+- **Overseer** — the agent runs the whole ladder; you audit `git log`.
+
+You set it once, per knowledge base, and it lives in `metadata.json -> grooming.autonomy` (a tracked field — config is files-as-truth, never an environment variable). There is a small visible command to get or set it:
+
+```bash
+mage autonomy            # print the current level
+mage autonomy overseer   # raise this KB to Overseer
+```
+
+## The one invariant — true at every level
+
+import { Aside } from '@astrojs/starlight/components';
+
+<Aside type="caution" title="Nothing is durable until YOU git commit">
+At every level, autonomous writes land in the working tree **uncommitted**. Reviewing the diff is the review; the **git commit is your "yes"** ([ADR-0013](https://github.com/Sumit1993/mage-memory/blob/main/mage/decisions/0013-procedure-skills-self-grooming-loop.md) — mage never commits). And **Gate-2 redaction always runs** before any tracked write ([ADR-0014](https://github.com/Sumit1993/mage-memory/blob/main/mage/decisions/0014-two-gate-redaction.md)): it scans every tracked write for secrets, credentials, and PII *before the file lands*, and a live hit stops that one write. Both the commit gate and the redaction gate hold regardless of level. These two never move — they are what make even the highest level safe. (See [Redaction](../reference/redaction.md) for the two gates in full.)
+</Aside>
+
+A direct consequence: mage structurally *cannot* reach "human-out-of-the-loop." Even at Overseer you are human-on-the-loop, because the commit gate is unconditional and the engine never calls a model — the CLI only string-templates a mandate by reading a config field; the host agent does all the judging and writing. The ladder is capped at HOTL by construction.
+
+## Level 1 — Operator (default)
+
+**What the agent does:** captures only. It stages a draft from the digest ([ADR-0029](https://github.com/Sumit1993/mage-memory/blob/main/mage/decisions/0029-digest-to-agent-capture.md)); it never writes a note or grooms on its own.
+
+**What you do:** you run `mage:groom`, judge each draft, write the keepers into `notes/`, and commit. You own every rung above *staged*.
+
+A fresh `mage connect` user is an Operator — the dial is opt-*in*, so there are no surprise autonomous writes. You still get the new backlog signal (below), which is a strict improvement on the old staged-only count.
+
+### Worked example
+
+```bash
+mage autonomy            # -> operator (the default; nothing to set)
+```
+
+After your next compaction, the post-compact nudge tells the agent something like:
+
+```text
+mage: 3 staged · 6 chapters unmined · up to 1 eligible to graduate → mage:groom
+Review with `mage:groom` (autonomy: operator).
+```
+
+That is a **reminder**. Nothing lands in the working tree on its own. You run the skill, accept the keepers, and commit yourself:
+
+```bash
+git add notes/ .mage/
+git commit -m "groom: capture the retry-backoff gotcha"
+```
+
+What about that `up to 1 eligible to graduate` in the line? It is an upper bound — a count of recurrence-eligible signatures, not an exact proposal. At Operator, graduation is its own step you run yourself: `mage:groom` handles the *writes*, but turning a proven note into a loadable skill is [`mage:graduate`](./promote-graduate.md), which you invoke directly. So when you see the "eligible to graduate" signal, run `mage:graduate` after grooming and commit the new skill alongside the notes. (Raise the KB to Overseer and the agent will run that graduation step for you — until then it stays in your hands.)
+
+## Level 2 — Approver
+
+**What the agent does:** at the boundary it grooms and writes the *clearly-durable* notes straight into the working tree (Gate-2 redaction runs); anything *borderline* it leaves staged; it runs `mage index`. The per-note "write only after a yes" prompt is waived — the "yes" relocates to the batch commit, which is exactly the ADR-0013 invariant.
+
+Two words to pin down here. A **clearly-durable** lesson is one the agent is confident enough to *write* — it clears the bar without a human in the loop. A **borderline** lesson is one it is unsure about: at Approver it gets *staged* (parked in `.mage/staging/` for a later human pass), and at Overseer it gets *disposed* (written or rejected rather than left waiting). The judgment both lean on is the **groom value-bar** — the same precision standard `mage:groom` applies by hand, baked into the mandate so an autonomous write is held to no lower a standard than a confirmed one.
+
+**What you do:** you review the resulting diff and commit. You no longer hand-run `mage:groom` for the obvious keepers.
+
+### Worked example
+
+```bash
+mage autonomy approver   # -> approver
+```
+
+After the next compaction, the nudge now carries a **mandate**, not just a reminder:
+
+```text
+mage: 3 staged · 6 chapters unmined · up to 1 eligible to graduate → mage:groom
+You are authorized (autonomy: approver) to run `mage:groom` now and write the clearly-durable notes into the working tree, UNCOMMITTED (Gate-2 redaction runs); leave borderline drafts staged. Reviewing the diff is the review; the human's `git commit` is the confirm — mage never commits.
+```
+
+The agent acts on it during the session. What lands in your working tree is real, uncommitted changes:
+
+```text
+ notes/gotcha-retry-backoff.md          | 14 ++++++++++
+ .mage/index.json                       |  3 +-
+```
+
+You read the diff, then make the one call that matters:
+
+```bash
+git diff                 # this is the review
+git add notes/ .mage/
+git commit -m "groom: durable notes from the last chapter"
+```
+
+If a written note was not worth keeping, `git revert` (or just don't stage it) is the whole undo.
+
+## Level 3 — Overseer (the headline use case)
+
+This is the level the whole design exists for. **You set it once, and then you mostly review diffs and commit.** That is the entire job.
+
+**What the agent does:** everything Approver does, *plus* it disposes the borderline tier, merges lessons into existing notes, and **graduates** eligible notes (a note that has recurred across at least M = 5 distinct compact-chapters) into loadable skills — all routed through the normal `mage:graduate` flow, recurrence-gated and commit-gated like everything else. The agent drains the full ladder on its normal session.
+
+**What you do — and how little it is:**
+
+1. Run `mage autonomy overseer` **once** for this KB.
+2. From then on, work normally. Grooming rides the agent's session at every boundary.
+3. Periodically read `git log` / the pending diff, `git revert` anything wrong, and **commit** the rest.
+
+The "I forgot to groom" failure mode disappears: there is no separate grooming chore to forget, because it happens inside the work you are already doing, gated only by the commit you were already going to make.
+
+### Worked example
+
+```bash
+mage autonomy overseer   # -> overseer  (you do this once, ever, for this KB)
+```
+
+The boundary nudge mandate is now the full ladder:
+
+```text
+mage: 3 staged · 6 chapters unmined · up to 1 eligible to graduate → mage:groom
+You are authorized (autonomy: overseer) to run `mage:groom` now: write durable notes, merge related lessons into existing notes, dispose the borderline tier, and `mage:graduate` eligible notes (Gate-2 runs; recurrence-gated). All writes land UNCOMMITTED in the working tree — the human audits `git log` and `git commit`s; mage never commits.
+```
+
+Across a few sessions the working tree fills with finished knowledge work you never hand-ran:
+
+```text
+ notes/gotcha-retry-backoff.md          | 14 ++++++++++
+ notes/playbook-release-soak.md         |  9 +++++--
+ .claude/skills/mage-skill-release-soak/SKILL.md | 22 ++++++++++++
+ .agents/skills/mage-skill-release-soak/SKILL.md | 22 ++++++++++++
+ .mage/index.json                       |  5 +-
+```
+
+Your review is `git log` plus the diff; your action is the commit:
+
+```bash
+git log --stat -3        # audit what the agent did
+git add notes/ .claude/ .agents/ .mage/
+git commit -m "groom: drain the backlog and graduate the release-soak playbook"
+```
+
+## The ladder as a picture
+
+The three levels map onto the **HITL -> HOTL** oversight spectrum. The ceiling above Overseer — HOOTL, human-out-of-the-loop — is **unreachable by construction**, because the git commit is always yours. The floor below everything is Gate-2 redaction, which always runs.
+
+<div style="border:1px solid #d0d7de;border-radius:8px;padding:16px;margin:1rem 0;background:#fbfcfd;overflow-x:auto;">
+  <svg viewBox="0 0 720 360" width="100%" role="img" aria-label="The autonomy ladder mapped to the HITL to HOTL spectrum, with an unreachable HOOTL ceiling and a Gate-2 redaction floor." style="display:block;max-width:720px;margin:0 auto;font-family:system-ui,sans-serif;">
+    {/* Unreachable HOOTL ceiling */}
+    <line x1="40" y1="40" x2="680" y2="40" stroke="#b42318" stroke-width="2" stroke-dasharray="6 5" />
+    <text x="360" y="30" text-anchor="middle" font-size="13" fill="#b42318" font-weight="600">HOOTL ceiling — UNREACHABLE</text>
+    <text x="360" y="56" text-anchor="middle" font-size="11" fill="#b42318">the git commit is always the human's (ADR-0013)</text>
+
+    {/* Overseer rung (HOTL) */}
+    <rect x="40" y="78" width="640" height="58" rx="6" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5" />
+    <text x="56" y="103" font-size="14" fill="#14532d" font-weight="700">Overseer</text>
+    <text x="56" y="123" font-size="11" fill="#166534">HOTL · agent drains the full ladder + graduates · you set once, review diffs, commit</text>
+    <text x="664" y="111" text-anchor="end" font-size="11" fill="#166534" font-weight="600">human ON the loop</text>
+
+    {/* Approver rung (HITL batch) */}
+    <rect x="40" y="148" width="640" height="58" rx="6" fill="#dbeafe" stroke="#2563eb" stroke-width="1.5" />
+    <text x="56" y="173" font-size="14" fill="#1e3a8a" font-weight="700">Approver</text>
+    <text x="56" y="193" font-size="11" fill="#1e40af">HITL (batch) · agent writes durable notes uncommitted · you review the diff, commit</text>
+    <text x="664" y="181" text-anchor="end" font-size="11" fill="#1e40af" font-weight="600">human IN the loop</text>
+
+    {/* Operator rung (HITL, default) */}
+    <rect x="40" y="218" width="640" height="58" rx="6" fill="#f1f5f9" stroke="#64748b" stroke-width="1.5" />
+    <text x="56" y="243" font-size="14" fill="#1e293b" font-weight="700">Operator (default)</text>
+    <text x="56" y="263" font-size="11" fill="#334155">HITL · agent only captures · you run mage:groom, write, commit</text>
+    <text x="664" y="251" text-anchor="end" font-size="11" fill="#334155" font-weight="600">human IN the loop</text>
+
+    {/* Gate-2 redaction floor */}
+    <line x1="40" y1="296" x2="680" y2="296" stroke="#0369a1" stroke-width="2" />
+    <text x="360" y="316" text-anchor="middle" font-size="13" fill="#0369a1" font-weight="600">Gate-2 redaction floor — ALWAYS RUNS</text>
+    <text x="360" y="334" text-anchor="middle" font-size="11" fill="#0369a1">before any tracked write, at every level (ADR-0014)</text>
+
+    {/* autonomy arrow */}
+    <line x1="20" y1="276" x2="20" y2="80" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)" />
+    <defs>
+      <marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
+        <path d="M0,0 L8,4 L0,8 Z" fill="#475569" />
+      </marker>
+    </defs>
+  </svg>
+  <p style="text-align:center;font-size:0.8rem;color:#475569;margin:0.5rem 0 0;">More agent autonomy upward — but the commit gate caps the climb at human-on-the-loop.</p>
+</div>
+
+## At a glance
+
+| Level | What YOU do | What the AGENT does | Risk | Expected behavior |
+|---|---|---|---|---|
+| **Operator** (default) | Run `mage:groom`, judge each draft, write, **commit** | Captures only — stages a draft from the digest | Lowest: nothing is written without you. The standing risk is the old one — you forget to groom and the KB stalls at raw scratch | A reminder line at the boundary; no autonomous writes; you do every rung above *staged* |
+| **Approver** | Review the diff, **commit** | Grooms + writes the clearly-durable notes into the working tree (Gate-2 runs); borderline → staged; runs `mage index` | A low-value note could be written — mitigated by Gate-2, per-section caps, the groom value-bar, and trivial `git revert` | Real uncommitted note changes land each boundary; the per-note prompt is waived (the commit is the "yes") |
+| **Overseer** | Set it once, then audit `git log` and **commit** | As Approver + disposes borderline, merges into existing notes, and **graduates** eligible notes (≥ M chapters) | Same low-value-note risk, now including a low-value graduation — same mitigations; graduation is still ≥ M recurrence-gated and commit-gated | The full ladder drains on the agent's normal session; you set once and mostly review + commit |
+
+## This is the standard pattern, not an invention
+
+The three levels are the well-established **HITL -> HOTL** oversight spectrum (Human-*In*- / *On*- / *Out-of*-the-Loop), and the role names follow the same operator -> approver -> observer user-role vocabulary the field already uses (Feng et al., 2025, Knight First Amendment Institute). The shape also mirrors a tool you may already know — the graduated permission modes in agent CLIs (for example Claude Code's `default` -> `acceptEdits` -> `auto`). mage's ladder is the knowledge-capture analog of that same idea; it was adopted, not invented. The one thing mage adds for free, from files-as-truth, is the unconditional commit gate that the governance literature usually flags as missing — which is why mage's ladder stops at HOTL and cannot reach HOOTL.
+
+See [ADR-0030](https://github.com/Sumit1993/mage-memory/blob/main/mage/decisions/0030-agent-autonomy-ladder.md) for the full decision, and the [boundary nudge](./nudge.md) for the carrier that templates each level's mandate.

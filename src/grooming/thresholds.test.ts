@@ -9,13 +9,17 @@ import {
 } from "../metrics/context-match.js";
 import {
   hubMetadataPath,
+  hubProjectDocsRoot,
   META_DIR,
   METADATA_SCHEMA,
   metadataPath,
+  writeHubMetadata,
 } from "../paths.js";
 import {
   BASE_THRESHOLDS,
+  DEFAULT_AUTONOMY,
   DEFAULT_SENSITIVITY,
+  readAutonomy,
   readSensitivity,
   thresholdsFor,
   type Sensitivity,
@@ -193,5 +197,92 @@ describe("readSensitivity — hub dial read", () => {
     const root = await tmp();
     const got = await readSensitivity({ root, kind: "hub", repo: root });
     expect(got).toBe("normal");
+  });
+});
+
+// ─── readAutonomy — fail-open, junk-narrowed, hub-aware (ADR-0030) ─────────────
+
+describe("readAutonomy — the opt-in autonomy ladder read", () => {
+  it("defaults to operator", () => {
+    expect(DEFAULT_AUTONOMY).toBe("operator");
+  });
+
+  it("reads each valid level from in-repo metadata", async () => {
+    for (const level of ["operator", "approver", "overseer"] as const) {
+      const repo = await tmp();
+      await writeRepoMeta(repo, { autonomy: level });
+      const got = await readAutonomy({ root: join(repo, META_DIR), kind: "repo", repo });
+      expect(got).toBe(level);
+    }
+  });
+
+  it("defaults to operator when no grooming block is present", async () => {
+    const repo = await tmp();
+    await writeRepoMeta(repo);
+    const got = await readAutonomy({ root: join(repo, META_DIR), kind: "repo", repo });
+    expect(got).toBe("operator");
+  });
+
+  it("defaults to operator when the metadata file is absent (fail-open)", async () => {
+    const repo = await tmp();
+    const got = await readAutonomy({ root: join(repo, META_DIR), kind: "repo", repo });
+    expect(got).toBe("operator");
+  });
+
+  it("defaults to operator on an out-of-enum value", async () => {
+    const repo = await tmp();
+    await writeRepoMeta(repo, { autonomy: "autopilot" });
+    const got = await readAutonomy({ root: join(repo, META_DIR), kind: "repo", repo });
+    expect(got).toBe("operator");
+  });
+
+  it("fails open to operator on unknown-schema metadata (read throws)", async () => {
+    const repo = await tmp();
+    await mkdir(join(repo, META_DIR), { recursive: true });
+    await writeFile(
+      metadataPath(repo),
+      JSON.stringify({ schema: "bogus.v0", grooming: { autonomy: "overseer" } }),
+      "utf8",
+    );
+    const got = await readAutonomy({ root: join(repo, META_DIR), kind: "repo", repo });
+    expect(got).toBe("operator");
+  });
+
+  it("reads the level from hub metadata (root, not repo) and respects it per-KB", async () => {
+    const root = await tmp();
+    await writeHubMeta(root, { autonomy: "approver" });
+    const got = await readAutonomy({ root, kind: "hub", repo: root });
+    expect(got).toBe("approver");
+  });
+
+  it("coexists with sensitivity in the same grooming block", async () => {
+    const repo = await tmp();
+    await writeRepoMeta(repo, { sensitivity: "high", autonomy: "overseer" });
+    const resolved = { root: join(repo, META_DIR), kind: "repo" as const, repo };
+    expect(await readSensitivity(resolved)).toBe("high");
+    expect(await readAutonomy(resolved)).toBe("overseer");
+  });
+
+  // ADR-0030 regression: for a hub-owned / external-mode KB the READ path (this fn) must
+  // match `mage autonomy`'s WRITE path. There root !== repo (root = <hub>/projects/<name>/,
+  // repo = <hub>), and the level is written into the HUB's own metadata at repo — so reading
+  // root (a file the writer never touches) would silently no-op the set. Prove the round-trip
+  // holds: write the hub metadata exactly as the command does, with root pointing at a project
+  // subdir, and confirm readAutonomy / readSensitivity read it back from repo.
+  it("round-trips a hub-set level when root !== repo (external mode)", async () => {
+    const hub = await tmp();
+    // The set path writes the hub's grooming block via writeHubMetadata(repo === hub root).
+    await writeHubMetadata(hub, {
+      schema: METADATA_SCHEMA,
+      name: "hub",
+      created_at: "2026-06-08T00:00:00.000Z",
+      projects: [],
+      grooming: { autonomy: "overseer", sensitivity: "high" },
+    });
+    // The resolved shape for a hub-owned project: root is the project subdir, repo is the hub.
+    const resolved = { root: hubProjectDocsRoot(hub, "p"), kind: "hub" as const, repo: hub };
+    expect(resolved.root).not.toBe(resolved.repo); // genuinely external (the bug's precondition)
+    expect(await readAutonomy(resolved)).toBe("overseer");
+    expect(await readSensitivity(resolved)).toBe("high");
   });
 });

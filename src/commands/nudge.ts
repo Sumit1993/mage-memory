@@ -1,93 +1,130 @@
-// `mage nudge` (ADR-0009 §24 step 2; ADR-0029). The Claude-Code adapter's boundary
-// SAFETY-NET for the organic grooming loop. Fired from a SessionStart hook; on
-// `source: "compact"` it renders the just-closed chapter's earned-signals (failures,
-// external commands, corrections) into a read-only DIGEST and surfaces it as
-// `additionalContext` for the host agent to MINE — the agent stages any durable lesson
-// via inline `mage stage`. mage does NOT decide what a lesson is (two pre-registered
-// replay gates killed deterministic candidate-selection — ADR-0027/0028; the digest→agent
-// pivot is ADR-0029): the deterministic layer NARROWS, the host model JUDGES, the human at
-// `mage:groom` confirms. Inline capture stays PRIMARY (AGENTS.md); the digest only catches
-// what the agent forgot. Verified hook contract: SessionStart carries `source` and its
-// structured stdout becomes context; SessionEnd cannot inject context, so it is NOT used
-// here. NEVER throws to the host (fail-open, exit 0).
+// `mage nudge` (ADR-0009 §24 step 2; ADR-0029; ADR-0030). The Claude-Code adapter's boundary
+// SAFETY-NET + work-list for the organic grooming loop. Fired from a SessionStart hook on
+// `compact` / `startup` / `resume` (NOT `clear`). On `compact` it renders the just-closed
+// chapter's earned-signals (failures, external commands, corrections) into a read-only DIGEST;
+// at every firing source it also surfaces a deterministic three-part capped BACKLOG tally
+// (staged drafts · unmined closed chapters · graduation-eligible signatures, ADR-0030 §2) and
+// templates a per-AUTONOMY-LEVEL mandate (operator/approver/overseer) into `additionalContext`
+// for the host agent. mage does NOT decide what a lesson is, never calls a model, and NEVER
+// commits (ADR-0009/0013): the deterministic layer NARROWS + templates a mandate, the host model
+// JUDGES + writes uncommitted, the human's git commit confirms. Inline capture stays PRIMARY
+// (AGENTS.md); the digest only catches what the agent forgot.
+//
+// Throttle: the fresh-chapter digest is NEVER throttled (new content each compact); the BACKLOG
+// line is throttled to once per window (grooming.nudgeThrottleHours ?? 4h) across all sources.
+// The backlog scan is mtime-gated — a no-new-scratch startup reuses the cached counts so it stays
+// ~instant. Verified hook contract: SessionStart carries `source` and its structured stdout
+// becomes context; SessionEnd cannot inject context, so it is NOT used here. NEVER throws to the
+// host (fail-open, exit 0).
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { Command } from "commander";
 import { computeDigest, lastClosedChapter, renderDigest } from "../distill/digest.js";
+import { distillWatermarkPath } from "../distill/watermark.js";
 import { readSessionStreams } from "../distill/reader.js";
-import { readStagedDrafts, type StagedDraft } from "../grooming/staging.js";
+import { type BacklogTally, computeBacklog } from "../grooming/backlog.js";
+import { type Autonomy, readAutonomy, readSensitivity } from "../grooming/thresholds.js";
 import type { ObserveEvent } from "../observe/types.js";
-import { absolutePath, learningsPath, metricsPath, resolveDocsRoot, stagingPath } from "../paths.js";
+import {
+  type ResolvedDocsRoot,
+  absolutePath,
+  learningsPath,
+  metricsPath,
+  resolveDocsRoot,
+  stagingPath,
+} from "../paths.js";
 
-/** Anti-nag throttle: a pending-batch reminder fires at most once per window. */
+/** Anti-nag throttle + mtime cache: the backlog reminder fires at most once per window. */
 const NUDGE_THROTTLE_FILE = "nudge-throttle.json";
-const NUDGE_THROTTLE_MS = 4 * 60 * 60 * 1000; // 4 hours
+/** Fallback backlog-reminder window when `grooming.nudgeThrottleHours` is absent/junk (ADR-0030 §5). */
+const DEFAULT_THROTTLE_MS = 4 * 60 * 60 * 1000; // 4 hours
+const MS_PER_HOUR = 60 * 60 * 1000;
+
+/** SessionStart sources that fire the nudge (ADR-0030 §5): NOT `clear`. */
+const FIRING_SOURCES = new Set(["compact", "startup", "resume"]);
 
 export interface NudgeOptions {
   /** Working directory used to resolve the KB (default: cwd). */
   cwd?: string;
-  /** The hook `source`; only "compact" acts (others are a no-op). */
+  /** The hook `source`; only compact/startup/resume act (clear + others are a no-op). */
   source?: string;
   /** Bypass the anti-nag throttle (testing / explicit re-nudge). */
   force?: boolean;
 }
 
 export interface NudgeResult {
-  /** True when the nudge acted (source was "compact" and a KB resolved). */
+  /** True when the nudge acted (a firing source AND a KB resolved). */
   ran: boolean;
   /** Always 0 — the digest path writes no drafts (ADR-0029); kept for the result shape. */
   drafted: number;
-  /** Total drafts pending in `.mage/staging/` after the run. */
+  /** Total staged drafts pending in `.mage/staging/` after the run. */
   pending: number;
-  /** The one-line additionalContext nudge, or null when nothing was surfaced. */
+  /** The additionalContext nudge (digest and/or backlog mandate), or null when nothing surfaced. */
   nudge: string | null;
 }
 
 const NONE: NudgeResult = { ran: false, drafted: 0, pending: 0, nudge: null };
 
 /**
- * Render the just-closed chapter's earned-signal DIGEST and COMPUTE the nudge (ADR-0029). Pure of
- * stdout — the caller (the hook command) emits `nudge` as additionalContext — so this is directly
- * unit-testable. May throw in tests; the command wraps it fail-open.
+ * Render the boundary nudge (ADR-0029 digest + ADR-0030 autonomy-scaled backlog mandate) and COMPUTE
+ * the result. Pure of stdout — the caller (the hook command) emits `nudge` as additionalContext — so
+ * this is directly unit-testable. May throw in tests; the command wraps it fail-open.
  */
 export async function nudgeCmd(opts: NudgeOptions): Promise<NudgeResult> {
-  // Only the post-compaction boundary reflects + nudges. Other SessionStart sources
-  // (startup/resume/clear) are no-ops — nothing closed to reflect on.
-  if (opts.source !== "compact") return NONE;
+  // Only compact/startup/resume reflect + nudge; `clear` (and any other source) is a no-op.
+  if (!opts.source || !FIRING_SOURCES.has(opts.source)) return NONE;
 
   const resolved = await resolveDocsRoot(absolutePath(opts.cwd ?? process.cwd())).catch(() => null);
   if (!resolved) return NONE;
-  const { root } = resolved;
-  return await digestNudge(root, stagingPath(root), opts.force === true);
+  return await digestNudge(resolved, opts.source, opts.force === true);
 }
 
-// ─── the digest nudge (ADR-0029) ───────────────────────────────────────────────
+// ─── the digest + backlog nudge (ADR-0029 / ADR-0030) ───────────────────────────
 
 /**
- * Render the just-closed chapter's earned-signal DIGEST as the nudge (the host agent mines it and
- * stages durable lessons via `mage stage`). NO drafts are written — `.mage/staging/` holds only
- * agent-chosen lessons. Surfaces a fresh digest whenever one exists; otherwise falls back to the
- * throttled pending-drafts reminder. `drafted` is always 0.
+ * Compose the boundary nudge: on `compact`, render the just-closed chapter's earned-signal DIGEST
+ * (never throttled — new content each compact); at every source, append the per-autonomy-level
+ * BACKLOG mandate when the throttle window has elapsed (ADR-0030 §5). NO drafts are written. The
+ * three-part tally is mtime-gated so a no-new-scratch startup reuses cached counts.
  */
-async function digestNudge(root: string, stagingDir: string, force: boolean): Promise<NudgeResult> {
-  const streams = await readSessionStreams(learningsPath(root)).catch(
-    () => [] as Array<{ session: string; events: ObserveEvent[] }>,
-  );
-  const chapter = latestClosedChapter(streams);
-  const rendered = chapter.length > 0 ? renderDigest(computeDigest(chapter)) : "";
-  const pending = (await readStagedDrafts(stagingDir).catch(() => [] as StagedDraft[])).length;
+async function digestNudge(resolved: ResolvedDocsRoot, source: string, force: boolean): Promise<NudgeResult> {
+  const { root } = resolved;
 
-  if (rendered.length > 0) {
-    const note =
-      pending > 0
-        ? `\n\n(${pending} lesson draft${plural(pending)} also pending in .mage/staging/ — review with \`mage:groom\`.)`
-        : "";
-    return { ran: true, drafted: 0, pending, nudge: rendered + note };
+  // The fresh-chapter digest only exists on `compact` (a chapter just closed); startup/resume
+  // carry no fresh chapter, so they ride the backlog reminder alone.
+  let rendered = "";
+  if (source === "compact") {
+    const streams = await readSessionStreams(learningsPath(root)).catch(
+      () => [] as Array<{ session: string; events: ObserveEvent[] }>,
+    );
+    const chapter = latestClosedChapter(streams);
+    rendered = chapter.length > 0 ? renderDigest(computeDigest(chapter)) : "";
   }
-  // No fresh chapter to surface → the throttled pending-batch reminder (or nothing).
-  const nudge = await pendingReminder(root, pending, force);
+
+  const level = await readAutonomy(resolved).catch(() => "operator" as Autonomy);
+  const sensitivity = await readSensitivity(resolved).catch(() => "normal" as const);
+  const tally = await backlogTally(root, sensitivity);
+  const pending = tally.staged;
+
+  // The backlog line is throttled (once per window, all sources); the digest is not.
+  const throttlePath = join(metricsPath(root), NUDGE_THROTTLE_FILE);
+  const windowMs = await throttleWindowMs(resolved);
+  const showBacklog = hasBacklog(tally) && (force || (await throttleElapsed(throttlePath, windowMs)));
+  const mandate = showBacklog ? renderMandate(level, tally) : "";
+  if (showBacklog) await writeThrottle(throttlePath, Date.now());
+
+  const nudge = composeNudge(rendered, mandate);
+  if (nudge === null) return { ran: true, drafted: 0, pending, nudge: null };
   return { ran: true, drafted: 0, pending, nudge };
+}
+
+/** Join the fresh digest and the backlog mandate; null when neither has anything to say. */
+function composeNudge(digest: string, mandate: string): string | null {
+  if (digest.length > 0 && mandate.length > 0) return `${digest}\n\n${mandate}`;
+  if (digest.length > 0) return digest;
+  if (mandate.length > 0) return mandate;
+  return null;
 }
 
 /** Events of the MOST-recently-closed chapter across all streams (latest terminator ts wins). */
@@ -108,53 +145,198 @@ function latestClosedChapter(
   return best;
 }
 
-// ─── anti-nag nudge decision ───────────────────────────────────────────────────
+// ─── backlog tally (mtime-gated) ─────────────────────────────────────────────────
+
+/** True iff any of the three backlog parts has something to report. */
+function hasBacklog(t: BacklogTally): boolean {
+  return t.staged > 0 || t.unmined > 0 || t.graduable > 0;
+}
 
 /**
- * The throttled pending-batch reminder — used when no fresh digest is surfaced (e.g. nothing closed
- * since last time, but agent-staged drafts still await `mage:groom`). Reminds at most once per
- * {@link NUDGE_THROTTLE_MS}; null when nothing is pending or the window has not elapsed. Persists the
- * throttle timestamp when it surfaces.
+ * The three-part capped backlog tally, MTIME-GATED (ADR-0030 §5): recompute only when `.learnings/`
+ * or the distill watermark changed since the last nudge; otherwise reuse the cached counts so a
+ * no-new-scratch startup stays ~instant. Fail-open — a stat/read miss recomputes (never throttles).
  */
-async function pendingReminder(root: string, pending: number, force: boolean): Promise<string | null> {
-  if (pending === 0) return null; // nothing to say.
-  const throttlePath = join(metricsPath(root), NUDGE_THROTTLE_FILE);
-  if (!force) {
-    const last = await readThrottle(throttlePath);
-    if (Date.now() - last < NUDGE_THROTTLE_MS) return null; // a recent reminder already fired.
-  }
-  await writeThrottle(throttlePath, Date.now());
-  return `mage: ${pending} lesson draft${plural(pending)} pending in .mage/staging/ — review with \`mage:groom\`.`;
+async function backlogTally(root: string, sensitivity: "low" | "normal" | "high"): Promise<BacklogTally> {
+  const fp = await scratchFingerprint(root);
+  const cached = await readThrottle(join(metricsPath(root), NUDGE_THROTTLE_FILE));
+  if (fp.length > 0 && cached.fp === fp && cached.tally) return cached.tally;
+  const tally = await computeBacklog(root, sensitivity);
+  // Persist the fresh fingerprint + tally so a later no-change startup skips the scan. The
+  // throttle timestamp is written separately when the backlog line actually surfaces.
+  await writeThrottle(join(metricsPath(root), NUDGE_THROTTLE_FILE), undefined, fp, tally);
+  return tally;
 }
 
-async function readThrottle(path: string): Promise<number> {
+/**
+ * An mtime fingerprint of the scratch that feeds the backlog scan: the `.learnings/` dir mtime
+ * (new/removed/rewritten session streams bump it), the distill watermark file mtime (a `mage
+ * distill --seen` advances the unmined cursor), and the `.mage/staging/` dir mtime (a `mage stage`
+ * adds a draft / a groom drains one — the staged count must not go stale across a stage/groom that
+ * never touched `.learnings/`). "" when none can be stat'd → never gate (always recompute), the
+ * safe-open behaviour.
+ */
+async function scratchFingerprint(root: string): Promise<string> {
+  const parts: string[] = [];
   try {
-    const parsed = JSON.parse(await readFile(path, "utf8")) as { lastNudge?: unknown };
-    return typeof parsed.lastNudge === "number" ? parsed.lastNudge : 0;
+    parts.push(String((await stat(learningsPath(root))).mtimeMs));
   } catch {
-    return 0; // missing/corrupt → never throttled.
+    // No `.learnings/` yet — leave it out; the watermark/staging may still pin the fingerprint.
+  }
+  try {
+    parts.push(String((await stat(distillWatermarkPath(root))).mtimeMs));
+  } catch {
+    // No watermark yet — distill has not run; fine.
+  }
+  try {
+    parts.push(String((await stat(stagingPath(root))).mtimeMs));
+  } catch {
+    // No `.mage/staging/` yet — nothing staged; fine.
+  }
+  return parts.join(":");
+}
+
+// ─── per-level mandate templating (ADR-0030 §5) ──────────────────────────────────
+
+/**
+ * Template the autonomy-scaled mandate: the one-line backlog tally + the level-specific instruction.
+ * Operator = a human reminder; Approver = authorized to groom + write durable notes uncommitted
+ * (Gate-2 runs); Overseer = + dispose the borderline tier and graduate eligible notes. PURE.
+ */
+function renderMandate(level: Autonomy, t: BacklogTally): string {
+  const line = backlogLine(t);
+  if (level === "approver") {
+    return (
+      `${line}\n` +
+      "You are authorized (autonomy: approver) to run `mage:groom` now and write the clearly-durable " +
+      "notes into the working tree, UNCOMMITTED (Gate-2 redaction runs); leave borderline drafts staged. " +
+      "Reviewing the diff is the review; the human's `git commit` is the confirm — mage never commits."
+    );
+  }
+  if (level === "overseer") {
+    return (
+      `${line}\n` +
+      "You are authorized (autonomy: overseer) to run `mage:groom` now: write durable notes, merge related " +
+      "lessons into existing notes, dispose the borderline tier, and `mage:graduate` eligible notes (Gate-2 " +
+      "runs; recurrence-gated). All writes land UNCOMMITTED in the working tree — the human audits `git log` " +
+      "and `git commit`s; mage never commits."
+    );
+  }
+  // operator (default) — a human reminder, no autonomous-write authorization.
+  return `${line}\nReview with \`mage:groom\` (autonomy: operator).`;
+}
+
+/**
+ * The one-line backlog tally (ADR-0030 §2): `mage: 3 staged · 6 chapters unmined · up to 1 eligible to
+ * graduate`. The graduable part is an UPPER BOUND — `graduableTally` counts recurrence-eligible
+ * signatures without subtracting already-covered notes (backlog.ts), so the phrasing conveys eligibility,
+ * not an exact proposal count.
+ */
+function backlogLine(t: BacklogTally): string {
+  const unmined = t.unminedCapped ? "9+" : String(t.unmined);
+  const parts = [
+    `${t.staged} staged`,
+    `${unmined} chapter${t.unmined === 1 && !t.unminedCapped ? "" : "s"} unmined`,
+    `up to ${t.graduable} eligible to graduate`,
+  ];
+  return `mage: ${parts.join(" · ")} → mage:groom`;
+}
+
+// ─── throttle + mtime-cache file I/O ─────────────────────────────────────────────
+
+/** The throttle window in ms: `grooming.nudgeThrottleHours` (positive) → ms, else the 4h default. */
+async function throttleWindowMs(resolved: ResolvedDocsRoot): Promise<number> {
+  try {
+    const hours = await readThrottleHours(resolved);
+    if (typeof hours === "number" && Number.isFinite(hours) && hours > 0) return hours * MS_PER_HOUR;
+  } catch {
+    // fall through to the default.
+  }
+  return DEFAULT_THROTTLE_MS;
+}
+
+/** Read the user-set `grooming.nudgeThrottleHours` (hub- or repo-side), or undefined. */
+async function readThrottleHours(resolved: ResolvedDocsRoot): Promise<number | undefined> {
+  // Lazy import avoids a paths.ts cycle in the hot module graph; readMetadata/readHubMetadata
+  // are the same readers thresholds.ts uses.
+  const { readHubMetadata, readMetadata } = await import("../paths.js");
+  const meta =
+    resolved.kind === "hub" ? await readHubMetadata(resolved.repo) : await readMetadata(resolved.repo);
+  const h = meta?.grooming?.nudgeThrottleHours;
+  return typeof h === "number" ? h : undefined;
+}
+
+/** True iff the backlog window has elapsed since the last surfaced reminder (fail-open: yes). */
+async function throttleElapsed(path: string, windowMs: number): Promise<boolean> {
+  const { lastNudge } = await readThrottle(path);
+  return Date.now() - lastNudge >= windowMs;
+}
+
+interface ThrottleState {
+  /** Epoch ms of the last surfaced backlog reminder (0 = never). */
+  lastNudge: number;
+  /** The scratch mtime fingerprint at the last tally compute ("" = none cached). */
+  fp: string;
+  /** The cached three-part tally, when a fingerprint pinned it. */
+  tally?: BacklogTally;
+}
+
+async function readThrottle(path: string): Promise<ThrottleState> {
+  try {
+    const parsed = JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>;
+    const lastNudge = typeof parsed.lastNudge === "number" ? parsed.lastNudge : 0;
+    const fp = typeof parsed.fp === "string" ? parsed.fp : "";
+    const tally = isBacklogTally(parsed.tally) ? parsed.tally : undefined;
+    return { lastNudge, fp, tally };
+  } catch {
+    return { lastNudge: 0, fp: "" }; // missing/corrupt → never throttled, no cache.
   }
 }
 
-async function writeThrottle(path: string, ts: number): Promise<void> {
+/** Narrow a parsed value to a BacklogTally (drops a partial/corrupt cache). */
+function isBacklogTally(v: unknown): v is BacklogTally {
+  if (v === null || typeof v !== "object") return false;
+  const t = v as Record<string, unknown>;
+  return (
+    typeof t.staged === "number" &&
+    typeof t.unmined === "number" &&
+    typeof t.unminedCapped === "boolean" &&
+    typeof t.graduable === "number"
+  );
+}
+
+/**
+ * Persist the throttle/cache file. When `lastNudge` is given it stamps the reminder time; the `fp` +
+ * `tally` (mtime cache) are merged with whatever is already on disk so a tally recompute does not
+ * reset the throttle clock and vice versa. Fail-open: a write failure must never break session start.
+ */
+async function writeThrottle(
+  path: string,
+  lastNudge?: number,
+  fp?: string,
+  tally?: BacklogTally,
+): Promise<void> {
   try {
+    const prev = await readThrottle(path);
+    const next: ThrottleState & { v: number } = {
+      v: 2,
+      lastNudge: lastNudge ?? prev.lastNudge,
+      fp: fp ?? prev.fp,
+      tally: tally ?? prev.tally,
+    };
     await mkdir(dirname(path), { recursive: true });
-    await writeFile(path, `${JSON.stringify({ v: 1, lastNudge: ts })}\n`);
+    await writeFile(path, `${JSON.stringify(next)}\n`);
   } catch {
     // Fail-open: a throttle write failure must never break the host session start.
   }
 }
 
-// ─── helpers ───────────────────────────────────────────────────────────────────
-
-function plural(n: number): string {
-  return n === 1 ? "" : "s";
-}
+// ─── stdout contract ─────────────────────────────────────────────────────────────
 
 /**
- * Emit a one-line nudge as Claude Code `additionalContext`. The structured form is
- * the documented contract for a SessionStart hook (plain stdout also works); exit 0
- * is required for stdout to be consumed.
+ * Emit the nudge as Claude Code `additionalContext`. The structured form is the documented
+ * contract for a SessionStart hook (plain stdout also works); exit 0 is required for stdout to
+ * be consumed.
  */
 export function emitAdditionalContext(context: string): void {
   const out = {
@@ -202,7 +384,7 @@ function str(v: unknown): string | undefined {
 export function buildNudgeCommand(): Command {
   return new Command("nudge")
     .description(
-      "Hook-fired boundary nudge: on a post-compaction SessionStart, surface the closed chapter's earned-signal digest (failures, external commands, corrections) for the agent to mine and `mage stage` (ADR-0029; never blocks the host)",
+      "Hook-fired boundary nudge: on a SessionStart (compact/startup/resume), surface the closed chapter's earned-signal digest plus the autonomy-scaled grooming backlog for the agent to mine and `mage stage`/`mage:groom` (ADR-0029/0030; never blocks the host)",
     )
     .option(
       "--cwd <dir>",
