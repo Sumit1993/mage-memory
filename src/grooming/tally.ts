@@ -20,7 +20,7 @@ import type { Dirent } from "node:fs";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { metricsPath } from "../paths.js";
-import type { ObserveEvent } from "../observe/types.js";
+import { type ObserveEvent, isTerminator } from "../observe/types.js";
 import type {
   Lens,
   LensCounts,
@@ -111,11 +111,6 @@ export async function writeTally(docsRoot: string, t: PromoteTally): Promise<voi
 }
 
 // ─── CLOSED-segment helpers (mirror reader.ts) ──────────────────────────────────
-
-/** A terminator = a compact or session_end event — the chapter boundary. */
-function isTerminator(e: ObserveEvent): boolean {
-  return e.type === "compact" || e.type === "session_end";
-}
 
 /**
  * The CLOSED prefix length: the index just past the LAST terminator, or 0 if the

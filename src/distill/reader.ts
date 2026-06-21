@@ -15,7 +15,7 @@
 import { basename, join } from "node:path";
 import { readdir, readFile } from "node:fs/promises";
 import type { Dirent } from "node:fs";
-import type { ObserveEvent } from "../observe/types.js";
+import { type ObserveEvent, isTerminator } from "../observe/types.js";
 import { redact } from "../redact.js";
 import { readWatermark } from "./watermark.js";
 import type { DistillCluster, DistillManifest } from "./types.js";
@@ -30,11 +30,6 @@ import type { DistillCluster, DistillManifest } from "./types.js";
 export const SALIENCE_CAP = 40;
 
 // ─── segmentation helpers ────────────────────────────────────────────────────
-
-/** A terminator = a compact or session_end event — the natural chapter boundary. */
-function isTerminator(e: ObserveEvent): boolean {
-  return e.type === "compact" || e.type === "session_end";
-}
 
 /**
  * The CLOSED prefix length: the index just past the LAST terminator, or 0 if the

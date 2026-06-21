@@ -37,6 +37,15 @@ export function isObserveEventType(v: unknown): v is ObserveEventType {
   return typeof v === "string" && OBSERVE_EVENT_TYPES.has(v);
 }
 
+/**
+ * A chapter terminator: a `compact` or `session_end` event closes a compact-chapter (0.0.11 —
+ * recurrence counts distinct chapters, not session_ids). The SINGLE definition of what closes a
+ * chapter; distill/reader, distill/digest, and grooming/tally import it rather than re-declaring it.
+ */
+export function isTerminator(e: ObserveEvent): boolean {
+  return e.type === "compact" || e.type === "session_end";
+}
+
 /** Shared envelope on every line (ADR-0015 §1): `v` + `ts` + `session` + `type`. */
 export interface ObserveEnvelope {
   v: typeof OBSERVE_SCHEMA_VERSION;
