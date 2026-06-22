@@ -78,6 +78,22 @@ The floor never moves, at either level:
   prefer a `merge` over a new file early, keep notes to insight + procedure +
   pointers. The waived prompt is convenience, not a lowered value-bar.
 
+**Stamp every autonomous write — the reject-ledger depends on it.** A note you write
+under an Approver or Overseer mandate (never at Operator, never a human-confirmed
+note) gets one extra field in its `provenance:` block marking it agent-written:
+
+```yaml
+provenance:
+  autonomy: overseer   # the mandate level that wrote it — `approver` or `overseer`
+```
+
+This is the attribution the crown signal needs (ADR-0030's live reject-ledger): a
+kept note survives in `git`, a wrong one is `git revert`ed or discarded, so the
+keep-vs-revert ratio per level becomes a deterministic scan over stamped notes — no
+guessing which notes the agent authored. Add only that field; the note's existing
+`created` date carries the timing, and a later `mage ledger` (Tier 1, ADR-0031) will
+read the stamp rather than re-derive authorship.
+
 **Approver** — groom the backlog and write the **clearly-durable** notes straight
 into the working tree (run Phase 1 / Phase 2 below, but write the keepers without
 the per-note prompt); leave anything **borderline** staged in `.mage/staging/` for
