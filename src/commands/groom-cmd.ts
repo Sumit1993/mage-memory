@@ -10,7 +10,8 @@
 
 import { basename } from "node:path";
 import { logger } from "../logger.js";
-import { requireDocsRoot, stagingPath } from "../paths.js";
+import { type ResolvedDocsRoot, requireDocsRoot, stagingPath } from "../paths.js";
+import { resolveCreationStamp } from "../provenance.js";
 import { scanNotes } from "../scan.js";
 import { BASE_THRESHOLDS } from "../grooming/thresholds.js";
 import {
@@ -73,7 +74,7 @@ export async function groomCmd(opts: GroomOptions): Promise<GroomResult> {
   }
 
   const staged = await readStagedDrafts(stagingPath(root));
-  if (opts.accept !== undefined) return acceptBatch(root, staged, opts.accept, opts);
+  if (opts.accept !== undefined) return acceptBatch(resolved, staged, opts.accept, opts);
   if (opts.reject !== undefined) return rejectBatch(root, staged, opts.reject, opts);
   return surface(root, staged, opts.json);
 }
@@ -127,16 +128,21 @@ function toView(d: StagedDraft): GroomDraftView {
 // ─── accept: promote to notes/ + re-index ────────────────────────────────────
 
 async function acceptBatch(
-  root: string,
+  resolved: ResolvedDocsRoot,
   staged: StagedDraft[],
   spec: string,
   opts: GroomOptions,
 ): Promise<GroomResult> {
+  const root = resolved.root;
   const selected = select(spec, staged);
   const taken = await existingNoteSlugs(root);
+  // Stamp provenance at the creation chokepoint (ADR-0031): repo + commit on every
+  // accepted note, and `autonomy` when this groom runs under approver/overseer (the
+  // reject-ledger's authorship mark — ADR-0030). Resolved once for the batch.
+  const stamp = await resolveCreationStamp(resolved);
   const accepted: string[] = [];
   for (const draft of selected) {
-    const rel = await promoteDraft(root, draft, taken);
+    const rel = await promoteDraft(root, draft, taken, stamp);
     taken.add(basename(rel, ".md")); // so two accepted drafts can't collide on a slug
     accepted.push(rel);
   }
