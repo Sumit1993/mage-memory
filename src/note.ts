@@ -9,6 +9,12 @@ export interface Provenance {
   commit?: string;
   /** The work-unit slug this note was distilled from. */
   work?: string;
+  /**
+   * Authorship mark stamped by mage's writer at note creation (ADR-0031): set ONLY
+   * when the resolved grooming autonomy is approver/overseer (ADR-0030). Absent ⇒
+   * operator / human-confirmed. The reject-ledger's keep-vs-revert signal reads it.
+   */
+  autonomy?: "approver" | "overseer";
 }
 
 /**

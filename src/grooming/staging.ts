@@ -23,6 +23,7 @@ import {
   writeNote,
 } from "../note.js";
 import { metricsPath, NOTES_DIR } from "../paths.js";
+import { type ProvenanceStamp, stampProvenance } from "../provenance.js";
 import type { ScannedNote } from "../scan.js";
 import { coveringNoteMin } from "./covering-note.js";
 
@@ -251,16 +252,28 @@ export function dedupDraft(
  * Move a staged draft into `notes/` (de-collided against `taken`), returning the
  * notes-relative path. `taken` should be mutated by the caller across a batch so
  * two accepted drafts can't land on the same slug.
+ *
+ * When `stamp` is given, this is the note-creation chokepoint (ADR-0031): the draft's
+ * frontmatter gets the provenance stamp and the stamped note is written to `notes/`
+ * (the staging file is then removed). Without a stamp it stays a byte-preserving
+ * `rename` — the staged bytes are unchanged.
  */
 export async function promoteDraft(
   docsRoot: string,
   draft: StagedDraft,
   taken: ReadonlySet<string>,
+  stamp?: ProvenanceStamp,
 ): Promise<string> {
   const notesDir = join(docsRoot, NOTES_DIR);
   await mkdir(notesDir, { recursive: true });
   const finalSlug = uniqueSlug(draft.slug, taken);
-  await rename(draft.path, join(notesDir, `${finalSlug}.md`));
+  const dest = join(notesDir, `${finalSlug}.md`);
+  if (stamp) {
+    await writeNote(dest, stampProvenance(draft.frontmatter, stamp), draft.body);
+    await rm(draft.path, { force: true });
+  } else {
+    await rename(draft.path, dest);
+  }
   return `${NOTES_DIR}/${finalSlug}.md`;
 }
 

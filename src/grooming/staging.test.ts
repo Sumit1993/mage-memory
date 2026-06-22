@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { STATE_DIR, METRICS_DIR, STAGING_DIR } from "../paths.js";
 import { describe, expect, it } from "vitest";
 import type { ScannedNote } from "../scan.js";
+import { parseNote } from "../note.js";
 import { tmpDir } from "../../test/fixtures/kb.js";
 import {
   type DraftSig,
@@ -197,6 +198,25 @@ describe("promoteDraft / discardDraft", () => {
     expect(rel).toBe("notes/lesson-2.md"); // de-collided
     expect(await readFile(join(root, "notes", "lesson-2.md"), "utf8")).toContain("# Lesson");
     expect(await readStagedDrafts(staging)).toEqual([]); // moved out of staging
+  });
+  it("stamps provenance and writes (not renames) when given a stamp (ADR-0031)", async () => {
+    const root = await tmpDir();
+    const staging = join(root, STATE_DIR, STAGING_DIR);
+    const { frontmatter, body } = composeDraft({ title: "Stamped", tags: ["mage/x"], body: "b" });
+    await writeDraft(staging, "stamped", frontmatter, body);
+
+    const [draft] = await readStagedDrafts(staging);
+    const rel = await promoteDraft(root, draft!, new Set(), {
+      autonomy: "overseer",
+      repo: "mage-memory",
+      commit: "abc1234",
+    });
+    expect(rel).toBe("notes/stamped.md");
+
+    const note = parseNote(await readFile(join(root, "notes", "stamped.md"), "utf8"));
+    expect(note.frontmatter.provenance).toEqual({ repo: "mage-memory", commit: "abc1234", autonomy: "overseer" });
+    expect(note.body).toContain("# Stamped"); // body preserved
+    expect(await readStagedDrafts(staging)).toEqual([]); // staging file removed
   });
   it("discardDraft removes the file (idempotent)", async () => {
     const root = await tmpDir();
