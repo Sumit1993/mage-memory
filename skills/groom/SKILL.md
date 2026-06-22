@@ -78,6 +78,11 @@ The floor never moves, at either level:
   prefer a `merge` over a new file early, keep notes to insight + procedure +
   pointers. The waived prompt is convenience, not a lowered value-bar.
 
+**Provenance is stamped for you (ADR-0031) — do not add it by hand.** `mage groom
+--accept` stamps each accepted note's `provenance` deterministically at the write:
+`autonomy: approver|overseer` (the reject-ledger's authorship mark, ADR-0030) plus
+`repo` + `commit`. It appears in the diff you review and commit; you write none of it.
+
 **Approver** — groom the backlog and write the **clearly-durable** notes straight
 into the working tree (run Phase 1 / Phase 2 below, but write the keepers without
 the per-note prompt); leave anything **borderline** staged in `.mage/staging/` for

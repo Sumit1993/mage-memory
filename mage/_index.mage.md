@@ -2,7 +2,7 @@
 
 # mage
 
-> 49 notes. Part of the [index](INDEX.md).
+> 50 notes. Part of the [index](INDEX.md).
 
 ### build
 
@@ -48,6 +48,7 @@
 - `decision` [0028 — Prose-keyed capture: corrections + recurrent failures (supersedes Faultline)](decisions/0028-prose-keyed-capture.md) — 0028, prose, keyed, capture, corrections, recurrent, failures, supersedes, faultline, context, decision, consequences _(superseded · reviewed 2026-06-20)_
 - `decision` [0029 — Digest-to-agent capture: deterministic narrowing, agent judgment (supersedes prose-keyed)](decisions/0029-digest-to-agent-capture.md) — 0029, digest, agent, capture, deterministic, narrowing, judgment, supersedes, prose, keyed, context, decision _(reviewed 2026-06-20)_
 - `decision` [0030 — Opt-in agent autonomy ladder for the grooming loop (Operator / Approver / Overseer)](decisions/0030-agent-autonomy-ladder.md) — 0030, opt, agent, autonomy, ladder, grooming, loop, operator, approver, overseer, context, decision _(reviewed 2026-06-21)_
+- `decision` [0031 — Programmatic provenance stamping + the autonomy reject-ledger (Phase 1: stamp at creation)](decisions/0031-programmatic-provenance-stamp.md) — 0031, programmatic, provenance, stamping, autonomy, reject, ledger, phase, stamp, creation, context, decision _(reviewed 2026-06-22)_
 
 ### design
 

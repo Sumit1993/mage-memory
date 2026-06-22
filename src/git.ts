@@ -28,6 +28,17 @@ export async function isGitRepo(dir: string): Promise<boolean> {
 }
 
 /**
+ * The short HEAD commit hash for `repoPath` (e.g. "aad31f0"), or null when git is
+ * missing, `repoPath` is not a repo, or it has no commits yet. Read-only; never
+ * throws. The provenance `commit` staleness anchor mage stamps at note creation
+ * (ADR-0031).
+ */
+export async function getHeadCommit(repoPath: string): Promise<string | null> {
+  const r = await run("git", ["-C", repoPath, "rev-parse", "--short", "HEAD"]);
+  return r.code === 0 ? r.stdout.trim() || null : null;
+}
+
+/**
  * Check whether `gh` CLI is installed.
  */
 export async function hasGh(): Promise<boolean> {
