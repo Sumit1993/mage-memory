@@ -94,6 +94,19 @@ describe("connect", () => {
     expect(r.wired).toBe(10);
   });
 
+  it("stashes a user's own autoMemoryDirectory before displacing it", async () => {
+    const { dir, root } = await withKb({ kind: "repo" });
+    await mkdir(join(dir, ".claude"), { recursive: true });
+    await writeFile(localPath(dir), JSON.stringify({ autoMemoryDirectory: "/my/own/dir" }));
+    await connect({ cwd: dir, yes: true, gitHook: false });
+    const settings = JSON.parse(await readFile(localPath(dir), "utf8")) as {
+      autoMemoryDirectory?: string;
+      mageStashedAutoMemoryDirectory?: string;
+    };
+    expect(settings.autoMemoryDirectory).toBe(root); // displaced to the KB
+    expect(settings.mageStashedAutoMemoryDirectory).toBe("/my/own/dir"); // preserved for restore
+  });
+
   it("merges into a pre-existing file preserving its content + makes a .bak", async () => {
     const dir = await freshDir();
     await mkdir(join(dir, ".claude"), { recursive: true });

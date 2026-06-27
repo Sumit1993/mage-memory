@@ -73,6 +73,41 @@ describe("disconnect", () => {
     expect(settings.hooks).toBeUndefined(); // all mage groups gone → hooks pruned
   });
 
+  it("preserves a user's own autoMemoryDirectory when mage never commandeered", async () => {
+    // The sharp clobber repro: a settings file with the user's own autoMemoryDirectory and
+    // only BASE mage hooks (no commandeer). disconnect must NOT delete the foreign value.
+    const dir = await tmpDir("mage-disconnect-");
+    await mkdir(join(dir, ".claude"), { recursive: true });
+    const pre = {
+      autoMemoryDirectory: "/my/own/dir",
+      hooks: {
+        SessionStart: [
+          { id: "mage:observe:SessionStart", hooks: [{ type: "command", command: "mage observe" }] },
+        ],
+      },
+    };
+    await writeFile(localPath(dir), `${JSON.stringify(pre, null, 2)}\n`);
+    const r = await disconnect({ cwd: dir, yes: true, gitHook: false });
+    expect(r.autoMemoryUnset).toBe(false);
+    const settings = JSON.parse(await readFile(localPath(dir), "utf8")) as { autoMemoryDirectory?: string };
+    expect(settings.autoMemoryDirectory).toBe("/my/own/dir"); // left untouched
+  });
+
+  it("restores a stashed user autoMemoryDirectory across connect/disconnect", async () => {
+    const { dir } = await withKb({ kind: "repo" });
+    await mkdir(join(dir, ".claude"), { recursive: true });
+    await writeFile(localPath(dir), JSON.stringify({ autoMemoryDirectory: "/my/own/dir" }));
+    await connect({ cwd: dir, yes: true, gitHook: false }); // commandeers, stashes the user value
+    const r = await disconnect({ cwd: dir, yes: true, gitHook: false });
+    expect(r.autoMemoryUnset).toBe(true);
+    const settings = JSON.parse(await readFile(localPath(dir), "utf8")) as {
+      autoMemoryDirectory?: string;
+      mageStashedAutoMemoryDirectory?: string;
+    };
+    expect(settings.autoMemoryDirectory).toBe("/my/own/dir"); // restored, not deleted
+    expect(settings.mageStashedAutoMemoryDirectory).toBeUndefined(); // stash cleaned up
+  });
+
   it("disconnect on a missing file is a clean no-op", async () => {
     const dir = await tmpDir("mage-disconnect-");
     const r = await disconnect({ cwd: dir, yes: true });

@@ -23,7 +23,7 @@ import { Command } from "commander";
 import { parseNote, stringifyNote } from "../../note.js";
 import { resolveDocsRoot } from "../../paths.js";
 import { redact } from "../../redact.js";
-import { isGeneratedArtifact, scanNotes } from "../../scan.js";
+import { isGeneratedArtifact } from "../../scan.js";
 import { type CcMemoryFrontmatter, mapCcMemoryToMageNote } from "./schema-map.js";
 
 const DENY_REASON =
@@ -68,32 +68,6 @@ function flatInboxRel(root: string, filePath: string): string | null {
   return rel;
 }
 
-/**
- * Best-guess the KB's primary wing (the modal wing across existing notes) so a
- * flat capture acquires the right tag at the source (ADR-0032 §2: "Gate-0
- * best-guess, groom confirms"). undefined on empty/error — the note then lands
- * cross-cutting and `mage groom` assigns the wing. Fail-open.
- */
-async function bestGuessWing(root: string): Promise<string | undefined> {
-  try {
-    const counts = new Map<string, number>();
-    for (const n of await scanNotes(root)) {
-      for (const w of n.wings) counts.set(w.wing, (counts.get(w.wing) ?? 0) + 1);
-    }
-    let best: string | undefined;
-    let bestN = 0;
-    for (const [w, n] of counts) {
-      if (n > bestN) {
-        best = w;
-        bestN = n;
-      }
-    }
-    return best;
-  } catch {
-    return undefined;
-  }
-}
-
 function rewriteReason(masked: number): string {
   return masked > 0
     ? `mage scrubbed ${masked} secret/PII value(s) and mapped this to its note schema.`
@@ -132,10 +106,15 @@ export async function memoryPreToolUse(
   if (toolName === "Write") {
     const content = str(input.content);
     if (content === undefined) return PASS;
+    // Map the body (H1 + folded description + wikilink rewrite — these survive). The
+    // wing/frontmatter is NOT best-guessed here: on Claude Code the auto-memory system
+    // RE-NORMALIZES a memory file's frontmatter after the write (live spike 2026-06-27),
+    // discarding any tags we set — so `mage groom` is authoritative for the wing + final
+    // schema at promotion to notes/. The SCRUB is what must (and does) survive.
     const parsed = parseNote(content);
     const mapped = mapCcMemoryToMageNote(
       { frontmatter: parsed.frontmatter as unknown as CcMemoryFrontmatter, body: parsed.body },
-      { wing: await bestGuessWing(resolved.root) },
+      {},
     );
     const { text, findings } = redact(stringifyNote(mapped.frontmatter, mapped.body));
     return {

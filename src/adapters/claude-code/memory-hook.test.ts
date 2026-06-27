@@ -1,4 +1,3 @@
-import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { tmpDir, withKb } from "../../../test/fixtures/kb.js";
@@ -83,15 +82,6 @@ describe("memoryPreToolUse", () => {
     expect(d.masked).toBeGreaterThan(0);
     expect(d.updatedInput.content as string).toContain("[REDACTED:email]");
     expect(d.updatedInput.content as string).not.toContain("admin@example.com");
-  });
-
-  it("best-guesses the wing from existing notes (groom confirms)", async () => {
-    const kb = await withKb();
-    await mkdir(join(kb.root, "notes"), { recursive: true });
-    await writeFile(join(kb.root, "notes", "seed.md"), "---\ntags: [platform/x]\n---\n# Seed\n");
-    const d = await memoryPreToolUse(preWrite(kb.dir, join(kb.root, "fresh.md"), CC_NOTE));
-    expect(d.kind).toBe("rewrite");
-    if (d.kind === "rewrite") expect(d.updatedInput.content as string).toContain("platform");
   });
 
   it("PASSES a subdirectory write, a non-.md write, and a path outside the root", async () => {

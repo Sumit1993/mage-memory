@@ -1,5 +1,6 @@
 import { confirm } from "@inquirer/prompts";
 import {
+  hasCommandeerHooks,
   isAutoMemoryEnabled,
   readClaudeSettings,
   resolveSettingsTarget,
@@ -84,7 +85,23 @@ export async function connect(opts: ConnectOptions): Promise<ConnectResult> {
     isAutoMemoryEnabled(r.settings, process.env) && kb !== null && target.scope === "local";
 
   const merged = upsertMageHooks(r.settings, { commandeer });
-  if (commandeer && kb) merged.autoMemoryDirectory = kb.root;
+  if (commandeer && kb) {
+    // Preserve a user's OWN autoMemoryDirectory so disconnect can restore it rather than
+    // clobber it. mage owns the value iff it previously commandeered (its commandeer hooks
+    // are present); a differing value with no commandeer hooks is the user's — stash + warn
+    // before we point it at the KB.
+    const prior =
+      typeof r.settings?.autoMemoryDirectory === "string"
+        ? r.settings.autoMemoryDirectory
+        : undefined;
+    if (prior && prior !== kb.root && !hasCommandeerHooks(r.settings)) {
+      merged.mageStashedAutoMemoryDirectory = prior;
+      logger.warn(
+        `Displacing your autoMemoryDirectory (${prior}) → ${kb.root} for the commandeer tier; \`mage disconnect\` restores it.`,
+      );
+    }
+    merged.autoMemoryDirectory = kb.root;
+  }
   const { backedUp } = await writeClaudeSettings(target.path, merged);
 
   const wired = MAGE_HOOKS.filter((h) => h.commandeer !== true || commandeer).length;

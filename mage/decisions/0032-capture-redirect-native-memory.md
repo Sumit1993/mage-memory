@@ -102,13 +102,17 @@ store is a durability dead-end on its own — never committed, never portable. S
      Base directive is the path.
      - **Gate-0 — capture-time scrub (extends [ADR-0014](0014-two-gate-redaction.md) to three gates).**
        The `PreToolUse` hook pipes the agent's `content` through mage's existing keep-context
-       `redact()` (`src/redact.ts:230` — secrets/PII → `[REDACTED:<kind>]`, key names preserved) and the
-       native→mage schema-map (`name`/`description`/`metadata` → `type`/`keywords`/`[](path)`) **in one
-       pass**, emitting `updatedInput`. CC's own docs name the lever: *"to block an action regardless of
-       what Claude decides, use a PreToolUse hook."* Raw PII/secrets **never reach disk**, so never a
-       commit — this **resolves the PII block-vs-warn question by construction**: no need to make Gate-2
-       block PII; it stays the un-skippable *secret* backstop. False positives bounded by the existing
-       `metadata.redact.ignore` allowlist.
+       `redact()` (`src/redact.ts:230` — secrets/PII → `[REDACTED:<kind>]`, key names preserved) plus the
+       body transforms of the native→mage map (`schema-map.ts`: H1 from `name`, folded `description`,
+       `[[wikilink]]`→`[](path.md)`), emitting `updatedInput`. CC's own docs name the lever: *"to block
+       an action regardless of what Claude decides, use a PreToolUse hook."* Raw PII/secrets **never
+       reach disk**, so never a commit — this **resolves the PII block-vs-warn question by
+       construction**: no need to make Gate-2 block PII; it stays the un-skippable *secret* backstop.
+       False positives bounded by the existing `metadata.redact.ignore` allowlist. **The 2026-06-27 spike
+       refined this** (§Gate): CC re-normalizes a memory file's *frontmatter* after the write, so Gate-0
+       does the **scrub + surviving body transforms** and **`mage groom` owns the wing + final
+       frontmatter schema** at promotion to `notes/` (the inbox file sits CC-shaped-but-scrubbed until
+       then).
      - **Curation posture — direct → the docs-root top** (the leaning choice, *now safe under Gate-0*):
        `autoMemoryDirectory` = `resolveDocsRoot().root` (here `mage/`), so `<root>/MEMORY.md` IS the KB's
        root index CC loads; scrubbed topic files land **flat** at the root as an **inbox** → `mage groom`
@@ -208,9 +212,26 @@ Claude Code.
   complies gracefully with the deny. **Recall-load spike PASSED (2026-06-27):** a fresh 2nd headless
   session answered three unguessable canaries planted *only* in `MEMORY.md` (`codename`/`port`/
   `captain`) exactly and with **zero tool calls** — proving CC auto-injects `MEMORY.md` from
-  `autoMemoryDirectory` at launch, with no volitional read. **Still to verify:** Gate-0's in-flight
-  `updatedInput` scrub end-to-end (the redact+map hook lands a masked draft), and multi-run /
-  real-auto-memory stability. (Curation posture settled — *direct → `mage/` root*, PII closed by Gate-0.)
+  `autoMemoryDirectory` at launch, with no volitional read.
+- **Gate-0 scrub spike PASSED (2026-06-27) — the keystone.** A real headless CC session was wired with
+  the commandeer settings (`autoMemoryDirectory` + the `mage memory-hook` `PreToolUse`/`PostToolUse`
+  groups) and asked to remember a lesson containing `oncall.billing@acme-example.com`. On disk:
+  `[REDACTED:email]` — **the raw email never touched disk.** CC honored the `PreToolUse` `updatedInput`
+  and rewrote the memory write in-flight. The load-bearing mechanism of the redesign is real.
+  - **Finding (built into the code 2026-06-27):** CC's auto-memory system **re-normalizes a memory
+    file's *frontmatter* after the write** (the on-disk note kept CC's `name`/`metadata` block, not
+    mage's). The **body scrub + body transforms survive** (that is the security goal); a frontmatter
+    schema-map / wing-tag at Gate-0 does **not** persist on CC. So Gate-0 was simplified to *scrub
+    (+ surviving body normalization)*; `bestGuessWing` (a `scanNotes` hot-path cost whose tag CC
+    discarded) was **dropped**, and **`mage groom` is authoritative for the wing + final schema** at
+    promotion to `notes/` (beyond CC's normalization). Body scrub is what must — and does — survive.
+  - **Adversarial review (2026-06-27)** confirmed an `autoMemoryDirectory` ownership defect: `connect`
+    displaced / `disconnect` deleted a *user's own* value with no provenance check. **Fixed:** `connect`
+    stashes a displaced user value (`mageStashedAutoMemoryDirectory`); `disconnect` only undoes the
+    relocation when mage owns it (commandeer hooks present) and **restores** the stash.
+- **Still to verify:** multi-run / real-auto-memory stability (a longer soak), and post-`/compact`
+  recall re-injection (the `@import` floor covers it meanwhile, ADR-0033). (Curation posture settled —
+  *direct → `mage/` root*, PII closed by Gate-0.)
 - **Relocation tier — quality gate only (capture is deterministic):** lean on the existing
   `mage groom` reject-ledger + the [ADR-0030](0030-agent-autonomy-ladder.md) keep-vs-revert
   crown. **KILL** if the ingested-and-promoted notes are mostly noise (low live keep-rate) across

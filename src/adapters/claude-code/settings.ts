@@ -35,6 +35,11 @@ export interface ClaudeSettings {
    * tier). Machine-specific absolute path → lives in the gitignored settings.local.json.
    */
   autoMemoryDirectory?: string;
+  /**
+   * mage-owned: a user's own `autoMemoryDirectory` that `mage connect` displaced when it
+   * commandeered the tier, so `mage disconnect` can restore it instead of clobbering it.
+   */
+  mageStashedAutoMemoryDirectory?: string;
   [k: string]: unknown;
 }
 
