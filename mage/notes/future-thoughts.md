@@ -2,8 +2,8 @@
 type: plan
 tags: [mage/roadmap, mage/future-thoughts]
 created: "2026-06-21"
-updated: "2026-06-21"
-last_reviewed: "2026-06-21"
+updated: "2026-06-22"
+last_reviewed: "2026-06-22"
 status: active
 provenance:
   repo: mage-memory
@@ -120,9 +120,9 @@ member files" *is* the wing → per-wing-skill structure ([ADR-0006](../decision
 Resolve before building anything: is "hierarchical skills" a new feature or just
 applying wings + promote to a skill-heavy repo? Likely the latter.
 
-#### FT-04 — fight note-pileup with examples, templates & grouping nudges · (orig #13)
+#### FT-04 — fight note-pileup with examples, templates & grouping nudges · (orig #13, #15)
 **Status:** raw
-**Touches:** [ADR-0006 — per-wing skills](../decisions/0006-two-layer-recall-per-wing-skills.md)
+**Touches:** [ADR-0006 — per-wing skills](../decisions/0006-two-layer-recall-per-wing-skills.md), [ADR-0004 — capture insight, not copies](../decisions/0004-capture-insight-not-copies.md)
 **Sequence:** unsequenced (0.1.0 credibility-push adjacent)
 From experience: notes + wings are fine for a new/small project, but for a large
 enough KB notes **pile up, look flat, and get hard to read/navigate**. Provide
@@ -130,21 +130,21 @@ enough KB notes **pile up, look flat, and get hard to read/navigate**. Provide
 good patterns — naming/wing conventions, grouping via folders or name prefixes.
 Also explore **skills about these grouping practices**, and **nudging the agent**
 to apply them based on tool results. Use-case-driven examples.
-**mage angle:** the core scaling story. Two shippable pieces: (a) a docs/examples
+**mage angle:** the core scaling story. Three shippable pieces: (a) a docs/examples
 gallery of well-shaped KBs, (b) a grouping-advisor that the host agent fires when
-`mage index` shows a wing crossing a flatness threshold.
+`mage index` shows a wing crossing a flatness threshold, and (c) **pre-generated
+template wings** for generic patterns *(orig #15, folded in)* — seed notes a user
+drops in; `mage index`/`mage skills` regenerate the wing index + auto-loaded wing
+skill. The "SDLC/SDD" framing there was illustrative, *not* a call to undo
+[ADR-0022](../decisions/0022-remove-sdd-skills.md) (that removed workflow skills;
+these are loop-native notes) — ADR-0022 only re-enters if a template ships SDD
+*content* **and** advertises it.
 
-#### FT-05 — pre-generated wings for generic patterns (SDLC, SDD) · (orig #15)
-**Status:** exploring
-**Touches:** [ADR-0022 — SDD skills removed](../decisions/0022-remove-sdd-skills.md) ⚠️
-**Sequence:** tension with 0.0.10 (SDD skills removed)
-A concrete form of FT-04: **ship pre-generated wings** for generic patterns like
-**SDLC** or **SDD** that a user can drop in as a starting scaffold.
-**mage angle:** ⚠️ **direct tension** — 0.0.10 *removed* the 7 spec-kit/SDD skills
-([ADR-0022](../decisions/0022-remove-sdd-skills.md)) to sharpen the memory-first
-identity. Re-introducing SDD content as a *template wing* is a different shape
-(opt-in example, not a bundled skill), but the grill must reconcile with ADR-0022's
-intent before this can proceed.
+#### FT-05 — pre-generated template wings for generic patterns · (orig #15)
+**Status:** raw · **merged → FT-04**
+Breadcrumb only (inbox ids are append-only, never reused). This was a concrete form of
+FT-04's examples — pre-generated *template wings* (seed notes) for generic patterns,
+SDLC/SDD illustrative. The full thought + the ADR-0022 caveat now live in **FT-04 (c)**.
 
 ### Theme B — dashboard & graph
 
@@ -189,6 +189,20 @@ an **export** function for HTML, JSON, and Obsidian.
 **mage angle:** we have the Obsidian + `dashboard.html` tiers already; the gap is a
 **structured `mage export --json`** (the graph as portable data) for external tools.
 Cheap, on-brand (file-as-truth), and complements FT-12 (queryable) and FT-08.
+
+#### FT-17 — dashboard interactivity ceiling → React? · (soak 2026-06-23)
+**Status:** raw
+**Touches:** [ADR-0020 — no-server tiered dashboards](../decisions/0020-no-server-tiered-dashboards.md)
+**Sequence:** revisits the 0.0.9 dashboard (Option D, the interactive cockpit)
+The generated `dashboard.html` keeps hitting an interactivity wall in real use: the graph
+renders as a static "big circle" (no hover/click affordances, no per-node-type colors), the
+per-page cards feel inert, and repeated asks for animations / modern CSS went unmet — reaching
+the point of **considering a switch to React** for the cockpit.
+**mage angle:** ⚠️ tensions with [ADR-0020](../decisions/0020-no-server-tiered-dashboards.md)'s
+no-server / no-build / single-file stance — a React cockpit implies a build step + bundle. Open
+question: can vanilla HTML+CSS+SVG (hover handlers, type-keyed node colors, light animation) reach
+"good enough", or must the top tier break the no-build rule? Cheap win regardless: **color graph
+nodes by note type** + basic hover highlight.
 
 ### Theme C — ingest & external knowledge
 
@@ -251,6 +265,13 @@ bounds us off a semantic service. A *local query layer* (structured frontmatter
 query / `mage query`) that doesn't become a service is the open lane — and it pairs
 with FT-09's `--json` export.
 
+#### FT-15 - add observability/telemetry of memories
+**Status:** raw
+**Sequence:** unsequenced
+Today mage does not track or trace its impact on the agent and the context window. We need to track how much we push into the context.
+Are we bloating it, are we optimizing future references.
+**mage angle:** to be added by agent
+
 ### Theme E — agent integration & use cases
 
 #### FT-15 — AI agent rules (distinct from skills) · (orig #10)
@@ -284,4 +305,4 @@ as an example skill that wires the KB into a review/debug flow.
 - promotes_via [ADR-0019 — mage promote: self-grooming](../decisions/0019-mage-promote-self-grooming.md)
 - recall_model [ADR-0006 — two-layer recall, per-wing skills](../decisions/0006-two-layer-recall-per-wing-skills.md)
 - dashboard_bound [ADR-0020 — no-server tiered dashboards](../decisions/0020-no-server-tiered-dashboards.md)
-- tension_with [ADR-0022 — SDD skills removed](../decisions/0022-remove-sdd-skills.md) (see FT-05)
+- caveat_for [ADR-0022 — SDD skills removed](../decisions/0022-remove-sdd-skills.md) (FT-04 (c): template wings are notes, not the removed workflow skills)

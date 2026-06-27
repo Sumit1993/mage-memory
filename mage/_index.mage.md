@@ -2,7 +2,7 @@
 
 # mage
 
-> 50 notes. Part of the [index](INDEX.md).
+> 53 notes. Part of the [index](INDEX.md).
 
 ### build
 
@@ -34,7 +34,7 @@
 - `decision` [0014 — Two-gate redaction (strip secrets before write, not before display)](decisions/0014-two-gate-redaction.md) — 0014, two, gate, redaction, strip, secrets, before, write, display, decision, considered, options _(reviewed 2026-06-05)_
 - `decision` [0015 — `mage observe`: the capture schema (the keystone `.jsonl`)](decisions/0015-mage-observe-capture-schema.md) — 0015, mage, observe, capture, schema, keystone, jsonl, decision, considered, options, consequences, relations _(reviewed 2026-06-06)_
 - `decision` [0016 — Context-match, the confidence ladder, and the single applier](decisions/0016-context-match-confidence-ladder-applier.md) — 0016, context, match, confidence, ladder, single, applier, decision, considered, options, consequences, relations _(reviewed 2026-06-06)_
-- `decision` [0017 — `mage connect`: the host hook adapter (capture is opt-in)](decisions/0017-mage-connect-host-hook-adapter.md) — 0017, mage, connect, host, hook, adapter, capture, opt, decision, considered, options, consequences _(reviewed 2026-06-06)_
+- `decision` [0017 — `mage connect`: the host hook adapter (capture is opt-in)](decisions/0017-mage-connect-host-hook-adapter.md) — 0017, mage, connect, host, hook, adapter, capture, opt, decision, considered, options, consequences _(reviewed 2026-06-27)_
 - `decision` [0018 — `mage distill`: the observed-scratch reader (capture, on first sight)](decisions/0018-mage-distill-observed-scratch-reader.md) — 0018, mage, distill, observed, scratch, reader, capture, first, sight, decision, considered, options _(reviewed 2026-06-08)_
 - `decision` [0019 — `mage promote`: self-grooming (recurrence, graduation, merge/split)](decisions/0019-mage-promote-self-grooming.md) — 0019, mage, promote, self, grooming, recurrence, graduation, merge, split, decision, considered, options _(reviewed 2026-06-08)_
 - `decision` [0020 — the dashboard: a per-KB, no-server generated view (Option D)](decisions/0020-no-server-tiered-dashboards.md) — 0020, dashboard, per, server, generated, view, option, decision, considered, rejected, relations, mage _(reviewed 2026-06-09)_
@@ -49,6 +49,8 @@
 - `decision` [0029 — Digest-to-agent capture: deterministic narrowing, agent judgment (supersedes prose-keyed)](decisions/0029-digest-to-agent-capture.md) — 0029, digest, agent, capture, deterministic, narrowing, judgment, supersedes, prose, keyed, context, decision _(reviewed 2026-06-20)_
 - `decision` [0030 — Opt-in agent autonomy ladder for the grooming loop (Operator / Approver / Overseer)](decisions/0030-agent-autonomy-ladder.md) — 0030, opt, agent, autonomy, ladder, grooming, loop, operator, approver, overseer, context, decision _(reviewed 2026-06-21)_
 - `decision` [0031 — Programmatic provenance stamping + the autonomy reject-ledger (Phase 1: stamp at creation)](decisions/0031-programmatic-provenance-stamp.md) — 0031, programmatic, provenance, stamping, autonomy, reject, ledger, phase, stamp, creation, context, decision _(reviewed 2026-06-22)_
+- `decision` [0032 — Capture-redirect: co-opt the host's native-memory write into mage's git-durable pipeline (relocation where the host allows it, coexist nudge as the floor)](decisions/0032-capture-redirect-native-memory.md) — capture, native-memory, automemorydirectory, relocation, coexist, nudge, redirect, staging, durability, claude-code, adapter, reflex _(proposed · reviewed 2026-06-25)_
+- `decision` [0033 — Recall: `@import` the bounded root index into the host's auto-loaded context (the capture companion to ADR-0032)](decisions/0033-recall-import-bounded-index.md) — recall, import, at-import, claude-md, agents-md, index, bounded, root-index, progressive-disclosure, capability-adaptive, compaction _(proposed · reviewed 2026-06-25)_
 
 ### design
 
@@ -69,6 +71,7 @@
 ### redaction
 
 - `gotcha` [Gotcha — scope Gate-2 to the knowledge base, not the whole repo](notes/gate2-blocks-own-redaction-fixtures.md) — gate2, pre-commit, hook, redaction, scope, docs-root, fixtures, connect, dogfood _(reviewed 2026-06-08)_
+- `gotcha` [Gotcha — a Gate-2 false positive can stall an autonomous groom; never disable the hook to unblock](notes/gate2-fp-blocks-autonomy.md) — gate2, redaction, false-positive, autonomy, overseer, approver, hook, unblock, capture, soak _(reviewed 2026-06-23)_
 - `gotcha` [Gotcha — key bodies with `-`/`_` partially leak past the high-entropy detector](notes/redaction-anthropic-key-detector.md) — gotcha, key, bodies, partially, leak, past, high, entropy, detector, mage, redaction _(reviewed 2026-06-07)_
 
 ### release
@@ -78,7 +81,7 @@
 ### roadmap
 
 - `reference` [Mining agentmemory's design into mage — files-native translation map](notes/agentmemory-mining-map.md) — agentmemory, iii, server-inverse, obsidian-ui, import-harvest, consolidation, auto-capture, dream, feeder, connect, mining, roadmap _(reviewed 2026-06-09)_
-- `plan` [mage — future thoughts (the standing idea inbox)](notes/future-thoughts.md) — future-thoughts, backlog, ideas, inbox, taxonomy, hierarchy, wings, dashboard, graph, leiden, graphify, ingest _(reviewed 2026-06-21)_
+- `plan` [mage — future thoughts (the standing idea inbox)](notes/future-thoughts.md) — future-thoughts, backlog, ideas, inbox, taxonomy, hierarchy, wings, dashboard, graph, leiden, graphify, ingest _(reviewed 2026-06-22)_
 - `reference` [Field notes — first external migrations (v0.1 dogfood)](notes/migration-field-notes.md) — field-test, migration, hub-indexing, link-awareness, bulk-import, dream, onboarding, v0.2 _(reviewed 2026-06-02)_
 - `plan` [mage — hosted documentation website (GRILLED, ready to build)](notes/plan-docs-site.md) — documentation, website, docs-site, astro, starlight, generated-docs, drift, github-pages, onboarding, reference, buildProgram _(reviewed 2026-06-18)_
 - `plan` [mage — release sequence (0.0.x → 0.1.0)](notes/plan-release-sequence.md) — release, sequence, backlog, 0.1.0, self-grooming, procedure-skill, redaction, skillopt, observe, optimize, promotion _(reviewed 2026-06-08)_

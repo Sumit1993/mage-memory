@@ -2,8 +2,8 @@
 type: decision
 tags: [mage/decisions]
 created: "2026-06-06"
-updated: "2026-06-06"
-last_reviewed: "2026-06-06"
+updated: "2026-06-27"
+last_reviewed: "2026-06-27"
 status: active
 provenance:
   repo: mage-memory
@@ -133,8 +133,32 @@ per-harness "adapter-installer" (mined from agentmemory's `connect`), Claude Cod
 - CONVENTIONS §10 (command tiers) updated; the `Stop` metrics-fold is a new tier-1
   hook-fired plumbing path.
 
+## Amendment — 2026-06-27: per-harness adapter directory (`src/adapters/<harness>/`)
+
+The original ADR named the adapter *concept* ("Claude Code first") but left the code organized **by
+mechanism, not by harness** — CC-specific logic ended up scattered across `claude-settings.ts`,
+`commands/connect.ts`/`disconnect.ts`, `commands/nudge.ts` ("the boundary-nudge adapter"), and bits of
+`doctor/kb-checks.ts`. Fine for one harness; it does not scale to ADR-0009's "other harnesses are
+additive adapters." [ADR-0032](0032-capture-redirect-native-memory.md) adds a new wave of CC-only
+surface (the consolidated memory `PreToolUse` hook, the native→mage schema-map, `autoMemoryDirectory`
+wiring, the `PostToolUse` capture-nudge), so it is the trigger to make the adapter **discrete**:
+
+1. **Each harness adapter lives in its own dir: `src/adapters/<harness>/`.** Claude Code is first
+   (`src/adapters/claude-code/`); the next harness is a sibling, never more scatter. This is the
+   physical realization of ADR-0009's per-harness adapter.
+2. **What moves in (CC-specific):** `claude-settings.ts` → `settings.ts`; `commands/nudge.ts` →
+   `nudge.ts`; the CC wiring of `connect`/`disconnect` (set `autoMemoryDirectory`, install the hooks);
+   and the **new** `memory-hook.ts` (consolidated `PreToolUse` deny/scrub/allow) + `schema-map.ts`.
+3. **What stays shared (harness-neutral):** `redact.ts`, `staged-scan.ts`/`git-hooks.ts` (Gate-2),
+   `agents-md.ts`, `paths.ts` (`resolveDocsRoot`), `ingest.ts`, `scan.ts`, `grooming/`. The generic
+   `mage connect` command stays the consent gate; it *delegates* to the active harness adapter.
+4. **First build task.** The directory extraction (migrate the scattered CC bits, keep tests green)
+   lands **before** the ADR-0032 surface, so Gate-0 is authored in its proper home rather than
+   migrated after.
+
 ## Relations
 
+- amended_by / realizes [ADR-0032 — capture-redirect into native memory](0032-capture-redirect-native-memory.md) — the new CC surface that triggers the discrete `src/adapters/claude-code/` home
 - realizes [ADR-0009 — no runtime; automation rides host hooks](0009-no-runtime-automation-rides-host-hooks.md) — the per-harness adapter-installer; amends its double-observe interlock
 - fires [ADR-0015 — mage observe capture schema](0015-mage-observe-capture-schema.md)
 - surfaces [ADR-0016 — context-match, the confidence ladder, and the single applier](0016-context-match-confidence-ladder-applier.md) — read-only metrics + the rollup fold
