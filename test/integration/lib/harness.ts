@@ -12,7 +12,7 @@
 //   MAGE_LIVE=1            opt into the billed live tests.
 //   MAGE_CLAUDE_BIN=path   the Claude Code CLI to drive (default: `claude`).
 
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -151,25 +151,43 @@ export async function requireLive(ctx: TestContext): Promise<boolean> {
  * Run `claude -p <prompt>` headless in `cwd` (which must contain the
  * `.claude/settings.local.json` wiring the hooks). `--dangerously-skip-permissions`
  * so hooks + autoMemoryDirectory activate without an interactive trust prompt.
+ *
+ * Uses spawn with `stdin: "ignore"` (EOF) — CRITICAL: with an open stdin pipe,
+ * `claude -p` blocks waiting for input (observed: a memory-writing session hung past
+ * 180s; with stdin closed it completes in ~50s). Never rejects — a timeout SIGTERMs
+ * the child and resolves with whatever was captured + the (non-zero) exit code.
  */
-export async function runClaude(
+export function runClaude(
   prompt: string,
   opts: { cwd: string; timeoutMs?: number; env?: NodeJS.ProcessEnv },
 ): Promise<RunResult> {
-  try {
-    const { stdout, stderr } = await execFileP(
-      CLAUDE_BIN,
-      ["-p", prompt, "--dangerously-skip-permissions"],
-      {
-        cwd: opts.cwd,
-        timeout: opts.timeoutMs ?? 180_000,
-        env: { ...process.env, ...opts.env },
-        maxBuffer: 32 * 1024 * 1024,
-      },
-    );
-    return { stdout, stderr, code: 0 };
-  } catch (e) {
-    const err = e as { stdout?: string; stderr?: string; code?: number };
-    return { stdout: err.stdout ?? "", stderr: err.stderr ?? "", code: err.code ?? 1 };
-  }
+  return new Promise<RunResult>((resolve) => {
+    const child = spawn(CLAUDE_BIN, ["-p", prompt, "--dangerously-skip-permissions"], {
+      cwd: opts.cwd,
+      env: { ...process.env, ...opts.env },
+      stdio: ["ignore", "pipe", "pipe"], // stdin = EOF so claude never blocks on input
+    });
+    const cap = 32 * 1024 * 1024;
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (c: Buffer) => {
+      if (stdout.length < cap) stdout += c.toString("utf8");
+    });
+    child.stderr.on("data", (c: Buffer) => {
+      if (stderr.length < cap) stderr += c.toString("utf8");
+    });
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill("SIGTERM");
+    }, opts.timeoutMs ?? 240_000);
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      resolve({ stdout, stderr: timedOut ? `${stderr}\n[harness] timed out` : stderr, code: code ?? 0 });
+    });
+    child.on("error", (err) => {
+      clearTimeout(timer);
+      resolve({ stdout, stderr: `${stderr}\n${String(err)}`, code: 1 });
+    });
+  });
 }

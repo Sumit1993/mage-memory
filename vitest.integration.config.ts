@@ -16,8 +16,8 @@ export default defineConfig({
     exclude: ["**/node_modules/**", "**/dist/**"],
     // Real processes + external tools are slow; give them room and run serially so
     // their output stays legible and they never contend for the same temp/git state.
-    testTimeout: 240_000,
-    hookTimeout: 240_000,
+    testTimeout: 300_000,
+    hookTimeout: 300_000,
     fileParallelism: false,
   },
 });

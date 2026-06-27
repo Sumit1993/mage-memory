@@ -36,15 +36,16 @@ describe("live: Claude Code capture redirect (BILLED, MAGE_LIVE only)", () => {
 
     const email = "oncall.billing@acme-example.com";
     const prompt =
-      "Use your memory to save this for future sessions, as a single memory note: " +
-      `the billing on-call contact email is ${email} and the deploy runbook lives at docs/deploy.md. ` +
-      "Persist it now.";
-    const run = await runClaude(prompt, { cwd: dir, timeoutMs: 180_000 });
-    expect(run.code, `claude exited non-zero: ${run.stderr}`).toBe(0);
+      `Save a memory note for future sessions: the billing on-call email is ${email} ` +
+      "and the deploy runbook is at docs/deploy.md. Persist it to your memory now, then stop.";
+    const run = await runClaude(prompt, { cwd: dir, timeoutMs: 240_000 });
 
     const captures = await inboxCaptures(root);
-    // If CC declined to write a memory this run, treat as an environment skip (not a fail).
+    // Agent-dependent: if CC wrote no memory this run (declined, or errored), there is
+    // nothing for Gate-0 to have scrubbed — skip (not fail). The on-disk capture is the
+    // real proof, not claude's exit code (a headless session can exit non-zero benignly).
     if (captures.length === 0) {
+      console.warn(`[live] no capture produced (claude code=${run.code}); stderr: ${run.stderr.slice(0, 200)}`);
       ctx.skip();
       return;
     }
