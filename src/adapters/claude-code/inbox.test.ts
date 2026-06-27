@@ -156,6 +156,23 @@ describe("ingestCaptureInbox", () => {
     expect(await exists(join(root, "lingering.md"))).toBe(false); // rm retried successfully
   });
 
+  it("stages every distinct capture from a single shared cc-session (no sibling-drop)", async () => {
+    const { root } = await withKb();
+    // CC stamps every memory from one work session with that session's id, and a session
+    // legitimately writes MANY distinct memories (an adopt cohort is exactly this). All
+    // must stage; none may be dropped as a false same-session duplicate.
+    await writeRoot(root, "alpha-lesson.md", gate0Capture({ session: "sess-shared", body: "# Alpha lesson\n\nthe first distinct lesson." }));
+    await writeRoot(root, "beta-lesson.md", gate0Capture({ session: "sess-shared", body: "# Beta lesson\n\nthe second distinct lesson." }));
+    await writeRoot(root, "gamma-lesson.md", gate0Capture({ session: "sess-shared", body: "# Gamma lesson\n\nthe third distinct lesson." }));
+
+    const r = await ingestCaptureInbox(root);
+    expect(r.ingested.map((i) => i.slug).sort()).toEqual(["alpha-lesson", "beta-lesson", "gamma-lesson"]);
+    for (const slug of ["alpha-lesson", "beta-lesson", "gamma-lesson"]) {
+      expect(await exists(join(stagingPath(root), `${slug}.md`)), `${slug} should be staged`).toBe(true);
+      expect(await exists(join(root, `${slug}.md`)), `${slug} inbox file should be removed`).toBe(false);
+    }
+  });
+
   it("de-collides a slug against an existing staged draft", async () => {
     const { root } = await withKb();
     await mkdir(stagingPath(root), { recursive: true });

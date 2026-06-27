@@ -217,10 +217,17 @@ export async function ingestCaptureInbox(root: string): Promise<InboxIngestResul
   const [allNotes, staged] = await Promise.all([scanNotes(root), readStagedDrafts(stagingDir)]);
   const committed = allNotes.filter((n) => !inboxSet.has(n.relPath));
   const taken = new Set(staged.map((d) => d.slug));
-  // Idempotency: cc-session sources already represented in staging. If a prior
-  // ingest staged a capture but its root file lingered (e.g. a post-write rm failed),
-  // we must NOT re-stage it as a `-2`/`-3` duplicate every groom — skip + retry the rm.
-  const stagedSessions = new Set(staged.flatMap((d) => sourceSessions(d.frontmatter)));
+  // Idempotency: a prior ingest may have staged a capture whose root file lingered
+  // (e.g. a post-write rm failed); re-seeing it must NOT re-stage a `-2` duplicate.
+  // Key on the capture's IDENTITY — `<cc-session>::<slug>` — NOT the session alone:
+  // ONE Claude session legitimately writes MANY distinct memories, so a session-only
+  // key drops every sibling capture after the first (silent data loss). Built from the
+  // PRE-EXISTING staged drafts only (the lingering-file case is cross-run); within a
+  // run, `uniqueSlug`/`taken` already separates two distinct captures.
+  const identity = (session: string, slug: string) => `${session}::${slug}`;
+  const stagedIdentity = new Set(
+    staged.flatMap((d) => sourceSessions(d.frontmatter).map((s) => identity(s, d.slug))),
+  );
 
   for (const name of inboxNames) {
     const path = join(root, name);
@@ -243,10 +250,13 @@ export async function ingestCaptureInbox(root: string): Promise<InboxIngestResul
       // (Gate-0 off / failed open) may not have. redact() is idempotent on scrubbed text.
       const { text: body, findings } = redact(mapped.body);
 
-      // Already ingested (its cc-session is staged) but the root file survived a prior
-      // run — drop the duplicate source, don't re-stage.
+      // Already ingested as THIS capture (same cc-session AND same slug) but the root
+      // file survived a prior run — drop the duplicate source, don't re-stage. Identity
+      // is (session, slug): two distinct memories from one session have different slugs,
+      // so only the genuine re-seen file is dropped, never a sibling capture.
       const sessions = sourceSessions(mapped.frontmatter);
-      if (sessions.length > 0 && sessions.some((s) => stagedSessions.has(s))) {
+      const baseSlug = slugify(stem);
+      if (sessions.some((s) => stagedIdentity.has(identity(s, baseSlug)))) {
         if (!(await safeRm(path))) {
           warnStderr(`mage: ${name} is already staged but could not be removed — remove it by hand.`);
         }
@@ -272,7 +282,6 @@ export async function ingestCaptureInbox(root: string): Promise<InboxIngestResul
       const slug = uniqueSlug(slugify(stem), taken);
       await writeDraft(stagingDir, slug, mapped.frontmatter, body);
       taken.add(slug);
-      for (const s of sessions) stagedSessions.add(s);
       // Stage succeeded; now remove the source. If the rm fails, the capture is SAFE
       // (it is staged) — warn so the user clears the lingering root file before it is
       // re-seen (the cc-session dedup above keeps it from re-staging meanwhile).
