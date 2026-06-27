@@ -36,6 +36,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:integration": "pnpm build && vitest run -c vitest.integration.config.ts",
     "prepublishOnly": "pnpm build"
   },
   "keywords": [
