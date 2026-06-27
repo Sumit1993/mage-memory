@@ -25,6 +25,7 @@ import {
   readStagedRejects,
 } from "../grooming/staging.js";
 import { normalizeTags } from "../note.js";
+import { type InboxIngestResult, ingestCaptureInbox } from "../adapters/claude-code/inbox.js";
 import { index } from "./index-cmd.js";
 
 /** Options for {@link groomCmd}. */
@@ -59,6 +60,10 @@ export interface GroomResult {
   accepted?: string[];
   /** slugs of discarded drafts (--reject). */
   rejected?: string[];
+  /** slugs lifted from the CC capture-inbox into staging this run (ADR-0032 §curation). */
+  ingested?: string[];
+  /** count of inbox captures dropped because an existing note already covered them. */
+  ingestCovered?: number;
 }
 
 /**
@@ -73,10 +78,43 @@ export async function groomCmd(opts: GroomOptions): Promise<GroomResult> {
     throw new Error("mage groom: choose one of --accept / --reject, not both.");
   }
 
+  // Lift any CC capture-inbox files (Gate-0 drops scrubbed native-memory writes at
+  // the docs-root top) into staging FIRST, so they flow through the same
+  // surface/accept/reject path as `mage stage` drafts (ADR-0032 §curation).
+  const ingest = await ingestCaptureInbox(root);
+  reportIngest(ingest, opts.json);
+
   const staged = await readStagedDrafts(stagingPath(root));
-  if (opts.accept !== undefined) return acceptBatch(resolved, staged, opts.accept, opts);
-  if (opts.reject !== undefined) return rejectBatch(root, staged, opts.reject, opts);
-  return surface(root, staged, opts.json);
+  const result =
+    opts.accept !== undefined
+      ? await acceptBatch(resolved, staged, opts.accept, opts)
+      : opts.reject !== undefined
+        ? await rejectBatch(root, staged, opts.reject, opts)
+        : await surface(root, staged, opts.json);
+  withIngest(result, ingest);
+  // Emit JSON once, at the top level, so the ingest summary rides along (the
+  // sub-functions only do human logging now).
+  if (opts.json) process.stdout.write(`${JSON.stringify(result)}\n`);
+  return result;
+}
+
+/** Attach the inbox-ingest summary to a groom result (so JSON consumers see it). */
+function withIngest(result: GroomResult, ingest: InboxIngestResult): GroomResult {
+  if (ingest.ingested.length > 0) result.ingested = ingest.ingested.map((i) => i.slug);
+  if (ingest.covered.length > 0) result.ingestCovered = ingest.covered.length;
+  return result;
+}
+
+/** Log a one-line human summary of what the inbox ingest moved (skipped in JSON mode). */
+function reportIngest(ingest: InboxIngestResult, asJson: boolean | undefined): void {
+  if (asJson) return;
+  const { ingested, covered } = ingest;
+  if (ingested.length === 0 && covered.length === 0) return;
+  const masked = ingested.reduce((n, i) => n + i.masked, 0);
+  const parts = [`Ingested ${ingested.length} capture(s) from the inbox`];
+  if (masked > 0) parts.push(`${masked} secret/PII value(s) scrubbed`);
+  if (covered.length > 0) parts.push(`${covered.length} already covered (dropped)`);
+  logger.info(`${parts.join(" · ")}.`);
 }
 
 // ─── surface (read-only) ─────────────────────────────────────────────────────
@@ -92,10 +130,7 @@ async function surface(root: string, staged: StagedDraft[], asJson: boolean | un
   const drafts = surfaced.map(toView);
   const result: GroomResult = { drafts, pending: pending.length };
 
-  if (asJson) {
-    process.stdout.write(JSON.stringify(result) + "\n");
-    return result;
-  }
+  if (asJson) return result; // JSON is emitted once by groomCmd (with the ingest summary)
   if (pending.length === 0) {
     logger.info("No staged lesson drafts awaiting review.");
     return result;
@@ -149,10 +184,7 @@ async function acceptBatch(
   await index({ dir: opts.dir }); // regenerate INDEX over the now-larger notes/ set.
 
   const result: GroomResult = { accepted };
-  if (opts.json) {
-    process.stdout.write(JSON.stringify(result) + "\n");
-    return result;
-  }
+  if (opts.json) return result; // JSON is emitted once by groomCmd (with the ingest summary)
   logger.success(`Promoted ${accepted.length} draft(s) to notes/ and re-indexed.`);
   for (const rel of accepted) logger.detail(rel);
   logger.step("Review the diff and commit when ready (the human commits — ADR-0013).");
@@ -172,10 +204,7 @@ async function rejectBatch(
   for (const draft of selected) await discardDraft(draft);
 
   const result: GroomResult = { rejected: selected.map((d) => d.slug) };
-  if (opts.json) {
-    process.stdout.write(JSON.stringify(result) + "\n");
-    return result;
-  }
+  if (opts.json) return result; // JSON is emitted once by groomCmd (with the ingest summary)
   logger.success(`Rejected ${selected.length} draft(s) — they won't be re-drafted.`);
   return result;
 }

@@ -74,7 +74,7 @@ export function rewriteWikilinks(body: string): string {
 }
 
 /** "wsl-rancher-container-gotchas" → "Wsl rancher container gotchas" (a readable H1). */
-function deKebab(name: string): string {
+export function deKebab(name: string): string {
   const words = name.replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
   return words ? words.charAt(0).toUpperCase() + words.slice(1) : "";
 }
