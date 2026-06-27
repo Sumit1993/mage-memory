@@ -2,10 +2,13 @@
 
 # mage
 
-> 54 notes. Part of the [index](INDEX.md).
+> 59 notes. Part of the [index](INDEX.md).
 
 ### build
 
+- `note` [Mage integration test framework](notes/mage-integration-test-framework.md) — mage, integration, test, framework, build
+- `note` [Mage main branch protected](notes/mage-main-branch-protected.md) — mage, main, branch, protected, build
+- `note` [Mage no biome 2space](notes/mage-no-biome-2space.md) — mage, biome, 2space, build
 - `gotcha` [Test files were never type-checked (tsconfig excluded them)](notes/test-files-were-excluded-from-typecheck.md) — typecheck, tsc, tests, tsconfig, exclude, vitest, tsup, esbuild, ci, fixture _(reviewed 2026-06-15)_
 
 ### capture
@@ -77,6 +80,8 @@
 
 ### release
 
+- `feedback` [Dogfood before release](notes/dogfood-before-release.md) — dogfood, before, release, mage
+- `feedback` [No emojis in releases](notes/no-emojis-in-releases.md) — emojis, releases, mage, release
 - `gotcha` [A release bump touches MORE than package.json — release-please now owns it](notes/release-bump-touches-many-artifacts.md) — release, release-please, version, bump, changelog, readme, badge, plugin, marketplace, consistency, hygiene, pat _(reviewed 2026-06-15)_
 
 ### roadmap
