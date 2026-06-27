@@ -84,6 +84,21 @@ describe("memoryPreToolUse", () => {
     expect(d.updatedInput.content as string).not.toContain("admin@example.com");
   });
 
+  it("still scrubs when the frontmatter is malformed YAML (never falls through unscrubbed)", async () => {
+    // Malformed frontmatter makes parseNote throw; Gate-0 must NOT let that escape to
+    // the fail-open sink (which would write the ORIGINAL content) — it scrubs the raw
+    // bytes instead, so the embedded secret never reaches disk.
+    const kb = await withKb();
+    const broken = `---\nname: "unterminated\nmetadata: [oops\n---\ntoken AKIA1234567890ABCD56 leaked here\n`;
+    const d = await memoryPreToolUse(preWrite(kb.dir, join(kb.root, "broken.md"), broken));
+    expect(d.kind).toBe("rewrite");
+    if (d.kind !== "rewrite") return;
+    expect(d.masked).toBeGreaterThan(0);
+    expect(d.updatedInput.content as string).not.toContain("AKIA1234567890ABCD56");
+    expect(d.updatedInput.content as string).toContain("[REDACTED");
+    expect(d.slug).toBe("broken");
+  });
+
   it("PASSES a subdirectory write, a non-.md write, and a path outside the root", async () => {
     const kb = await withKb();
     const other = await tmpDir("outside-");

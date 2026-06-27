@@ -18,7 +18,7 @@
 // (an explicit `allow` there would bypass the user's own permission prompts).
 // Mirrors the observe.ts / nudge.ts fail-open contract.
 
-import { isAbsolute, relative } from "node:path";
+import { isAbsolute, relative, sep } from "node:path";
 import { Command } from "commander";
 import { parseNote, stringifyNote } from "../../note.js";
 import { resolveDocsRoot } from "../../paths.js";
@@ -61,7 +61,11 @@ function str(v: unknown): string | undefined {
  * escapes the root, or a non-.md file — all of which PASS untouched.
  */
 function flatInboxRel(root: string, filePath: string): string | null {
-  const rel = relative(root, filePath);
+  // Normalize to a POSIX-separated relative path BEFORE the structural checks: on
+  // native Windows `path.relative` yields backslashes, so a `sub\note.md` subdir write
+  // would slip past `includes("/")` and be mis-handled as a flat topic note (and
+  // isGeneratedArtifact below requires POSIX separators).
+  const rel = relative(root, filePath).split(sep).join("/");
   if (!rel || rel.startsWith("..") || isAbsolute(rel)) return null; // outside the root
   if (rel.includes("/")) return null; // a subdirectory write, not a flat topic note
   if (!rel.endsWith(".md")) return null; // CC memory topic files are .md
@@ -111,17 +115,32 @@ export async function memoryPreToolUse(
     // RE-NORMALIZES a memory file's frontmatter after the write (live spike 2026-06-27),
     // discarding any tags we set — so `mage groom` is authoritative for the wing + final
     // schema at promotion to notes/. The SCRUB is what must (and does) survive.
-    const parsed = parseNote(content);
-    const mapped = mapCcMemoryToMageNote(
-      { frontmatter: parsed.frontmatter as unknown as CcMemoryFrontmatter, body: parsed.body },
-      {},
-    );
-    const { text, findings } = redact(stringifyNote(mapped.frontmatter, mapped.body));
+    //
+    // SECURITY (Gate-0's guarantee is "no raw secret reaches disk"): if the agent's
+    // frontmatter is malformed YAML, parseNote/mapping THROWS. We must NOT let that
+    // escape — the outer fail-open catch would then emit nothing and CC would write the
+    // ORIGINAL unscrubbed content. So on a map failure, fall back to scrubbing the RAW
+    // content directly (pure regex, no YAML) and still emit it redacted.
+    let toScrub: string;
+    let slug: string;
+    try {
+      const parsed = parseNote(content);
+      const mapped = mapCcMemoryToMageNote(
+        { frontmatter: parsed.frontmatter as unknown as CcMemoryFrontmatter, body: parsed.body },
+        {},
+      );
+      toScrub = stringifyNote(mapped.frontmatter, mapped.body);
+      slug = mapped.slug;
+    } catch {
+      toScrub = content; // malformed frontmatter → scrub raw bytes, still land redacted
+      slug = rel.replace(/\.md$/, "");
+    }
+    const { text, findings } = redact(toScrub);
     return {
       kind: "rewrite",
       updatedInput: { ...input, content: text },
       reason: rewriteReason(findings.length),
-      slug: mapped.slug,
+      slug,
       masked: findings.length,
     };
   }
