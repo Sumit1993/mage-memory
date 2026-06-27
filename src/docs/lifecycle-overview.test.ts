@@ -18,9 +18,9 @@ const OVERVIEW = fileURLToPath(
 /** The first ```mermaid fenced block in the overview page (the lifecycle diagram). */
 function lifecycleDiagram(): string {
   const md = readFileSync(OVERVIEW, "utf8");
-  const m = md.match(/```mermaid\n([\s\S]*?)```/);
-  if (!m) throw new Error("loop/overview.md has no mermaid lifecycle diagram");
-  return m[1];
+  const body = md.match(/```mermaid\n([\s\S]*?)```/)?.[1];
+  if (body === undefined) throw new Error("loop/overview.md has no mermaid lifecycle diagram");
+  return body;
 }
 
 describe("lifecycle overview diagram", () => {

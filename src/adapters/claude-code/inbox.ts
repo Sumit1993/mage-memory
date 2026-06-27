@@ -21,10 +21,9 @@
 // from the body, wikilinks are rewritten idempotently, and the body is re-scrubbed
 // (redact is idempotent) as a backstop.
 
-import { readFile, readdir, rm } from "node:fs/promises";
+import { mkdir, readFile, readdir, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { logger } from "../../logger.js";
-import { type NoteFrontmatter, parseNote } from "../../note.js";
+import { type NoteFrontmatter, parseNote, writeNote } from "../../note.js";
 import { stagingPath } from "../../paths.js";
 import { redact } from "../../redact.js";
 import { isGeneratedArtifact, scanNotes } from "../../scan.js";
@@ -32,12 +31,44 @@ import {
   composeDraft,
   draftSig,
   lessonCoveringNote,
+  readStagedDrafts,
   slugify,
-  stagedSlugs,
   uniqueSlug,
   writeDraft,
 } from "../../grooming/staging.js";
 import { deKebab, mapType, rewriteWikilinks } from "./schema-map.js";
+
+/**
+ * Fail-soft diagnostics go to STDERR, never stdout. ingestCaptureInbox runs at the
+ * top of EVERY `mage groom` — including `--json`, whose stdout must stay a single
+ * JSON line — so a `logger.warn` (which writes to stdout) would corrupt that
+ * contract. stderr is visible in a terminal and ignored by JSON consumers.
+ */
+function warnStderr(msg: string): void {
+  process.stderr.write(`⚠ ${msg}\n`);
+}
+
+/** The `cc-session:<uuid>` source pointers a draft/capture carries (for re-ingest dedup). */
+function sourceSessions(fm: NoteFrontmatter): string[] {
+  const sources = (fm as { sources?: unknown }).sources;
+  if (!Array.isArray(sources)) return [];
+  return sources.filter((s): s is string => typeof s === "string" && s.startsWith("cc-session:"));
+}
+
+/** rm a file, returning whether it is now gone (force suppresses ENOENT). */
+async function safeRm(path: string): Promise<boolean> {
+  try {
+    await rm(path, { force: true });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** The recoverable graveyard for covered captures — under `.mage/` (git-ignored, unindexed). */
+function coveredDir(stagingDir: string): string {
+  return join(stagingDir, ".covered");
+}
 
 /** CC's frontmatter discriminator — present on every native-memory file, never on a mage note. */
 const CC_MEMORY_NODE_TYPE = "memory";
@@ -153,11 +184,15 @@ export interface InboxIngestResult {
 
 /**
  * Lift CC capture-inbox files from the docs-root top into `.mage/staging/` as clean
- * mage drafts, MOVING each (the root file is deleted once staged or dropped). A
- * capture an existing committed note already covers (ADR-0032 §4 covered-arm) is
- * dropped, not staged. Fail-soft per file: a parse/redact/fs error on one inbox file
- * is logged and skipped, never aborting the batch (mirrors the scanNotes/observe
- * fail-open contract). Returns what was ingested + dropped.
+ * mage drafts, MOVING each (the root file is removed once the capture is safely
+ * elsewhere). A capture an existing committed note already covers (ADR-0032 §4
+ * covered-arm) is NOT staged into the active batch, but it is never destroyed — it
+ * is archived to `.mage/staging/.covered/` (git-ignored, recoverable) rather than
+ * deleted, because the root file is the capture's only durable copy and the cover
+ * heuristic is deliberately loose. Fail-soft per file: a parse/map/redact/fs error
+ * on one inbox file is logged (to stderr) and skipped, never aborting the batch
+ * (mirrors the scanNotes/observe fail-open contract). Returns what was ingested +
+ * archived.
  */
 export async function ingestCaptureInbox(root: string): Promise<InboxIngestResult> {
   const result: InboxIngestResult = { ingested: [], covered: [] };
@@ -178,53 +213,99 @@ export async function ingestCaptureInbox(root: string): Promise<InboxIngestResul
   // only — exclude the inbox batch itself, since scanNotes walks the whole root and
   // a capture would otherwise "cover" its own root representation and be dropped.
   const inboxSet = new Set(inboxNames);
-  const [allNotes, taken] = await Promise.all([scanNotes(root), stagedSlugs(stagingPath(root))]);
-  const committed = allNotes.filter((n) => !inboxSet.has(n.relPath));
   const stagingDir = stagingPath(root);
+  const [allNotes, staged] = await Promise.all([scanNotes(root), readStagedDrafts(stagingDir)]);
+  const committed = allNotes.filter((n) => !inboxSet.has(n.relPath));
+  const taken = new Set(staged.map((d) => d.slug));
+  // Idempotency: cc-session sources already represented in staging. If a prior
+  // ingest staged a capture but its root file lingered (e.g. a post-write rm failed),
+  // we must NOT re-stage it as a `-2`/`-3` duplicate every groom — skip + retry the rm.
+  const stagedSessions = new Set(staged.flatMap((d) => sourceSessions(d.frontmatter)));
 
   for (const name of inboxNames) {
     const path = join(root, name);
-    let raw: string;
     try {
-      raw = await readFile(path, "utf8");
-    } catch {
-      continue;
-    }
+      let raw: string;
+      try {
+        raw = await readFile(path, "utf8");
+      } catch {
+        continue; // unreadable now (vanished/locked) — leave it for next pass
+      }
 
-    let parsed: ReturnType<typeof parseNote>;
-    try {
-      parsed = parseNote(raw);
-    } catch (err) {
-      logger.warn(`mage: skipping unparseable inbox capture ${name} (${(err as Error).message})`);
-      continue;
-    }
-    if (!isCaptureInboxNote(parsed.frontmatter)) continue; // a hand-authored root note — leave it
+      // The whole tail (parse → map → redact → sig → cover → write) is fail-soft:
+      // one pathological capture skips itself, never killing the batch.
+      const parsed = parseNote(raw);
+      if (!isCaptureInboxNote(parsed.frontmatter)) continue; // a hand-authored root note — leave it
 
-    const stem = name.replace(/\.md$/i, "");
-    const mapped = mapInboxNote(parsed.frontmatter, parsed.body, stem);
-    // Backstop scrub: Gate-0 already scrubbed its files, but a raw native file (Gate-0
-    // off / failed open) may not have. redact() is idempotent on already-scrubbed text.
-    const { text: body, findings } = redact(mapped.body);
+      const stem = name.replace(/\.md$/i, "");
+      const mapped = mapInboxNote(parsed.frontmatter, parsed.body, stem);
+      // Backstop scrub: Gate-0 already scrubbed its files, but a raw native file
+      // (Gate-0 off / failed open) may not have. redact() is idempotent on scrubbed text.
+      const { text: body, findings } = redact(mapped.body);
 
-    // §4 covered-arm: drop a capture an existing committed note already covers.
-    const sig = draftSig(mapped.frontmatter, body, stem);
-    const cover = lessonCoveringNote(sig, committed);
-    if (cover) {
-      await rm(path, { force: true }).catch(() => {});
-      result.covered.push({ from: name, by: cover.relPath });
-      continue;
-    }
+      // Already ingested (its cc-session is staged) but the root file survived a prior
+      // run — drop the duplicate source, don't re-stage.
+      const sessions = sourceSessions(mapped.frontmatter);
+      if (sessions.length > 0 && sessions.some((s) => stagedSessions.has(s))) {
+        if (!(await safeRm(path))) {
+          warnStderr(`mage: ${name} is already staged but could not be removed — remove it by hand.`);
+        }
+        continue;
+      }
 
-    const slug = uniqueSlug(slugify(stem), taken);
-    try {
+      // §4 covered-arm: a capture an existing committed note already covers does not
+      // enter the active batch — ARCHIVE it (recoverable), never destroy it.
+      const sig = draftSig(mapped.frontmatter, body, stem);
+      const cover = lessonCoveringNote(sig, committed);
+      if (cover) {
+        const archived = await archiveCovered(stagingDir, stem, taken, mapped.frontmatter, body);
+        if (archived) {
+          taken.add(archived);
+          await safeRm(path);
+          result.covered.push({ from: name, by: cover.relPath });
+        } else {
+          warnStderr(`mage: could not archive covered capture ${name} — leaving it at the root.`);
+        }
+        continue;
+      }
+
+      const slug = uniqueSlug(slugify(stem), taken);
       await writeDraft(stagingDir, slug, mapped.frontmatter, body);
+      taken.add(slug);
+      for (const s of sessions) stagedSessions.add(s);
+      // Stage succeeded; now remove the source. If the rm fails, the capture is SAFE
+      // (it is staged) — warn so the user clears the lingering root file before it is
+      // re-seen (the cc-session dedup above keeps it from re-staging meanwhile).
+      if (!(await safeRm(path))) {
+        warnStderr(`mage: staged ${name} but could not remove the source file — remove it by hand to avoid a re-ingest.`);
+      }
+      result.ingested.push({ slug, from: name, masked: findings.length });
     } catch (err) {
-      logger.warn(`mage: could not stage inbox capture ${name} (${(err as Error).message})`);
-      continue; // leave the root file in place so it isn't lost
+      warnStderr(`mage: skipping inbox capture ${name} (${(err as Error).message})`);
     }
-    taken.add(slug);
-    await rm(path, { force: true }).catch(() => {});
-    result.ingested.push({ slug, from: name, masked: findings.length });
   }
   return result;
+}
+
+/**
+ * Archive a covered capture to `.mage/staging/.covered/<slug>.md` (the mapped +
+ * scrubbed form, so the graveyard never holds raw secrets). Returns the slug written,
+ * or null on failure (so the caller leaves the root file in place rather than lose it).
+ */
+async function archiveCovered(
+  stagingDir: string,
+  stem: string,
+  taken: ReadonlySet<string>,
+  fm: NoteFrontmatter,
+  body: string,
+): Promise<string | null> {
+  try {
+    const dir = coveredDir(stagingDir);
+    await mkdir(dir, { recursive: true });
+    const slug = uniqueSlug(slugify(stem), taken);
+    await writeNote(join(dir, `${slug}.md`), fm, body);
+    return slug;
+  } catch {
+    return null;
+  }
 }

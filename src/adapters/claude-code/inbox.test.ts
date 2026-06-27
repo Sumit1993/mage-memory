@@ -134,9 +134,26 @@ describe("ingestCaptureInbox", () => {
     expect(r.ingested).toHaveLength(0);
     expect(r.covered).toHaveLength(1);
     expect(r.covered[0]?.by).toBe("notes/covers.md");
-    // Dropped: gone from root, NOT staged.
+    // Out of the active batch: gone from root, NOT staged...
     expect(await exists(join(root, "dup.md"))).toBe(false);
     expect(await exists(join(stagingPath(root), "dup.md"))).toBe(false);
+    // ...but ARCHIVED, never destroyed (recoverable, scrubbed).
+    expect(await exists(join(stagingPath(root), ".covered", "dup.md"))).toBe(true);
+  });
+
+  it("re-ingest is idempotent when a staged capture's root file lingers (no -2 duplicate)", async () => {
+    const { root } = await withKb();
+    await writeRoot(root, "lingering.md", gate0Capture({ session: "sess-keep", body: "# Lingering\n\na capture whose source file survives." }));
+    const first = await ingestCaptureInbox(root);
+    expect(first.ingested).toHaveLength(1);
+
+    // Simulate a post-write rm that failed: the source file is back at the root.
+    await writeRoot(root, "lingering.md", gate0Capture({ session: "sess-keep", body: "# Lingering\n\na capture whose source file survives." }));
+    const second = await ingestCaptureInbox(root);
+    // Same cc-session is already staged → skipped, not re-staged as lingering-2.
+    expect(second.ingested).toHaveLength(0);
+    expect(await exists(join(stagingPath(root), "lingering-2.md"))).toBe(false);
+    expect(await exists(join(root, "lingering.md"))).toBe(false); // rm retried successfully
   });
 
   it("de-collides a slug against an existing staged draft", async () => {
