@@ -13,6 +13,8 @@ It has three epistemic states, each with its own home:
 - `.mage/staging/` — **judged-but-uncommitted drafts**. Git-ignored, kept out of the live index. This is the inbox.
 - `notes/` — committed, indexed knowledge.
 
+Drafts reach `.mage/staging/` from two feeders: `mage stage` (the agent or the boundary nudge composing a lesson directly), and — on Claude Code — the **capture inbox**, the scrubbed native-memory writes Gate-0 drops at the docs-root top. `mage groom` ingests that inbox into staging at the start of each pass, so both feeders converge on the one batch below. See [Capture on Claude Code](./capture.md#capture-on-claude-code-the-native-memory-redirect).
+
 ## Stage: a frictionless draft
 
 When the agent notices a lesson during work — a correction you made, a gotcha that bit you, a rule worth keeping — it stages a short draft with `mage stage`. There is no per-draft confirmation prompt; staging is meant to be cheap so the agent captures at first sight instead of deferring. The boundary nudge stages forgotten lessons the same way.
@@ -37,7 +39,7 @@ mage groom --accept migration-lock-fix
 mage groom --reject stale-draft-slug
 ```
 
-`--accept` moves the confirmed drafts into `notes/` and re-runs `mage index` so they show up in `INDEX.md`. `--reject` discards a draft and **records its key** in a reject ledger, so the same lesson is never re-drafted.
+`--accept` moves the confirmed drafts into `notes/` and re-runs `mage index` so they show up in `INDEX.md`. `--reject` discards a draft and **records its key** in the lesson reject ledger, `.mage/metrics/staged-rejects.json`, so the same lesson is never re-drafted. (This is the lesson path's ledger; do not confuse it with the recurrence path's `.mage/metrics/rejected.json`, which suppresses re-proposed recurring *signatures* — see [Promote and graduate](./promote-graduate.md).)
 
 ## How the inbox stays uncluttered
 

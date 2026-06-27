@@ -36,6 +36,19 @@ mage wires several hooks, each firing `mage observe` at a different moment, so t
 
 A separate hook, `mage:metrics:Stop`, is not capture — it rolls up context-match (did the skills that auto-loaded match the work?). That feeds [Optimize](./optimize.md), not the scratch.
 
+## Capture on Claude Code: the native-memory redirect (Gate-0)
+
+The `mage observe` seam above records the *trail*; the lesson and recurrence stages distill notes from it. On Claude Code there is a second, more direct capture seam: the host's own native-memory reflex, **redirected into mage**.
+
+Claude Code writes memories on its own. `mage connect` points its `autoMemoryDirectory` at the knowledge base and wires a **Gate-0** `PreToolUse` hook on `Write`/`Edit`. When the host saves a memory, Gate-0 fires before the file touches disk and:
+
+- **scrubs** secrets and PII out of the content (the same redactor the rest of the pipeline uses) and **maps** it into mage's note schema, so it lands as a well-formed, redacted note; or
+- **denies** the write outright if it targets a generated index (`INDEX.md`, `MEMORY.md`, a wing index) — mage owns those and regenerates them.
+
+The result lands flat at the docs-root top as a **capture inbox** file. It is not committed knowledge yet: the next `mage groom` ingests the inbox into `.mage/staging/` and routes it through the same human-confirm gate as every other draft. See [Stage and groom](./stage-groom.md).
+
+Like `mage observe`, Gate-0 is **fail-open**: any stdin/parse/redact/filesystem error emits nothing and exits clean, so a capture gate can never block the host's write. It is adapter-specific and active only when Claude Code's `autoMemoryEnabled` is on; on other harnesses the volitional directive (write a mage note to the inbox) is the capture path.
+
 For the exact event names, hook ids, and the command each runs, see the [Hooks reference](../reference/hooks.mdx).
 
 ## What happens to the scratch
