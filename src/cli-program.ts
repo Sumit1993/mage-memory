@@ -14,6 +14,7 @@ import { type InitMode, type InitVisibility, init } from "./commands/init.js";
 import { link, type Storage } from "./commands/link.js";
 import { list } from "./commands/list.js";
 import { mageMigrate, reportMigrate } from "./commands/migrate.js";
+import { buildMemoryHookCommand } from "./adapters/claude-code/memory-hook.js";
 import { buildNudgeCommand } from "./adapters/claude-code/nudge.js";
 import { buildObserveCommand } from "./commands/observe.js";
 import { promoteCmd } from "./commands/promote-cmd.js";
@@ -311,6 +312,9 @@ export function buildProgram(): Command {
   program.addCommand(buildObserveCommand(), { hidden: true });
   // The boundary-nudge adapter (adapters/claude-code/nudge.ts) — fired from the SessionStart hook.
   program.addCommand(buildNudgeCommand(), { hidden: true });
+  // The Gate-0 capture adapter (adapters/claude-code/memory-hook.ts) — fired from
+  // PreToolUse + PostToolUse to redirect/scrub native-memory writes (ADR-0032).
+  program.addCommand(buildMemoryHookCommand(), { hidden: true });
 
   // ─── redact ──────────────────────────────────────────────────────────────────
   program

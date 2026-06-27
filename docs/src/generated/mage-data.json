@@ -418,6 +418,18 @@
       ]
     },
     {
+      "name": "memory-hook",
+      "summary": "Hook-fired Claude Code Gate-0 capture gate: on PreToolUse, redirect + scrub a native-memory write into mage's note schema (or deny a write to a generated index); on PostToolUse, nudge `mage groom` (ADR-0032/0033; never blocks the host)",
+      "aliases": [],
+      "hidden": true,
+      "options": [
+        {
+          "flags": "--cwd <dir>",
+          "description": "working directory used to locate the knowledge base (overrides the hook JSON cwd; defaults to it, then process.cwd())"
+        }
+      ]
+    },
+    {
       "name": "redact",
       "summary": "Deterministically scan a file or stdin for secrets/PII (ADR-0014 Gate 2); --strip emits redacted text",
       "aliases": [],
