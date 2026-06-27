@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { exists, stagingPath } from "../paths.js";
 import { parseNote } from "../note.js";
 import { withKb } from "../../test/fixtures/kb.js";
@@ -142,6 +142,32 @@ describe("mage groom — inbox ingest (ADR-0032)", () => {
     expect(note).toContain("cc-session:sess-x"); // session pointer survives to the note
     const { frontmatter } = parseNote(note);
     expect(frontmatter.provenance).toBeDefined(); // stamped at the promote chokepoint (ADR-0031)
+  });
+
+  it("--accept all --json emits a clean single JSON line (no index logging leak)", async () => {
+    // F6: index()'s 'Indexed N note(s)...' success/detail must not corrupt the --json
+    // stdout contract. acceptBatch passes quiet:true to index() in json mode.
+    const dir = await makeKb();
+    const root = join(dir, "mage");
+    await mkdir(root, { recursive: true });
+    await writeFile(join(root, "x-capture.md"), gate0Capture("# X capture\n\na distinct body."));
+    await groomCmd({ dir }); // ingest x-capture into staging
+
+    const logs: string[] = [];
+    const out: string[] = [];
+    const clog = vi.spyOn(console, "log").mockImplementation((m?: unknown) => void logs.push(String(m)));
+    const swrite = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation((m: unknown) => (out.push(String(m)), true) as never);
+    try {
+      await groomCmd({ dir, accept: "all", json: true });
+    } finally {
+      clog.mockRestore();
+      swrite.mockRestore();
+    }
+    expect(logs).toHaveLength(0); // nothing leaked to console.log (index/accept human lines)
+    const parsed = JSON.parse(out.join("").trim());
+    expect(parsed.accepted).toContain("notes/x-capture.md");
   });
 });
 

@@ -19,6 +19,8 @@ const FLAT_MAX_NOTES = 20;
 export interface IndexOptions {
   /** Where to look for the knowledge base (default cwd; walks up for in-repo). */
   dir?: string;
+  /** Suppress the human success/detail logging (for callers emitting JSON on stdout). */
+  quiet?: boolean;
 }
 
 export interface IndexResult {
@@ -74,12 +76,14 @@ export async function index(opts: IndexOptions = {}): Promise<IndexResult> {
   // Keep the Obsidian graph colored by wing (no-op without .obsidian/graph.json).
   await updateGraphColorGroups(root, wings);
 
-  logger.success(
-    `Indexed ${entries.length} note(s) across ${wings.length} wing(s) → ${written.length} file(s) (${
-      hierarchical ? "hierarchical" : "flat"
-    }).`,
-  );
-  for (const w of written) logger.detail(w);
+  if (!opts.quiet) {
+    logger.success(
+      `Indexed ${entries.length} note(s) across ${wings.length} wing(s) → ${written.length} file(s) (${
+        hierarchical ? "hierarchical" : "flat"
+      }).`,
+    );
+    for (const w of written) logger.detail(w);
+  }
   return { root, noteCount: entries.length, wings, hierarchical, written };
 }
 

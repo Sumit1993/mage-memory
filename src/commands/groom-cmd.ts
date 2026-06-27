@@ -181,7 +181,9 @@ async function acceptBatch(
     taken.add(basename(rel, ".md")); // so two accepted drafts can't collide on a slug
     accepted.push(rel);
   }
-  await index({ dir: opts.dir }); // regenerate INDEX over the now-larger notes/ set.
+  // Regenerate INDEX over the now-larger notes/ set. In --json mode, keep index()'s
+  // human logging off stdout so the single JSON line groomCmd emits stays clean.
+  await index({ dir: opts.dir, quiet: opts.json });
 
   const result: GroomResult = { accepted };
   if (opts.json) return result; // JSON is emitted once by groomCmd (with the ingest summary)

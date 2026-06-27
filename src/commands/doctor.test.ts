@@ -5,6 +5,7 @@ import {
   type ClaudeSettings,
   MAGE_HOOKS,
   diffMageHooks,
+  hasCommandeerHooks,
   upsertMageHooks,
 } from "../adapters/claude-code/settings.js";
 import { gitInit } from "../git.js";
@@ -126,6 +127,23 @@ describe("diffMageHooks", () => {
     const d = diffMageHooks(full, { commandeer: true });
     expect(d.matches).toBe(true);
     expect(d.missingIds).toEqual([]);
+  });
+
+  it("a stale commandeer command is detected when the flag is driven off the installed hooks (F9)", () => {
+    // doctor's resolveConnection now passes { commandeer: hasCommandeerHooks(settings) }
+    // so a drifted mage:memory:* command is caught rather than silently passing.
+    const full = upsertMageHooks(null, { commandeer: true }) as ClaudeSettings & {
+      hooks: Record<string, Array<{ id?: string; hooks: Array<{ command: string }> }>>;
+    };
+    const cmd0 = full.hooks.PreToolUse?.find((g) => g.id === "mage:memory:PreToolUse")?.hooks[0];
+    expect(cmd0).toBeDefined();
+    if (cmd0) cmd0.command = "mage OLD-memory-hook"; // simulate a version-bump drift
+    // The OLD default (commandeer omitted) MISSES the drift — the bug:
+    expect(diffMageHooks(full).matches).toBe(true);
+    // Driven off the installed hooks (the fix), the stale commandeer row is detected:
+    const d = diffMageHooks(full, { commandeer: hasCommandeerHooks(full) });
+    expect(d.matches).toBe(false);
+    expect(d.staleIds).toContain("mage:memory:PreToolUse");
   });
 
   it("empty settings → not connected", () => {

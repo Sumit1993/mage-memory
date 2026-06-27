@@ -107,6 +107,62 @@ describe("connect", () => {
     expect(settings.mageStashedAutoMemoryDirectory).toBe("/my/own/dir"); // preserved for restore
   });
 
+  it("stashes a user value even when it already equals the KB root (so disconnect restores, not deletes)", async () => {
+    // F10: a user who explicitly set autoMemoryDirectory = the KB root must not have it
+    // silently deleted by a connect/disconnect round-trip.
+    const { dir, root } = await withKb({ kind: "repo" });
+    await mkdir(join(dir, ".claude"), { recursive: true });
+    await writeFile(localPath(dir), JSON.stringify({ autoMemoryDirectory: root }));
+    await connect({ cwd: dir, yes: true, gitHook: false });
+    const settings = JSON.parse(await readFile(localPath(dir), "utf8")) as {
+      autoMemoryDirectory?: string;
+      mageStashedAutoMemoryDirectory?: string;
+    };
+    expect(settings.autoMemoryDirectory).toBe(root);
+    expect(settings.mageStashedAutoMemoryDirectory).toBe(root); // stashed → disconnect restores it
+  });
+
+  it("reconnect with auto-memory now OFF releases the relocation and restores the stashed user value", async () => {
+    // F3: the commandeer tier gating OFF must reconcile autoMemoryDirectory, never leave
+    // CC writing memories to the KB with no Gate-0 scrub.
+    const { dir } = await withKb({ kind: "repo" });
+    await mkdir(join(dir, ".claude"), { recursive: true });
+    await writeFile(localPath(dir), JSON.stringify({ autoMemoryDirectory: "/my/own/dir" }));
+    await connect({ cwd: dir, yes: true, gitHook: false }); // commandeers, stashes /my/own/dir
+
+    // User disables auto-memory, then reconnects.
+    const wired = JSON.parse(await readFile(localPath(dir), "utf8"));
+    wired.autoMemoryEnabled = false;
+    await writeFile(localPath(dir), JSON.stringify(wired));
+    const r = await connect({ cwd: dir, yes: true, gitHook: false });
+    expect(r.commandeer).toBe(false);
+
+    const settings = JSON.parse(await readFile(localPath(dir), "utf8")) as {
+      autoMemoryDirectory?: string;
+      mageStashedAutoMemoryDirectory?: string;
+      hooks?: Record<string, unknown>;
+    };
+    expect(settings.autoMemoryDirectory).toBe("/my/own/dir"); // restored, not left at the KB
+    expect(settings.mageStashedAutoMemoryDirectory).toBeUndefined(); // stash cleared
+    expect(settings.hooks?.PreToolUse).toBeUndefined(); // commandeer scrub hooks stripped
+  });
+
+  it("reconnect with auto-memory OFF and no prior user value drops mage's KB relocation", async () => {
+    // F3 (no-stash branch): mage commandeered a KB with no pre-existing user value; turning
+    // auto-memory off must delete mage's autoMemoryDirectory, not strand it.
+    const { dir, root } = await withKb({ kind: "repo" });
+    await connect({ cwd: dir, yes: true, gitHook: false }); // commandeers, autoMemoryDirectory = root
+    let settings = JSON.parse(await readFile(localPath(dir), "utf8"));
+    expect(settings.autoMemoryDirectory).toBe(root);
+
+    settings.autoMemoryEnabled = false;
+    await writeFile(localPath(dir), JSON.stringify(settings));
+    await connect({ cwd: dir, yes: true, gitHook: false });
+    settings = JSON.parse(await readFile(localPath(dir), "utf8"));
+    expect(settings.autoMemoryDirectory).toBeUndefined();
+    expect(settings.mageStashedAutoMemoryDirectory).toBeUndefined();
+  });
+
   it("merges into a pre-existing file preserving its content + makes a .bak", async () => {
     const dir = await freshDir();
     await mkdir(join(dir, ".claude"), { recursive: true });

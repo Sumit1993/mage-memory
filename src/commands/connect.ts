@@ -88,19 +88,39 @@ export async function connect(opts: ConnectOptions): Promise<ConnectResult> {
   if (commandeer && kb) {
     // Preserve a user's OWN autoMemoryDirectory so disconnect can restore it rather than
     // clobber it. mage owns the value iff it previously commandeered (its commandeer hooks
-    // are present); a differing value with no commandeer hooks is the user's — stash + warn
-    // before we point it at the KB.
+    // are present); any pre-existing value with no commandeer hooks is the user's — stash it
+    // (even when it already equals the KB root, so a later disconnect RESTORES the user's
+    // explicit choice instead of deleting it). Only warn when we are actually displacing.
     const prior =
       typeof r.settings?.autoMemoryDirectory === "string"
         ? r.settings.autoMemoryDirectory
         : undefined;
-    if (prior && prior !== kb.root && !hasCommandeerHooks(r.settings)) {
+    if (prior !== undefined && !hasCommandeerHooks(r.settings)) {
       merged.mageStashedAutoMemoryDirectory = prior;
-      logger.warn(
-        `Displacing your autoMemoryDirectory (${prior}) → ${kb.root} for the commandeer tier; \`mage disconnect\` restores it.`,
-      );
+      if (prior !== kb.root) {
+        logger.warn(
+          `Displacing your autoMemoryDirectory (${prior}) → ${kb.root} for the commandeer tier; \`mage disconnect\` restores it.`,
+        );
+      }
     }
     merged.autoMemoryDirectory = kb.root;
+  } else if (hasCommandeerHooks(r.settings) && "autoMemoryDirectory" in merged) {
+    // The commandeer tier just gated OFF (auto-memory disabled, KB no longer resolvable,
+    // or --user scope) but mage previously owned the relocation. upsertMageHooks already
+    // stripped the scrub hooks; reconcile autoMemoryDirectory symmetrically so CC is never
+    // left writing memories to the KB with NO Gate-0 scrub: restore the stashed user value,
+    // else drop mage's KB value.
+    const stashed =
+      typeof merged.mageStashedAutoMemoryDirectory === "string"
+        ? merged.mageStashedAutoMemoryDirectory
+        : undefined;
+    if (stashed !== undefined) {
+      merged.autoMemoryDirectory = stashed;
+    } else {
+      delete merged.autoMemoryDirectory;
+    }
+    delete merged.mageStashedAutoMemoryDirectory;
+    logger.detail("Released the CC auto-memory relocation (commandeer tier off).");
   }
   const { backedUp } = await writeClaudeSettings(target.path, merged);
 
