@@ -6,7 +6,7 @@
 //
 // Before this module the ladder had no home: the type + default + validator sat
 // in thresholds.ts, the level list + meanings + coercer in commands/autonomy.ts,
-// and the three mandate templates in commands/nudge.ts — four files that had to
+// and the three mandate templates in adapters/claude-code/nudge.ts — four files that had to
 // change together to add or reword a rung. This module concentrates them so a
 // rung change touches one place (locality) and every consumer reads one
 // definition (leverage). PURE: no fs, no model, no metadata read — the config

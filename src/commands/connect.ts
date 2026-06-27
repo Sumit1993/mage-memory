@@ -5,7 +5,7 @@ import {
   upsertMageHooks,
   writeClaudeSettings,
   MAGE_HOOKS,
-} from "../claude-settings.js";
+} from "../adapters/claude-code/settings.js";
 import { resolveDecision } from "../interactive.js";
 import { installRedactHook } from "../git-hooks.js";
 import { ensureGitignored } from "../gitignore.js";

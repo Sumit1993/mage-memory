@@ -6,7 +6,7 @@ import {
   MAGE_HOOKS,
   diffMageHooks,
   upsertMageHooks,
-} from "../claude-settings.js";
+} from "../adapters/claude-code/settings.js";
 import { gitInit } from "../git.js";
 import { detectRedactHook, installRedactHook } from "../git-hooks.js";
 import { METADATA_SCHEMA, METADATA_SCHEMA_V1, exists } from "../paths.js";

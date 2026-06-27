@@ -13,7 +13,7 @@ import {
   resolveSettingsTarget,
   upsertMageHooks,
   writeClaudeSettings,
-} from "../claude-settings.js";
+} from "../adapters/claude-code/settings.js";
 import { LAYOUT_LEAVES, mageMigrate } from "../commands/migrate.js";
 import type { DoctorCheck, DoctorOptions } from "../commands/doctor.js";
 import { detectRedactHook } from "../git-hooks.js";

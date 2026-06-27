@@ -1,8 +1,8 @@
 import { mkdir } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
-import type { BacklogTally } from "../grooming/backlog.js";
-import { learningsPath } from "../paths.js";
-import { tmpDir } from "../../test/fixtures/kb.js";
+import type { BacklogTally } from "../../grooming/backlog.js";
+import { learningsPath } from "../../paths.js";
+import { tmpDir } from "../../../test/fixtures/kb.js";
 import { cacheTally, cachedTally, elapsedSince, markReminded, scratchFingerprint } from "./nudge-state.js";
 
 const tmpRoot = (): Promise<string> => tmpDir("mage-nudge-state-");

@@ -15,7 +15,7 @@
 // JSON diff is stable.
 
 import { type Command, Help } from "commander";
-import { MAGE_HOOKS } from "../claude-settings.js";
+import { MAGE_HOOKS } from "../adapters/claude-code/settings.js";
 import { buildProgram } from "../cli-program.js";
 import {
   BASE_THRESHOLDS,

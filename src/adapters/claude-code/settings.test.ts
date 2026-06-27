@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { tmpDir } from "../test/fixtures/kb.js";
+import { tmpDir } from "../../../test/fixtures/kb.js";
 import {
   type ClaudeSettings,
   MAGE_HOOKS,
@@ -11,7 +11,7 @@ import {
   resolveSettingsTarget,
   upsertMageHooks,
   writeClaudeSettings,
-} from "./claude-settings.js";
+} from "./settings.js";
 
 const tmp = (): Promise<string> => tmpDir("mage-settings-");
 

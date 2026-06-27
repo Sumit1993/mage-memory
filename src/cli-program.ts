@@ -14,7 +14,7 @@ import { type InitMode, type InitVisibility, init } from "./commands/init.js";
 import { link, type Storage } from "./commands/link.js";
 import { list } from "./commands/list.js";
 import { mageMigrate, reportMigrate } from "./commands/migrate.js";
-import { buildNudgeCommand } from "./commands/nudge.js";
+import { buildNudgeCommand } from "./adapters/claude-code/nudge.js";
 import { buildObserveCommand } from "./commands/observe.js";
 import { promoteCmd } from "./commands/promote-cmd.js";
 import { redactCmd } from "./commands/redact.js";
@@ -309,7 +309,7 @@ export function buildProgram(): Command {
   // Registration lives next to the handler (commands/observe.ts) so the flag list
   // and the ObserveOptions contract can't drift apart.
   program.addCommand(buildObserveCommand(), { hidden: true });
-  // The boundary-nudge adapter (commands/nudge.ts) — fired from the SessionStart hook.
+  // The boundary-nudge adapter (adapters/claude-code/nudge.ts) — fired from the SessionStart hook.
   program.addCommand(buildNudgeCommand(), { hidden: true });
 
   // ─── redact ──────────────────────────────────────────────────────────────────

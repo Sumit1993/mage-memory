@@ -14,9 +14,9 @@
 
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { distillWatermarkPath } from "../distill/watermark.js";
-import type { BacklogTally } from "../grooming/backlog.js";
-import { learningsPath, metricsPath, stagingPath } from "../paths.js";
+import { distillWatermarkPath } from "../../distill/watermark.js";
+import type { BacklogTally } from "../../grooming/backlog.js";
+import { learningsPath, metricsPath, stagingPath } from "../../paths.js";
 
 /** Anti-nag throttle + mtime cache: the backlog reminder fires at most once per window. */
 const NUDGE_THROTTLE_FILE = "nudge-throttle.json";

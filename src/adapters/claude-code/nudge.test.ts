@@ -1,16 +1,16 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { tmpDir, withKb } from "../../test/fixtures/kb.js";
-import { readStagedDrafts } from "../grooming/staging.js";
+import { tmpDir, withKb } from "../../../test/fixtures/kb.js";
+import { readStagedDrafts } from "../../grooming/staging.js";
 import {
   buildSessionEnd,
   buildToolUse,
   buildUserPrompt,
   type EventBase,
-} from "../observe/events.js";
-import type { ObserveEvent } from "../observe/types.js";
-import { learningsPath, stagingPath } from "../paths.js";
+} from "../../observe/events.js";
+import type { ObserveEvent } from "../../observe/types.js";
+import { learningsPath, stagingPath } from "../../paths.js";
 import { emitAdditionalContext, nudgeCmd } from "./nudge.js";
 
 afterEach(() => {

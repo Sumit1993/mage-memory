@@ -3,7 +3,7 @@ import {
   removeMageHooks,
   resolveSettingsTarget,
   writeClaudeSettings,
-} from "../claude-settings.js";
+} from "../adapters/claude-code/settings.js";
 import { removeRedactHook } from "../git-hooks.js";
 import { logger } from "../logger.js";
 

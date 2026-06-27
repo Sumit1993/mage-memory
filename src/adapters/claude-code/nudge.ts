@@ -18,13 +18,13 @@
 // host (fail-open, exit 0).
 
 import { Command } from "commander";
-import { computeDigest, lastClosedChapter, renderDigest } from "../distill/digest.js";
-import { readSessionStreams } from "../distill/reader.js";
-import { type BacklogTally, computeBacklog } from "../grooming/backlog.js";
-import { type Autonomy, mandateFor } from "../grooming/autonomy-ladder.js";
-import { readGrooming } from "../grooming/config.js";
-import type { ObserveEvent } from "../observe/types.js";
-import { type ResolvedDocsRoot, absolutePath, learningsPath, resolveDocsRoot } from "../paths.js";
+import { computeDigest, lastClosedChapter, renderDigest } from "../../distill/digest.js";
+import { readSessionStreams } from "../../distill/reader.js";
+import { type BacklogTally, computeBacklog } from "../../grooming/backlog.js";
+import { type Autonomy, mandateFor } from "../../grooming/autonomy-ladder.js";
+import { readGrooming } from "../../grooming/config.js";
+import type { ObserveEvent } from "../../observe/types.js";
+import { type ResolvedDocsRoot, absolutePath, learningsPath, resolveDocsRoot } from "../../paths.js";
 import { cacheTally, cachedTally, elapsedSince, markReminded, scratchFingerprint } from "./nudge-state.js";
 
 /** Fallback backlog-reminder window when `grooming.nudgeThrottleHours` is absent/junk (ADR-0030 §5). */

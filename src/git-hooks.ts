@@ -6,7 +6,7 @@
 // git `pre-commit` hook that runs `mage redact --check --staged` and BLOCKS the
 // commit on a live secret (`git commit --no-verify` is the human escape hatch).
 //
-// The installer mirrors claude-settings.ts discipline: refuse-don't-clobber a
+// The installer mirrors adapters/claude-code/settings.ts discipline: refuse-don't-clobber a
 // foreign hook (we never overwrite a hook we didn't write), idempotent by marker,
 // and a pure immutable construction (we read the existing file, never mutate it).
 // Everything here is reachable from `mage connect`/`mage disconnect`; nothing a
