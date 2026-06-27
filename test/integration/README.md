@@ -41,6 +41,13 @@ current code. `npm test` (the default) never runs anything here.
   `scratchpad/soak-ingest.sh`.
 - `gate0.live.test.ts` — **live.** Drives `claude -p` to prove Gate-0 scrubs a real
   native-memory write before disk, and that `MEMORY.md` is auto-loaded for recall.
+  (Proven 2026-06-27 on claude 2.1.195.)
+- `memory-deny.live.test.ts` — **live.** Proves Gate-0's deny arm holds — a real agent
+  told to edit `MEMORY.md` cannot inject into the mage-owned index.
+- `release-smoke.integration.test.ts` — **deterministic.** The hermetic pre-publish
+  smoke checks: `--version`, the human/plumbing `--help` split, the shipped skills set,
+  `distill --json` validity, hook fail-open on malformed stdin, `doctor` cleanliness,
+  and the Gate-2 staged-secret block.
 
 ## Adding a live test
 
@@ -54,18 +61,18 @@ it("does a real thing", async (ctx) => {
 });
 ```
 
-## Manifest — ad-hoc harnesses to fold in next
+## Manifest — ad-hoc harnesses (`~/ai-context/…`)
 
-Custom harnesses currently living under `~/ai-context/` (and referenced in notes),
-to migrate into this suite as durable, gated tests. Listed so they aren't lost.
+Where each ad-hoc harness landed. Not every harness is a *test* — two are a monitor
+and a research artifact, and forcing them into hermetic tests would misrepresent them.
 
-| Harness (`~/ai-context/…`) | Proves | Target here |
+| Harness | What it is | Status |
 |---|---|---|
-| `mage-gate0-spike/` | live native-write → Gate-0 scrub → MEMORY.md recall | **ported** → `gate0.live.test.ts` |
-| `mage-spike-memory-deny/deny-memory.sh` | Gate-0 **denies** a write to a generated index (`MEMORY.md`) | live test: assert the agent is blocked from editing `MEMORY.md` |
-| `mage-soak/` (`soak-digest.sh`, `soak-report.mjs`, `soak-baseline.json`) | multi-KB distill/digest soak vs a baseline | deterministic soak over recorded `.learnings` fixtures |
-| `mage-prove-20260619/` (`faultline-*.mjs`, `ops-corpus-replay.mjs`) | faultline detector replayed over real session logs | deterministic replay test over a checked-in log corpus |
-| `mage-dogfood-0.0.10.sh` | release smoke (planted-secret + malformed-input) on the packed tarball | a `pack → install → smoke` deterministic test |
+| `mage-gate0-spike/` | live native-write → Gate-0 scrub → MEMORY.md recall | **ported** → `gate0.live.test.ts` (proven on claude 2.1.195) |
+| `mage-spike-memory-deny/` | Gate-0 **denies** a write to a generated index | **ported** → `memory-deny.live.test.ts` |
+| `mage-dogfood-0.0.10.sh` | pre-publish release smoke | **ported (hermetic parts)** → `release-smoke.integration.test.ts`. The live-KB read-only probes (doctor over your real repos) stay in the script — they depend on machine state. |
+| `mage-soak/` | a **cron monitor**: a read-only digest of organic lesson capture across your *live* KBs over time, vs a stamped baseline | **not a hermetic test** — left as a monitor. Its read-only-CLI invariants are already covered by unit tests. |
+| `mage-prove-20260619/` (`faultline-*.mjs`) | a **research harness**: replays log corpora to *measure* whether a proposed trigger fires (rates + samples for human scoring) — no pass/fail | **not a regression test** — left as a research artifact. |
 
 > The scratchpad soak (`…/scratchpad/soak-ingest.sh`) is **superseded** by
 > `inbox-ingest.integration.test.ts` and can be deleted.

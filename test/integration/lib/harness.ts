@@ -64,6 +64,29 @@ export async function runMage(
   }
 }
 
+/** Run the built `mage <args>` piping `stdin` to it (for hook commands that read stdin). */
+export function runMageStdin(
+  args: string[],
+  stdin: string,
+  opts: { cwd: string; env?: NodeJS.ProcessEnv } = { cwd: REPO_ROOT },
+): Promise<RunResult> {
+  assertBuilt();
+  return new Promise<RunResult>((resolve) => {
+    const child = spawn(process.execPath, [MAGE_BIN, ...args], {
+      cwd: opts.cwd,
+      env: { ...process.env, ...opts.env },
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (c: Buffer) => (stdout += c.toString("utf8")));
+    child.stderr.on("data", (c: Buffer) => (stderr += c.toString("utf8")));
+    child.on("close", (code) => resolve({ stdout, stderr, code: code ?? 0 }));
+    child.on("error", (err) => resolve({ stdout, stderr: String(err), code: 1 }));
+    child.stdin.end(stdin);
+  });
+}
+
 /** A temp dir removed when the current test finishes (no afterEach bookkeeping needed). */
 export async function tmpKbDir(prefix = "mage-it-"): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), prefix));
