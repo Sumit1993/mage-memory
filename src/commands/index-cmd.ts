@@ -5,6 +5,7 @@ import { updateGraphColorGroups } from "../obsidian.js";
 import {
   INDEX_FILE,
   type HubProject,
+  MEMORY_FILE,
   readHubMetadata,
   requireDocsRoot,
 } from "../paths.js";
@@ -62,6 +63,13 @@ export async function index(opts: IndexOptions = {}): Promise<IndexResult> {
     await writeFile(join(root, INDEX_FILE), renderFlat(entries, wings, registry));
     written.push(INDEX_FILE);
   }
+
+  // The Claude Code adapter twin (ADR-0032/0033): always emit MEMORY.md at the
+  // docs-root top so CC's `autoMemoryDirectory` auto-loads it. For a single-wing
+  // (or flat) KB it folds the per-note list inline (rich recall, CC self-bounds at
+  // 25KB); for a multi-wing hierarchical KB it stays the bounded wings-map twin.
+  await writeFile(join(root, MEMORY_FILE), renderMemory(entries, wings, hierarchical, registry));
+  written.push(MEMORY_FILE);
 
   // Keep the Obsidian graph colored by wing (no-op without .obsidian/graph.json).
   await updateGraphColorGroups(root, wings);
@@ -169,6 +177,25 @@ function renderRootHierarchical(entries: ScannedNote[], wings: string[], reg: Re
   }
   pushLinkedRepos(lines, reg);
   return `${lines.join("\n").replace(/\n+$/, "")}\n`;
+}
+
+/**
+ * MEMORY.md content — the Claude Code adapter twin of INDEX.md (ADR-0032/0033).
+ * A single-wing (or flat) KB folds the full per-note list inline so CC's launch
+ * recall is rich (CC self-bounds the load at 200 lines / 25KB); a multi-wing
+ * hierarchical KB stays the bounded wings-map twin (never inline every wing — the
+ * unbounded cost ADR-0033 forbids).
+ */
+function renderMemory(
+  entries: ScannedNote[],
+  wings: string[],
+  hierarchical: boolean,
+  reg: RegistryView,
+): string {
+  const foldInline = !hierarchical || wings.length <= 1;
+  return foldInline
+    ? renderFlat(entries, wings, reg)
+    : renderRootHierarchical(entries, wings, reg);
 }
 
 function renderWing(wing: string, entries: ScannedNote[], reg: RegistryView): string {

@@ -211,7 +211,7 @@
     },
     {
       "name": "index",
-      "summary": "(Re)generate INDEX.md — the always-loaded index of notes (deterministic, idempotent)",
+      "summary": "(Re)generate INDEX.md + the Claude Code MEMORY.md twin — the always-loaded index of notes (deterministic, idempotent)",
       "aliases": [],
       "hidden": true,
       "options": [

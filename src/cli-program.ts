@@ -117,7 +117,7 @@ export function buildProgram(): Command {
   program
     .command("index", { hidden: true })
     .description(
-      "(Re)generate INDEX.md — the always-loaded index of notes (deterministic, idempotent)",
+      "(Re)generate INDEX.md + the Claude Code MEMORY.md twin — the always-loaded index of notes (deterministic, idempotent)",
     )
     .option(
       "-d, --dir <path>",

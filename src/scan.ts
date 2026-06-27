@@ -19,6 +19,7 @@ import {
   GIT_DIR,
   IDENTITY_FILE,
   INDEX_FILE,
+  MEMORY_FILE,
   NODE_MODULES_DIR,
   OBSIDIAN_DIR,
   STATE_DIR,
@@ -51,6 +52,7 @@ const SKIP_DIRS = new Set<string>([
  */
 const RESERVED_MD = new Set<string>([
   INDEX_FILE,
+  MEMORY_FILE, // the Claude Code adapter index twin (ADR-0032) — generated, never a note
   IDENTITY_FILE,
   AGENTS_FILE,
   CLAUDE_FILE,
