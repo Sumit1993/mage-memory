@@ -150,6 +150,18 @@
       "id": "mage:observe:SubagentStop",
       "command": "mage observe",
       "purpose": "Capture autonomous subagent work — a Task subagent's final reply, the one capture point for multi-agent workflows."
+    },
+    {
+      "event": "PreToolUse",
+      "id": "mage:memory:PreToolUse",
+      "command": "mage memory-hook",
+      "purpose": "Gate-0 (ADR-0032): redirect + scrub a native-memory write into mage's note schema before it touches disk, or deny a write to a generated index."
+    },
+    {
+      "event": "PostToolUse",
+      "id": "mage:memory:PostToolUse",
+      "command": "mage memory-hook",
+      "purpose": "Nudge `mage groom` after a captured topic-note write (ADR-0032)."
     }
   ],
   "commands": [

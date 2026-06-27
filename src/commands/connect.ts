@@ -1,5 +1,6 @@
 import { confirm } from "@inquirer/prompts";
 import {
+  isAutoMemoryEnabled,
   readClaudeSettings,
   resolveSettingsTarget,
   upsertMageHooks,
@@ -33,6 +34,8 @@ export interface ConnectResult {
   scope: "local" | "user";
   wired: number;
   backedUp: boolean;
+  /** True iff the ADR-0032 commandeer tier was wired (auto-memory on + a local KB root). */
+  commandeer: boolean;
   /** Outcome of the pre-commit redaction hook install (omitted when not attempted). */
   hook?: { installed: boolean; reason?: string };
 }
@@ -68,16 +71,29 @@ export async function connect(opts: ConnectOptions): Promise<ConnectResult> {
 
   if (!proceed) {
     logger.info("Aborted — no changes made.");
-    return { path: target.path, scope: target.scope, wired: 0, backedUp: false };
+    return { path: target.path, scope: target.scope, wired: 0, backedUp: false, commandeer: false };
   }
 
-  const merged = upsertMageHooks(r.settings);
+  // Commandeer tier (ADR-0032): redirect + scrub native-memory writes via a PreToolUse
+  // hook + relocate CC's memory dir to the KB. Gated on (a) CC auto-memory being on,
+  // (b) a resolvable KB docs root (the autoMemoryDirectory target), and (c) LOCAL scope
+  // — autoMemoryDirectory is a machine-specific absolute path, so it belongs only in the
+  // gitignored settings.local.json, never a shared/global file (`--user`).
+  const kb = await resolveDocsRoot(opts.cwd ?? process.cwd());
+  const commandeer =
+    isAutoMemoryEnabled(r.settings, process.env) && kb !== null && target.scope === "local";
+
+  const merged = upsertMageHooks(r.settings, { commandeer });
+  if (commandeer && kb) merged.autoMemoryDirectory = kb.root;
   const { backedUp } = await writeClaudeSettings(target.path, merged);
 
-  const wired = MAGE_HOOKS.length;
+  const wired = MAGE_HOOKS.filter((h) => h.commandeer !== true || commandeer).length;
   // settings.local.json is itself personal + gitignored by Claude Code; the capture
   // SINKS those hooks feed (.learnings/, .metrics/) are gitignored separately below.
   logger.success(`Wired ${wired} events into ${target.path} (personal settings file).`);
+  if (commandeer && kb) {
+    logger.detail(`Commandeered CC auto-memory → ${kb.root} (writes redirect + scrub into mage; MEMORY.md mage-owned).`);
+  }
   logger.detail("Run `mage disconnect` to remove.");
 
   // Self-heal the capture-sink ignores so the dirs these hooks write can never be
@@ -94,7 +110,7 @@ export async function connect(opts: ConnectOptions): Promise<ConnectResult> {
   // hook, so this is safe to attempt unconditionally. A non-repo cwd no-ops.
   const hook = opts.gitHook === false ? undefined : await installHook(opts.cwd ?? process.cwd());
 
-  return { path: target.path, scope: target.scope, wired, backedUp, hook };
+  return { path: target.path, scope: target.scope, wired, backedUp, commandeer, hook };
 }
 
 /**

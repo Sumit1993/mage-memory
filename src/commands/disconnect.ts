@@ -28,6 +28,8 @@ export interface DisconnectResult {
   scope: "local" | "user";
   removed: number;
   backedUp: boolean;
+  /** True iff the commandeer tier's `autoMemoryDirectory` key was present and removed. */
+  autoMemoryUnset: boolean;
   /** Outcome of the pre-commit redaction hook removal (omitted when not attempted). */
   hook?: { removed: boolean };
 }
@@ -47,7 +49,14 @@ export async function disconnect(opts: DisconnectOptions): Promise<DisconnectRes
     // The pre-commit hook lives independently of settings, so still attempt its
     // removal — a connect that only installed the hook is undone by disconnect.
     const hook = await removeHook(opts);
-    return { path: target.path, scope: target.scope, removed: 0, backedUp: false, hook };
+    return {
+      path: target.path,
+      scope: target.scope,
+      removed: 0,
+      backedUp: false,
+      autoMemoryUnset: false,
+      hook,
+    };
   }
 
   if (r.malformed) {
@@ -58,17 +67,28 @@ export async function disconnect(opts: DisconnectOptions): Promise<DisconnectRes
 
   const { settings, removed } = removeMageHooks(r.settings);
 
+  // Symmetric undo of connect's commandeer tier: drop the relocation lever we set.
+  // (removeMageHooks strips the hook groups; autoMemoryDirectory is a top-level key.)
+  // Rewrite the file when EITHER hooks were removed OR the key was present, so a
+  // commandeer-only state (auto-memory later toggled off → no groups) still cleans up.
+  const autoMemoryUnset = "autoMemoryDirectory" in settings;
+  if (autoMemoryUnset) delete settings.autoMemoryDirectory;
+
   let backedUp = false;
-  if (removed > 0) {
+  if (removed > 0 || autoMemoryUnset) {
     ({ backedUp } = await writeClaudeSettings(target.path, settings));
-    logger.success(`Removed ${removed} mage hook(s) from ${target.path}.`);
+    const bits = [
+      removed > 0 ? `${removed} mage hook(s)` : null,
+      autoMemoryUnset ? "autoMemoryDirectory" : null,
+    ].filter(Boolean);
+    logger.success(`Removed ${bits.join(" + ")} from ${target.path}.`);
   } else {
     logger.info(`No mage hooks found in ${target.path} — nothing removed.`);
   }
 
   const hook = await removeHook(opts);
 
-  return { path: target.path, scope: target.scope, removed, backedUp, hook };
+  return { path: target.path, scope: target.scope, removed, backedUp, autoMemoryUnset, hook };
 }
 
 /**

@@ -56,6 +56,44 @@ describe("connect", () => {
     );
   });
 
+  // ─── commandeer tier (ADR-0032) ──────────────────────────────────────────────
+
+  it("commandeers in a KB with auto-memory on: wires 12 + sets autoMemoryDirectory", async () => {
+    const { dir, root } = await withKb({ kind: "repo" });
+    const r = await connect({ cwd: dir, yes: true, gitHook: false });
+    expect(r.commandeer).toBe(true);
+    expect(r.wired).toBe(12);
+    const settings = JSON.parse(await readFile(r.path, "utf8")) as {
+      autoMemoryDirectory?: string;
+      hooks: Record<string, Array<{ id?: string; matcher?: string }>>;
+    };
+    expect(settings.autoMemoryDirectory).toBe(root);
+    const pre = settings.hooks.PreToolUse ?? [];
+    expect(pre[0]?.id).toBe("mage:memory:PreToolUse");
+    expect(pre[0]?.matcher).toBe("Write|Edit");
+  });
+
+  it("does NOT commandeer when auto-memory is disabled (10 groups, no autoMemoryDirectory)", async () => {
+    const { dir } = await withKb({ kind: "repo" });
+    await mkdir(join(dir, ".claude"), { recursive: true });
+    await writeFile(localPath(dir), JSON.stringify({ autoMemoryEnabled: false }));
+    const r = await connect({ cwd: dir, yes: true, gitHook: false });
+    expect(r.commandeer).toBe(false);
+    expect(r.wired).toBe(10);
+    const settings = JSON.parse(await readFile(r.path, "utf8")) as {
+      autoMemoryDirectory?: string;
+      hooks: Record<string, unknown[]>;
+    };
+    expect(settings.autoMemoryDirectory).toBeUndefined();
+    expect(settings.hooks.PreToolUse).toBeUndefined();
+  });
+
+  it("does NOT commandeer in a fresh non-KB dir (no docs root resolves)", async () => {
+    const r = await connect({ cwd: await freshDir(), yes: true });
+    expect(r.commandeer).toBe(false);
+    expect(r.wired).toBe(10);
+  });
+
   it("merges into a pre-existing file preserving its content + makes a .bak", async () => {
     const dir = await freshDir();
     await mkdir(join(dir, ".claude"), { recursive: true });

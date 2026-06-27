@@ -5,7 +5,7 @@ import { gitInit } from "../git.js";
 import { resolveHooksDir } from "../git-hooks.js";
 import { connect } from "./connect.js";
 import { disconnect } from "./disconnect.js";
-import { tmpDir } from "../../test/fixtures/kb.js";
+import { tmpDir, withKb } from "../../test/fixtures/kb.js";
 
 function localPath(dir: string): string {
   return join(dir, ".claude", "settings.local.json");
@@ -53,6 +53,24 @@ describe("disconnect", () => {
       .filter((id): id is string => typeof id === "string" && id.startsWith("mage:"));
     expect(ids).toHaveLength(0);
     expect(settings.hooks.SessionStart?.find((g) => g.hooks[0]?.command === "host-thing")).toBeTruthy();
+  });
+
+  it("unsets autoMemoryDirectory it set (commandeer round-trip)", async () => {
+    const { dir, root } = await withKb({ kind: "repo" });
+    const c = await connect({ cwd: dir, yes: true, gitHook: false });
+    expect(c.commandeer).toBe(true);
+    const wired = JSON.parse(await readFile(localPath(dir), "utf8")) as { autoMemoryDirectory?: string };
+    expect(wired.autoMemoryDirectory).toBe(root);
+
+    const r = await disconnect({ cwd: dir, yes: true, gitHook: false });
+    expect(r.autoMemoryUnset).toBe(true);
+    expect(r.removed).toBe(12); // all 12 mage groups (incl. the 2 commandeer)
+    const settings = JSON.parse(await readFile(localPath(dir), "utf8")) as {
+      autoMemoryDirectory?: string;
+      hooks?: unknown;
+    };
+    expect(settings.autoMemoryDirectory).toBeUndefined();
+    expect(settings.hooks).toBeUndefined(); // all mage groups gone → hooks pruned
   });
 
   it("disconnect on a missing file is a clean no-op", async () => {

@@ -8,6 +8,7 @@ import { join } from "node:path";
 import {
   type ClaudeSettings,
   diffMageHooks,
+  hasCommandeerHooks,
   readClaudeSettings,
   removeMageHooks,
   resolveSettingsTarget,
@@ -417,10 +418,14 @@ async function pushConnectionCheck(
  */
 async function refreshHookBlock(conn: Connection): Promise<MageDiff | null> {
   try {
+    // Preserve the commandeer tier across the strip+re-add if it was wired (detected by
+    // the mage:memory:* id family). --fix repairs drift; it must never silently strip
+    // Gate-0. A base-only block stays base.
+    const commandeer = hasCommandeerHooks(conn.settings);
     const cleared = removeMageHooks(conn.settings).settings;
-    const refreshed = upsertMageHooks(cleared);
+    const refreshed = upsertMageHooks(cleared, { commandeer });
     await writeClaudeSettings(conn.settingsPath, refreshed);
-    return diffMageHooks(refreshed);
+    return diffMageHooks(refreshed, { commandeer });
   } catch {
     return null;
   }

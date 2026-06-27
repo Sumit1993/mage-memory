@@ -105,6 +105,29 @@ describe("diffMageHooks", () => {
     expect(d.staleIds).toEqual([]);
   });
 
+  it("ignores commandeer rows by default — a base block still matches", () => {
+    const base = upsertMageHooks(null); // 10 base rows, no commandeer
+    const d = diffMageHooks(base); // default: commandeer not expected
+    expect(d.matches).toBe(true);
+    expect(d.missingIds).toEqual([]);
+  });
+
+  it("with commandeer:true, a base block reports the commandeer rows missing", () => {
+    const base = upsertMageHooks(null);
+    const d = diffMageHooks(base, { commandeer: true });
+    expect(d.matches).toBe(false);
+    expect(new Set(d.missingIds)).toEqual(
+      new Set(["mage:memory:PreToolUse", "mage:memory:PostToolUse"]),
+    );
+  });
+
+  it("with commandeer:true, a full commandeer block matches", () => {
+    const full = upsertMageHooks(null, { commandeer: true });
+    const d = diffMageHooks(full, { commandeer: true });
+    expect(d.matches).toBe(true);
+    expect(d.missingIds).toEqual([]);
+  });
+
   it("empty settings → not connected", () => {
     expect(diffMageHooks({})).toMatchObject({ connected: false, matches: false });
   });
@@ -340,8 +363,8 @@ describe("doctor env checks still run", () => {
     }
   });
 
-  it("MAGE_HOOKS length is the expected hook count used by the connection check", () => {
-    expect(MAGE_HOOKS.length).toBe(10);
+  it("MAGE_HOOKS length is the expected hook count (10 base + 2 commandeer)", () => {
+    expect(MAGE_HOOKS.length).toBe(12);
   });
 });
 
