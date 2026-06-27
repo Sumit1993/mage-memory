@@ -69,7 +69,7 @@ and a research artifact, and forcing them into hermetic tests would misrepresent
 | Harness | What it is | Status |
 |---|---|---|
 | `mage-gate0-spike/` | live native-write → Gate-0 scrub → MEMORY.md recall | **ported** → `gate0.live.test.ts` (proven on claude 2.1.195) |
-| `mage-spike-memory-deny/` | Gate-0 **denies** a write to a generated index | **ported** → `memory-deny.live.test.ts` |
+| `mage-spike-memory-deny/` | Gate-0 **denies** a write to a generated index | **ported** → `memory-deny.live.test.ts` (proven on claude 2.1.195) |
 | `mage-dogfood-0.0.10.sh` | pre-publish release smoke | **ported (hermetic parts)** → `release-smoke.integration.test.ts`. The live-KB read-only probes (doctor over your real repos) stay in the script — they depend on machine state. |
 | `mage-soak/` | a **cron monitor**: a read-only digest of organic lesson capture across your *live* KBs over time, vs a stamped baseline | **not a hermetic test** — left as a monitor. Its read-only-CLI invariants are already covered by unit tests. |
 | `mage-prove-20260619/` (`faultline-*.mjs`) | a **research harness**: replays log corpora to *measure* whether a proposed trigger fires (rates + samples for human scoring) — no pass/fail | **not a regression test** — left as a research artifact. |
