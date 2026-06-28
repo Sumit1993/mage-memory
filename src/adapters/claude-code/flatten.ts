@@ -31,28 +31,11 @@
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, relative, resolve, sep } from "node:path";
-import { type NoteFrontmatter, parseNote, stringifyNote } from "../../note.js";
+import { parseNote, stringifyNote } from "../../note.js";
 import { resolveDocsRoot } from "../../paths.js";
 import { isGeneratedArtifact } from "../../scan.js";
 import { run } from "../../shell.js";
-import { isCaptureInboxNote } from "./inbox.js";
-import { mapType } from "./schema-map.js";
-
-/** CC-only frontmatter keys — dropped (or extracted-then-dropped) on flatten. */
-const CC_ONLY_KEYS = new Set(["name", "description", "metadata"]);
-
-/** mage's canonical frontmatter key order, so flattened output matches authored notes. */
-const MAGE_KEY_ORDER = [
-  "type",
-  "tags",
-  "created",
-  "updated",
-  "last_reviewed",
-  "status",
-  "provenance",
-  "sources",
-  "keywords",
-] as const;
+import { isCcShaped, recoverCcFrontmatter } from "./cc-note.js";
 
 export interface FlattenResult {
   /** The flattened note text (or the input unchanged when nothing to do). */
@@ -62,118 +45,28 @@ export interface FlattenResult {
 }
 
 /**
- * True iff this frontmatter is a Claude Code capture worth flattening — i.e. it
- * still carries `metadata.node_type: memory`. A hand-authored mage note (no nested
- * `metadata`) NEVER matches, so flatten leaves it untouched. This is the single gate
- * that makes {@link flattenCcNote} idempotent: once flattened, the `metadata` wrapper
- * is gone, so a second pass is a no-op.
- */
-export function isCcShaped(fm: NoteFrontmatter): boolean {
-  return isCaptureInboxNote(fm);
-}
-
-/** First `YYYY-MM-DD` of a string- or Date-ish value, else undefined. */
-function isoDate(v: unknown): string | undefined {
-  // YAML 1.1 parses an UNQUOTED `created: 2026-06-01` (or a full timestamp) into a JS
-  // Date, not a string — accept both so a CC-restamped unquoted date is not lost.
-  if (v instanceof Date) return Number.isNaN(v.getTime()) ? undefined : v.toISOString().slice(0, 10);
-  if (typeof v !== "string") return undefined;
-  const m = v.match(/^\d{4}-\d{2}-\d{2}/);
-  return m ? m[0] : undefined;
-}
-
-/** Merge an existing `sources` array with a `cc-session:<id>` pointer, de-duped, order-stable. */
-function mergeSources(existing: unknown, sessionId: string | undefined): string[] | undefined {
-  const out: string[] = [];
-  const seen = new Set<string>();
-  const push = (s: unknown) => {
-    if (typeof s === "string" && s.length > 0 && !seen.has(s)) {
-      seen.add(s);
-      out.push(s);
-    }
-  };
-  if (Array.isArray(existing)) for (const s of existing) push(s);
-  if (sessionId) push(`cc-session:${sessionId}`);
-  return out.length > 0 ? out : undefined;
-}
-
-/**
  * Flatten one CC native-memory note's text to mage's neutral schema (FRONTMATTER ONLY;
  * the body is preserved verbatim). PURE + idempotent + fail-open. Returns the input
  * verbatim (changed:false) when the note is not CC-shaped or when parsing fails — so it
- * is always safe to run over an arbitrary tracked note.
+ * is always safe to run over an arbitrary tracked note. The CC-shape predicate and the
+ * field recovery both live in the cc-note adapter; this is the text↔text + git wrapper.
  */
 export function flattenCcNote(raw: string): FlattenResult {
-  let parsed: { frontmatter: NoteFrontmatter; body: string };
+  let parsed: ReturnType<typeof parseNote>;
   try {
     parsed = parseNote(raw);
   } catch {
     return { text: raw, changed: false }; // malformed YAML → leave it for the redaction gate / human
   }
-  const fm = parsed.frontmatter;
-  if (!isCcShaped(fm)) return { text: raw, changed: false };
+  if (!isCcShaped(parsed.frontmatter)) return { text: raw, changed: false };
 
-  const meta =
-    fm.metadata && typeof fm.metadata === "object" && !Array.isArray(fm.metadata)
-      ? (fm.metadata as Record<string, unknown>)
-      : {};
-
-  // Preserve every NON-CC top-level key verbatim (a groomed note's tags/status/
-  // provenance/keywords/unknown-vocab all survive); we re-derive type/created/sources.
-  const preserved: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(fm)) {
-    if (!CC_ONLY_KEYS.has(k) && v !== undefined) preserved[k] = v;
-  }
-
-  // RECOVER each mage field from the top level OR from under `metadata` — CC's
-  // restamp (observed live) buries the WHOLE authored frontmatter (tags,
-  // last_reviewed, sources, keywords, …) under `metadata`, not just its own keys.
-  // Top-level wins when present; otherwise pull the nested value. Only CC's internal
-  // discriminators (`node_type`, `originSessionId`) are never recovered.
-  const recover = (key: string): unknown =>
-    preserved[key] !== undefined ? preserved[key] : meta[key];
-
-  const sessionId = typeof meta.originSessionId === "string" ? meta.originSessionId : undefined;
-  const created = isoDate(recover("created"));
-  const sources = mergeSources(recover("sources"), sessionId);
-
-  // Assemble in mage's canonical key order; append any unknown-vocab keys after.
-  const out: NoteFrontmatter = {};
-  // type: a top-level (authored) type is kept as-is; a nested CC type is mapped.
-  out.type =
-    typeof preserved.type === "string" && preserved.type.trim()
-      ? preserved.type.trim()
-      : mapType(typeof meta.type === "string" ? meta.type : undefined);
-  const tags = recover("tags");
-  if (tags !== undefined) out.tags = tags as NoteFrontmatter["tags"];
-  if (created) out.created = created;
-  const updated = recover("updated");
-  if (updated !== undefined) out.updated = updated as string;
-  const lastReviewed = recover("last_reviewed");
-  if (lastReviewed !== undefined) out.last_reviewed = lastReviewed as string;
-  const status = recover("status");
-  if (status !== undefined) out.status = status as NoteFrontmatter["status"];
-  const provenance = recover("provenance");
-  if (provenance !== undefined) out.provenance = provenance as NoteFrontmatter["provenance"];
-  if (sources) out.sources = sources;
-  const keywords = recover("keywords");
-  if (keywords !== undefined) out.keywords = keywords as string[];
-
-  // Recover any OTHER authored open-vocab keys CC buried under metadata or left at
-  // top level, dropping only CC's internal discriminators + the keys handled above.
-  const HANDLED = new Set<string>([...MAGE_KEY_ORDER, "node_type", "originSessionId"]);
-  for (const [k, v] of Object.entries(meta)) {
-    if (!HANDLED.has(k) && !(k in out) && v !== undefined) out[k] = v;
-  }
-  for (const [k, v] of Object.entries(preserved)) {
-    if (!HANDLED.has(k) && v !== undefined) out[k] = v; // top-level authored extras win
-  }
+  const { frontmatter } = recoverCcFrontmatter(parsed.frontmatter);
 
   // Body preserved verbatim (only a trailing newline is ensured) — never rewritten.
   let body = parsed.body ?? "";
   if (!body.endsWith("\n")) body = `${body}\n`;
 
-  const text = stringifyNote(out, body);
+  const text = stringifyNote(frontmatter, body);
   return { text, changed: text !== raw };
 }
 

@@ -2,7 +2,7 @@
 
 # mage
 
-> 57 notes. Part of the [index](INDEX.md).
+> 58 notes. Part of the [index](INDEX.md).
 
 ### build
 
@@ -53,6 +53,7 @@
 - `decision` [0033 — Recall: `@import` the bounded root index into the host's auto-loaded context (the capture companion to ADR-0032)](decisions/0033-recall-import-bounded-index.md) — recall, import, at-import, claude-md, agents-md, index, bounded, root-index, progressive-disclosure, capability-adaptive, compaction _(proposed · reviewed 2026-06-25)_
 - `decision` [0034 — Adopt: a dispatcher for onboarding pre-existing knowledge](decisions/0034-adopt-preexisting-knowledge.md) — adopt, onboard, dispatcher, place, distill, in-shape, out-of-shape, never-a-copy, preexisting, native-memory, learn-from, routing _(proposed · reviewed 2026-06-27)_
 - `decision` [0035 — Notes are memories: one unified store; embrace the harness format at rest, normalize at the durable boundary](decisions/0035-decouple-harness-memory-from-notes.md) — notes-are-memories, unified-store, harness-format, embrace-at-rest, normalize-at-commit, posttooluse-flatten, groom-as-curation, scanner-tolerance, hard-earned-knowledge, write-update-recall, future-proof, restamp _(proposed · reviewed 2026-06-28)_
+- `decision` [0036 — Defer the `HarnessAdapter` seam until a second harness exists; consolidate CC note-shape into one named module now](decisions/0036-defer-harness-adapter-seam.md) — harness-adapter, seam, defer, hypothetical-seam, one-adapter, cc-note, neutral-core, multi-harness, premature-abstraction, second-harness, capture _(accepted)_
 
 ### design
 

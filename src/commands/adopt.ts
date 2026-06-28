@@ -1,7 +1,7 @@
 import { confirm } from "@inquirer/prompts";
 import { readFile, readdir, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
-import { isCaptureInboxNote } from "../adapters/claude-code/inbox.js";
+import { captureSessions, ccSessionId, isCcShaped } from "../adapters/claude-code/cc-note.js";
 import { discoverMemoryDirs } from "../adapters/claude-code/projects.js";
 import { resolveDecision } from "../interactive.js";
 import { logger } from "../logger.js";
@@ -95,13 +95,7 @@ export interface AdoptResult {
 
 /** in-shape = already authored as a note (CC marker OR mage note-frontmatter); else distill. */
 function inShape(fm: NoteFrontmatter): boolean {
-  return isCaptureInboxNote(fm) || (typeof fm.type === "string" && fm.type.trim().length > 0);
-}
-
-/** The CC session id a native memory was written under (drives idempotency identity). */
-function sessionOf(fm: NoteFrontmatter): string | undefined {
-  const meta = fm.metadata as { originSessionId?: unknown } | undefined;
-  return typeof meta?.originSessionId === "string" ? meta.originSessionId : undefined;
+  return isCcShaped(fm) || (typeof fm.type === "string" && fm.type.trim().length > 0);
 }
 
 function escapeRe(s: string): string {
@@ -126,13 +120,11 @@ async function existingIdentities(root: string): Promise<Map<string, Set<string>
     const slug = slugify(stem);
     // Committed notes + staged drafts carry the session in `sources: [cc-session:<id>]`
     // (mapInboxNote stamps it at ingest)…
-    for (const s of fm.sources ?? []) {
-      if (typeof s === "string" && s.startsWith("cc-session:")) addId(s.slice("cc-session:".length), slug);
-    }
+    for (const s of captureSessions(fm)) addId(s, slug);
     // …while a placed-but-ungroomed inbox capture still carries it RAW in
     // metadata.originSessionId — without this, re-running adopt before groom would
     // re-place (a duplicate) what is already sitting in the inbox.
-    const sess = sessionOf(fm);
+    const sess = ccSessionId(fm);
     if (sess) addId(sess, slug);
   };
   // scanNotes walks the whole root, so it already includes root-level inbox captures.
@@ -254,7 +246,7 @@ async function planAdopt(kb: ResolvedDocsRoot, opts: AdoptOptions): Promise<Adop
       }
       // Idempotency (ADR-0034 §5): this exact capture (cc-session + slug) is already
       // in — committed, staged, or sitting ungroomed in the inbox — so skip it.
-      if (alreadyAdopted(sessionOf(frontmatter), baseSlug, idx)) {
+      if (alreadyAdopted(ccSessionId(frontmatter), baseSlug, idx)) {
         result.skipped.push({ slug: baseSlug, reason: "already adopted (cc-session)" });
         continue;
       }

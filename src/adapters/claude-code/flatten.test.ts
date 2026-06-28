@@ -3,7 +3,8 @@ import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { withKb } from "../../../test/fixtures/kb.js";
 import { run } from "../../shell.js";
-import { flattenCcNote, flattenStagedNotes, flattenWorktreeNotes, isCcShaped } from "./flatten.js";
+import { flattenCcNote, flattenStagedNotes, flattenWorktreeNotes } from "./flatten.js";
+import { isCcShaped } from "./cc-note.js";
 import { parseNote } from "../../note.js";
 
 // ─── fixtures ────────────────────────────────────────────────────────────────

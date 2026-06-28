@@ -5,6 +5,7 @@ import {
   type Note,
   type NoteFrontmatter,
   deriveKeywords,
+  effectiveFrontmatter,
   noteTitle,
   noteWings,
   readNote,
@@ -170,7 +171,7 @@ function toScanned(fm: NoteFrontmatter, body: string, abs: string, relPath: stri
   // view (top-level wins, `metadata.*` as fallback) so index/dream/groom categorize it
   // correctly even before the durable-boundary flatten runs. Harness-neutral — a plain
   // nested read, no CC-specific vocab mapping (the neutral-core posture, ADR-0035 §6).
-  const efm = effectiveFm(fm);
+  const efm = effectiveFrontmatter(fm);
   // Multi-home: every tag-wing, primary first, with unsafe segments dropped so a
   // crafted tag like `../x` can never drive file creation or deletion.
   const wings = noteWings(efm).filter((w) => safeSegment(w.wing));
@@ -185,27 +186,6 @@ function toScanned(fm: NoteFrontmatter, body: string, abs: string, relPath: stri
     keywords: deriveKeywords(efm, body, abs),
     status: typeof efm.status === "string" ? efm.status : undefined,
     lastReviewed: typeof efm.last_reviewed === "string" ? efm.last_reviewed : undefined,
-  };
-}
-
-/**
- * A read-only view that surfaces a restamped note's nested `metadata.*` fields to the
- * top level (top-level always wins). Returns `fm` unchanged when there is no nested
- * `metadata` object. Never mutates the note on disk — only the durable-boundary flatten
- * rewrites the file; this is the transient-tolerant READ (ADR-0035 §3).
- */
-function effectiveFm(fm: NoteFrontmatter): NoteFrontmatter {
-  const meta = fm.metadata;
-  if (!meta || typeof meta !== "object" || Array.isArray(meta)) return fm;
-  const m = meta as Record<string, unknown>;
-  const pick = <T>(top: T, nested: unknown): T => (top !== undefined ? top : (nested as T));
-  return {
-    ...fm,
-    type: pick(fm.type, m.type),
-    tags: pick(fm.tags, m.tags),
-    status: pick(fm.status, m.status),
-    last_reviewed: pick(fm.last_reviewed, m.last_reviewed),
-    keywords: pick(fm.keywords, m.keywords),
   };
 }
 

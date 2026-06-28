@@ -1,6 +1,6 @@
 import { readdir } from "node:fs/promises";
 import { join, posix } from "node:path";
-import { isCaptureInboxNote } from "./adapters/claude-code/inbox.js";
+import { isCcShaped } from "./adapters/claude-code/cc-note.js";
 import { type Note, readNote } from "./note.js";
 import { type HubMetadata, PROJECTS_DIR, exists } from "./paths.js";
 import { type ScannedNote, scanNotes } from "./scan.js";
@@ -126,7 +126,7 @@ export async function analyzeDream(root: string, opts: DreamOptions = {}): Promi
     } catch {
       note = null;
     }
-    if (note && isCaptureInboxNote(note.frontmatter)) continue;
+    if (note && isCcShaped(note.frontmatter)) continue;
     scanned.push(s);
     bodies.set(s.relPath, note?.body ?? "");
   }

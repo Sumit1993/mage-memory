@@ -112,7 +112,7 @@ describe("memoryPreToolUse", () => {
     }
   });
 
-  it("scrubs only new_string on an Edit (a fragment — no schema-map)", async () => {
+  it("scrubs only new_string on an Edit (a fragment — no frontmatter map)", async () => {
     const kb = await withKb();
     const d = await memoryPreToolUse({
       hook_event_name: "PreToolUse",

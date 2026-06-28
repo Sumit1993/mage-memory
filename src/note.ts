@@ -107,6 +107,41 @@ export function stringifyNote(fm: NoteFrontmatter, body: string): string {
   return `---\n${yaml}---\n${body}`;
 }
 
+// ─── harness-neutral frontmatter reads (ADR-0035 §3 — no harness vocab here) ──
+
+/** First `YYYY-MM-DD` of a string- or Date-ish value, else undefined. */
+export function isoDate(v: unknown): string | undefined {
+  // YAML 1.1 parses an UNQUOTED `created: 2026-06-01` (or a full timestamp) into a JS
+  // Date, not a string — accept both so a restamped unquoted date is not lost.
+  if (v instanceof Date) return Number.isNaN(v.getTime()) ? undefined : v.toISOString().slice(0, 10);
+  if (typeof v !== "string") return undefined;
+  const m = v.match(/^\d{4}-\d{2}-\d{2}/);
+  return m ? m[0] : undefined;
+}
+
+/**
+ * A read-only view that surfaces a transiently-restamped note's nested `metadata.*`
+ * fields to the top level (top-level always wins), so `scan`/`dream`/`groom` categorize
+ * it correctly even before the durable-boundary flatten runs. Returns `fm` unchanged when
+ * there is no nested `metadata` object. HARNESS-NEUTRAL by design (ADR-0035 §6): a plain
+ * nested read, no harness vocab mapping — the cc-note adapter layers that on top. Never
+ * mutates the note on disk (only the durable flatten rewrites the file).
+ */
+export function effectiveFrontmatter(fm: NoteFrontmatter): NoteFrontmatter {
+  const meta = fm.metadata;
+  if (!meta || typeof meta !== "object" || Array.isArray(meta)) return fm;
+  const m = meta as Record<string, unknown>;
+  const pick = <T>(top: T, nested: unknown): T => (top !== undefined ? top : (nested as T));
+  return {
+    ...fm,
+    type: pick(fm.type, m.type),
+    tags: pick(fm.tags, m.tags),
+    status: pick(fm.status, m.status),
+    last_reviewed: pick(fm.last_reviewed, m.last_reviewed),
+    keywords: pick(fm.keywords, m.keywords),
+  };
+}
+
 // ─── derivations (used by `mage index`) ────────────────────────────────────
 
 /** First-segment of the first tag: `billing/payments` -> `billing`. Null if untagged. */
