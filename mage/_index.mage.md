@@ -2,7 +2,7 @@
 
 # mage
 
-> 54 notes. Part of the [index](INDEX.md).
+> 56 notes. Part of the [index](INDEX.md).
 
 ### build
 
@@ -52,10 +52,12 @@
 - `decision` [0032 — Capture-redirect: co-opt the host's native-memory write into mage's git-durable pipeline (relocation where the host allows it, coexist nudge as the floor)](decisions/0032-capture-redirect-native-memory.md) — capture, native-memory, automemorydirectory, relocation, coexist, nudge, redirect, staging, durability, claude-code, adapter, reflex _(proposed · reviewed 2026-06-25)_
 - `decision` [0033 — Recall: `@import` the bounded root index into the host's auto-loaded context (the capture companion to ADR-0032)](decisions/0033-recall-import-bounded-index.md) — recall, import, at-import, claude-md, agents-md, index, bounded, root-index, progressive-disclosure, capability-adaptive, compaction _(proposed · reviewed 2026-06-25)_
 - `decision` [0034 — Adopt: a dispatcher for onboarding pre-existing knowledge](decisions/0034-adopt-preexisting-knowledge.md) — adopt, onboard, dispatcher, place, distill, in-shape, out-of-shape, never-a-copy, preexisting, native-memory, learn-from, routing _(proposed · reviewed 2026-06-27)_
+- `decision` [0035 — Notes are memories: one unified store; embrace the harness format at rest, normalize at the durable boundary](decisions/0035-decouple-harness-memory-from-notes.md) — notes-are-memories, unified-store, harness-format, embrace-at-rest, normalize-at-commit, posttooluse-flatten, groom-as-curation, scanner-tolerance, hard-earned-knowledge, write-update-recall, future-proof, restamp _(proposed · reviewed 2026-06-28)_
 
 ### design
 
 - `reference` [mage — context & glossary](notes/context.md) — knowledge-base, note, wing, room, index, tag, moc, skill, work-unit, artifact, note-types, glossary _(reviewed 2026-06-09)_
+- `principle` [mage is one durable memory — of hard-earned knowledge](notes/mage-is-durable-memory.md) — charter, identity, unified-memory, durable, portable, notes-are-memories, hard-earned-knowledge, insight, procedure, gotcha, decision, pointer _(reviewed 2026-06-28)_
 
 ### grooming
 
