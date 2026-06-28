@@ -546,6 +546,30 @@
       ]
     },
     {
+      "name": "adopt",
+      "summary": "Onboard pre-existing Claude Code memories into this KB's capture inbox: place in-shape captures, report out-of-shape to distill (plan-first; never commits)",
+      "aliases": [],
+      "hidden": false,
+      "options": [
+        {
+          "flags": "-d, --dir <path>",
+          "description": "where to look for the knowledge base (default: cwd; walks up for in-repo)"
+        },
+        {
+          "flags": "--all",
+          "description": "whole-machine sweep: adopt memories for every KB they belong to, not just this one"
+        },
+        {
+          "flags": "--dry-run",
+          "description": "stop at the plan; write nothing"
+        },
+        {
+          "flags": "-y, --yes",
+          "description": "non-interactive: skip the confirmation prompt"
+        }
+      ]
+    },
+    {
       "name": "status",
       "summary": "Check per-machine link health for one or more code repos",
       "aliases": [],

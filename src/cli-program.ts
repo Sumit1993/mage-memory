@@ -1,4 +1,5 @@
 import { Command, Option } from "commander";
+import { adopt } from "./commands/adopt.js";
 import { autonomy } from "./commands/autonomy.js";
 import { connect, connectAllProjects } from "./commands/connect.js";
 import { dashboard } from "./commands/dashboard-cmd.js";
@@ -443,6 +444,26 @@ export function buildProgram(): Command {
     )
     .action(async (opts: { dir?: string }) => {
       reportMigrate(await mageMigrate({ dir: opts.dir }));
+    });
+
+  // ─── adopt ─────────────────────────────────────────────────────────────────
+  program
+    .command("adopt")
+    .description(
+      "Onboard pre-existing Claude Code memories into this KB's capture inbox: place in-shape captures, report out-of-shape to distill (plan-first; never commits)",
+    )
+    .option(
+      "-d, --dir <path>",
+      "where to look for the knowledge base (default: cwd; walks up for in-repo)",
+    )
+    .option(
+      "--all",
+      "whole-machine sweep: adopt memories for every KB they belong to, not just this one",
+    )
+    .option("--dry-run", "stop at the plan; write nothing")
+    .option("-y, --yes", "non-interactive: skip the confirmation prompt")
+    .action(async (opts: { dir?: string; all?: boolean; dryRun?: boolean; yes?: boolean }) => {
+      await adopt({ dir: opts.dir, all: opts.all, dryRun: opts.dryRun, yes: opts.yes });
     });
 
   // ─── status ────────────────────────────────────────────────────────────────

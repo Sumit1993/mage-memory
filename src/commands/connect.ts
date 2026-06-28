@@ -8,11 +8,21 @@ import {
   writeClaudeSettings,
   MAGE_HOOKS,
 } from "../adapters/claude-code/settings.js";
-import { resolveDecision } from "../interactive.js";
+import { discoverMemoryDirs } from "../adapters/claude-code/projects.js";
+import { adopt } from "./adopt.js";
+import { isInteractive, resolveDecision } from "../interactive.js";
 import { installRedactHook } from "../git-hooks.js";
 import { ensureGitignored } from "../gitignore.js";
 import { logger } from "../logger.js";
-import { absolutePath, exists, looksLikeHub, readHubMetadata, resolveDocsRoot } from "../paths.js";
+import {
+  type ResolvedDocsRoot,
+  absolutePath,
+  exists,
+  looksLikeHub,
+  ownedDocsRoots,
+  readHubMetadata,
+  resolveDocsRoot,
+} from "../paths.js";
 
 /** Options for {@link connect}. */
 export interface ConnectOptions {
@@ -27,6 +37,8 @@ export interface ConnectOptions {
    * toggleable — pass `false` to wire capture without the safety net. Default true.
    */
   gitHook?: boolean;
+  /** Claude Code config home for the commandeer-coverage check (tests inject a fake `~/.claude`). */
+  home?: string;
 }
 
 /** Result of {@link connect}. */
@@ -147,7 +159,60 @@ export async function connect(opts: ConnectOptions): Promise<ConnectResult> {
   // hook, so this is safe to attempt unconditionally. A non-repo cwd no-ops.
   const hook = opts.gitHook === false ? undefined : await installHook(opts.cwd ?? process.cwd());
 
+  // Commandeer-coverage (ADR-0034 §6-7): the redirect we just wired covers FUTURE
+  // captures for THIS cwd only, but CC keys memory by launch cwd — so sibling cwds
+  // (org root, hub, other repos) may already hold orphaned memories that resolve to
+  // this same KB. Surface them and, interactively, offer to adopt now. Fail-open and
+  // read-only here — we flag/offer but never reach into another cwd's settings.
+  if (commandeer && kb) {
+    await offerCommandeerCoverage(kb, { cwd: opts.cwd, yes: opts.yes, home: opts.home });
+  }
+
   return { path: target.path, scope: target.scope, wired, backedUp, commandeer, hook };
+}
+
+/**
+ * After commandeering, count the pre-existing CC memories whose recovered origin
+ * cwd resolves to THIS KB (the coverage map, ADR-0034 §7) and either offer to adopt
+ * them now (interactive) or print the nudge (non-interactive — connect never
+ * auto-adopts, ADR-0034 §6). Fully fail-open: a discovery hiccup never breaks a
+ * connect.
+ */
+async function offerCommandeerCoverage(
+  kb: ResolvedDocsRoot,
+  opts: { cwd?: string; yes?: boolean; home?: string },
+): Promise<void> {
+  try {
+    const owned = new Set(await ownedDocsRoots(kb));
+    const cwds = new Set<string>();
+    let orphans = 0;
+    for (const dir of await discoverMemoryDirs({ home: opts.home })) {
+      if (!dir.cwd) continue;
+      const originKb = await resolveDocsRoot(dir.cwd);
+      if (originKb && owned.has(originKb.root)) {
+        orphans += dir.files.length;
+        cwds.add(dir.cwd);
+      }
+    }
+    if (orphans === 0) return;
+
+    logger.info(
+      `Commandeer-coverage: up to ${orphans} pre-existing memor${orphans === 1 ? "y" : "ies"} ` +
+        `across ${cwds.size} cwd(s) map to this KB but predate the redirect.`,
+    );
+    if (!(isInteractive() && !opts.yes)) {
+      logger.detail("Run `mage adopt` to fold them into the inbox (you can do it later).");
+      return;
+    }
+    const adoptNow = await confirm({ message: `Adopt them now?`, default: true });
+    if (adoptNow) {
+      await adopt({ dir: opts.cwd, yes: true, home: opts.home });
+    } else {
+      logger.detail("Skipped — run `mage adopt` anytime to fold them in.");
+    }
+  } catch (err) {
+    logger.detail(`Commandeer-coverage check skipped: ${(err as Error).message}`);
+  }
 }
 
 /**

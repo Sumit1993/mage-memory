@@ -194,4 +194,18 @@ describe("mage dream — info-tier drift signals (never failures)", () => {
     const r2 = await analyzeDream(taggedHub, { now: NOW });
     expect(r2.untaggedNudge).toEqual([]);
   });
+
+  it("excludes ungroomed capture-inbox files (node_type: memory) from the health scan", async () => {
+    const dir = await vault();
+    await note(dir, "a.md", `---\ntags: [w/r]\nlast_reviewed: "${FRESH}"\n---\n# A\n\n## Relations\n- see_also [B](b.md)\n`);
+    await note(dir, "b.md", `---\ntags: [w/r]\nlast_reviewed: "${FRESH}"\n---\n# B\n\n## Relations\n- see_also [A](a.md)\n`);
+    // An ungroomed capture sitting at the docs-root top (placed by Gate-0/adopt): no
+    // links, no last_reviewed, no wing tag. It must NOT read as an orphan/stale/untagged.
+    await putRaw(dir, "deploy-runbook.md", '---\nname: ""\nmetadata:\n  node_type: memory\n  type: pointer\n---\n# Deploy runbook\n\nwhere it lives.\n');
+
+    const r = await analyzeDream(dir, { now: NOW, staleDays: 180 });
+    expect(r.clean).toBe(true);
+    expect(r.noteCount).toBe(2); // the capture is not a note yet
+    expect([...r.orphans, ...r.stale].some((f) => f.note.includes("deploy-runbook"))).toBe(false);
+  });
 });

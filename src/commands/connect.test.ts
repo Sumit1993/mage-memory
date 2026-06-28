@@ -444,3 +444,29 @@ describe("connect --all-projects (Decision 11C)", () => {
     );
   });
 });
+
+// ─── commandeer-coverage (ADR-0034 §6-7) ──────────────────────────────────────
+describe("connect commandeer-coverage", () => {
+  /** A fake `~/.claude/projects/<slug>/` with one in-shape memory + a transcript cwd. */
+  async function ccMemory(home: string, slug: string, cwd: string): Promise<void> {
+    const projectDir = join(home, "projects", slug);
+    await mkdir(join(projectDir, "memory"), { recursive: true });
+    await writeFile(
+      join(projectDir, "memory", "lesson.md"),
+      '---\nname: ""\nmetadata:\n  node_type: memory\n  type: gotcha\n  originSessionId: s\n---\n# Lesson\n\nbody.\n',
+    );
+    await writeFile(join(projectDir, "s.jsonl"), `${JSON.stringify({ cwd })}\n`);
+  }
+
+  it("non-interactive connect surfaces sibling-cwd orphans but NEVER auto-adopts", async () => {
+    const { dir, root, repo } = await withKb({ kind: "repo" });
+    const home = await tmpDir("cc-home");
+    // A sibling cwd whose memory resolves to THIS KB.
+    await ccMemory(home, "-sibling", repo);
+
+    const r = await connect({ cwd: dir, yes: true, gitHook: false, home });
+    expect(r.commandeer).toBe(true);
+    // §6: non-interactive connect prints the nudge only — it must not place anything.
+    expect(await exists(join(root, "lesson.md"))).toBe(false);
+  });
+});
