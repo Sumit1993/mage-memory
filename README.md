@@ -12,6 +12,12 @@
 > insight, procedure, and **pointers** to sources — never copies of sources —
 > navigable as an Obsidian graph and usable by any AI coding agent.
 
+Put plainly: **a note is a memory.** What your agent would otherwise re-learn
+every session — a gotcha, a convention, a decision — mage keeps as a durable note
+you own. mage isn't a knowledge base bolted *onto* your agent; it **is** your
+agent's memory, made durable, curated, portable, and shareable. And it keeps the
+memory worth keeping — hard-earned knowledge, not facts you can re-derive in seconds.
+
 [![CI](https://github.com/Sumit1993/mage-memory/actions/workflows/ci.yml/badge.svg)](https://github.com/Sumit1993/mage-memory/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/mage-memory?style=flat&logo=npm)](https://www.npmjs.com/package/mage-memory)
 ![License](https://img.shields.io/badge/License-MIT-blue?style=flat)

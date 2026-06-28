@@ -9,7 +9,8 @@ Every mage term in one place. Each links to the page where it is explained in fu
 
 | Term | Meaning |
 |---|---|
-| **note** | one committed markdown lesson under `notes/`: insight + procedure + pointers, never a copy of a source. See [Notes](../model/notes.md). |
+| **memory** | what your agent remembers across sessions. In mage, **a memory *is* a note** — there is no separate store. mage is the agent's memory, made durable, curated, portable, and shareable. See [The loop](../loop/overview.md). |
+| **note** | one such memory: a committed markdown unit of *hard-earned knowledge* under `notes/` — insight + procedure + pointers, never a copy of a source (not a fact you can re-derive in seconds). See [Notes](../model/notes.md). |
 | **compact-chapter** | one stretch of work between context compactions. mage counts *chapters*, not session ids — so one long, continuously-compacted chat still accrues recurrence. See [Promote and graduate](../loop/promote-graduate.md). |
 | **wing / room** | how the index is organised: a **wing** is a top-level grouping (by tag); a **room** is a sub-group within a wing. See [The graph](../model/graph.md). |
 | **learnings** (`.mage/learnings/`) | the raw, auto-pruned trail of session events — git-ignored, not knowledge yet. See [Capture](../loop/capture.md) and [The .mage/ layout](./layout.md). |
