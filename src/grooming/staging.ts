@@ -12,7 +12,7 @@
 // staged batch (exact key), and vs the reject ledger (exact key) + a bounded budget.
 
 import { mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import {
   type NoteFrontmatter,
   deriveKeywords,
@@ -161,11 +161,12 @@ function today(): string {
 // ─── stage: write a draft ──────────────────────────────────────────────────────
 
 /**
- * Write `.staging/<slug>.md`. The body must ALREADY be redacted by the caller
+ * Write `.staging/<slug>.md` (internal — callers cross {@link stageDraft}, which
+ * de-collides the slug first). The body must ALREADY be redacted by the caller
  * (`mage stage` scrubs it; drafts are pre-commit + git-ignored, Gate-2 still guards
  * the eventual `mage groom` commit). Returns the absolute path written.
  */
-export async function writeDraft(
+async function writeDraft(
   stagingDir: string,
   slug: string,
   fm: NoteFrontmatter,
@@ -175,6 +176,26 @@ export async function writeDraft(
   const path = join(stagingDir, `${slug}.md`);
   await writeNote(path, fm, body);
   return path;
+}
+
+/**
+ * Stage a composed draft: de-collide `slugBase` against `taken`, then write
+ * `.staging/<slug>.md`. The one write-side seam — both `mage stage` and the CC
+ * capture-inbox ingest cross it, so the "unique the slug BEFORE the write" invariant
+ * lives in one place. `taken` is the caller's collision scope: the on-disk staged
+ * slugs for a one-shot stage, or an accumulating set across an ingest batch. The body
+ * must already be redacted (see {@link writeDraft}). Returns the final slug + path.
+ */
+export async function stageDraft(
+  stagingDir: string,
+  slugBase: string,
+  fm: NoteFrontmatter,
+  body: string,
+  taken: ReadonlySet<string>,
+): Promise<{ slug: string; path: string }> {
+  const slug = uniqueSlug(slugBase, taken);
+  const path = await writeDraft(stagingDir, slug, fm, body);
+  return { slug, path };
 }
 
 // ─── list staged drafts (fail-open) ─────────────────────────────────────────────
@@ -209,8 +230,8 @@ export async function stagedSlugs(stagingDir: string): Promise<Set<string>> {
   return slugsIn(stagingDir);
 }
 
-/** Existing flat slugs in `notes/` (so a promotion never clobbers a committed note). */
-export async function existingNoteSlugs(docsRoot: string): Promise<Set<string>> {
+/** Existing flat slugs in `notes/` (so a promotion never clobbers a committed note). Internal: {@link promoteBatch} seeds its collision scope from this. */
+async function existingNoteSlugs(docsRoot: string): Promise<Set<string>> {
   return slugsIn(join(docsRoot, NOTES_DIR));
 }
 
@@ -258,7 +279,7 @@ export function dedupDraft(
  * (the staging file is then removed). Without a stamp it stays a byte-preserving
  * `rename` — the staged bytes are unchanged.
  */
-export async function promoteDraft(
+async function promoteDraft(
   docsRoot: string,
   draft: StagedDraft,
   taken: ReadonlySet<string>,
@@ -275,6 +296,29 @@ export async function promoteDraft(
     await rename(draft.path, dest);
   }
   return `${NOTES_DIR}/${finalSlug}.md`;
+}
+
+/**
+ * Promote a batch of staged drafts into `notes/` — the accept path. Owns the
+ * collision scope so callers don't: it seeds `taken` from the committed slugs (a
+ * promotion never clobbers a note) and adds each promoted slug, so two accepted
+ * drafts in one batch can't land on the same slug. With `stamp`, each note gets the
+ * ADR-0031 provenance stamp at this creation chokepoint. Returns the notes-relative
+ * paths, in selection order.
+ */
+export async function promoteBatch(
+  docsRoot: string,
+  drafts: StagedDraft[],
+  stamp?: ProvenanceStamp,
+): Promise<string[]> {
+  const taken = await existingNoteSlugs(docsRoot);
+  const accepted: string[] = [];
+  for (const draft of drafts) {
+    const rel = await promoteDraft(docsRoot, draft, taken, stamp);
+    taken.add(basename(rel, ".md")); // so two accepted drafts can't collide on a slug
+    accepted.push(rel);
+  }
+  return accepted;
 }
 
 /** Delete a staged draft file (idempotent). */

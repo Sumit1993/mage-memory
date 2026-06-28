@@ -24,9 +24,8 @@ import {
   readStagedDrafts,
   readStagedRejects,
   slugify,
+  stageDraft,
   stagedSlugs,
-  uniqueSlug,
-  writeDraft,
 } from "../grooming/staging.js";
 
 /** Options for {@link stageCmd}. */
@@ -121,8 +120,13 @@ export async function stageCmd(opts: StageOptions): Promise<StageResult> {
     return report({ staged: false, reason: verdict.reason, by: "by" in verdict ? verdict.by : undefined }, opts.json);
   }
 
-  const slug = uniqueSlug(slugBase, await stagedSlugs(stagingDir));
-  const path = await writeDraft(stagingDir, slug, frontmatter, bodyScrub.text);
+  const { slug, path } = await stageDraft(
+    stagingDir,
+    slugBase,
+    frontmatter,
+    bodyScrub.text,
+    await stagedSlugs(stagingDir),
+  );
   warnIfLong(bodyScrub.text, key, sig);
   return report({ staged: true, slug, path, key, redactions }, opts.json);
 }

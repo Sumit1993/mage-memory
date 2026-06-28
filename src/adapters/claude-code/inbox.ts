@@ -33,8 +33,8 @@ import {
   lessonCoveringNote,
   readStagedDrafts,
   slugify,
+  stageDraft,
   uniqueSlug,
-  writeDraft,
 } from "../../grooming/staging.js";
 import {
   type CcFrontmatter,
@@ -240,8 +240,7 @@ export async function ingestCaptureInbox(root: string): Promise<InboxIngestResul
         continue;
       }
 
-      const slug = uniqueSlug(slugify(stem), taken);
-      await writeDraft(stagingDir, slug, mapped.frontmatter, body);
+      const { slug } = await stageDraft(stagingDir, slugify(stem), mapped.frontmatter, body, taken);
       taken.add(slug);
       // Stage succeeded; now remove the source. If the rm fails, the capture is SAFE
       // (it is staged) — warn so the user clears the lingering root file before it is
