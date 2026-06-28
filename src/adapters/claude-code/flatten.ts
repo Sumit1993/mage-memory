@@ -1,0 +1,283 @@
+// Harness-format flatten (ADR-0035): normalize a Claude Code native-memory note
+// back to mage's neutral, flat note schema — at the DURABLE boundary, not at
+// write-time. ADR-0032 tried to win the format at the PreToolUse write; CC
+// re-normalizes a memory file's frontmatter AFTER the hook (and the restamp is
+// async — it can land after the tool returns), so that fight is unwinnable. The
+// durable layer instead becomes neutral here: the commit-time gate
+// ({@link flattenStagedNotes}) flattens any tracked CC-shaped note before it is
+// committed, so git is ALWAYS neutral no matter what shape the working tree holds.
+//
+// Two surfaces:
+//   - {@link flattenCcNote} — the PURE, idempotent text→text transform (the keystone).
+//   - {@link flattenStagedNotes} — the git plumbing that runs it over staged blobs
+//     and re-stages the result (mirrors staged-scan.ts / the Gate-2 redaction hook).
+//
+// SCOPE: flatten normalizes FRONTMATTER ONLY. CC's shape (observed, ADR-0032/0035) is
+// top-level `name`/`description` + nested `metadata: { node_type: memory, type,
+// originSessionId, created }`. We DROP the CC-only keys (`name`/`description`/`metadata`
+// wrapper, incl. `node_type`), promote the useful bits (`metadata.type` → `type`,
+// `metadata.originSessionId` → a `cc-session:` source), and PRESERVE every existing
+// mage field — so flattening a note already groomed (real `tags`/`status`/`provenance`)
+// never clobbers it. The BODY is left byte-for-byte intact: markdown is already neutral,
+// and an authored `[[wikilink]]` is Obsidian-native (ADR-0008) — rewriting it at the
+// durable boundary would MANGLE a legitimate note (the ADR Gate's KILL condition).
+// Body enrichment for a brand-new capture (H1 from name, description fold, flat-link
+// conversion) is the job of the fresh-capture ingest/groom path (inbox.ts mapInboxNote),
+// not this format normalizer. FAIL-OPEN: malformed/odd input returns unchanged.
+
+import { readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, relative, resolve, sep } from "node:path";
+import { type NoteFrontmatter, parseNote, stringifyNote } from "../../note.js";
+import { resolveDocsRoot } from "../../paths.js";
+import { isGeneratedArtifact } from "../../scan.js";
+import { run } from "../../shell.js";
+import { isCaptureInboxNote } from "./inbox.js";
+import { mapType } from "./schema-map.js";
+
+/** CC-only frontmatter keys — dropped (or extracted-then-dropped) on flatten. */
+const CC_ONLY_KEYS = new Set(["name", "description", "metadata"]);
+
+/** mage's canonical frontmatter key order, so flattened output matches authored notes. */
+const MAGE_KEY_ORDER = [
+  "type",
+  "tags",
+  "created",
+  "updated",
+  "last_reviewed",
+  "status",
+  "provenance",
+  "sources",
+  "keywords",
+] as const;
+
+export interface FlattenResult {
+  /** The flattened note text (or the input unchanged when nothing to do). */
+  text: string;
+  /** True iff `text` differs from the input — the caller re-stages only when true. */
+  changed: boolean;
+}
+
+/**
+ * True iff this frontmatter is a Claude Code capture worth flattening — i.e. it
+ * still carries `metadata.node_type: memory`. A hand-authored mage note (no nested
+ * `metadata`) NEVER matches, so flatten leaves it untouched. This is the single gate
+ * that makes {@link flattenCcNote} idempotent: once flattened, the `metadata` wrapper
+ * is gone, so a second pass is a no-op.
+ */
+export function isCcShaped(fm: NoteFrontmatter): boolean {
+  return isCaptureInboxNote(fm);
+}
+
+/** First `YYYY-MM-DD` of a string- or Date-ish value, else undefined. */
+function isoDate(v: unknown): string | undefined {
+  // YAML 1.1 parses an UNQUOTED `created: 2026-06-01` (or a full timestamp) into a JS
+  // Date, not a string — accept both so a CC-restamped unquoted date is not lost.
+  if (v instanceof Date) return Number.isNaN(v.getTime()) ? undefined : v.toISOString().slice(0, 10);
+  if (typeof v !== "string") return undefined;
+  const m = v.match(/^\d{4}-\d{2}-\d{2}/);
+  return m ? m[0] : undefined;
+}
+
+/** Merge an existing `sources` array with a `cc-session:<id>` pointer, de-duped, order-stable. */
+function mergeSources(existing: unknown, sessionId: string | undefined): string[] | undefined {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const push = (s: unknown) => {
+    if (typeof s === "string" && s.length > 0 && !seen.has(s)) {
+      seen.add(s);
+      out.push(s);
+    }
+  };
+  if (Array.isArray(existing)) for (const s of existing) push(s);
+  if (sessionId) push(`cc-session:${sessionId}`);
+  return out.length > 0 ? out : undefined;
+}
+
+/**
+ * Flatten one CC native-memory note's text to mage's neutral schema (FRONTMATTER ONLY;
+ * the body is preserved verbatim). PURE + idempotent + fail-open. Returns the input
+ * verbatim (changed:false) when the note is not CC-shaped or when parsing fails — so it
+ * is always safe to run over an arbitrary tracked note.
+ */
+export function flattenCcNote(raw: string): FlattenResult {
+  let parsed: { frontmatter: NoteFrontmatter; body: string };
+  try {
+    parsed = parseNote(raw);
+  } catch {
+    return { text: raw, changed: false }; // malformed YAML → leave it for the redaction gate / human
+  }
+  const fm = parsed.frontmatter;
+  if (!isCcShaped(fm)) return { text: raw, changed: false };
+
+  const meta =
+    fm.metadata && typeof fm.metadata === "object" && !Array.isArray(fm.metadata)
+      ? (fm.metadata as Record<string, unknown>)
+      : {};
+
+  // Preserve every NON-CC top-level key verbatim (a groomed note's tags/status/
+  // provenance/keywords/unknown-vocab all survive); we re-derive type/created/sources.
+  const preserved: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(fm)) {
+    if (!CC_ONLY_KEYS.has(k) && v !== undefined) preserved[k] = v;
+  }
+
+  const type =
+    typeof preserved.type === "string" && preserved.type.trim()
+      ? preserved.type.trim()
+      : mapType(typeof meta.type === "string" ? meta.type : undefined);
+  const created = isoDate(preserved.created) ?? isoDate(meta.created);
+  const sessionId = typeof meta.originSessionId === "string" ? meta.originSessionId : undefined;
+  const sources = mergeSources(preserved.sources, sessionId);
+
+  // Assemble in mage's canonical key order; append any unknown-vocab keys after.
+  const out: NoteFrontmatter = {};
+  out.type = type;
+  if (preserved.tags !== undefined) out.tags = preserved.tags as NoteFrontmatter["tags"];
+  if (created) out.created = created;
+  if (preserved.updated !== undefined) out.updated = preserved.updated as string;
+  if (preserved.last_reviewed !== undefined) out.last_reviewed = preserved.last_reviewed as string;
+  if (preserved.status !== undefined) out.status = preserved.status as NoteFrontmatter["status"];
+  if (preserved.provenance !== undefined)
+    out.provenance = preserved.provenance as NoteFrontmatter["provenance"];
+  if (sources) out.sources = sources;
+  if (preserved.keywords !== undefined) out.keywords = preserved.keywords as string[];
+  const placed = new Set<string>(MAGE_KEY_ORDER);
+  for (const [k, v] of Object.entries(preserved)) {
+    if (!placed.has(k)) out[k] = v;
+  }
+
+  // Body preserved verbatim (only a trailing newline is ensured) — never rewritten.
+  let body = parsed.body ?? "";
+  if (!body.endsWith("\n")) body = `${body}\n`;
+
+  const text = stringifyNote(out, body);
+  return { text, changed: text !== raw };
+}
+
+// ─── commit-time gate (mirrors staged-scan.ts scope discipline) ────────────────
+
+export interface FlattenStagedResult {
+  /** Repo-relative POSIX paths whose staged note was flattened (worktree or index). */
+  flattened: string[];
+}
+
+let flattenSeq = 0;
+
+/**
+ * Flatten the INDEX blob for `file` WITHOUT touching the worktree — used for a file
+ * that has unstaged worktree edits, so we normalize the durable (staged) layer while
+ * leaving the user's in-progress edits intact. Writes a fresh blob (`hash-object -w`,
+ * with `--path` so any clean filter matches how git would store it) and points the
+ * index entry at it (`update-index --cacheinfo`, preserving the file mode). Fail-open.
+ */
+async function restageIndexBlob(top: string, file: string, text: string): Promise<boolean> {
+  const ls = await run("git", ["-C", top, "ls-files", "--stage", "--", file]);
+  if (ls.code !== 0) return false;
+  const mode = ls.stdout.trim().split(/\s+/)[0];
+  if (!/^\d{6}$/.test(mode ?? "")) return false;
+  const tmp = join(tmpdir(), `mage-flatten-${process.pid}-${flattenSeq++}.md`);
+  try {
+    await writeFile(tmp, text);
+    const hash = await run("git", ["-C", top, "hash-object", "-w", "--path", file, tmp]);
+    if (hash.code !== 0) return false;
+    const sha = hash.stdout.trim();
+    if (!/^[0-9a-f]{40,64}$/.test(sha)) return false;
+    const upd = await run("git", ["-C", top, "update-index", "--cacheinfo", `${mode},${sha},${file}`]);
+    return upd.code === 0;
+  } finally {
+    await rm(tmp, { force: true }).catch(() => {});
+  }
+}
+
+/**
+ * Flatten every TRACKED, STAGED, CC-shaped note under the mage docs root, re-staging
+ * each — the durable-boundary normalizer the pre-commit hook drives (`mage flatten
+ * --staged`). SCOPE mirrors staged-scan.ts: only staged files under the docs root,
+ * skipping mage's own generated artifacts. The guarantee (git is always neutral) holds
+ * for EVERY staged note:
+ *   - a CLEAN note (worktree == index) is flattened in the worktree and re-added, so
+ *     `git status` stays clean afterwards;
+ *   - a DIRTY note (unstaged worktree edits present) is flattened in the INDEX ONLY, so
+ *     the durable/staged blob is neutral while the user's unstaged edits are untouched.
+ * Paths are resolved against the git TOPLEVEL (git's `--name-only` output is
+ * toplevel-relative), so a manual run from a subdirectory works too. FAIL-OPEN end to
+ * end: missing git / non-repo / no-KB yields an empty result, any per-file error skips
+ * that file, and if the dirtiness probe fails we treat ALL files as dirty (index-only —
+ * the safe direction that never overwrites a worktree edit). A normalizer must NEVER
+ * block or break a commit (the hook also guards with `|| true`).
+ */
+export async function flattenStagedNotes(repoPath: string): Promise<FlattenStagedResult> {
+  const empty: FlattenStagedResult = { flattened: [] };
+  const docs = await resolveDocsRoot(repoPath).catch(() => null);
+  if (!docs) return empty;
+
+  // git diff --name-only emits TOPLEVEL-relative paths; resolve the toplevel once and
+  // use it as the base for every git op AND every worktree write.
+  const topRes = await run("git", ["-C", repoPath, "rev-parse", "--show-toplevel"]);
+  if (topRes.code !== 0) return empty;
+  const top = topRes.stdout.trim();
+  if (!top) return empty;
+
+  const prefix = relative(top, docs.root).split(sep).join("/");
+  const inScope =
+    prefix === "" || prefix === "."
+      ? () => true
+      : (f: string) => f === prefix || f.startsWith(`${prefix}/`);
+  const toDocsRel =
+    prefix === "" || prefix === "."
+      ? (f: string) => f
+      : (f: string) => (f.startsWith(`${prefix}/`) ? f.slice(prefix.length + 1) : f);
+
+  const list = await run("git", [
+    "-C",
+    top,
+    "diff",
+    "--cached",
+    "--name-only",
+    "--diff-filter=ACM",
+    "-z",
+  ]);
+  if (list.code !== 0) return empty;
+  const staged = list.stdout
+    .split("\0")
+    .filter((l) => l.length > 0)
+    .filter(inScope)
+    .filter((f) => !isGeneratedArtifact(toDocsRel(f)));
+  if (staged.length === 0) return empty;
+
+  // Files with UNSTAGED worktree edits take the index-only path. If the probe itself
+  // FAILS, treat everything as dirty (index-only) — never risk overwriting a worktree edit.
+  const probe = await run("git", ["-C", top, "diff", "--name-only", "-z"]);
+  const probeFailed = probe.code !== 0;
+  const dirty = new Set(probeFailed ? [] : probe.stdout.split("\0").filter((l) => l.length > 0));
+
+  const result: FlattenStagedResult = { flattened: [] };
+  for (const file of staged) {
+    try {
+      const isDirty = probeFailed || dirty.has(file);
+      // Source to flatten: a clean file's worktree == index (read it directly, preserving
+      // its exact bytes/line-endings); a dirty file must use the staged index blob.
+      let srcText: string;
+      if (isDirty) {
+        const blob = await run("git", ["-C", top, "show", `:${file}`]);
+        if (blob.code !== 0) continue; // deleted/renamed race — skip, don't abort.
+        srcText = blob.stdout;
+      } else {
+        srcText = await readFile(resolve(top, file), "utf8");
+      }
+      const { text, changed } = flattenCcNote(srcText);
+      if (!changed) continue; // not CC-shaped / already flat → nothing to do.
+      if (isDirty) {
+        if (await restageIndexBlob(top, file, text)) result.flattened.push(file);
+      } else {
+        await writeFile(resolve(top, file), text);
+        const add = await run("git", ["-C", top, "add", "--", file]);
+        if (add.code === 0) result.flattened.push(file);
+      }
+    } catch {
+      // Fail-open per file: a single pathological note never breaks the commit.
+    }
+  }
+  return result;
+}

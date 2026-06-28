@@ -1,10 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  type CcMemoryNote,
-  mapCcMemoryToMageNote,
-  mapType,
-  rewriteWikilinks,
-} from "./schema-map.js";
+import { deKebab, mapType, rewriteWikilinks } from "./schema-map.js";
 
 describe("mapType", () => {
   it("aliases the known CC metadata types", () => {
@@ -39,68 +34,13 @@ describe("rewriteWikilinks", () => {
   });
 });
 
-describe("mapCcMemoryToMageNote", () => {
-  const cc: CcMemoryNote = {
-    frontmatter: {
-      name: "wsl-rancher-container-gotchas",
-      description: "Rancher Desktop on WSL needs the moby engine, not containerd.",
-      metadata: {
-        node_type: "memory",
-        type: "reference",
-        originSessionId: "abc-123-uuid",
-      },
-    },
-    body: "**Symptom:** pods stuck pending. See [[de-tell-lens-dominates]].",
-  };
-
-  it("maps name → slug and a de-kebabbed H1 title", () => {
-    const r = mapCcMemoryToMageNote(cc, { wing: "mage" });
-    expect(r.slug).toBe("wsl-rancher-container-gotchas");
-    expect(r.body.startsWith("# Wsl rancher container gotchas")).toBe(true);
+describe("deKebab", () => {
+  it("turns a kebab/underscore slug into a readable, capitalized title", () => {
+    expect(deKebab("wsl-rancher-container-gotchas")).toBe("Wsl rancher container gotchas");
+    expect(deKebab("quick_note")).toBe("Quick note");
   });
-
-  it("maps metadata.type → mage type and drops node_type", () => {
-    const r = mapCcMemoryToMageNote(cc, { wing: "mage" });
-    expect(r.frontmatter.type).toBe("pointer");
-    expect(r.frontmatter).not.toHaveProperty("node_type");
-    expect(JSON.stringify(r.frontmatter)).not.toContain("memory"); // node_type discriminator gone
-  });
-
-  it("folds the description into the body lead (mage has no description field)", () => {
-    const r = mapCcMemoryToMageNote(cc, { wing: "mage" });
-    expect(r.body).toContain("Rancher Desktop on WSL needs the moby engine");
-    expect(r.frontmatter).not.toHaveProperty("description");
-  });
-
-  it("rewrites body wikilinks to flat relative links", () => {
-    const r = mapCcMemoryToMageNote(cc, { wing: "mage" });
-    expect(r.body).toContain("[de-tell-lens-dominates](de-tell-lens-dominates.md)");
-    expect(r.body).not.toContain("[[");
-  });
-
-  it("routes originSessionId to a sources pointer (not provenance)", () => {
-    const r = mapCcMemoryToMageNote(cc, { wing: "mage" });
-    expect(r.frontmatter.sources).toEqual(["cc-session:abc-123-uuid"]);
-    expect(r.frontmatter.provenance).toBeUndefined();
-  });
-
-  it("best-guesses the wing tag from ctx.wing (groom confirms it)", () => {
-    const r = mapCcMemoryToMageNote(cc, { wing: "mage" });
-    expect(r.frontmatter.tags).toContain("mage");
-  });
-
-  it("never stamps promote-time fields (status / last_reviewed / provenance)", () => {
-    const r = mapCcMemoryToMageNote(cc, { wing: "mage", created: "2026-06-27" });
-    expect(r.frontmatter.status).toBeUndefined();
-    expect(r.frontmatter.last_reviewed).toBeUndefined();
-    expect(r.frontmatter.provenance).toBeUndefined();
-    expect(r.frontmatter.created).toBe("2026-06-27");
-  });
-
-  it("handles a minimal note (no description, no metadata) without throwing", () => {
-    const r = mapCcMemoryToMageNote({ frontmatter: { name: "quick-note" }, body: "a body" });
-    expect(r.slug).toBe("quick-note");
-    expect(r.frontmatter.type).toBe("note");
-    expect(r.frontmatter.sources).toBeUndefined();
+  it("returns empty string for an empty/whitespace name", () => {
+    expect(deKebab("")).toBe("");
+    expect(deKebab("   ")).toBe("");
   });
 });

@@ -466,6 +466,22 @@
       ]
     },
     {
+      "name": "flatten",
+      "summary": "Normalize staged harness-shaped (Claude Code) notes to mage's flat schema at the commit boundary (ADR-0035); pairs with the redaction pre-commit hook. Never blocks.",
+      "aliases": [],
+      "hidden": true,
+      "options": [
+        {
+          "flags": "--staged",
+          "description": "flatten staged git changes (the pre-commit normalizer)"
+        },
+        {
+          "flags": "--quiet",
+          "description": "suppress the report"
+        }
+      ]
+    },
+    {
       "name": "link",
       "summary": "Link this code repo to an existing hub (auto-detects storage based on mage/ content)",
       "aliases": [],

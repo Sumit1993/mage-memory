@@ -175,11 +175,27 @@ function toScanned(fm: NoteFrontmatter, body: string, abs: string, relPath: stri
     wing: primary ? primary.wing : CROSS,
     room: primary ? primary.room : "",
     title: noteTitle(body, abs),
-    type: typeof fm.type === "string" && fm.type.trim() ? fm.type.trim() : "note",
+    // Dual-format tolerance (ADR-0035): a note CC has transiently restamped keeps its
+    // type under nested `metadata.type` (the durable boundary flattens it back to the
+    // top level at commit). Read the top level first, then that fallback, so the index
+    // reflects a sensible type even before flatten runs. Untagged CC captures still
+    // index as cross-cutting (CC carries no `tags`) — `mage groom` assigns the wing.
+    type: scannedType(fm),
     keywords: deriveKeywords(fm, body, abs),
     status: typeof fm.status === "string" ? fm.status : undefined,
     lastReviewed: typeof fm.last_reviewed === "string" ? fm.last_reviewed : undefined,
   };
+}
+
+/** Top-level `type`, else a transiently-restamped note's nested `metadata.type`, else "note". */
+function scannedType(fm: NoteFrontmatter): string {
+  if (typeof fm.type === "string" && fm.type.trim()) return fm.type.trim();
+  const meta = fm.metadata;
+  if (meta && typeof meta === "object" && !Array.isArray(meta)) {
+    const t = (meta as Record<string, unknown>).type;
+    if (typeof t === "string" && t.trim()) return t.trim();
+  }
+  return "note";
 }
 
 function toPosix(p: string): string {

@@ -260,10 +260,14 @@ async function ensureSinkIgnores(startDir: string): Promise<void> {
 async function installHook(repo: string): Promise<{ installed: boolean; reason?: string }> {
   const r = await installRedactHook(repo);
   if (r.installed) {
-    logger.success("Installed the redaction pre-commit hook (mage redact --check --staged)");
+    logger.success(
+      r.reason === "upgraded"
+        ? "Upgraded the mage pre-commit hook (now flattens harness-shaped notes + redaction check)"
+        : "Installed the mage pre-commit hook (flatten harness-shaped notes + mage redact --check --staged)",
+    );
   } else if (r.reason === "exists-foreign") {
     logger.warn(
-      "A pre-commit hook already exists — add `mage redact --check --staged` to it for staged-secret blocking.",
+      "A pre-commit hook already exists — add `mage flatten --staged --quiet || true` then `mage redact --check --staged` to it for note normalization + staged-secret blocking.",
     );
   } else if (r.reason === "already") {
     logger.detail("Redaction pre-commit hook already present.");

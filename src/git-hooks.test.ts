@@ -39,6 +39,16 @@ describe("REDACT_HOOK_BODY", () => {
     expect(REDACT_HOOK_BODY).toContain("exit 1");
   });
 
+  it("flattens harness-shaped notes BEFORE the redact check, non-blocking (ADR-0035)", () => {
+    expect(REDACT_HOOK_BODY).toContain("mage flatten --staged");
+    const flattenIdx = REDACT_HOOK_BODY.indexOf("mage flatten --staged");
+    const checkIdx = REDACT_HOOK_BODY.indexOf("mage redact --check --staged");
+    expect(flattenIdx).toBeGreaterThanOrEqual(0);
+    expect(flattenIdx).toBeLessThan(checkIdx); // flatten re-stages, THEN redact scans the result.
+    // flatten must never block a commit — it is guarded `|| true`.
+    expect(REDACT_HOOK_BODY).toMatch(/mage flatten --staged[^\n]*\|\| true/);
+  });
+
   it("fails open (exit 0) when mage is not on PATH instead of false-blocking the commit", () => {
     // The guard must precede the redact check and skip rather than block on 127.
     expect(REDACT_HOOK_BODY).toContain("command -v mage");
@@ -97,6 +107,23 @@ describe("installRedactHook", () => {
     const r2 = await installRedactHook(repo);
     expect(r2.installed).toBe(false);
     expect(r2.reason).toBe("already");
+  });
+
+  it("upgrades a STALE mage-authored hook in place -> {installed:true, reason:'upgraded'}", async () => {
+    const repo = await freshRepo();
+    const hooksDir = await resolveHooksDir(repo);
+    const hookPath = join(hooksDir as string, "pre-commit");
+    // An older mage hook: carries OUR marker but a pre-ADR-0035 body (no flatten step).
+    const stale = `#!/bin/sh\n# ${REDACT_HOOK_MARKER} — old\nmage redact --check --staged\n`;
+    await writeFile(hookPath, stale);
+
+    const r = await installRedactHook(repo);
+    expect(r.installed).toBe(true);
+    expect(r.reason).toBe("upgraded");
+    // Body is now the current one (with the flatten step).
+    const body = await readFile(hookPath, "utf8");
+    expect(body).toBe(REDACT_HOOK_BODY);
+    expect(body).toContain("mage flatten --staged");
   });
 
   it("foreign pre-commit hook -> 'exists-foreign' and the foreign file is left untouched", async () => {

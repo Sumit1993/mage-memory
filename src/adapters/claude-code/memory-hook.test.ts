@@ -56,19 +56,18 @@ describe("memoryPreToolUse", () => {
     }
   });
 
-  it("REWRITES a flat topic-note write: scrubs + schema-maps in-flight", async () => {
+  it("REWRITES a flat topic-note write: scrubs ONLY, leaving the frontmatter to the durable boundary (ADR-0035)", async () => {
     const kb = await withKb();
     const d = await memoryPreToolUse(preWrite(kb.dir, join(kb.root, "my-lesson.md"), CC_NOTE));
     expect(d.kind).toBe("rewrite");
     if (d.kind !== "rewrite") return;
-    expect(d.slug).toBe("my-lesson");
+    expect(d.slug).toBe("my-lesson"); // slug from the filename, not a frontmatter map.
     const content = d.updatedInput.content as string;
-    // schema-mapped: native metadata.type "reference" → mage type "pointer", H1 from name,
-    // description folded into the body, node_type discriminator dropped.
-    expect(content).toContain("type: pointer");
-    expect(content).toContain("# My lesson");
-    expect(content).toContain("Rancher needs the moby engine");
-    expect(content).not.toContain("node_type");
+    // Gate-0 no longer reshapes the frontmatter — CC's shape passes through verbatim
+    // (no secrets here). Normalization to mage's schema happens at `mage flatten --staged`.
+    expect(content).toBe(CC_NOTE);
+    expect(content).toContain("node_type: memory");
+    expect(content).toContain("type: reference");
     // updatedInput echoes the original keys (CC replaces the whole tool_input).
     expect(d.updatedInput.file_path).toBe(join(kb.root, "my-lesson.md"));
   });
@@ -85,9 +84,9 @@ describe("memoryPreToolUse", () => {
   });
 
   it("still scrubs when the frontmatter is malformed YAML (never falls through unscrubbed)", async () => {
-    // Malformed frontmatter makes parseNote throw; Gate-0 must NOT let that escape to
-    // the fail-open sink (which would write the ORIGINAL content) — it scrubs the raw
-    // bytes instead, so the embedded secret never reaches disk.
+    // Scrub-only Gate-0 (ADR-0035) redacts the RAW bytes — no YAML parse — so even
+    // malformed frontmatter can never make us fall through to the fail-open sink (which
+    // would write the ORIGINAL content); the embedded secret never reaches disk.
     const kb = await withKb();
     const broken = `---\nname: "unterminated\nmetadata: [oops\n---\ntoken AKIA1234567890ABCD56 leaked here\n`;
     const d = await memoryPreToolUse(preWrite(kb.dir, join(kb.root, "broken.md"), broken));

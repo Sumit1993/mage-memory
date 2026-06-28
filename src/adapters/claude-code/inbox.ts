@@ -104,8 +104,11 @@ export function isCaptureInboxNote(fm: NoteFrontmatter): boolean {
   return !!meta && typeof meta === "object" && meta.node_type === CC_MEMORY_NODE_TYPE;
 }
 
-/** First `YYYY-MM-DD` of a string-ish value, else undefined. */
+/** First `YYYY-MM-DD` of a string- or Date-ish value, else undefined. */
 function isoDate(v: unknown): string | undefined {
+  // YAML 1.1 parses an UNQUOTED `created: 2026-06-01` into a JS Date, not a string —
+  // accept both so an unquoted-date capture keeps its date (parity with flatten.ts).
+  if (v instanceof Date) return Number.isNaN(v.getTime()) ? undefined : v.toISOString().slice(0, 10);
   if (typeof v !== "string") return undefined;
   const m = v.match(/^\d{4}-\d{2}-\d{2}/);
   return m ? m[0] : undefined;

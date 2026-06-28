@@ -7,6 +7,7 @@ import { OPEN_WITH_TARGETS } from "./dashboard/html.js";
 import { disconnect } from "./commands/disconnect.js";
 import { distillCmd } from "./commands/distill-cmd.js";
 import { doctor } from "./commands/doctor.js";
+import { flattenCmd } from "./commands/flatten.js";
 import { dream } from "./commands/dream-cmd.js";
 import { groomCmd } from "./commands/groom-cmd.js";
 import { index } from "./commands/index-cmd.js";
@@ -350,6 +351,18 @@ export function buildProgram(): Command {
         if (result.blocked) process.exit(2);
       },
     );
+
+  // ─── flatten ───────────────────────────────────────────────────────────────────
+  program
+    .command("flatten", { hidden: true })
+    .description(
+      "Normalize staged harness-shaped (Claude Code) notes to mage's flat schema at the commit boundary (ADR-0035); pairs with the redaction pre-commit hook. Never blocks.",
+    )
+    .option("--staged", "flatten staged git changes (the pre-commit normalizer)")
+    .option("--quiet", "suppress the report")
+    .action(async (opts: { staged?: boolean; quiet?: boolean }) => {
+      await flattenCmd({ staged: opts.staged, quiet: opts.quiet });
+    });
 
   // ─── link ──────────────────────────────────────────────────────────────────
   program
