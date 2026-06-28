@@ -12,13 +12,16 @@
 //   - {@link flattenStagedNotes} — the git plumbing that runs it over staged blobs
 //     and re-stages the result (mirrors staged-scan.ts / the Gate-2 redaction hook).
 //
-// SCOPE: flatten normalizes FRONTMATTER ONLY. CC's shape (observed, ADR-0032/0035) is
-// top-level `name`/`description` + nested `metadata: { node_type: memory, type,
-// originSessionId, created }`. We DROP the CC-only keys (`name`/`description`/`metadata`
-// wrapper, incl. `node_type`), promote the useful bits (`metadata.type` → `type`,
-// `metadata.originSessionId` → a `cc-session:` source), and PRESERVE every existing
-// mage field — so flattening a note already groomed (real `tags`/`status`/`provenance`)
-// never clobbers it. The BODY is left byte-for-byte intact: markdown is already neutral,
+// SCOPE: flatten normalizes FRONTMATTER ONLY. CC's restamp (observed live) buries the
+// WHOLE authored frontmatter under `metadata` and blanks `name` — e.g. `name: ""` +
+// `metadata: { node_type: memory, type, tags, created, last_reviewed, sources, keywords }`.
+// So flatten RECOVERS every mage field from the top level OR from under `metadata`
+// (top-level wins), dropping only CC's internal discriminators (`node_type`,
+// `originSessionId`) and the `name`/`description`/`metadata` wrapper;
+// `metadata.originSessionId` becomes a `cc-session:` source. Recovery (not mere
+// top-level preservation) is load-bearing: a restamped authored/groomed note would
+// otherwise lose its tags, last_reviewed, sources, and keywords at the durable
+// boundary. The BODY is left byte-for-byte intact: markdown is already neutral,
 // and an authored `[[wikilink]]` is Obsidian-native (ADR-0008) — rewriting it at the
 // durable boundary would MANGLE a legitimate note (the ADR Gate's KILL condition).
 // Body enrichment for a brand-new capture (H1 from name, description fold, flat-link
@@ -122,29 +125,48 @@ export function flattenCcNote(raw: string): FlattenResult {
     if (!CC_ONLY_KEYS.has(k) && v !== undefined) preserved[k] = v;
   }
 
-  const type =
-    typeof preserved.type === "string" && preserved.type.trim()
-      ? preserved.type.trim()
-      : mapType(typeof meta.type === "string" ? meta.type : undefined);
-  const created = isoDate(preserved.created) ?? isoDate(meta.created);
+  // RECOVER each mage field from the top level OR from under `metadata` — CC's
+  // restamp (observed live) buries the WHOLE authored frontmatter (tags,
+  // last_reviewed, sources, keywords, …) under `metadata`, not just its own keys.
+  // Top-level wins when present; otherwise pull the nested value. Only CC's internal
+  // discriminators (`node_type`, `originSessionId`) are never recovered.
+  const recover = (key: string): unknown =>
+    preserved[key] !== undefined ? preserved[key] : meta[key];
+
   const sessionId = typeof meta.originSessionId === "string" ? meta.originSessionId : undefined;
-  const sources = mergeSources(preserved.sources, sessionId);
+  const created = isoDate(recover("created"));
+  const sources = mergeSources(recover("sources"), sessionId);
 
   // Assemble in mage's canonical key order; append any unknown-vocab keys after.
   const out: NoteFrontmatter = {};
-  out.type = type;
-  if (preserved.tags !== undefined) out.tags = preserved.tags as NoteFrontmatter["tags"];
+  // type: a top-level (authored) type is kept as-is; a nested CC type is mapped.
+  out.type =
+    typeof preserved.type === "string" && preserved.type.trim()
+      ? preserved.type.trim()
+      : mapType(typeof meta.type === "string" ? meta.type : undefined);
+  const tags = recover("tags");
+  if (tags !== undefined) out.tags = tags as NoteFrontmatter["tags"];
   if (created) out.created = created;
-  if (preserved.updated !== undefined) out.updated = preserved.updated as string;
-  if (preserved.last_reviewed !== undefined) out.last_reviewed = preserved.last_reviewed as string;
-  if (preserved.status !== undefined) out.status = preserved.status as NoteFrontmatter["status"];
-  if (preserved.provenance !== undefined)
-    out.provenance = preserved.provenance as NoteFrontmatter["provenance"];
+  const updated = recover("updated");
+  if (updated !== undefined) out.updated = updated as string;
+  const lastReviewed = recover("last_reviewed");
+  if (lastReviewed !== undefined) out.last_reviewed = lastReviewed as string;
+  const status = recover("status");
+  if (status !== undefined) out.status = status as NoteFrontmatter["status"];
+  const provenance = recover("provenance");
+  if (provenance !== undefined) out.provenance = provenance as NoteFrontmatter["provenance"];
   if (sources) out.sources = sources;
-  if (preserved.keywords !== undefined) out.keywords = preserved.keywords as string[];
-  const placed = new Set<string>(MAGE_KEY_ORDER);
+  const keywords = recover("keywords");
+  if (keywords !== undefined) out.keywords = keywords as string[];
+
+  // Recover any OTHER authored open-vocab keys CC buried under metadata or left at
+  // top level, dropping only CC's internal discriminators + the keys handled above.
+  const HANDLED = new Set<string>([...MAGE_KEY_ORDER, "node_type", "originSessionId"]);
+  for (const [k, v] of Object.entries(meta)) {
+    if (!HANDLED.has(k) && !(k in out) && v !== undefined) out[k] = v;
+  }
   for (const [k, v] of Object.entries(preserved)) {
-    if (!placed.has(k)) out[k] = v;
+    if (!HANDLED.has(k) && v !== undefined) out[k] = v; // top-level authored extras win
   }
 
   // Body preserved verbatim (only a trailing newline is ensured) — never rewritten.

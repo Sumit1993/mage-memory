@@ -112,6 +112,48 @@ describe("flattenCcNote", () => {
     expect(text).toContain("Body content here.");
   });
 
+  it("RECOVERS every mage field CC buried under metadata (the live aggressive-restamp shape)", () => {
+    // CC's observed restamp nests the WHOLE authored frontmatter under metadata and
+    // blanks name. flatten must recover tags/last_reviewed/status/sources/keywords —
+    // not just type/created — or the durable note silently loses them.
+    const fullyRestamped = [
+      "---",
+      'name: ""',
+      "metadata:",
+      "  node_type: memory",
+      "  type: reference",
+      "  tags:",
+      "    - mage/roadmap",
+      '  created: "2026-06-01"',
+      '  last_reviewed: "2026-06-02"',
+      "  status: active",
+      "  sources:",
+      "    - file:~/x.md",
+      "  keywords:",
+      "    - alpha",
+      "    - beta",
+      "  originSessionId: sess-xyz",
+      "---",
+      "# Real title",
+      "",
+      "Body with a [[wikilink]].",
+      "",
+    ].join("\n");
+    const { text, changed } = flattenCcNote(fullyRestamped);
+    expect(changed).toBe(true);
+    const fm = parseNote(text).frontmatter;
+    expect(fm.type).toBe("pointer"); // metadata.type reference → mage pointer
+    expect(fm.tags).toEqual(["mage/roadmap"]); // recovered, not dropped
+    expect(fm.created).toBe("2026-06-01");
+    expect(fm.last_reviewed).toBe("2026-06-02");
+    expect(fm.status).toBe("active");
+    expect(fm.sources).toEqual(["file:~/x.md", "cc-session:sess-xyz"]);
+    expect(fm.keywords).toEqual(["alpha", "beta"]);
+    expect(text).not.toContain("node_type");
+    expect(text).not.toMatch(/^name:/m);
+    expect(text).toContain("Body with a [[wikilink]]."); // body untouched
+  });
+
   it("leaves a hand-authored mage note (and its Obsidian wikilinks) untouched", () => {
     const { text, changed } = flattenCcNote(PLAIN);
     expect(changed).toBe(false);

@@ -165,9 +165,15 @@ async function walk(dir: string, root: string, out: ScannedNote[]): Promise<void
 }
 
 function toScanned(fm: NoteFrontmatter, body: string, abs: string, relPath: string): ScannedNote {
+  // Dual-format tolerance (ADR-0035 §3): a note CC has transiently restamped buries its
+  // real fields (type, tags, status, …) under nested `metadata.*`. Read an EFFECTIVE
+  // view (top-level wins, `metadata.*` as fallback) so index/dream/groom categorize it
+  // correctly even before the durable-boundary flatten runs. Harness-neutral — a plain
+  // nested read, no CC-specific vocab mapping (the neutral-core posture, ADR-0035 §6).
+  const efm = effectiveFm(fm);
   // Multi-home: every tag-wing, primary first, with unsafe segments dropped so a
   // crafted tag like `../x` can never drive file creation or deletion.
-  const wings = noteWings(fm).filter((w) => safeSegment(w.wing));
+  const wings = noteWings(efm).filter((w) => safeSegment(w.wing));
   const primary = wings[0];
   return {
     relPath,
@@ -175,27 +181,32 @@ function toScanned(fm: NoteFrontmatter, body: string, abs: string, relPath: stri
     wing: primary ? primary.wing : CROSS,
     room: primary ? primary.room : "",
     title: noteTitle(body, abs),
-    // Dual-format tolerance (ADR-0035): a note CC has transiently restamped keeps its
-    // type under nested `metadata.type` (the durable boundary flattens it back to the
-    // top level at commit). Read the top level first, then that fallback, so the index
-    // reflects a sensible type even before flatten runs. Untagged CC captures still
-    // index as cross-cutting (CC carries no `tags`) — `mage groom` assigns the wing.
-    type: scannedType(fm),
-    keywords: deriveKeywords(fm, body, abs),
-    status: typeof fm.status === "string" ? fm.status : undefined,
-    lastReviewed: typeof fm.last_reviewed === "string" ? fm.last_reviewed : undefined,
+    type: typeof efm.type === "string" && efm.type.trim() ? efm.type.trim() : "note",
+    keywords: deriveKeywords(efm, body, abs),
+    status: typeof efm.status === "string" ? efm.status : undefined,
+    lastReviewed: typeof efm.last_reviewed === "string" ? efm.last_reviewed : undefined,
   };
 }
 
-/** Top-level `type`, else a transiently-restamped note's nested `metadata.type`, else "note". */
-function scannedType(fm: NoteFrontmatter): string {
-  if (typeof fm.type === "string" && fm.type.trim()) return fm.type.trim();
+/**
+ * A read-only view that surfaces a restamped note's nested `metadata.*` fields to the
+ * top level (top-level always wins). Returns `fm` unchanged when there is no nested
+ * `metadata` object. Never mutates the note on disk — only the durable-boundary flatten
+ * rewrites the file; this is the transient-tolerant READ (ADR-0035 §3).
+ */
+function effectiveFm(fm: NoteFrontmatter): NoteFrontmatter {
   const meta = fm.metadata;
-  if (meta && typeof meta === "object" && !Array.isArray(meta)) {
-    const t = (meta as Record<string, unknown>).type;
-    if (typeof t === "string" && t.trim()) return t.trim();
-  }
-  return "note";
+  if (!meta || typeof meta !== "object" || Array.isArray(meta)) return fm;
+  const m = meta as Record<string, unknown>;
+  const pick = <T>(top: T, nested: unknown): T => (top !== undefined ? top : (nested as T));
+  return {
+    ...fm,
+    type: pick(fm.type, m.type),
+    tags: pick(fm.tags, m.tags),
+    status: pick(fm.status, m.status),
+    last_reviewed: pick(fm.last_reviewed, m.last_reviewed),
+    keywords: pick(fm.keywords, m.keywords),
+  };
 }
 
 function toPosix(p: string): string {
