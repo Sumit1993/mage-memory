@@ -58,11 +58,11 @@ describe("connect", () => {
 
   // ─── commandeer tier (ADR-0032) ──────────────────────────────────────────────
 
-  it("commandeers in a KB with auto-memory on: wires 12 + sets autoMemoryDirectory", async () => {
+  it("commandeers in a KB with auto-memory on: wires 13 + sets autoMemoryDirectory", async () => {
     const { dir, root } = await withKb({ kind: "repo" });
     const r = await connect({ cwd: dir, yes: true, gitHook: false });
     expect(r.commandeer).toBe(true);
-    expect(r.wired).toBe(12);
+    expect(r.wired).toBe(13);
     const settings = JSON.parse(await readFile(r.path, "utf8")) as {
       autoMemoryDirectory?: string;
       hooks: Record<string, Array<{ id?: string; matcher?: string }>>;

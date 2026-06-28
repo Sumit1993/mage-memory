@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { withKb } from "../../../test/fixtures/kb.js";
 import { run } from "../../shell.js";
-import { flattenCcNote, flattenStagedNotes, isCcShaped } from "./flatten.js";
+import { flattenCcNote, flattenStagedNotes, flattenWorktreeNotes, isCcShaped } from "./flatten.js";
 import { parseNote } from "../../note.js";
 
 // ─── fixtures ────────────────────────────────────────────────────────────────
@@ -282,5 +282,40 @@ describe("flattenStagedNotes", () => {
     const { dir } = await withKb(); // a KB but NOT a git repo
     const res = await flattenStagedNotes(dir);
     expect(res).toEqual({ flattened: [] });
+  });
+});
+
+describe("flattenWorktreeNotes (the Stop sweep)", () => {
+  it("flattens a tracked note CC restamped in the worktree + a new untracked capture", async () => {
+    const { dir } = await withKb();
+    await initRepo(dir);
+    // A note committed flat, then CC restamps the worktree copy (cc-shape).
+    await addFile(dir, "mage/tracked.md", PLAIN);
+    await run("git", ["-C", dir, "commit", "-q", "-m", "init"], { throwOnError: true });
+    await writeFile(join(dir, "mage/tracked.md"), CC_FRESH);
+    // A brand-new untracked capture.
+    await writeFile(join(dir, "mage/untracked.md"), CC_FRESH);
+
+    const res = await flattenWorktreeNotes(dir);
+
+    expect(res.flattened.sort()).toEqual(["mage/tracked.md", "mage/untracked.md"]);
+    // Worktree files are now neutral (no staging — Stop is not commit time).
+    expect(await readFile(join(dir, "mage/tracked.md"), "utf8")).not.toContain("node_type");
+    expect(await readFile(join(dir, "mage/untracked.md"), "utf8")).toContain("type: pointer");
+  });
+
+  it("leaves a clean tracked non-cc note untouched", async () => {
+    const { dir } = await withKb();
+    await initRepo(dir);
+    await addFile(dir, "mage/plain.md", PLAIN);
+    await run("git", ["-C", dir, "commit", "-q", "-m", "init"], { throwOnError: true });
+
+    const res = await flattenWorktreeNotes(dir);
+    expect(res.flattened).toHaveLength(0);
+  });
+
+  it("fails open on a non-repo path", async () => {
+    const { dir } = await withKb();
+    expect(await flattenWorktreeNotes(dir)).toEqual({ flattened: [] });
   });
 });

@@ -162,6 +162,12 @@
       "id": "mage:memory:PostToolUse",
       "command": "mage memory-hook",
       "purpose": "Nudge `mage groom` after a captured topic-note write (ADR-0032)."
+    },
+    {
+      "event": "Stop",
+      "id": "mage:flatten:Stop",
+      "command": "mage flatten --quiet",
+      "purpose": "ADR-0035 working-tree sweep: at turn-end, after CC's async restamp settles, flatten any note CC restamped this turn back to mage's flat schema — keeping the working tree neutral between commits (commit-flatten stays the durable guarantee)."
     }
   ],
   "commands": [
@@ -467,13 +473,13 @@
     },
     {
       "name": "flatten",
-      "summary": "Normalize staged harness-shaped (Claude Code) notes to mage's flat schema at the commit boundary (ADR-0035); pairs with the redaction pre-commit hook. Never blocks.",
+      "summary": "Normalize harness-shaped (Claude Code) notes to mage's flat schema (ADR-0035): --staged flattens staged blobs at the commit boundary; default sweeps the working tree (the Stop hook). Never blocks.",
       "aliases": [],
       "hidden": true,
       "options": [
         {
           "flags": "--staged",
-          "description": "flatten staged git changes (the pre-commit normalizer)"
+          "description": "flatten staged git changes (the pre-commit guarantee)"
         },
         {
           "flags": "--quiet",

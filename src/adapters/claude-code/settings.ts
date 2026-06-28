@@ -103,6 +103,17 @@ export const MAGE_HOOKS: ReadonlyArray<{
     command: "mage memory-hook",
     commandeer: true,
   },
+  // ADR-0035 working-tree sweep: at turn-end (Stop), AFTER CC's async restamp has
+  // settled, flatten any note CC restamped this turn back to mage's flat schema —
+  // keeping the working tree neutral between commits (commit-flatten stays the
+  // guarantee for anything that slips past). Commandeer-gated: only meaningful when CC
+  // auto-memory is redirecting into the docs root. Never blocks (fail-open, no commit).
+  {
+    event: "Stop",
+    id: "mage:flatten:Stop",
+    command: "mage flatten --quiet",
+    commandeer: true,
+  },
 ];
 
 /**

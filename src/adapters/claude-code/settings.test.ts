@@ -24,7 +24,7 @@ function countMage(s: ClaudeSettings): number {
 const tmp = (): Promise<string> => tmpDir("mage-settings-");
 
 describe("MAGE_HOOKS table", () => {
-  it("wires exactly twelve rows (10 base + 2 commandeer)", () => {
+  it("wires exactly thirteen rows (10 base + 3 commandeer)", () => {
     expect(MAGE_HOOKS).toEqual([
       { event: "SessionStart", id: "mage:observe:SessionStart", command: "mage observe" },
       { event: "SessionStart", id: "mage:nudge:SessionStart", command: "mage nudge" },
@@ -52,6 +52,12 @@ describe("MAGE_HOOKS table", () => {
         id: "mage:memory:PostToolUse",
         matcher: "Write|Edit",
         command: "mage memory-hook",
+        commandeer: true,
+      },
+      {
+        event: "Stop",
+        id: "mage:flatten:Stop",
+        command: "mage flatten --quiet",
         commandeer: true,
       },
     ]);
@@ -200,9 +206,9 @@ describe("commandeer-tier gating (ADR-0032)", () => {
     expect(post.find((g) => g.id === "mage:observe:PostToolUse")).toBeTruthy();
   });
 
-  it("adds the commandeer rows with matchers when commandeer:true (12 groups)", () => {
+  it("adds the commandeer rows with matchers when commandeer:true (13 groups)", () => {
     const merged = upsertMageHooks(null, { commandeer: true });
-    expect(countMage(merged)).toBe(12);
+    expect(countMage(merged)).toBe(13);
     const pre = merged.hooks?.PreToolUse ?? [];
     expect(pre).toHaveLength(1);
     expect(pre[0]?.id).toBe("mage:memory:PreToolUse");

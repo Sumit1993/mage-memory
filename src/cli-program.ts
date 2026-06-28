@@ -356,9 +356,9 @@ export function buildProgram(): Command {
   program
     .command("flatten", { hidden: true })
     .description(
-      "Normalize staged harness-shaped (Claude Code) notes to mage's flat schema at the commit boundary (ADR-0035); pairs with the redaction pre-commit hook. Never blocks.",
+      "Normalize harness-shaped (Claude Code) notes to mage's flat schema (ADR-0035): --staged flattens staged blobs at the commit boundary; default sweeps the working tree (the Stop hook). Never blocks.",
     )
-    .option("--staged", "flatten staged git changes (the pre-commit normalizer)")
+    .option("--staged", "flatten staged git changes (the pre-commit guarantee)")
     .option("--quiet", "suppress the report")
     .action(async (opts: { staged?: boolean; quiet?: boolean }) => {
       await flattenCmd({ staged: opts.staged, quiet: opts.quiet });

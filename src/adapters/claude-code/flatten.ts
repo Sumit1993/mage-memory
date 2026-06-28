@@ -180,8 +180,36 @@ export function flattenCcNote(raw: string): FlattenResult {
 // ─── commit-time gate (mirrors staged-scan.ts scope discipline) ────────────────
 
 export interface FlattenStagedResult {
-  /** Repo-relative POSIX paths whose staged note was flattened (worktree or index). */
+  /** Repo-relative POSIX paths whose note was flattened. */
   flattened: string[];
+}
+
+/** Git toplevel + a docs-root scope predicate/mapper, or null (no repo / no KB). */
+interface DocsScope {
+  top: string;
+  inScope: (f: string) => boolean;
+  toDocsRel: (f: string) => string;
+}
+
+/**
+ * Resolve the git toplevel for `repoPath` plus a scope filter for paths under the mage
+ * docs root. git's `--name-only` output is TOPLEVEL-relative, so all git ops and
+ * worktree writes key off `top`. Returns null (fail-open) when there's no repo or no KB.
+ */
+async function resolveDocsScope(repoPath: string): Promise<DocsScope | null> {
+  const docs = await resolveDocsRoot(repoPath).catch(() => null);
+  if (!docs) return null;
+  const topRes = await run("git", ["-C", repoPath, "rev-parse", "--show-toplevel"]);
+  if (topRes.code !== 0) return null;
+  const top = topRes.stdout.trim();
+  if (!top) return null;
+  const prefix = relative(top, docs.root).split(sep).join("/");
+  const flat = prefix === "" || prefix === ".";
+  return {
+    top,
+    inScope: flat ? () => true : (f) => f === prefix || f.startsWith(`${prefix}/`),
+    toDocsRel: flat ? (f) => f : (f) => (f.startsWith(`${prefix}/`) ? f.slice(prefix.length + 1) : f),
+  };
 }
 
 let flattenSeq = 0;
@@ -231,25 +259,9 @@ async function restageIndexBlob(top: string, file: string, text: string): Promis
  */
 export async function flattenStagedNotes(repoPath: string): Promise<FlattenStagedResult> {
   const empty: FlattenStagedResult = { flattened: [] };
-  const docs = await resolveDocsRoot(repoPath).catch(() => null);
-  if (!docs) return empty;
-
-  // git diff --name-only emits TOPLEVEL-relative paths; resolve the toplevel once and
-  // use it as the base for every git op AND every worktree write.
-  const topRes = await run("git", ["-C", repoPath, "rev-parse", "--show-toplevel"]);
-  if (topRes.code !== 0) return empty;
-  const top = topRes.stdout.trim();
-  if (!top) return empty;
-
-  const prefix = relative(top, docs.root).split(sep).join("/");
-  const inScope =
-    prefix === "" || prefix === "."
-      ? () => true
-      : (f: string) => f === prefix || f.startsWith(`${prefix}/`);
-  const toDocsRel =
-    prefix === "" || prefix === "."
-      ? (f: string) => f
-      : (f: string) => (f.startsWith(`${prefix}/`) ? f.slice(prefix.length + 1) : f);
+  const scope = await resolveDocsScope(repoPath);
+  if (!scope) return empty;
+  const { top, inScope, toDocsRel } = scope;
 
   const list = await run("git", [
     "-C",
@@ -299,6 +311,50 @@ export async function flattenStagedNotes(repoPath: string): Promise<FlattenStage
       }
     } catch {
       // Fail-open per file: a single pathological note never breaks the commit.
+    }
+  }
+  return result;
+}
+
+/**
+ * Sweep the WORKING TREE for notes CC restamped this turn and flatten them in place —
+ * the ADR-0035 `Stop`-hook normalizer (`mage flatten`, no `--staged`). It runs at
+ * turn-end, AFTER CC's async restamp has settled, so it catches what a write-time hook
+ * would fire too early to see. SCOPE is the cheap, correct set: the worktree-MODIFIED +
+ * UNTRACKED `.md` files under the docs root (exactly the notes CC just touched) — not a
+ * full-KB walk. It rewrites the worktree only (Stop is NOT commit time; nothing is
+ * staged — mage never auto-stages); the pre-commit flatten stays the durable guarantee.
+ * FAIL-OPEN end to end: no repo / no KB / any per-file error → skip, never throw or block.
+ */
+export async function flattenWorktreeNotes(repoPath: string): Promise<FlattenStagedResult> {
+  const empty: FlattenStagedResult = { flattened: [] };
+  const scope = await resolveDocsScope(repoPath);
+  if (!scope) return empty;
+  const { top, inScope, toDocsRel } = scope;
+
+  // The notes CC could have restamped this turn: worktree-modified (a tracked note
+  // CC rewrote) + untracked (a brand-new capture). Union, NUL-delimited.
+  const modified = await run("git", ["-C", top, "diff", "--name-only", "-z"]);
+  const untracked = await run("git", ["-C", top, "ls-files", "--others", "--exclude-standard", "-z"]);
+  const paths = new Set<string>([
+    ...(modified.code === 0 ? modified.stdout.split("\0").filter((l) => l.length > 0) : []),
+    ...(untracked.code === 0 ? untracked.stdout.split("\0").filter((l) => l.length > 0) : []),
+  ]);
+  const candidates = [...paths]
+    .filter(inScope)
+    .filter((f) => f.endsWith(".md"))
+    .filter((f) => !isGeneratedArtifact(toDocsRel(f)));
+
+  const result: FlattenStagedResult = { flattened: [] };
+  for (const file of candidates) {
+    try {
+      const abs = resolve(top, file);
+      const { text, changed } = flattenCcNote(await readFile(abs, "utf8"));
+      if (!changed) continue; // not CC-shaped / already flat → nothing to do.
+      await writeFile(abs, text);
+      result.flattened.push(file);
+    } catch {
+      // Fail-open per file: a normalizer must never break the agent's turn.
     }
   }
   return result;

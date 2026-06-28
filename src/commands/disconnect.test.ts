@@ -64,7 +64,7 @@ describe("disconnect", () => {
 
     const r = await disconnect({ cwd: dir, yes: true, gitHook: false });
     expect(r.autoMemoryUnset).toBe(true);
-    expect(r.removed).toBe(12); // all 12 mage groups (incl. the 2 commandeer)
+    expect(r.removed).toBe(13); // all 13 mage groups (incl. the 3 commandeer)
     const settings = JSON.parse(await readFile(localPath(dir), "utf8")) as {
       autoMemoryDirectory?: string;
       hooks?: unknown;
