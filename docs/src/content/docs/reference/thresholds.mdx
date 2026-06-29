@@ -38,12 +38,14 @@ count. See [Promote and graduate](../loop/promote-graduate.md) for the full path
 
 ## What the sensitivity dial does
 
-The **sensitivity dial** is the one human knob over this loop. It lives in your
+The **sensitivity dial** is the human knob over mage's *recurrence* path. It lives in your
 knowledge base's tracked `metadata.json` (under `grooming.sensitivity`), so the
 setting travels with the KB and is shared by everyone who clones it. It takes one
 of three values — `low`, `normal`, or `high` — and `normal` is the default. A
 missing or unrecognized value falls back to `normal`, so a bad edit never silently
-shifts behaviour.
+shifts behaviour. (A separate, independent dial — the per-KB
+[autonomy level](../loop/autonomy.md) — governs how much of the grooming *work* the
+agent does on its own; it does not touch these thresholds.)
 
 The dial scales **only the two recurrence gates, K and M, together**:
 

@@ -42,7 +42,7 @@ The most visible touch is **wing coloring**. mage deterministically assigns each
 
 Wings are sorted before assignment, so the mapping is stable across runs (a wing keeps its color). The color group is keyed on an Obsidian search query (`tag:#<wing>`), which also matches the nested `#<wing>/<room>` tags underneath it. When your set of wings changes, `mage index` refreshes the color groups in place and leaves every other graph setting untouched.
 
-```mermaid
+```mermaid How the index fans out into wings and rooms: INDEX.md links to each wing (billing, web, and untagged cross-cutting notes), and each wing links to its rooms.
 flowchart TD
   index["INDEX.md (always-loaded)"]
   index --> billing["billing wing"]

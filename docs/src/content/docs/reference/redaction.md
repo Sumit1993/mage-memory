@@ -9,7 +9,7 @@ mage captures what you do as you work, and turns the recurring parts into commit
 
 It does this with **one deterministic redaction engine applied at two write boundaries** (ADR-0014). The engine is pure mage code: regex detectors plus a high-entropy check, no model and no network. What differs between the two gates is *behaviour at the boundary*, not the strength of the rules.
 
-```mermaid
+```mermaid The two redaction gates: Gate 1 scrubs secrets in place and continues on capture into the gitignored scratch; Gate 2 scans staged files at git commit and blocks the commit on a live secret, or lets a clean commit land.
 flowchart LR
   capture[Capture and distill] --> g1[Gate 1: scrub and continue]
   g1 --> scratch[Gitignored scratch]

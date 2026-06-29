@@ -29,6 +29,21 @@
   white-space: nowrap;
 }
 
+/* Accessible Mermaid diagrams: the figure wraps the client-rendered <pre> and
+ * carries the caption (remark-mermaid-pre.mjs). Center the caption and make it
+ * read as secondary text. */
+.mage-diagram {
+  margin: 1.5rem 0;
+}
+
+.mage-diagram figcaption {
+  margin-top: 0.5rem;
+  font-size: var(--sl-text-xs);
+  line-height: 1.4;
+  color: var(--sl-color-gray-3);
+  text-align: center;
+}
+
 /* A subtle marker for hidden / plumbing commands. */
 .mage-plumbing-badge {
   display: inline-block;
