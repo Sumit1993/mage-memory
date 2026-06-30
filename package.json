@@ -62,9 +62,9 @@
   "dependencies": {
     "@inquirer/prompts": "^8.5.2",
     "commander": "^15.0.0",
-    "ora": "^9.4.0",
+    "ora": "^9.4.1",
     "picocolors": "^1.1.1",
-    "tar": "^7.4.3",
+    "tar": "^7.5.19",
     "yaml": "^2.9.0"
   },
   "devDependencies": {
