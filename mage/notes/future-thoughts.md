@@ -1,14 +1,34 @@
 ---
 type: plan
-tags: [mage/roadmap, mage/future-thoughts]
+tags:
+  - mage/roadmap
+  - mage/future-thoughts
 created: "2026-06-21"
-updated: "2026-06-22"
-last_reviewed: "2026-06-22"
+updated: 2026-06-30
+last_reviewed: 2026-06-30
 status: active
 provenance:
   repo: mage-memory
   commit: aad31f0
-keywords: [future-thoughts, backlog, ideas, inbox, taxonomy, hierarchy, wings, dashboard, graph, leiden, graphify, ingest, querying, export, agent-rules, use-cases]
+sources:
+  - cc-session:3c5c8534-8611-4d9d-9087-9975da48dd44
+keywords:
+  - future-thoughts
+  - backlog
+  - ideas
+  - inbox
+  - taxonomy
+  - hierarchy
+  - wings
+  - dashboard
+  - graph
+  - leiden
+  - graphify
+  - ingest
+  - querying
+  - export
+  - agent-rules
+  - use-cases
 ---
 
 # mage — future thoughts (the standing idea inbox)
@@ -146,6 +166,32 @@ Breadcrumb only (inbox ids are append-only, never reused). This was a concrete f
 FT-04's examples — pre-generated *template wings* (seed notes) for generic patterns,
 SDLC/SDD illustrative. The full thought + the ADR-0022 caveat now live in **FT-04 (c)**.
 
+#### FT-19 — are notes over-weighted vs `decisions/` & `work/`?  ·  (soak; raw author note #2)
+**Status:** raw
+**Touches:** [ADR-0003 — track work and notes](../decisions/0003-track-work-ignore-artifacts.md), [ADR-0035 — notes are memories; one unified store](../decisions/0035-decouple-harness-memory-from-notes.md)
+**Sequence:** unsequenced (taxonomy)
+Are we **overly dependent on notes**? We have `decisions/` and `work/` directories too — are they
+getting less importance because notes absorb everything?
+**mage angle:** [ADR-0035](../decisions/0035-decouple-harness-memory-from-notes.md) ("notes are
+memories; one unified store") deliberately pulled weight toward notes — worth checking it didn't
+*starve* the `decisions/` (ADR) and `work/` lanes. Open question: are decisions/work first-class
+destinations the grooming loop routes to, or notes' poor cousins? Probably a routing/guidance gap,
+not new machinery — the loop could learn to propose an ADR or a work-unit, not only a note.
+
+#### FT-21 — formalize directory structure as the KB scales (dirs vs tags)  ·  (soak; raw author note #4)
+**Status:** raw
+**Touches:** [ADR-0008 — visible mage/ dir for Obsidian](../decisions/0008-visible-mage-dir-for-obsidian.md), [ADR-0006 — two-layer recall / per-wing skills](../decisions/0006-two-layer-recall-per-wing-skills.md), [ADR-0023 — hub owns notes; flat projects](../decisions/0023-hub-own-notes-and-flat-projects.md)
+**Sequence:** unsequenced (scaling track — pairs with FT-04)
+For a human reader, **flat notes categorized only by wing/room tags inside the file stop working as
+the KB scales**. **Directories** are the natural way forward, but it must be made formal: should
+**wings and rooms be the only legal directory names**? Does having directories make the in-file
+**tags redundant**? This only bites as the KB grows.
+**mage angle:** the *structural* half of Theme A (pairs with FT-04's grouping nudges). Today
+wings/rooms are *tag namespaces*, deliberately decoupled from on-disk layout. Promoting directories
+to first-class structure is a real model change — grill whether dirs **replace** tags, **mirror**
+them, or **coexist** (tags stay the query layer, dirs the human-reading layer). Touches the scanner,
+`mage index`, and the wing→skill generation.
+
 ### Theme B — dashboard & graph
 
 #### FT-06 — run internal commands from the dashboard · (orig #2)
@@ -215,6 +261,10 @@ they already have.
 **mage angle:** partially built — `mage learn --from` already ingests skills/prose
 (0.0.4). Open scope: *rough/unstructured* notes and *whole external KBs* (vs single
 sources), distilled to insight-not-copies per [ADR-0004](../decisions/0004-capture-insight-not-copies.md).
+**Update (soak 2026-06-30):** `mage adopt` ([ADR-0034](../decisions/0034-adopt-preexisting-knowledge.md))
+now dispatches pre-existing knowledge — *in-shape* notes get **placed**, *out-of-shape* sources get
+**distilled** — so the in-shape "existing skills/notes/KBs" case is mostly handled; the open scope
+narrows to **bulk / whole-KB** ingest. *(folds in raw author note #1.)*
 
 #### FT-11 — hybrid: in-repo KBs for A & B + an external KB about A+B together · (orig #11)
 **Status:** exploring  (author note: **answered — yes, supported**)
@@ -252,6 +302,20 @@ because** the manual path has no other enforcement point — whereas the automat
 [ADR-0030](../decisions/0030-agent-autonomy-ladder.md) exists to kill). Pairs with FT-04's
 examples.
 
+#### FT-20 — a global, user-level hub (personal cross-system memory)  ·  (soak; raw author note #3)
+**Status:** raw
+**Touches:** [ADR-0011 — a hub is one vault; projects are wings](../decisions/0011-recursive-scan-hub-projects.md), [ADR-0012 — wings optional; standalone hubs](../decisions/0012-wings-optional-convention-standalone-hubs.md), [ADR-0005 — one canonical memory; others feed](../decisions/0005-one-canonical-memory-others-are-feeders.md)
+**Sequence:** unsequenced
+A **user-level hub** — memories/knowledge a user wants for **their own system**, at a **global**
+level, analogous to a global `~/.claude/CLAUDE.md`. Personal, cross-project, machine-spanning.
+**mage angle:** a standalone hub already covers cross-project federation
+([ADR-0012](../decisions/0012-wings-optional-convention-standalone-hubs.md)); the new shape is a
+conventional **`~/`-rooted hub auto-discovered as a user default** — the personal tier above
+repo/hub (e.g. `mage init --user-hub`, resolved when no repo/hub is found). Open question: real
+machinery, or just a documented convention + discovery rule? Bounded by
+[ADR-0005](../decisions/0005-one-canonical-memory-others-are-feeders.md) — still one canonical store
+per scope; the global hub is another vault, not a rival.
+
 ### Theme D — cost-aware docs & querying
 
 #### FT-13 — be token-mindful when updating docs (reduce, don't just append) · (orig #4)
@@ -278,12 +342,17 @@ bounds us off a semantic service. A *local query layer* (structured frontmatter
 query / `mage query`) that doesn't become a service is the open lane — and it pairs
 with FT-09's `--json` export.
 
-#### FT-15 - add observability/telemetry of memories
+#### FT-18 — observability of mage's context-window footprint  ·  (soak; was a duplicate FT-15)
 **Status:** raw
-**Sequence:** unsequenced
-Today mage does not track or trace its impact on the agent and the context window. We need to track how much we push into the context.
-Are we bloating it, are we optimizing future references.
-**mage angle:** to be added by agent
+**Touches:** [ADR-0021 — offline, no telemetry; local signal](../decisions/0021-offline-no-telemetry-local-signal.md), [ADR-0033 — recall: @import the bounded root index](../decisions/0033-recall-import-bounded-index.md)
+**Sequence:** unsequenced (measurement track)
+Today mage does not track or trace its impact on the agent or the context window. We need to measure
+how much mage pushes into context — are we bloating it, or optimizing future references?
+**mage angle:** must stay **local** to respect [ADR-0021](../decisions/0021-offline-no-telemetry-local-signal.md)
+(no phone-home) — a `mage skills --metrics`-style local report of recall/import byte-cost and
+context-match, never external telemetry. Pairs directly with FT-14 (query, fetch less) and the
+[ADR-0033](../decisions/0033-recall-import-bounded-index.md) bounded-index recall budget. (Renumbered
+from a second `FT-15` — ids are append-only; FT-15 stays the AI-agent-rules entry in Theme E.)
 
 ### Theme E — agent integration & use cases
 
@@ -307,6 +376,15 @@ debugs against the captured gotchas/playbooks/decisions.
 **mage angle:** a flagship *consumption* use case (most of mage so far is *capture*).
 The gotcha/decision notes are exactly what a reviewer should load first; could ship
 as an example skill that wires the KB into a review/debug flow.
+
+---
+
+## Raw notes by author, to be groomed into FT notes above
+
+_(empty — last drained 2026-06-30. The 2026-06-21→06-30 author scratch became FT entries:
+#1 → folded into **FT-10** (adopt covers in-shape ingest) · #2 → **FT-19** · #3 → **FT-20** ·
+#4 → **FT-21**. Drop new raw thoughts here; groom them into `FT-NN` entries above, then leave a
+breadcrumb.)_
 
 ---
 
