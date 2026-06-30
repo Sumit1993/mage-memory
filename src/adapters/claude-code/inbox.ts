@@ -23,7 +23,7 @@
 
 import { mkdir, readFile, readdir, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { type NoteFrontmatter, parseNote, writeNote } from "../../note.js";
+import { type NoteFrontmatter, isoDate, parseNote, writeNote } from "../../note.js";
 import { stagingPath } from "../../paths.js";
 import { redact } from "../../redact.js";
 import { isGeneratedArtifact, scanNotes } from "../../scan.js";
@@ -33,10 +33,20 @@ import {
   lessonCoveringNote,
   readStagedDrafts,
   slugify,
+  stageDraft,
   uniqueSlug,
-  writeDraft,
 } from "../../grooming/staging.js";
-import { deKebab, mapType, rewriteWikilinks } from "./schema-map.js";
+import {
+  type CcFrontmatter,
+  captureKey,
+  captureSessions,
+  ccSessionId,
+  ccSource,
+  deKebab,
+  isCcShaped,
+  mapType,
+  rewriteWikilinks,
+} from "./cc-note.js";
 
 /**
  * Fail-soft diagnostics go to STDERR, never stdout. ingestCaptureInbox runs at the
@@ -46,13 +56,6 @@ import { deKebab, mapType, rewriteWikilinks } from "./schema-map.js";
  */
 function warnStderr(msg: string): void {
   process.stderr.write(`⚠ ${msg}\n`);
-}
-
-/** The `cc-session:<uuid>` source pointers a draft/capture carries (for re-ingest dedup). */
-function sourceSessions(fm: NoteFrontmatter): string[] {
-  const sources = (fm as { sources?: unknown }).sources;
-  if (!Array.isArray(sources)) return [];
-  return sources.filter((s): s is string => typeof s === "string" && s.startsWith("cc-session:"));
 }
 
 /** rm a file, returning whether it is now gone (force suppresses ENOENT). */
@@ -70,47 +73,6 @@ function coveredDir(stagingDir: string): string {
   return join(stagingDir, ".covered");
 }
 
-/** CC's frontmatter discriminator — present on every native-memory file, never on a mage note. */
-const CC_MEMORY_NODE_TYPE = "memory";
-
-/** A CC capture inbox file's frontmatter (either on-disk shape — see file header). */
-interface InboxFrontmatter {
-  /** kebab slug (raw native) or "" (post-renormalization, blanked by CC). */
-  name?: string;
-  /** one-line summary (raw native only); folds into the body when not already there. */
-  description?: string;
-  /** top-level created (raw native); the post-renorm date lives under metadata. */
-  created?: string;
-  metadata?: {
-    /** the "memory" discriminator. */
-    node_type?: string;
-    /** the mage type (post-renorm) or a raw CC type — mapType handles both. */
-    type?: string;
-    created?: string;
-    /** the CC session UUID → a `cc-session:` source pointer. */
-    originSessionId?: string;
-    [k: string]: unknown;
-  };
-  [k: string]: unknown;
-}
-
-/**
- * True iff this frontmatter is a Claude Code capture (carries `metadata.node_type:
- * memory`). A hand-authored mage note at the docs root never matches, so it is left
- * untouched by the ingest.
- */
-export function isCaptureInboxNote(fm: NoteFrontmatter): boolean {
-  const meta = (fm as InboxFrontmatter).metadata;
-  return !!meta && typeof meta === "object" && meta.node_type === CC_MEMORY_NODE_TYPE;
-}
-
-/** First `YYYY-MM-DD` of a string-ish value, else undefined. */
-function isoDate(v: unknown): string | undefined {
-  if (typeof v !== "string") return undefined;
-  const m = v.match(/^\d{4}-\d{2}-\d{2}/);
-  return m ? m[0] : undefined;
-}
-
 /**
  * Map a parsed CC inbox capture to a clean mage draft (frontmatter + body). PURE —
  * no fs, no redact. Strips CC's `name`/`metadata`/`node_type`; routes the body
@@ -124,7 +86,7 @@ export function mapInboxNote(
   body: string,
   slug: string,
 ): { frontmatter: NoteFrontmatter; body: string } {
-  const f = fm as InboxFrontmatter;
+  const f = fm as CcFrontmatter;
   const meta = f.metadata ?? {};
 
   // Title: the body H1 wins (post-renorm `name` is blank); else a de-kebab'd `name`
@@ -151,10 +113,10 @@ export function mapInboxNote(
     created: isoDate(meta.created) ?? isoDate(f.created),
   });
 
-  const sessionId = typeof meta.originSessionId === "string" ? meta.originSessionId : undefined;
+  const sessionId = ccSessionId(fm);
   const frontmatter: NoteFrontmatter = {
     ...draft.frontmatter,
-    ...(sessionId ? { sources: [`cc-session:${sessionId}`] } : {}),
+    ...(sessionId ? { sources: [ccSource(sessionId)] } : {}),
   };
   return { frontmatter, body: draft.body };
 }
@@ -224,9 +186,8 @@ export async function ingestCaptureInbox(root: string): Promise<InboxIngestResul
   // key drops every sibling capture after the first (silent data loss). Built from the
   // PRE-EXISTING staged drafts only (the lingering-file case is cross-run); within a
   // run, `uniqueSlug`/`taken` already separates two distinct captures.
-  const identity = (session: string, slug: string) => `${session}::${slug}`;
   const stagedIdentity = new Set(
-    staged.flatMap((d) => sourceSessions(d.frontmatter).map((s) => identity(s, d.slug))),
+    staged.flatMap((d) => captureSessions(d.frontmatter).map((s) => captureKey(s, d.slug))),
   );
 
   for (const name of inboxNames) {
@@ -242,7 +203,7 @@ export async function ingestCaptureInbox(root: string): Promise<InboxIngestResul
       // The whole tail (parse → map → redact → sig → cover → write) is fail-soft:
       // one pathological capture skips itself, never killing the batch.
       const parsed = parseNote(raw);
-      if (!isCaptureInboxNote(parsed.frontmatter)) continue; // a hand-authored root note — leave it
+      if (!isCcShaped(parsed.frontmatter)) continue; // a hand-authored root note — leave it
 
       const stem = name.replace(/\.md$/i, "");
       const mapped = mapInboxNote(parsed.frontmatter, parsed.body, stem);
@@ -254,9 +215,9 @@ export async function ingestCaptureInbox(root: string): Promise<InboxIngestResul
       // file survived a prior run — drop the duplicate source, don't re-stage. Identity
       // is (session, slug): two distinct memories from one session have different slugs,
       // so only the genuine re-seen file is dropped, never a sibling capture.
-      const sessions = sourceSessions(mapped.frontmatter);
+      const sessions = captureSessions(mapped.frontmatter);
       const baseSlug = slugify(stem);
-      if (sessions.some((s) => stagedIdentity.has(identity(s, baseSlug)))) {
+      if (sessions.some((s) => stagedIdentity.has(captureKey(s, baseSlug)))) {
         if (!(await safeRm(path))) {
           warnStderr(`mage: ${name} is already staged but could not be removed — remove it by hand.`);
         }
@@ -279,8 +240,7 @@ export async function ingestCaptureInbox(root: string): Promise<InboxIngestResul
         continue;
       }
 
-      const slug = uniqueSlug(slugify(stem), taken);
-      await writeDraft(stagingDir, slug, mapped.frontmatter, body);
+      const { slug } = await stageDraft(stagingDir, slugify(stem), mapped.frontmatter, body, taken);
       taken.add(slug);
       // Stage succeeded; now remove the source. If the rm fails, the capture is SAFE
       // (it is staged) — warn so the user clears the lingering root file before it is

@@ -7,9 +7,11 @@ sidebar:
 
 mage watches your coding sessions, drafts what looks worth remembering, and lets you confirm it into durable notes — without you stopping to write documentation. That cycle is the **self-grooming loop**. This page is the map; each stage links to its own page.
 
-Two terms first, because everything below leans on them:
+First, what mage *is*: **a note is a memory.** mage is your agent's memory — the hard-earned knowledge it would otherwise re-learn every session — made durable, curated, portable, and shareable. It is not a separate knowledge base bolted onto your agent; it *is* the agent's memory, in files you own.
 
-- A **note** is a small markdown file under `mage/notes/` holding one reusable lesson — insight plus procedure plus pointers, never a copy of a source. Notes are committed, indexed knowledge.
+Two terms the rest of the page leans on:
+
+- A **note** is one such memory: a small markdown file under `mage/notes/` holding one piece of hard-earned knowledge — insight plus procedure plus pointers, never a copy of a source. It is exactly what an agent remembers across sessions, made committed and indexed.
 - A **compact-chapter** is one stretch of work between context compactions (or session ends). When your coding host compacts the conversation to free up context, that closes a chapter. mage counts chapters, not session ids — so one long, continuously-compacted chat still produces many chapters.
 
 ## The loop

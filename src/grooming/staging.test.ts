@@ -13,14 +13,13 @@ import {
   discardDraft,
   draftKey,
   draftSig,
-  existingNoteSlugs,
-  promoteDraft,
+  promoteBatch,
   readStagedDrafts,
   readStagedRejects,
   slugify,
+  stageDraft,
   stagedSlugs,
   uniqueSlug,
-  writeDraft,
 } from "./staging.js";
 
 /** A minimal ScannedNote for dedup tests. */
@@ -107,14 +106,15 @@ describe("composeDraft", () => {
 
 // ─── stage write + read round-trip ─────────────────────────────────────────────
 
-describe("writeDraft / readStagedDrafts", () => {
+describe("stageDraft / readStagedDrafts", () => {
   it("round-trips a draft and is fail-open on a missing dir", async () => {
     const root = await tmpDir();
     const staging = join(root, STATE_DIR, STAGING_DIR);
     expect(await readStagedDrafts(staging)).toEqual([]); // missing dir → []
 
     const { frontmatter, body } = composeDraft({ title: "A Lesson", tags: ["mage/x"], body: "body text", created: "2026-06-15" });
-    await writeDraft(staging, "a-lesson", frontmatter, body);
+    const { slug } = await stageDraft(staging, "a-lesson", frontmatter, body, new Set());
+    expect(slug).toBe("a-lesson");
 
     const drafts = await readStagedDrafts(staging);
     expect(drafts).toHaveLength(1);
@@ -122,6 +122,14 @@ describe("writeDraft / readStagedDrafts", () => {
     expect(drafts[0]?.title).toBe("A Lesson");
     expect(drafts[0]?.frontmatter.type).toBe("gotcha");
     expect(await stagedSlugs(staging)).toEqual(new Set(["a-lesson"]));
+  });
+
+  it("de-collides slugBase against the taken set before writing", async () => {
+    const root = await tmpDir();
+    const staging = join(root, STATE_DIR, STAGING_DIR);
+    const { frontmatter, body } = composeDraft({ title: "Dup", body: "b" });
+    const { slug } = await stageDraft(staging, "dup", frontmatter, body, new Set(["dup"]));
+    expect(slug).toBe("dup-2");
   });
 });
 
@@ -183,19 +191,18 @@ describe("reject ledger", () => {
 
 // ─── promote / discard ─────────────────────────────────────────────────────────
 
-describe("promoteDraft / discardDraft", () => {
-  it("moves a draft into notes/, de-colliding the slug", async () => {
+describe("promoteBatch / discardDraft", () => {
+  it("moves a draft into notes/, de-colliding the slug against committed notes", async () => {
     const root = await tmpDir();
     const staging = join(root, STATE_DIR, STAGING_DIR);
     const { frontmatter, body } = composeDraft({ title: "Lesson", tags: ["mage/x"], body: "b" });
-    await writeDraft(staging, "lesson", frontmatter, body);
+    await stageDraft(staging, "lesson", frontmatter, body, new Set());
     await mkdir(join(root, "notes"), { recursive: true });
     await writeFile(join(root, "notes", "lesson.md"), "# pre-existing\n");
 
     const drafts = await readStagedDrafts(staging);
-    const taken = await existingNoteSlugs(root);
-    const rel = await promoteDraft(root, drafts[0]!, taken);
-    expect(rel).toBe("notes/lesson-2.md"); // de-collided
+    const accepted = await promoteBatch(root, drafts);
+    expect(accepted).toEqual(["notes/lesson-2.md"]); // de-collided vs the committed note
     expect(await readFile(join(root, "notes", "lesson-2.md"), "utf8")).toContain("# Lesson");
     expect(await readStagedDrafts(staging)).toEqual([]); // moved out of staging
   });
@@ -203,26 +210,42 @@ describe("promoteDraft / discardDraft", () => {
     const root = await tmpDir();
     const staging = join(root, STATE_DIR, STAGING_DIR);
     const { frontmatter, body } = composeDraft({ title: "Stamped", tags: ["mage/x"], body: "b" });
-    await writeDraft(staging, "stamped", frontmatter, body);
+    await stageDraft(staging, "stamped", frontmatter, body, new Set());
 
-    const [draft] = await readStagedDrafts(staging);
-    const rel = await promoteDraft(root, draft!, new Set(), {
+    const drafts = await readStagedDrafts(staging);
+    const accepted = await promoteBatch(root, drafts, {
       autonomy: "overseer",
       repo: "mage-memory",
       commit: "abc1234",
     });
-    expect(rel).toBe("notes/stamped.md");
+    expect(accepted).toEqual(["notes/stamped.md"]);
 
     const note = parseNote(await readFile(join(root, "notes", "stamped.md"), "utf8"));
     expect(note.frontmatter.provenance).toEqual({ repo: "mage-memory", commit: "abc1234", autonomy: "overseer" });
     expect(note.body).toContain("# Stamped"); // body preserved
     expect(await readStagedDrafts(staging)).toEqual([]); // staging file removed
   });
+  it("de-collides two accepted drafts in one batch onto distinct slugs", async () => {
+    const root = await tmpDir();
+    const staging = join(root, STATE_DIR, STAGING_DIR);
+    // Two drafts whose staging slugs differ but would both want `notes/lesson.md`
+    // is impossible (staging slugs are unique); instead prove the batch seeds + grows
+    // `taken` so a second draft colliding with a committed note still de-collides.
+    await mkdir(join(root, "notes"), { recursive: true });
+    await writeFile(join(root, "notes", "a.md"), "# pre\n");
+    const d1 = composeDraft({ title: "A", body: "b" });
+    const d2 = composeDraft({ title: "A two", body: "b" });
+    await stageDraft(staging, "a", d1.frontmatter, d1.body, new Set());
+    await stageDraft(staging, "a-2", d2.frontmatter, d2.body, new Set(["a"]));
+
+    const accepted = await promoteBatch(root, await readStagedDrafts(staging));
+    expect(new Set(accepted)).toEqual(new Set(["notes/a-2.md", "notes/a-3.md"]));
+  });
   it("discardDraft removes the file (idempotent)", async () => {
     const root = await tmpDir();
     const staging = join(root, STATE_DIR, STAGING_DIR);
     const { frontmatter, body } = composeDraft({ title: "X", body: "b" });
-    await writeDraft(staging, "x", frontmatter, body);
+    await stageDraft(staging, "x", frontmatter, body, new Set());
     const [d] = await readStagedDrafts(staging);
     await discardDraft(d!);
     await discardDraft(d!); // no throw on a second call

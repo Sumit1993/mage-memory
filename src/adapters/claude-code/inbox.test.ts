@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { parseNote } from "../../note.js";
 import { exists, stagingPath } from "../../paths.js";
 import { withKb } from "../../../test/fixtures/kb.js";
-import { ingestCaptureInbox, isCaptureInboxNote, mapInboxNote } from "./inbox.js";
+import { ingestCaptureInbox, mapInboxNote } from "./inbox.js";
 
 // The live 2026-06-27 spike's on-disk shape: CC renormalized the frontmatter
 // (blanked `name`, moved the mage type/created under `metadata`), but the
@@ -18,17 +18,6 @@ function gate0Capture(opts: { type?: string; session?: string; body: string } = 
   ].join("\n");
   return `---\nname: ""\nmetadata:\n${meta}\n---\n\n${opts.body}\n`;
 }
-
-describe("isCaptureInboxNote", () => {
-  it("matches CC's metadata.node_type: memory discriminator", () => {
-    expect(isCaptureInboxNote({ metadata: { node_type: "memory" } } as never)).toBe(true);
-  });
-  it("rejects a hand-authored mage note (no node_type)", () => {
-    expect(isCaptureInboxNote({ type: "gotcha", tags: ["mage"] } as never)).toBe(false);
-    expect(isCaptureInboxNote({ metadata: { node_type: "other" } } as never)).toBe(false);
-    expect(isCaptureInboxNote({} as never)).toBe(false);
-  });
-});
 
 describe("mapInboxNote", () => {
   it("maps the post-renormalization shape without double-folding", () => {

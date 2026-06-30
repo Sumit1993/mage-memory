@@ -162,6 +162,12 @@
       "id": "mage:memory:PostToolUse",
       "command": "mage memory-hook",
       "purpose": "Nudge `mage groom` after a captured topic-note write (ADR-0032)."
+    },
+    {
+      "event": "Stop",
+      "id": "mage:flatten:Stop",
+      "command": "mage flatten --quiet",
+      "purpose": "ADR-0035 working-tree sweep: at turn-end, after CC's async restamp settles, flatten any note CC restamped this turn back to mage's flat schema — keeping the working tree neutral between commits (commit-flatten stays the durable guarantee)."
     }
   ],
   "commands": [
@@ -466,6 +472,22 @@
       ]
     },
     {
+      "name": "flatten",
+      "summary": "Normalize harness-shaped (Claude Code) notes to mage's flat schema (ADR-0035): --staged flattens staged blobs at the commit boundary; default sweeps the working tree (the Stop hook). Never blocks.",
+      "aliases": [],
+      "hidden": true,
+      "options": [
+        {
+          "flags": "--staged",
+          "description": "flatten staged git changes (the pre-commit guarantee)"
+        },
+        {
+          "flags": "--quiet",
+          "description": "suppress the report"
+        }
+      ]
+    },
+    {
       "name": "link",
       "summary": "Link this code repo to an existing hub (auto-detects storage based on mage/ content)",
       "aliases": [],
@@ -542,6 +564,30 @@
         {
           "flags": "--dir <path>",
           "description": "where to look for the knowledge base (default: cwd; walks up)"
+        }
+      ]
+    },
+    {
+      "name": "adopt",
+      "summary": "Onboard pre-existing Claude Code memories into this KB's capture inbox: place in-shape captures, report out-of-shape to distill (plan-first; never commits)",
+      "aliases": [],
+      "hidden": false,
+      "options": [
+        {
+          "flags": "-d, --dir <path>",
+          "description": "where to look for the knowledge base (default: cwd; walks up for in-repo)"
+        },
+        {
+          "flags": "--all",
+          "description": "whole-machine sweep: adopt memories for every KB they belong to, not just this one"
+        },
+        {
+          "flags": "--dry-run",
+          "description": "stop at the plan; write nothing"
+        },
+        {
+          "flags": "-y, --yes",
+          "description": "non-interactive: skip the confirmation prompt"
         }
       ]
     },

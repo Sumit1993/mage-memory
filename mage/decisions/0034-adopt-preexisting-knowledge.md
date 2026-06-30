@@ -99,6 +99,25 @@ Copying a source verbatim is the anti-pattern mage exists to prevent. So onboard
      connect never auto-adopts** — it prints the nudge only. No surprise writes (ADR-0013: nothing is
      real until you accept + commit).
 
+7. **Commandeer-coverage — connect consumes adopt's discovery so it stops stranding siblings.**
+   The 2026-06-27 soak wiring exposed the root cause directly: `mage connect` redirects future capture
+   for the **single cwd it runs in**, but CC keys memory by launch cwd, so one logical project smears
+   across many cwds (org-root, hub, code-repo). Connecting one strands the rest — both their *past*
+   memories (the adopt gap above) and their *future* writes (still landing in CC's per-cwd dir, never
+   commandeered). The fix is not new machinery: **connect and adopt ask the same question** —
+   "which cwds' memory dirs resolve to *this* KB?" — so connect reuses adopt's discovery.
+   - **After wiring, connect reports the coverage map.** Discovery resolves every
+     `~/.claude/projects/*/memory/` origin cwd via `resolveDocsRoot`; connect surfaces the siblings
+     that land on this KB: "M cwds map to this KB — 1 commandeered (here), Y not yet (`mage connect`
+     there), and N orphaned memories across them (`mage adopt`)." It **flags and offers; it never
+     reaches into another cwd's settings** — each cwd's `settings.local.json` is that cwd's to wire
+     (interactive may offer; non-interactive prints only).
+   - **Distinct from `connect --all-projects`.** That existing sweep fans out over a hub's
+     *registered* `projects[].code_repo_path` (a mage-metadata fact). Commandeer-coverage fans out
+     over CC's *cwd-keyed memory dirs* (a Claude-Code fact) — they overlap but neither subsumes the
+     other (a code repo can be registered yet never have run CC; a CC cwd can be unregistered).
+     Coverage discovery is the union view; the two fan-outs stay separate verbs.
+
 ## Gate
 
 - **Yield at groom** — same crown as ADR-0030/0032: the live reject-ledger. **KILL** if adopted
@@ -110,6 +129,9 @@ Copying a source verbatim is the anti-pattern mage exists to prevent. So onboard
 
 - Commandeering becomes a clean **cutover** — the future redirected *and* the past folded in — instead
   of a forward-only redirect that strands prior knowledge.
+- **Coverage is legible, not silent.** Connecting one cwd no longer quietly leaves sibling cwds writing
+  to un-commandeered CC dirs; connect names them (clause 7), so the user can wire the rest deliberately
+  instead of discovering the gap weeks later (exactly how the 2026-06-27 soak missed the hubs).
 - One **shape rule** serves every source (CC memory, a user's notes, a foreign vault) without ever
   letting a verbatim-copy path in the back door; new in-shape sources opt in by registering a
   detector + mapper.

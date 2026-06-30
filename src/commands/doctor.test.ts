@@ -118,7 +118,7 @@ describe("diffMageHooks", () => {
     const d = diffMageHooks(base, { commandeer: true });
     expect(d.matches).toBe(false);
     expect(new Set(d.missingIds)).toEqual(
-      new Set(["mage:memory:PreToolUse", "mage:memory:PostToolUse"]),
+      new Set(["mage:memory:PreToolUse", "mage:memory:PostToolUse", "mage:flatten:Stop"]),
     );
   });
 
@@ -381,8 +381,8 @@ describe("doctor env checks still run", () => {
     }
   });
 
-  it("MAGE_HOOKS length is the expected hook count (10 base + 2 commandeer)", () => {
-    expect(MAGE_HOOKS.length).toBe(12);
+  it("MAGE_HOOKS length is the expected hook count (10 base + 3 commandeer)", () => {
+    expect(MAGE_HOOKS.length).toBe(13);
   });
 });
 

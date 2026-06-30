@@ -8,7 +8,6 @@
 // Hidden plumbing behind the `mage:groom` skill. Accept is the ONLY thing that
 // writes into committed `notes/`; the human still commits the diff (ADR-0013).
 
-import { basename } from "node:path";
 import { logger } from "../logger.js";
 import { type ResolvedDocsRoot, requireDocsRoot, stagingPath } from "../paths.js";
 import { resolveCreationStamp } from "../provenance.js";
@@ -18,9 +17,8 @@ import {
   type StagedDraft,
   addStagedRejects,
   discardDraft,
-  existingNoteSlugs,
   lessonCoveringNote,
-  promoteDraft,
+  promoteBatch,
   readStagedDrafts,
   readStagedRejects,
 } from "../grooming/staging.js";
@@ -170,17 +168,11 @@ async function acceptBatch(
 ): Promise<GroomResult> {
   const root = resolved.root;
   const selected = select(spec, staged);
-  const taken = await existingNoteSlugs(root);
   // Stamp provenance at the creation chokepoint (ADR-0031): repo + commit on every
   // accepted note, and `autonomy` when this groom runs under approver/overseer (the
   // reject-ledger's authorship mark — ADR-0030). Resolved once for the batch.
   const stamp = await resolveCreationStamp(resolved);
-  const accepted: string[] = [];
-  for (const draft of selected) {
-    const rel = await promoteDraft(root, draft, taken, stamp);
-    taken.add(basename(rel, ".md")); // so two accepted drafts can't collide on a slug
-    accepted.push(rel);
-  }
+  const accepted = await promoteBatch(root, selected, stamp);
   // Regenerate INDEX over the now-larger notes/ set. In --json mode, keep index()'s
   // human logging off stdout so the single JSON line groomCmd emits stays clean.
   await index({ dir: opts.dir, quiet: opts.json });

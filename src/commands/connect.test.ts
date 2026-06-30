@@ -58,11 +58,11 @@ describe("connect", () => {
 
   // ─── commandeer tier (ADR-0032) ──────────────────────────────────────────────
 
-  it("commandeers in a KB with auto-memory on: wires 12 + sets autoMemoryDirectory", async () => {
+  it("commandeers in a KB with auto-memory on: wires 13 + sets autoMemoryDirectory", async () => {
     const { dir, root } = await withKb({ kind: "repo" });
     const r = await connect({ cwd: dir, yes: true, gitHook: false });
     expect(r.commandeer).toBe(true);
-    expect(r.wired).toBe(12);
+    expect(r.wired).toBe(13);
     const settings = JSON.parse(await readFile(r.path, "utf8")) as {
       autoMemoryDirectory?: string;
       hooks: Record<string, Array<{ id?: string; matcher?: string }>>;
@@ -442,5 +442,31 @@ describe("connect --all-projects (Decision 11C)", () => {
     await expect(connectAllProjects({ cwd: notHub, yes: true })).rejects.toThrow(
       /must run from a mage hub/,
     );
+  });
+});
+
+// ─── commandeer-coverage (ADR-0034 §6-7) ──────────────────────────────────────
+describe("connect commandeer-coverage", () => {
+  /** A fake `~/.claude/projects/<slug>/` with one in-shape memory + a transcript cwd. */
+  async function ccMemory(home: string, slug: string, cwd: string): Promise<void> {
+    const projectDir = join(home, "projects", slug);
+    await mkdir(join(projectDir, "memory"), { recursive: true });
+    await writeFile(
+      join(projectDir, "memory", "lesson.md"),
+      '---\nname: ""\nmetadata:\n  node_type: memory\n  type: gotcha\n  originSessionId: s\n---\n# Lesson\n\nbody.\n',
+    );
+    await writeFile(join(projectDir, "s.jsonl"), `${JSON.stringify({ cwd })}\n`);
+  }
+
+  it("non-interactive connect surfaces sibling-cwd orphans but NEVER auto-adopts", async () => {
+    const { dir, root, repo } = await withKb({ kind: "repo" });
+    const home = await tmpDir("cc-home");
+    // A sibling cwd whose memory resolves to THIS KB.
+    await ccMemory(home, "-sibling", repo);
+
+    const r = await connect({ cwd: dir, yes: true, gitHook: false, home });
+    expect(r.commandeer).toBe(true);
+    // §6: non-interactive connect prints the nudge only — it must not place anything.
+    expect(await exists(join(root, "lesson.md"))).toBe(false);
   });
 });

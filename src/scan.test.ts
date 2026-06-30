@@ -180,3 +180,50 @@ describe("isGeneratedArtifact (docs-root-relative; Gate-2 generated-artifact ski
     expect(isGeneratedArtifact("README.md")).toBe(false);
   });
 });
+
+describe("scanNotes — dual-format tolerance (ADR-0035 §3)", () => {
+  it("reads a transiently CC-restamped note's wing/type from nested metadata.*", async () => {
+    const root = await mkVault();
+    // CC's aggressive restamp: the whole authored frontmatter nested under metadata.
+    await put(
+      root,
+      "notes/restamped.md",
+      [
+        "---",
+        'name: ""',
+        "metadata:",
+        "  node_type: memory",
+        "  type: reference",
+        "  tags:",
+        "    - billing/payments",
+        "  status: active",
+        "---",
+        "# Restamped",
+        "",
+        "body",
+        "",
+      ].join("\n"),
+    );
+    const out = await scanNotes(root);
+    const n = out.find((x) => x.relPath === "notes/restamped.md");
+    expect(n).toBeDefined();
+    // Wing/type/status recovered from metadata.* — not mis-indexed as cross-cutting.
+    expect(n?.wing).toBe("billing");
+    expect(n?.room).toBe("payments");
+    expect(n?.type).toBe("reference");
+    expect(n?.status).toBe("active");
+  });
+
+  it("a top-level field still wins over a nested one", async () => {
+    const root = await mkVault();
+    await put(
+      root,
+      "notes/mixed.md",
+      ["---", "type: gotcha", "tags: [a/b]", "metadata:", "  type: reference", "  tags:", "    - c/d", "---", "# Mixed", "", "body", ""].join("\n"),
+    );
+    const out = await scanNotes(root);
+    const n = out.find((x) => x.relPath === "notes/mixed.md");
+    expect(n?.type).toBe("gotcha"); // top-level wins
+    expect(n?.wing).toBe("a");
+  });
+});

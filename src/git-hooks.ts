@@ -42,6 +42,7 @@ export const REDACT_HOOK_MARKER = "mage:redact-precommit";
 export const REDACT_HOOK_BODY = `#!/bin/sh
 # ${REDACT_HOOK_MARKER} — installed by \`mage connect\`; remove with \`mage disconnect\`.
 command -v mage >/dev/null 2>&1 || { echo "mage not found on PATH; skipping redaction gate" 1>&2; exit 0; }
+mage flatten --staged --quiet || true
 if ! mage redact --check --staged; then
   echo "commit blocked — staged changes contain a live secret; remove it or commit with --no-verify" 1>&2
   exit 1
@@ -73,16 +74,18 @@ export async function resolveHooksDir(repoPath: string): Promise<string | null> 
 export interface InstallHookResult {
   installed: boolean;
   path: string;
-  reason?: "not-a-repo" | "exists-foreign" | "already";
+  reason?: "not-a-repo" | "exists-foreign" | "already" | "upgraded";
   backedUp: boolean;
 }
 
 /**
  * Install the redaction pre-commit hook into the repo at `repoPath`, refusing to
  * clobber a foreign hook. Resolution failures (not a repo) no-op. If a pre-commit
- * hook already exists we read it: ours (carries the marker) → "already"; anyone
- * else's → "exists-foreign" and we leave it completely untouched. Otherwise we
- * write the hook and chmod it executable. Never mutates an existing file.
+ * hook already exists we read it: ours (carries the marker) and current → "already";
+ * ours but STALE (an older body — e.g. before ADR-0035 added the flatten step) → we
+ * rewrite it in place ("upgraded"), since we only ever overwrite a hook we wrote;
+ * anyone else's → "exists-foreign" and we leave it completely untouched. Otherwise we
+ * write the hook and chmod it executable. Never mutates a FOREIGN file.
  */
 export async function installRedactHook(repoPath: string): Promise<InstallHookResult> {
   const hooksDir = await resolveHooksDir(repoPath);
@@ -102,10 +105,19 @@ export async function installRedactHook(repoPath: string): Promise<InstallHookRe
 
   const existing = await readHookIfPresent(hookPath);
   if (existing !== null) {
-    // A pre-commit hook is already there. Recognize our own by marker; never
-    // overwrite a foreign one (the human's hook is theirs to keep).
-    const reason = existing.includes(REDACT_HOOK_MARKER) ? "already" : "exists-foreign";
-    return { installed: false, path: hookPath, reason, backedUp: false };
+    // A pre-commit hook is already there. Never overwrite a foreign one (the human's
+    // hook is theirs to keep). Recognize our own by marker: if its body is current,
+    // no-op ("already"); if it is a stale mage-authored body, upgrade it in place so
+    // hook evolution (e.g. ADR-0035's flatten step) reaches existing installs.
+    if (!existing.includes(REDACT_HOOK_MARKER)) {
+      return { installed: false, path: hookPath, reason: "exists-foreign", backedUp: false };
+    }
+    if (existing === REDACT_HOOK_BODY) {
+      return { installed: false, path: hookPath, reason: "already", backedUp: false };
+    }
+    await writeFile(hookPath, REDACT_HOOK_BODY);
+    await chmod(hookPath, 0o755);
+    return { installed: true, path: hookPath, reason: "upgraded", backedUp: false };
   }
 
   await writeFile(hookPath, REDACT_HOOK_BODY);

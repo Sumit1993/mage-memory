@@ -1,4 +1,5 @@
 import { Command, Option } from "commander";
+import { adopt } from "./commands/adopt.js";
 import { autonomy } from "./commands/autonomy.js";
 import { connect, connectAllProjects } from "./commands/connect.js";
 import { dashboard } from "./commands/dashboard-cmd.js";
@@ -6,6 +7,7 @@ import { OPEN_WITH_TARGETS } from "./dashboard/html.js";
 import { disconnect } from "./commands/disconnect.js";
 import { distillCmd } from "./commands/distill-cmd.js";
 import { doctor } from "./commands/doctor.js";
+import { flattenCmd } from "./commands/flatten.js";
 import { dream } from "./commands/dream-cmd.js";
 import { groomCmd } from "./commands/groom-cmd.js";
 import { index } from "./commands/index-cmd.js";
@@ -350,6 +352,18 @@ export function buildProgram(): Command {
       },
     );
 
+  // ─── flatten ───────────────────────────────────────────────────────────────────
+  program
+    .command("flatten", { hidden: true })
+    .description(
+      "Normalize harness-shaped (Claude Code) notes to mage's flat schema (ADR-0035): --staged flattens staged blobs at the commit boundary; default sweeps the working tree (the Stop hook). Never blocks.",
+    )
+    .option("--staged", "flatten staged git changes (the pre-commit guarantee)")
+    .option("--quiet", "suppress the report")
+    .action(async (opts: { staged?: boolean; quiet?: boolean }) => {
+      await flattenCmd({ staged: opts.staged, quiet: opts.quiet });
+    });
+
   // ─── link ──────────────────────────────────────────────────────────────────
   program
     .command("link")
@@ -443,6 +457,26 @@ export function buildProgram(): Command {
     )
     .action(async (opts: { dir?: string }) => {
       reportMigrate(await mageMigrate({ dir: opts.dir }));
+    });
+
+  // ─── adopt ─────────────────────────────────────────────────────────────────
+  program
+    .command("adopt")
+    .description(
+      "Onboard pre-existing Claude Code memories into this KB's capture inbox: place in-shape captures, report out-of-shape to distill (plan-first; never commits)",
+    )
+    .option(
+      "-d, --dir <path>",
+      "where to look for the knowledge base (default: cwd; walks up for in-repo)",
+    )
+    .option(
+      "--all",
+      "whole-machine sweep: adopt memories for every KB they belong to, not just this one",
+    )
+    .option("--dry-run", "stop at the plan; write nothing")
+    .option("-y, --yes", "non-interactive: skip the confirmation prompt")
+    .action(async (opts: { dir?: string; all?: boolean; dryRun?: boolean; yes?: boolean }) => {
+      await adopt({ dir: opts.dir, all: opts.all, dryRun: opts.dryRun, yes: opts.yes });
     });
 
   // ─── status ────────────────────────────────────────────────────────────────
