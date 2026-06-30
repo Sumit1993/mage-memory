@@ -28,6 +28,13 @@ You create it with:
 mage init --in-repo
 ```
 
+```mermaid
+flowchart TD
+  i["mage init --in-repo"] --> s["creates the repo's mage/<br/>notes · decisions · work · metadata.json · INDEX.md"]
+  s --> c["mage connect — wires capture + recall"]
+  c --> w["work → the loop → groom → notes/ → you commit"]
+```
+
 The notes travel with the code, in the same history, behind the same branch protection. This is the right default when one repo's knowledge belongs to that one repo.
 
 ### A standalone hub
@@ -82,6 +89,15 @@ mage link --storage hub-owned    # external: the hub owns the docs
 ```
 
 To undo a link, `mage unlink` removes the linkage from both sides' metadata.
+
+```mermaid
+flowchart TD
+  h["mage init --hub"] --> hs["the hub<br/>notes · decisions · projects/ · metadata.json"]
+  hs --> l["in a code repo: mage link"]
+  l --> q{"who owns this repo's notes?"}
+  q -->|hub-owned| e["live in the hub · projects/name/<br/>repo mode = external"]
+  q -->|repo-owned| r["live in the repo · mage/<br/>repo mode = hybrid"]
+```
 
 ### The shapes, side by side
 

@@ -84,6 +84,7 @@ export default defineConfig({
             },
             { label: 'The .mage/ layout', slug: 'reference/layout' },
             { label: 'Redaction (two gates)', slug: 'reference/redaction' },
+            { label: 'Glossary', slug: 'reference/glossary' },
           ],
         },
       ],

@@ -67,6 +67,58 @@ describe("mage index", () => {
     expect(second).toBe(first);
   });
 
+  // ─── MEMORY.md — the Claude Code adapter twin (ADR-0032/0033) ────────────────
+
+  it("emits a MEMORY.md twin alongside INDEX.md (flat single-wing KB)", async () => {
+    const dir = await vault();
+    await note(dir, "billing/pay.md", "---\ntype: interface\ntags: [billing/payments]\n---\n# Pay\n");
+    const r = await index({ dir });
+    expect(r.written).toContain("MEMORY.md");
+    const mem = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
+    // Flat KB: MEMORY.md folds the per-note list inline — byte-identical to INDEX.md.
+    expect(mem).toContain("[Pay](notes/billing/pay.md)");
+    expect(mem).toBe(await readFile(join(dir, "mage", "INDEX.md"), "utf8"));
+  });
+
+  it("folds the per-note list INTO MEMORY.md for a single-wing hierarchical KB", async () => {
+    const dir = await vault();
+    for (let i = 0; i < 21; i++) await note(dir, `n${i}.md`, `---\ntags: [one/r]\n---\n# n${i}\n`);
+    const r = await index({ dir });
+    expect(r.hierarchical).toBe(true);
+    expect(r.wings).toEqual(["one"]);
+    const idx = await readFile(join(dir, "mage", "INDEX.md"), "utf8");
+    const mem = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
+    // INDEX.md stays the bounded wings-map (links OUT to the per-wing index)…
+    expect(idx).toContain("[_index.one.md](_index.one.md)");
+    expect(idx).not.toContain("[n0](notes/n0.md)");
+    // …but MEMORY.md folds the per-note list inline (CC self-bounds the load at 25KB).
+    expect(mem).toContain("[n0](notes/n0.md)");
+    expect(mem).not.toContain("_index.one.md");
+  });
+
+  it("keeps MEMORY.md a bounded wings-map twin for a multi-wing hierarchical KB", async () => {
+    const dir = await vault();
+    for (const w of ["a", "b", "c", "d", "e"]) {
+      await note(dir, `${w}.md`, `---\ntags: [${w}/r]\n---\n# ${w}\n`);
+    }
+    const r = await index({ dir });
+    expect(r.hierarchical).toBe(true);
+    const mem = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
+    // Multi-wing: never inline every wing — MEMORY.md is the wings-map twin of INDEX.md.
+    expect(mem).toContain("## Wings");
+    expect(mem).toContain("[_index.a.md](_index.a.md)");
+    expect(mem).toBe(await readFile(join(dir, "mage", "INDEX.md"), "utf8"));
+  });
+
+  it("MEMORY.md is idempotent (re-run = byte-identical)", async () => {
+    const dir = await vault();
+    await note(dir, "a.md", "---\ntags: [x/y]\n---\n# A\n");
+    await index({ dir });
+    const first = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
+    await index({ dir });
+    expect(await readFile(join(dir, "mage", "MEMORY.md"), "utf8")).toBe(first);
+  });
+
   it("goes hierarchical past the wing threshold and writes per-wing files", async () => {
     const dir = await vault();
     for (const w of ["a", "b", "c", "d", "e"]) {

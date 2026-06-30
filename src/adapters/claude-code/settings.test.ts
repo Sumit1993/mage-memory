@@ -1,22 +1,30 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { tmpDir } from "../test/fixtures/kb.js";
+import { tmpDir } from "../../../test/fixtures/kb.js";
 import {
   type ClaudeSettings,
   MAGE_HOOKS,
   MAGE_ID_PREFIX,
+  isAutoMemoryEnabled,
   readClaudeSettings,
   removeMageHooks,
   resolveSettingsTarget,
   upsertMageHooks,
   writeClaudeSettings,
-} from "./claude-settings.js";
+} from "./settings.js";
+
+/** Count the mage-owned groups across every event. */
+function countMage(s: ClaudeSettings): number {
+  return Object.values(s.hooks ?? {})
+    .flat()
+    .filter((g) => typeof g.id === "string" && g.id.startsWith(MAGE_ID_PREFIX)).length;
+}
 
 const tmp = (): Promise<string> => tmpDir("mage-settings-");
 
 describe("MAGE_HOOKS table", () => {
-  it("wires exactly the ten expected event/id/command rows", () => {
+  it("wires exactly thirteen rows (10 base + 3 commandeer)", () => {
     expect(MAGE_HOOKS).toEqual([
       { event: "SessionStart", id: "mage:observe:SessionStart", command: "mage observe" },
       { event: "SessionStart", id: "mage:nudge:SessionStart", command: "mage nudge" },
@@ -32,6 +40,26 @@ describe("MAGE_HOOKS table", () => {
       { event: "Stop", id: "mage:metrics:Stop", command: "mage skills --metrics --quiet" },
       { event: "Stop", id: "mage:observe:Stop", command: "mage observe" },
       { event: "SubagentStop", id: "mage:observe:SubagentStop", command: "mage observe" },
+      {
+        event: "PreToolUse",
+        id: "mage:memory:PreToolUse",
+        matcher: "Write|Edit",
+        command: "mage memory-hook",
+        commandeer: true,
+      },
+      {
+        event: "PostToolUse",
+        id: "mage:memory:PostToolUse",
+        matcher: "Write|Edit",
+        command: "mage memory-hook",
+        commandeer: true,
+      },
+      {
+        event: "Stop",
+        id: "mage:flatten:Stop",
+        command: "mage flatten --quiet",
+        commandeer: true,
+      },
     ]);
   });
 
@@ -89,7 +117,7 @@ describe("readClaudeSettings", () => {
 describe("upsertMageHooks", () => {
   it("creates hooks from absent and preserves unknown top-level keys", () => {
     const original: ClaudeSettings = { permissions: { allow: ["Read(/x)"] } };
-    const merged = upsertMageHooks(original);
+    const merged = upsertMageHooks(original, { commandeer: true });
 
     // unknown top-level key survives untouched
     expect(merged.permissions).toEqual({ allow: ["Read(/x)"] });
@@ -99,7 +127,7 @@ describe("upsertMageHooks", () => {
       const groups = merged.hooks?.[h.event] ?? [];
       const mine = groups.find((g) => g.id === h.id);
       expect(mine).toBeDefined();
-      expect(mine?.matcher).toBeUndefined();
+      expect(mine?.matcher).toBe(h.matcher); // undefined for base rows, "Write|Edit" for commandeer
       expect(mine?.hooks).toEqual([{ type: "command", command: h.command }]);
     }
   });
@@ -137,8 +165,8 @@ describe("upsertMageHooks", () => {
   });
 
   it("is idempotent — re-upsert produces no duplicate mage groups", () => {
-    const once = upsertMageHooks(null);
-    const twice = upsertMageHooks(once);
+    const once = upsertMageHooks(null, { commandeer: true });
+    const twice = upsertMageHooks(once, { commandeer: true });
     for (const h of MAGE_HOOKS) {
       const groups = twice.hooks?.[h.event] ?? [];
       const mine = groups.filter((g) => g.id === h.id);
@@ -167,13 +195,71 @@ describe("upsertMageHooks", () => {
   });
 });
 
+describe("commandeer-tier gating (ADR-0032)", () => {
+  it("omits the commandeer rows by default (10 groups, no PreToolUse)", () => {
+    const merged = upsertMageHooks(null);
+    expect(countMage(merged)).toBe(10);
+    expect(merged.hooks?.PreToolUse).toBeUndefined();
+    // PostToolUse carries only the observe group, not the memory one.
+    const post = merged.hooks?.PostToolUse ?? [];
+    expect(post.find((g) => g.id === "mage:memory:PostToolUse")).toBeUndefined();
+    expect(post.find((g) => g.id === "mage:observe:PostToolUse")).toBeTruthy();
+  });
+
+  it("adds the commandeer rows with matchers when commandeer:true (13 groups)", () => {
+    const merged = upsertMageHooks(null, { commandeer: true });
+    expect(countMage(merged)).toBe(13);
+    const pre = merged.hooks?.PreToolUse ?? [];
+    expect(pre).toHaveLength(1);
+    expect(pre[0]?.id).toBe("mage:memory:PreToolUse");
+    expect(pre[0]?.matcher).toBe("Write|Edit");
+    expect(pre[0]?.hooks).toEqual([{ type: "command", command: "mage memory-hook" }]);
+    // PostToolUse now coexists: observe + memory.
+    const post = merged.hooks?.PostToolUse ?? [];
+    expect(post.find((g) => g.id === "mage:memory:PostToolUse")).toBeTruthy();
+    expect(post.find((g) => g.id === "mage:observe:PostToolUse")).toBeTruthy();
+  });
+
+  it("self-heals: re-upserting with commandeer off removes a prior commandeer group", () => {
+    const on = upsertMageHooks(null, { commandeer: true });
+    expect(on.hooks?.PreToolUse).toHaveLength(1);
+    const off = upsertMageHooks(on, { commandeer: false });
+    expect(off.hooks?.PreToolUse).toBeUndefined(); // event pruned
+    expect(countMage(off)).toBe(10);
+    expect(off.hooks?.PostToolUse?.find((g) => g.id === "mage:memory:PostToolUse")).toBeUndefined();
+  });
+});
+
+describe("isAutoMemoryEnabled", () => {
+  it("defaults to true (CC's documented default)", () => {
+    expect(isAutoMemoryEnabled(null, {})).toBe(true);
+    expect(isAutoMemoryEnabled({}, {})).toBe(true);
+    expect(isAutoMemoryEnabled({ autoMemoryEnabled: true }, {})).toBe(true);
+  });
+
+  it("is false when autoMemoryEnabled is explicitly false", () => {
+    expect(isAutoMemoryEnabled({ autoMemoryEnabled: false }, {})).toBe(false);
+  });
+
+  it("is false when CLAUDE_CODE_DISABLE_AUTO_MEMORY is set in env", () => {
+    expect(isAutoMemoryEnabled({}, { CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1" })).toBe(false);
+    // env override beats an enabled setting
+    expect(
+      isAutoMemoryEnabled({ autoMemoryEnabled: true }, { CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1" }),
+    ).toBe(false);
+  });
+});
+
 describe("removeMageHooks", () => {
   it("strips only mage groups, prunes empties, and counts removed", () => {
-    const wired = upsertMageHooks({
-      hooks: {
-        SessionStart: [{ matcher: "*", hooks: [{ type: "command", command: "user-tool" }] }],
+    const wired = upsertMageHooks(
+      {
+        hooks: {
+          SessionStart: [{ matcher: "*", hooks: [{ type: "command", command: "user-tool" }] }],
+        },
       },
-    });
+      { commandeer: true },
+    );
     const { settings, removed } = removeMageHooks(wired);
 
     expect(removed).toBe(MAGE_HOOKS.length);
@@ -187,7 +273,7 @@ describe("removeMageHooks", () => {
   });
 
   it("prunes the hooks{} key entirely when it becomes empty", () => {
-    const wired = upsertMageHooks({ permissions: { allow: ["X"] } });
+    const wired = upsertMageHooks({ permissions: { allow: ["X"] } }, { commandeer: true });
     const { settings, removed } = removeMageHooks(wired);
     expect(removed).toBe(MAGE_HOOKS.length);
     expect(settings.hooks).toBeUndefined();

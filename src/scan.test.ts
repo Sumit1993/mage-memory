@@ -69,6 +69,7 @@ describe("scanNotes — recursive deny-list walk (ADR-0011 §2)", () => {
   it("excludes generated index files ANYWHERE (INDEX.md + _index.*.md)", async () => {
     const root = await mkVault();
     await put(root, "INDEX.md", "# generated\n");
+    await put(root, "MEMORY.md", "# generated CC twin\n");
     await put(root, "_index.foo.md", "# generated wing index\n");
     await put(root, "projects/x/_index.bar.md", "# planted deep\n");
     await put(root, "notes/real.md", note(["x/y"]));
@@ -151,13 +152,14 @@ describe("scanNotes — multi-home wings[] (ADR-0012 §5)", () => {
 
 describe("isGeneratedArtifact (docs-root-relative; Gate-2 generated-artifact skip)", () => {
   it("matches the fixed scaffolding files ONLY at the docs root", () => {
-    for (const f of ["INDEX.md", "IDENTITY.md", "AGENTS.md", "CLAUDE.md", "Dashboard.md"]) {
+    for (const f of ["INDEX.md", "MEMORY.md", "IDENTITY.md", "AGENTS.md", "CLAUDE.md", "Dashboard.md"]) {
       expect(isGeneratedArtifact(f)).toBe(true);
     }
   });
 
   it("does NOT match a reserved basename in a subdirectory (author content → must be scanned)", () => {
     expect(isGeneratedArtifact("notes/INDEX.md")).toBe(false);
+    expect(isGeneratedArtifact("notes/MEMORY.md")).toBe(false);
     expect(isGeneratedArtifact("notes/decisions/AGENTS.md")).toBe(false);
     expect(isGeneratedArtifact("projects/p/INDEX.md")).toBe(false);
   });
@@ -176,5 +178,52 @@ describe("isGeneratedArtifact (docs-root-relative; Gate-2 generated-artifact ski
   it("does NOT match an ordinary authored note", () => {
     expect(isGeneratedArtifact("notes/my-lesson.md")).toBe(false);
     expect(isGeneratedArtifact("README.md")).toBe(false);
+  });
+});
+
+describe("scanNotes — dual-format tolerance (ADR-0035 §3)", () => {
+  it("reads a transiently CC-restamped note's wing/type from nested metadata.*", async () => {
+    const root = await mkVault();
+    // CC's aggressive restamp: the whole authored frontmatter nested under metadata.
+    await put(
+      root,
+      "notes/restamped.md",
+      [
+        "---",
+        'name: ""',
+        "metadata:",
+        "  node_type: memory",
+        "  type: reference",
+        "  tags:",
+        "    - billing/payments",
+        "  status: active",
+        "---",
+        "# Restamped",
+        "",
+        "body",
+        "",
+      ].join("\n"),
+    );
+    const out = await scanNotes(root);
+    const n = out.find((x) => x.relPath === "notes/restamped.md");
+    expect(n).toBeDefined();
+    // Wing/type/status recovered from metadata.* — not mis-indexed as cross-cutting.
+    expect(n?.wing).toBe("billing");
+    expect(n?.room).toBe("payments");
+    expect(n?.type).toBe("reference");
+    expect(n?.status).toBe("active");
+  });
+
+  it("a top-level field still wins over a nested one", async () => {
+    const root = await mkVault();
+    await put(
+      root,
+      "notes/mixed.md",
+      ["---", "type: gotcha", "tags: [a/b]", "metadata:", "  type: reference", "  tags:", "    - c/d", "---", "# Mixed", "", "body", ""].join("\n"),
+    );
+    const out = await scanNotes(root);
+    const n = out.find((x) => x.relPath === "notes/mixed.md");
+    expect(n?.type).toBe("gotcha"); // top-level wins
+    expect(n?.wing).toBe("a");
   });
 });

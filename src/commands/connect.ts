@@ -1,16 +1,28 @@
 import { confirm } from "@inquirer/prompts";
 import {
+  hasCommandeerHooks,
+  isAutoMemoryEnabled,
   readClaudeSettings,
   resolveSettingsTarget,
   upsertMageHooks,
   writeClaudeSettings,
   MAGE_HOOKS,
-} from "../claude-settings.js";
-import { resolveDecision } from "../interactive.js";
+} from "../adapters/claude-code/settings.js";
+import { discoverMemoryDirs } from "../adapters/claude-code/projects.js";
+import { adopt } from "./adopt.js";
+import { isInteractive, resolveDecision } from "../interactive.js";
 import { installRedactHook } from "../git-hooks.js";
 import { ensureGitignored } from "../gitignore.js";
 import { logger } from "../logger.js";
-import { absolutePath, exists, looksLikeHub, readHubMetadata, resolveDocsRoot } from "../paths.js";
+import {
+  type ResolvedDocsRoot,
+  absolutePath,
+  exists,
+  looksLikeHub,
+  ownedDocsRoots,
+  readHubMetadata,
+  resolveDocsRoot,
+} from "../paths.js";
 
 /** Options for {@link connect}. */
 export interface ConnectOptions {
@@ -25,6 +37,8 @@ export interface ConnectOptions {
    * toggleable — pass `false` to wire capture without the safety net. Default true.
    */
   gitHook?: boolean;
+  /** Claude Code config home for the commandeer-coverage check (tests inject a fake `~/.claude`). */
+  home?: string;
 }
 
 /** Result of {@link connect}. */
@@ -33,6 +47,8 @@ export interface ConnectResult {
   scope: "local" | "user";
   wired: number;
   backedUp: boolean;
+  /** True iff the ADR-0032 commandeer tier was wired (auto-memory on + a local KB root). */
+  commandeer: boolean;
   /** Outcome of the pre-commit redaction hook install (omitted when not attempted). */
   hook?: { installed: boolean; reason?: string };
 }
@@ -68,16 +84,65 @@ export async function connect(opts: ConnectOptions): Promise<ConnectResult> {
 
   if (!proceed) {
     logger.info("Aborted — no changes made.");
-    return { path: target.path, scope: target.scope, wired: 0, backedUp: false };
+    return { path: target.path, scope: target.scope, wired: 0, backedUp: false, commandeer: false };
   }
 
-  const merged = upsertMageHooks(r.settings);
+  // Commandeer tier (ADR-0032): redirect + scrub native-memory writes via a PreToolUse
+  // hook + relocate CC's memory dir to the KB. Gated on (a) CC auto-memory being on,
+  // (b) a resolvable KB docs root (the autoMemoryDirectory target), and (c) LOCAL scope
+  // — autoMemoryDirectory is a machine-specific absolute path, so it belongs only in the
+  // gitignored settings.local.json, never a shared/global file (`--user`).
+  const kb = await resolveDocsRoot(opts.cwd ?? process.cwd());
+  const commandeer =
+    isAutoMemoryEnabled(r.settings, process.env) && kb !== null && target.scope === "local";
+
+  const merged = upsertMageHooks(r.settings, { commandeer });
+  if (commandeer && kb) {
+    // Preserve a user's OWN autoMemoryDirectory so disconnect can restore it rather than
+    // clobber it. mage owns the value iff it previously commandeered (its commandeer hooks
+    // are present); any pre-existing value with no commandeer hooks is the user's — stash it
+    // (even when it already equals the KB root, so a later disconnect RESTORES the user's
+    // explicit choice instead of deleting it). Only warn when we are actually displacing.
+    const prior =
+      typeof r.settings?.autoMemoryDirectory === "string"
+        ? r.settings.autoMemoryDirectory
+        : undefined;
+    if (prior !== undefined && !hasCommandeerHooks(r.settings)) {
+      merged.mageStashedAutoMemoryDirectory = prior;
+      if (prior !== kb.root) {
+        logger.warn(
+          `Displacing your autoMemoryDirectory (${prior}) → ${kb.root} for the commandeer tier; \`mage disconnect\` restores it.`,
+        );
+      }
+    }
+    merged.autoMemoryDirectory = kb.root;
+  } else if (hasCommandeerHooks(r.settings) && "autoMemoryDirectory" in merged) {
+    // The commandeer tier just gated OFF (auto-memory disabled, KB no longer resolvable,
+    // or --user scope) but mage previously owned the relocation. upsertMageHooks already
+    // stripped the scrub hooks; reconcile autoMemoryDirectory symmetrically so CC is never
+    // left writing memories to the KB with NO Gate-0 scrub: restore the stashed user value,
+    // else drop mage's KB value.
+    const stashed =
+      typeof merged.mageStashedAutoMemoryDirectory === "string"
+        ? merged.mageStashedAutoMemoryDirectory
+        : undefined;
+    if (stashed !== undefined) {
+      merged.autoMemoryDirectory = stashed;
+    } else {
+      delete merged.autoMemoryDirectory;
+    }
+    delete merged.mageStashedAutoMemoryDirectory;
+    logger.detail("Released the CC auto-memory relocation (commandeer tier off).");
+  }
   const { backedUp } = await writeClaudeSettings(target.path, merged);
 
-  const wired = MAGE_HOOKS.length;
+  const wired = MAGE_HOOKS.filter((h) => h.commandeer !== true || commandeer).length;
   // settings.local.json is itself personal + gitignored by Claude Code; the capture
   // SINKS those hooks feed (.learnings/, .metrics/) are gitignored separately below.
   logger.success(`Wired ${wired} events into ${target.path} (personal settings file).`);
+  if (commandeer && kb) {
+    logger.detail(`Commandeered CC auto-memory → ${kb.root} (writes redirect + scrub into mage; MEMORY.md mage-owned).`);
+  }
   logger.detail("Run `mage disconnect` to remove.");
 
   // Self-heal the capture-sink ignores so the dirs these hooks write can never be
@@ -94,7 +159,60 @@ export async function connect(opts: ConnectOptions): Promise<ConnectResult> {
   // hook, so this is safe to attempt unconditionally. A non-repo cwd no-ops.
   const hook = opts.gitHook === false ? undefined : await installHook(opts.cwd ?? process.cwd());
 
-  return { path: target.path, scope: target.scope, wired, backedUp, hook };
+  // Commandeer-coverage (ADR-0034 §6-7): the redirect we just wired covers FUTURE
+  // captures for THIS cwd only, but CC keys memory by launch cwd — so sibling cwds
+  // (org root, hub, other repos) may already hold orphaned memories that resolve to
+  // this same KB. Surface them and, interactively, offer to adopt now. Fail-open and
+  // read-only here — we flag/offer but never reach into another cwd's settings.
+  if (commandeer && kb) {
+    await offerCommandeerCoverage(kb, { cwd: opts.cwd, yes: opts.yes, home: opts.home });
+  }
+
+  return { path: target.path, scope: target.scope, wired, backedUp, commandeer, hook };
+}
+
+/**
+ * After commandeering, count the pre-existing CC memories whose recovered origin
+ * cwd resolves to THIS KB (the coverage map, ADR-0034 §7) and either offer to adopt
+ * them now (interactive) or print the nudge (non-interactive — connect never
+ * auto-adopts, ADR-0034 §6). Fully fail-open: a discovery hiccup never breaks a
+ * connect.
+ */
+async function offerCommandeerCoverage(
+  kb: ResolvedDocsRoot,
+  opts: { cwd?: string; yes?: boolean; home?: string },
+): Promise<void> {
+  try {
+    const owned = new Set(await ownedDocsRoots(kb));
+    const cwds = new Set<string>();
+    let orphans = 0;
+    for (const dir of await discoverMemoryDirs({ home: opts.home })) {
+      if (!dir.cwd) continue;
+      const originKb = await resolveDocsRoot(dir.cwd);
+      if (originKb && owned.has(originKb.root)) {
+        orphans += dir.files.length;
+        cwds.add(dir.cwd);
+      }
+    }
+    if (orphans === 0) return;
+
+    logger.info(
+      `Commandeer-coverage: up to ${orphans} pre-existing memor${orphans === 1 ? "y" : "ies"} ` +
+        `across ${cwds.size} cwd(s) map to this KB but predate the redirect.`,
+    );
+    if (!(isInteractive() && !opts.yes)) {
+      logger.detail("Run `mage adopt` to fold them into the inbox (you can do it later).");
+      return;
+    }
+    const adoptNow = await confirm({ message: `Adopt them now?`, default: true });
+    if (adoptNow) {
+      await adopt({ dir: opts.cwd, yes: true, home: opts.home });
+    } else {
+      logger.detail("Skipped — run `mage adopt` anytime to fold them in.");
+    }
+  } catch (err) {
+    logger.detail(`Commandeer-coverage check skipped: ${(err as Error).message}`);
+  }
 }
 
 /**
@@ -142,10 +260,14 @@ async function ensureSinkIgnores(startDir: string): Promise<void> {
 async function installHook(repo: string): Promise<{ installed: boolean; reason?: string }> {
   const r = await installRedactHook(repo);
   if (r.installed) {
-    logger.success("Installed the redaction pre-commit hook (mage redact --check --staged)");
+    logger.success(
+      r.reason === "upgraded"
+        ? "Upgraded the mage pre-commit hook (now flattens harness-shaped notes + redaction check)"
+        : "Installed the mage pre-commit hook (flatten harness-shaped notes + mage redact --check --staged)",
+    );
   } else if (r.reason === "exists-foreign") {
     logger.warn(
-      "A pre-commit hook already exists — add `mage redact --check --staged` to it for staged-secret blocking.",
+      "A pre-commit hook already exists — add `mage flatten --staged --quiet || true` then `mage redact --check --staged` to it for note normalization + staged-secret blocking.",
     );
   } else if (r.reason === "already") {
     logger.detail("Redaction pre-commit hook already present.");

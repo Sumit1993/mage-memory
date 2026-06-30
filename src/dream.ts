@@ -1,6 +1,7 @@
 import { readdir } from "node:fs/promises";
 import { join, posix } from "node:path";
-import { readNote } from "./note.js";
+import { isCcShaped } from "./adapters/claude-code/cc-note.js";
+import { type Note, readNote } from "./note.js";
 import { type HubMetadata, PROJECTS_DIR, exists } from "./paths.js";
 import { type ScannedNote, scanNotes } from "./scan.js";
 
@@ -109,19 +110,28 @@ export async function analyzeDream(root: string, opts: DreamOptions = {}): Promi
   // defensively by relPath so the by-relPath model holds regardless of how the
   // scanner represents wings.
   const raw = await scanNotes(root);
-  const scanned = [...new Map(raw.map((s) => [s.relPath, s])).values()];
+  const deduped = [...new Map(raw.map((s) => [s.relPath, s])).values()];
+
+  // Read each note body once (scan already gave us status/lastReviewed/title), and
+  // drop UNGROOMED CAPTURES while we have the frontmatter: Gate-0/adopt place native
+  // memories (`metadata.node_type: memory`) at the docs-root top as an inbox awaiting
+  // `mage groom` (ADR-0032/0034). They are not notes yet — counting them as orphans,
+  // stale, or untagged is pure noise, so they never enter the health scan.
+  const bodies = new Map<string, string>();
+  const scanned: ScannedNote[] = [];
+  for (const s of deduped) {
+    let note: Note | null = null;
+    try {
+      note = await readNote(join(root, s.relPath));
+    } catch {
+      note = null;
+    }
+    if (note && isCcShaped(note.frontmatter)) continue;
+    scanned.push(s);
+    bodies.set(s.relPath, note?.body ?? "");
+  }
   const noteSet = new Set(scanned.map((s) => s.relPath));
   const statusOf = new Map(scanned.map((s) => [s.relPath, s.status]));
-
-  // Read each note body once (scan already gave us status/lastReviewed/title).
-  const bodies = new Map<string, string>();
-  for (const s of scanned) {
-    try {
-      bodies.set(s.relPath, (await readNote(join(root, s.relPath))).body);
-    } catch {
-      bodies.set(s.relPath, "");
-    }
-  }
 
   const danglingLinks: DreamFinding[] = [];
   const supersededButActive: DreamFinding[] = [];

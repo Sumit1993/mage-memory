@@ -5,7 +5,7 @@ import { gitInit } from "../git.js";
 import { resolveHooksDir } from "../git-hooks.js";
 import { connect } from "./connect.js";
 import { disconnect } from "./disconnect.js";
-import { tmpDir } from "../../test/fixtures/kb.js";
+import { tmpDir, withKb } from "../../test/fixtures/kb.js";
 
 function localPath(dir: string): string {
   return join(dir, ".claude", "settings.local.json");
@@ -53,6 +53,59 @@ describe("disconnect", () => {
       .filter((id): id is string => typeof id === "string" && id.startsWith("mage:"));
     expect(ids).toHaveLength(0);
     expect(settings.hooks.SessionStart?.find((g) => g.hooks[0]?.command === "host-thing")).toBeTruthy();
+  });
+
+  it("unsets autoMemoryDirectory it set (commandeer round-trip)", async () => {
+    const { dir, root } = await withKb({ kind: "repo" });
+    const c = await connect({ cwd: dir, yes: true, gitHook: false });
+    expect(c.commandeer).toBe(true);
+    const wired = JSON.parse(await readFile(localPath(dir), "utf8")) as { autoMemoryDirectory?: string };
+    expect(wired.autoMemoryDirectory).toBe(root);
+
+    const r = await disconnect({ cwd: dir, yes: true, gitHook: false });
+    expect(r.autoMemoryUnset).toBe(true);
+    expect(r.removed).toBe(13); // all 13 mage groups (incl. the 3 commandeer)
+    const settings = JSON.parse(await readFile(localPath(dir), "utf8")) as {
+      autoMemoryDirectory?: string;
+      hooks?: unknown;
+    };
+    expect(settings.autoMemoryDirectory).toBeUndefined();
+    expect(settings.hooks).toBeUndefined(); // all mage groups gone → hooks pruned
+  });
+
+  it("preserves a user's own autoMemoryDirectory when mage never commandeered", async () => {
+    // The sharp clobber repro: a settings file with the user's own autoMemoryDirectory and
+    // only BASE mage hooks (no commandeer). disconnect must NOT delete the foreign value.
+    const dir = await tmpDir("mage-disconnect-");
+    await mkdir(join(dir, ".claude"), { recursive: true });
+    const pre = {
+      autoMemoryDirectory: "/my/own/dir",
+      hooks: {
+        SessionStart: [
+          { id: "mage:observe:SessionStart", hooks: [{ type: "command", command: "mage observe" }] },
+        ],
+      },
+    };
+    await writeFile(localPath(dir), `${JSON.stringify(pre, null, 2)}\n`);
+    const r = await disconnect({ cwd: dir, yes: true, gitHook: false });
+    expect(r.autoMemoryUnset).toBe(false);
+    const settings = JSON.parse(await readFile(localPath(dir), "utf8")) as { autoMemoryDirectory?: string };
+    expect(settings.autoMemoryDirectory).toBe("/my/own/dir"); // left untouched
+  });
+
+  it("restores a stashed user autoMemoryDirectory across connect/disconnect", async () => {
+    const { dir } = await withKb({ kind: "repo" });
+    await mkdir(join(dir, ".claude"), { recursive: true });
+    await writeFile(localPath(dir), JSON.stringify({ autoMemoryDirectory: "/my/own/dir" }));
+    await connect({ cwd: dir, yes: true, gitHook: false }); // commandeers, stashes the user value
+    const r = await disconnect({ cwd: dir, yes: true, gitHook: false });
+    expect(r.autoMemoryUnset).toBe(true);
+    const settings = JSON.parse(await readFile(localPath(dir), "utf8")) as {
+      autoMemoryDirectory?: string;
+      mageStashedAutoMemoryDirectory?: string;
+    };
+    expect(settings.autoMemoryDirectory).toBe("/my/own/dir"); // restored, not deleted
+    expect(settings.mageStashedAutoMemoryDirectory).toBeUndefined(); // stash cleaned up
   });
 
   it("disconnect on a missing file is a clean no-op", async () => {

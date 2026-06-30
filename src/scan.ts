@@ -5,6 +5,7 @@ import {
   type Note,
   type NoteFrontmatter,
   deriveKeywords,
+  effectiveFrontmatter,
   noteTitle,
   noteWings,
   readNote,
@@ -19,6 +20,7 @@ import {
   GIT_DIR,
   IDENTITY_FILE,
   INDEX_FILE,
+  MEMORY_FILE,
   NODE_MODULES_DIR,
   OBSIDIAN_DIR,
   STATE_DIR,
@@ -51,6 +53,7 @@ const SKIP_DIRS = new Set<string>([
  */
 const RESERVED_MD = new Set<string>([
   INDEX_FILE,
+  MEMORY_FILE, // the Claude Code adapter index twin (ADR-0032) — generated, never a note
   IDENTITY_FILE,
   AGENTS_FILE,
   CLAUDE_FILE,
@@ -163,9 +166,15 @@ async function walk(dir: string, root: string, out: ScannedNote[]): Promise<void
 }
 
 function toScanned(fm: NoteFrontmatter, body: string, abs: string, relPath: string): ScannedNote {
+  // Dual-format tolerance (ADR-0035 §3): a note CC has transiently restamped buries its
+  // real fields (type, tags, status, …) under nested `metadata.*`. Read an EFFECTIVE
+  // view (top-level wins, `metadata.*` as fallback) so index/dream/groom categorize it
+  // correctly even before the durable-boundary flatten runs. Harness-neutral — a plain
+  // nested read, no CC-specific vocab mapping (the neutral-core posture, ADR-0035 §6).
+  const efm = effectiveFrontmatter(fm);
   // Multi-home: every tag-wing, primary first, with unsafe segments dropped so a
   // crafted tag like `../x` can never drive file creation or deletion.
-  const wings = noteWings(fm).filter((w) => safeSegment(w.wing));
+  const wings = noteWings(efm).filter((w) => safeSegment(w.wing));
   const primary = wings[0];
   return {
     relPath,
@@ -173,10 +182,10 @@ function toScanned(fm: NoteFrontmatter, body: string, abs: string, relPath: stri
     wing: primary ? primary.wing : CROSS,
     room: primary ? primary.room : "",
     title: noteTitle(body, abs),
-    type: typeof fm.type === "string" && fm.type.trim() ? fm.type.trim() : "note",
-    keywords: deriveKeywords(fm, body, abs),
-    status: typeof fm.status === "string" ? fm.status : undefined,
-    lastReviewed: typeof fm.last_reviewed === "string" ? fm.last_reviewed : undefined,
+    type: typeof efm.type === "string" && efm.type.trim() ? efm.type.trim() : "note",
+    keywords: deriveKeywords(efm, body, abs),
+    status: typeof efm.status === "string" ? efm.status : undefined,
+    lastReviewed: typeof efm.last_reviewed === "string" ? efm.last_reviewed : undefined,
   };
 }
 

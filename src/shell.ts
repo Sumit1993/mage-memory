@@ -27,16 +27,24 @@ export function run(command: string, args: string[], opts: RunOptions = {}): Pro
       stdio: opts.inherit ? "inherit" : ["ignore", "pipe", "pipe"],
     });
 
-    let stdout = "";
-    let stderr = "";
+    // Accumulate raw Buffers and decode ONCE at close — never per-chunk. A multibyte
+    // UTF-8 char (or a secret token) can straddle two pipe reads; per-chunk `toString()`
+    // would decode each half independently, corrupting the boundary char (U+FFFD) and
+    // letting a split secret evade the redaction scanner. Buffer.concat then decode is exact.
+    const outChunks: Buffer[] = [];
+    const errChunks: Buffer[] = [];
     if (!opts.inherit) {
-      child.stdout?.on("data", (d) => (stdout += d.toString()));
-      child.stderr?.on("data", (d) => (stderr += d.toString()));
+      child.stdout?.on("data", (d: Buffer) => outChunks.push(d));
+      child.stderr?.on("data", (d: Buffer) => errChunks.push(d));
     }
 
     child.on("error", reject);
     child.on("close", (code) => {
-      const result: RunResult = { code: code ?? 1, stdout, stderr };
+      const result: RunResult = {
+        code: code ?? 1,
+        stdout: Buffer.concat(outChunks).toString("utf8"),
+        stderr: Buffer.concat(errChunks).toString("utf8"),
+      };
       if (opts.throwOnError && result.code !== 0) {
         reject(
           new Error(

@@ -8,12 +8,13 @@ import { join } from "node:path";
 import {
   type ClaudeSettings,
   diffMageHooks,
+  hasCommandeerHooks,
   readClaudeSettings,
   removeMageHooks,
   resolveSettingsTarget,
   upsertMageHooks,
   writeClaudeSettings,
-} from "../claude-settings.js";
+} from "../adapters/claude-code/settings.js";
 import { LAYOUT_LEAVES, mageMigrate } from "../commands/migrate.js";
 import type { DoctorCheck, DoctorOptions } from "../commands/doctor.js";
 import { detectRedactHook } from "../git-hooks.js";
@@ -310,7 +311,11 @@ async function resolveConnection(opts: DoctorOptions): Promise<Connection> {
   const cwd = opts.cwd ?? process.cwd();
   const localPath = resolveSettingsTarget({ cwd }).path;
   const localRead = await readClaudeSettings(localPath);
-  let diff = diffMageHooks(localRead.settings);
+  // Drive the commandeer flag off the INSTALLED hooks so a commandeer-wired settings
+  // file is drift-checked for its mage:memory:* rows (else a stale commandeer command
+  // across a version bump is silently never detected/fixed), while a base-only file is
+  // not falsely flagged as "missing commandeer rows".
+  let diff = diffMageHooks(localRead.settings, { commandeer: hasCommandeerHooks(localRead.settings) });
   let scope = "local";
   let settingsPath = localPath;
   let settings = localRead.settings;
@@ -318,7 +323,7 @@ async function resolveConnection(opts: DoctorOptions): Promise<Connection> {
   if (!diff.connected) {
     const userPath = resolveSettingsTarget({ user: true }).path;
     const userRead = await readClaudeSettings(userPath);
-    const userDiff = diffMageHooks(userRead.settings);
+    const userDiff = diffMageHooks(userRead.settings, { commandeer: hasCommandeerHooks(userRead.settings) });
     if (userDiff.connected) {
       diff = userDiff;
       scope = "user";
@@ -417,10 +422,14 @@ async function pushConnectionCheck(
  */
 async function refreshHookBlock(conn: Connection): Promise<MageDiff | null> {
   try {
+    // Preserve the commandeer tier across the strip+re-add if it was wired (detected by
+    // the mage:memory:* id family). --fix repairs drift; it must never silently strip
+    // Gate-0. A base-only block stays base.
+    const commandeer = hasCommandeerHooks(conn.settings);
     const cleared = removeMageHooks(conn.settings).settings;
-    const refreshed = upsertMageHooks(cleared);
+    const refreshed = upsertMageHooks(cleared, { commandeer });
     await writeClaudeSettings(conn.settingsPath, refreshed);
-    return diffMageHooks(refreshed);
+    return diffMageHooks(refreshed, { commandeer });
   } catch {
     return null;
   }

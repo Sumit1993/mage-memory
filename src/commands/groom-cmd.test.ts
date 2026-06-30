@@ -1,7 +1,8 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
-import { exists } from "../paths.js";
+import { describe, expect, it, vi } from "vitest";
+import { exists, stagingPath } from "../paths.js";
+import { parseNote } from "../note.js";
 import { withKb } from "../../test/fixtures/kb.js";
 import { groomCmd } from "./groom-cmd.js";
 import { stageCmd } from "./stage-cmd.js";
@@ -12,6 +13,7 @@ async function makeKb(): Promise<string> {
 }
 
 const stagingFile = (dir: string, slug: string) => join(dir, "mage", ".staging", `${slug}.md`);
+const stagingFile2 = (dir: string, slug: string) => join(stagingPath(join(dir, "mage")), `${slug}.md`);
 const noteFile = (dir: string, slug: string) => join(dir, "mage", "notes", `${slug}.md`);
 
 /** Stage N distinct drafts; returns their slugs in stage order. */
@@ -101,6 +103,71 @@ describe("mage groom — reject", () => {
     const again = await stageCmd({ dir, title: "Alpha redaction rule", tags: "mage/redact", body: "alpha lesson about scrubbing" });
     expect(again.staged).toBe(false);
     expect(again.reason).toBe("rejected");
+  });
+});
+
+describe("mage groom — inbox ingest (ADR-0032)", () => {
+  // A Gate-0 capture sitting flat at the docs-root top (CC-renormalized frontmatter,
+  // already-scrubbed-and-shaped body).
+  function gate0Capture(body: string, session = "sess-x"): string {
+    return `---\nname: ""\nmetadata:\n  node_type: memory\n  type: note\n  created: 2026-06-27\n  originSessionId: ${session}\n---\n\n${body}\n`;
+  }
+
+  it("ingests an inbox capture into staging and surfaces it", async () => {
+    const dir = await makeKb();
+    const root = join(dir, "mage");
+    await mkdir(root, { recursive: true });
+    await writeFile(join(root, "ssh-timeout-fix.md"), gate0Capture("# SSH timeout fix\n\nbump ServerAliveInterval to 30."));
+
+    const r = await groomCmd({ dir });
+    expect(r.ingested).toEqual(["ssh-timeout-fix"]);
+    expect(r.pending).toBe(1);
+    expect(r.drafts?.[0]?.slug).toBe("ssh-timeout-fix");
+    // Moved: gone from the root inbox, now a staged draft.
+    expect(await exists(join(root, "ssh-timeout-fix.md"))).toBe(false);
+    expect(await exists(stagingFile2(dir, "ssh-timeout-fix"))).toBe(true);
+  });
+
+  it("promotes an ingested capture to notes/ on --accept all (provenance stamped)", async () => {
+    const dir = await makeKb();
+    const root = join(dir, "mage");
+    await mkdir(root, { recursive: true });
+    await writeFile(join(root, "ssh-timeout-fix.md"), gate0Capture("# SSH timeout fix\n\nbump ServerAliveInterval to 30."));
+
+    await groomCmd({ dir }); // ingest + surface
+    const r = await groomCmd({ dir, accept: "all" });
+    expect(r.accepted).toEqual(["notes/ssh-timeout-fix.md"]);
+    const note = await readFile(noteFile(dir, "ssh-timeout-fix"), "utf8");
+    expect(note).toContain("# SSH timeout fix");
+    expect(note).toContain("cc-session:sess-x"); // session pointer survives to the note
+    const { frontmatter } = parseNote(note);
+    expect(frontmatter.provenance).toBeDefined(); // stamped at the promote chokepoint (ADR-0031)
+  });
+
+  it("--accept all --json emits a clean single JSON line (no index logging leak)", async () => {
+    // F6: index()'s 'Indexed N note(s)...' success/detail must not corrupt the --json
+    // stdout contract. acceptBatch passes quiet:true to index() in json mode.
+    const dir = await makeKb();
+    const root = join(dir, "mage");
+    await mkdir(root, { recursive: true });
+    await writeFile(join(root, "x-capture.md"), gate0Capture("# X capture\n\na distinct body."));
+    await groomCmd({ dir }); // ingest x-capture into staging
+
+    const logs: string[] = [];
+    const out: string[] = [];
+    const clog = vi.spyOn(console, "log").mockImplementation((m?: unknown) => void logs.push(String(m)));
+    const swrite = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation((m: unknown) => (out.push(String(m)), true) as never);
+    try {
+      await groomCmd({ dir, accept: "all", json: true });
+    } finally {
+      clog.mockRestore();
+      swrite.mockRestore();
+    }
+    expect(logs).toHaveLength(0); // nothing leaked to console.log (index/accept human lines)
+    const parsed = JSON.parse(out.join("").trim());
+    expect(parsed.accepted).toContain("notes/x-capture.md");
   });
 });
 

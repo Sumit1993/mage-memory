@@ -15,7 +15,7 @@
 // JSON diff is stable.
 
 import { type Command, Help } from "commander";
-import { MAGE_HOOKS } from "../claude-settings.js";
+import { MAGE_HOOKS } from "../adapters/claude-code/settings.js";
 import { buildProgram } from "../cli-program.js";
 import {
   BASE_THRESHOLDS,
@@ -161,6 +161,11 @@ const HOOK_PURPOSE: Record<string, string> = {
   "mage:metrics:Stop": "Roll up context-match: did the skills that auto-loaded actually match the work that followed?",
   "mage:observe:Stop": "Capture the agent's final reply (ADR-0019 amendment to ADR-0015).",
   "mage:observe:SubagentStop": "Capture autonomous subagent work — a Task subagent's final reply, the one capture point for multi-agent workflows.",
+  "mage:memory:PreToolUse":
+    "Gate-0 (ADR-0032): redirect + scrub a native-memory write into mage's note schema before it touches disk, or deny a write to a generated index.",
+  "mage:memory:PostToolUse": "Nudge `mage groom` after a captured topic-note write (ADR-0032).",
+  "mage:flatten:Stop":
+    "ADR-0035 working-tree sweep: at turn-end, after CC's async restamp settles, flatten any note CC restamped this turn back to mage's flat schema — keeping the working tree neutral between commits (commit-flatten stays the durable guarantee).",
 };
 
 /**

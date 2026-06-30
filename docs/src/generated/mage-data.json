@@ -150,6 +150,24 @@
       "id": "mage:observe:SubagentStop",
       "command": "mage observe",
       "purpose": "Capture autonomous subagent work — a Task subagent's final reply, the one capture point for multi-agent workflows."
+    },
+    {
+      "event": "PreToolUse",
+      "id": "mage:memory:PreToolUse",
+      "command": "mage memory-hook",
+      "purpose": "Gate-0 (ADR-0032): redirect + scrub a native-memory write into mage's note schema before it touches disk, or deny a write to a generated index."
+    },
+    {
+      "event": "PostToolUse",
+      "id": "mage:memory:PostToolUse",
+      "command": "mage memory-hook",
+      "purpose": "Nudge `mage groom` after a captured topic-note write (ADR-0032)."
+    },
+    {
+      "event": "Stop",
+      "id": "mage:flatten:Stop",
+      "command": "mage flatten --quiet",
+      "purpose": "ADR-0035 working-tree sweep: at turn-end, after CC's async restamp settles, flatten any note CC restamped this turn back to mage's flat schema — keeping the working tree neutral between commits (commit-flatten stays the durable guarantee)."
     }
   ],
   "commands": [
@@ -211,7 +229,7 @@
     },
     {
       "name": "index",
-      "summary": "(Re)generate INDEX.md — the always-loaded index of notes (deterministic, idempotent)",
+      "summary": "(Re)generate INDEX.md + the Claude Code MEMORY.md twin — the always-loaded index of notes (deterministic, idempotent)",
       "aliases": [],
       "hidden": true,
       "options": [
@@ -418,6 +436,18 @@
       ]
     },
     {
+      "name": "memory-hook",
+      "summary": "Hook-fired Claude Code Gate-0 capture gate: on PreToolUse, redirect + scrub a native-memory write into mage's note schema (or deny a write to a generated index); on PostToolUse, nudge `mage groom` (ADR-0032/0033; never blocks the host)",
+      "aliases": [],
+      "hidden": true,
+      "options": [
+        {
+          "flags": "--cwd <dir>",
+          "description": "working directory used to locate the knowledge base (overrides the hook JSON cwd; defaults to it, then process.cwd())"
+        }
+      ]
+    },
+    {
       "name": "redact",
       "summary": "Deterministically scan a file or stdin for secrets/PII (ADR-0014 Gate 2); --strip emits redacted text",
       "aliases": [],
@@ -438,6 +468,22 @@
         {
           "flags": "--check",
           "description": "report-only intent for hooks"
+        }
+      ]
+    },
+    {
+      "name": "flatten",
+      "summary": "Normalize harness-shaped (Claude Code) notes to mage's flat schema (ADR-0035): --staged flattens staged blobs at the commit boundary; default sweeps the working tree (the Stop hook). Never blocks.",
+      "aliases": [],
+      "hidden": true,
+      "options": [
+        {
+          "flags": "--staged",
+          "description": "flatten staged git changes (the pre-commit guarantee)"
+        },
+        {
+          "flags": "--quiet",
+          "description": "suppress the report"
         }
       ]
     },
@@ -518,6 +564,30 @@
         {
           "flags": "--dir <path>",
           "description": "where to look for the knowledge base (default: cwd; walks up)"
+        }
+      ]
+    },
+    {
+      "name": "adopt",
+      "summary": "Onboard pre-existing Claude Code memories into this KB's capture inbox: place in-shape captures, report out-of-shape to distill (plan-first; never commits)",
+      "aliases": [],
+      "hidden": false,
+      "options": [
+        {
+          "flags": "-d, --dir <path>",
+          "description": "where to look for the knowledge base (default: cwd; walks up for in-repo)"
+        },
+        {
+          "flags": "--all",
+          "description": "whole-machine sweep: adopt memories for every KB they belong to, not just this one"
+        },
+        {
+          "flags": "--dry-run",
+          "description": "stop at the plan; write nothing"
+        },
+        {
+          "flags": "-y, --yes",
+          "description": "non-interactive: skip the confirmation prompt"
         }
       ]
     },

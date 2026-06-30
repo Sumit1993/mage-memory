@@ -28,6 +28,18 @@ export interface HookGroup {
 
 export interface ClaudeSettings {
   hooks?: Record<string, HookGroup[]>;
+  /** Claude Code's documented auto-memory toggle (default true). */
+  autoMemoryEnabled?: boolean;
+  /**
+   * Relocates CC's per-project memory dir to the KB docs root (ADR-0032 commandeer
+   * tier). Machine-specific absolute path → lives in the gitignored settings.local.json.
+   */
+  autoMemoryDirectory?: string;
+  /**
+   * mage-owned: a user's own `autoMemoryDirectory` that `mage connect` displaced when it
+   * commandeered the tier, so `mage disconnect` can restore it instead of clobbering it.
+   */
+  mageStashedAutoMemoryDirectory?: string;
   [k: string]: unknown;
 }
 
@@ -35,10 +47,20 @@ export interface ClaudeSettings {
 export const MAGE_ID_PREFIX = "mage:";
 
 /**
- * The complete set of hooks mage wires into a host's settings. mage groups
- * carry NO matcher (they observe all tools) and are keyed by a stable `id`.
+ * The complete set of hooks mage wires into a host's settings, keyed by a stable
+ * `id`. Most groups carry NO matcher (they observe all tools); the ADR-0032
+ * commandeer rows carry `matcher: "Write|Edit"` and `commandeer: true` (wired only
+ * when CC auto-memory is on AND a docs root resolves — see `upsertMageHooks`).
  */
-export const MAGE_HOOKS: ReadonlyArray<{ event: string; id: string; command: string }> = [
+export const MAGE_HOOKS: ReadonlyArray<{
+  event: string;
+  id: string;
+  command: string;
+  /** CC tool matcher (e.g. "Write|Edit"); omitted ⇒ the group observes all tools. */
+  matcher?: string;
+  /** Commandeer-tier row (ADR-0032) — gated on auto-memory + a docs root. */
+  commandeer?: boolean;
+}> = [
   { event: "SessionStart", id: "mage:observe:SessionStart", command: "mage observe" },
   // The boundary nudge (0.0.12, ADR-0009 §24 step 2; ADR-0030 §5): fires on
   // SessionStart source compact/startup/resume — on compact it distills the just-closed
@@ -61,7 +83,59 @@ export const MAGE_HOOKS: ReadonlyArray<{ event: string; id: string; command: str
   // from the subagent transcript, exactly like Stop → assistant_msg — is the one
   // capture point as harnesses move toward autonomous multi-agent workflows.
   { event: "SubagentStop", id: "mage:observe:SubagentStop", command: "mage observe" },
+  // ADR-0032 commandeer tier: one `mage memory-hook` command on Write|Edit. PreToolUse
+  // redirects + scrubs a native-memory write into mage's note schema (Gate-0) or denies a
+  // write to a generated index; PostToolUse nudges `mage groom`. The PostToolUse matcher
+  // scopes the capture-nudge to memory writes so it coexists with the matcher-less
+  // mage:observe:PostToolUse, exactly like the two Stop groups. Wired only when CC
+  // auto-memory is on and a docs root resolves (commandeer: true → gated in upsert).
+  {
+    event: "PreToolUse",
+    id: "mage:memory:PreToolUse",
+    matcher: "Write|Edit",
+    command: "mage memory-hook",
+    commandeer: true,
+  },
+  {
+    event: "PostToolUse",
+    id: "mage:memory:PostToolUse",
+    matcher: "Write|Edit",
+    command: "mage memory-hook",
+    commandeer: true,
+  },
+  // ADR-0035 working-tree sweep: at turn-end (Stop), AFTER CC's async restamp has
+  // settled, flatten any note CC restamped this turn back to mage's flat schema —
+  // keeping the working tree neutral between commits (commit-flatten stays the
+  // guarantee for anything that slips past). Commandeer-gated: only meaningful when CC
+  // auto-memory is redirecting into the docs root. Never blocks (fail-open, no commit).
+  {
+    event: "Stop",
+    id: "mage:flatten:Stop",
+    command: "mage flatten --quiet",
+    commandeer: true,
+  },
 ];
+
+/**
+ * Whether CC auto memory is on — the commandeer tier's precondition. False iff
+ * `CLAUDE_CODE_DISABLE_AUTO_MEMORY` is truthy in env OR `autoMemoryEnabled` is
+ * explicitly `false` in the target settings; default true (CC's documented default).
+ * Best-effort: a sibling settings layer CC merges may also carry the key, which this
+ * (reading one file + env) can't see — so it's a precondition gate, not a guarantee.
+ */
+export function isAutoMemoryEnabled(
+  settings: ClaudeSettings | null,
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  if (env.CLAUDE_CODE_DISABLE_AUTO_MEMORY) return false;
+  return settings?.autoMemoryEnabled !== false;
+}
+
+/** True iff any installed group belongs to the commandeer tier (the mage:memory:* id family). */
+export function hasCommandeerHooks(settings: ClaudeSettings | null): boolean {
+  const groups = settings?.hooks ? Object.values(settings.hooks).flat() : [];
+  return groups.some((g) => typeof g?.id === "string" && g.id.startsWith("mage:memory:"));
+}
 
 // ─── drift diff (doctor) ─────────────────────────────────────────────────────
 /**
@@ -81,7 +155,10 @@ export const MAGE_HOOKS: ReadonlyArray<{ event: string; id: string; command: str
  * its single-command groups), so a hand-edited multi-command group is compared
  * on its first entry only.
  */
-export function diffMageHooks(settings: ClaudeSettings | null): {
+export function diffMageHooks(
+  settings: ClaudeSettings | null,
+  opts: { commandeer?: boolean } = {},
+): {
   connected: boolean;
   matches: boolean;
   missingIds: string[];
@@ -104,9 +181,15 @@ export function diffMageHooks(settings: ClaudeSettings | null): {
   const missingIds: string[] = [];
   const staleIds: string[] = [];
   const expectedIds = new Set<string>();
+  // Commandeer rows participate in missing/stale drift only when the caller asks
+  // (the connect/doctor gate: auto-memory on + a docs root). When not, they're still
+  // claimed as expected ids so an installed one is never flagged EXTRA — the tier is
+  // connect/disconnect-managed, not a drift signal.
+  const wantCommandeer = opts.commandeer === true;
 
   for (const entry of MAGE_HOOKS) {
     expectedIds.add(entry.id);
+    if (entry.commandeer === true && !wantCommandeer) continue;
     if (!installed.has(entry.id)) {
       missingIds.push(entry.id);
     } else if (installed.get(entry.id) !== entry.command) {
@@ -179,7 +262,10 @@ export async function readClaudeSettings(
  * fresh mage group. Non-mage groups, other events, and other top-level keys are
  * preserved. Idempotent and self-healing (replace-by-id updates drifted commands).
  */
-export function upsertMageHooks(settings: ClaudeSettings | null): ClaudeSettings {
+export function upsertMageHooks(
+  settings: ClaudeSettings | null,
+  opts: { commandeer?: boolean } = {},
+): ClaudeSettings {
   const base = structuredClone(settings ?? {}) as ClaudeSettings;
   // Detach the hooks map from `base` before mutating it, so this stays a clean
   // immutable construction (we never write through an alias of the clone).
@@ -189,11 +275,21 @@ export function upsertMageHooks(settings: ClaudeSettings | null): ClaudeSettings
     const current = hooks[entry.event];
     const existing = Array.isArray(current) ? current : [];
     const withoutMine = existing.filter((g) => g.id !== entry.id);
-    const group: HookGroup = {
-      id: entry.id,
-      hooks: [{ type: "command", command: entry.command }],
-    };
-    hooks[entry.event] = [...withoutMine, group];
+    // A commandeer row with the tier gated OFF is removed (drop any prior group),
+    // never added — so toggling auto-memory off and re-connecting self-heals.
+    const skip = entry.commandeer === true && opts.commandeer !== true;
+    const next = skip
+      ? withoutMine
+      : [
+          ...withoutMine,
+          {
+            id: entry.id,
+            ...(entry.matcher ? { matcher: entry.matcher } : {}),
+            hooks: [{ type: "command" as const, command: entry.command }],
+          },
+        ];
+    if (next.length > 0) hooks[entry.event] = next;
+    else delete hooks[entry.event]; // prune an event array emptied by a skip
   }
 
   return { ...base, hooks };

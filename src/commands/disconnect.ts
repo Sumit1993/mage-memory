@@ -1,9 +1,10 @@
 import {
+  hasCommandeerHooks,
   readClaudeSettings,
   removeMageHooks,
   resolveSettingsTarget,
   writeClaudeSettings,
-} from "../claude-settings.js";
+} from "../adapters/claude-code/settings.js";
 import { removeRedactHook } from "../git-hooks.js";
 import { logger } from "../logger.js";
 
@@ -28,6 +29,8 @@ export interface DisconnectResult {
   scope: "local" | "user";
   removed: number;
   backedUp: boolean;
+  /** True iff the commandeer tier's `autoMemoryDirectory` key was present and removed. */
+  autoMemoryUnset: boolean;
   /** Outcome of the pre-commit redaction hook removal (omitted when not attempted). */
   hook?: { removed: boolean };
 }
@@ -47,7 +50,14 @@ export async function disconnect(opts: DisconnectOptions): Promise<DisconnectRes
     // The pre-commit hook lives independently of settings, so still attempt its
     // removal — a connect that only installed the hook is undone by disconnect.
     const hook = await removeHook(opts);
-    return { path: target.path, scope: target.scope, removed: 0, backedUp: false, hook };
+    return {
+      path: target.path,
+      scope: target.scope,
+      removed: 0,
+      backedUp: false,
+      autoMemoryUnset: false,
+      hook,
+    };
   }
 
   if (r.malformed) {
@@ -58,17 +68,42 @@ export async function disconnect(opts: DisconnectOptions): Promise<DisconnectRes
 
   const { settings, removed } = removeMageHooks(r.settings);
 
+  // Symmetric undo of connect's commandeer tier — but ONLY when mage OWNED the relocation.
+  // mage sets autoMemoryDirectory iff it wired commandeer hooks (mage:memory:*); a value
+  // with no commandeer hooks is the user's own and is left untouched (disconnect's contract:
+  // unknown top-level keys are preserved). When mage owned it, restore any user value mage
+  // displaced (stashed at connect) rather than deleting outright.
+  const mageOwned = hasCommandeerHooks(r.settings);
+  let autoMemoryUnset = false;
+  let restored: string | undefined;
+  if (mageOwned && "autoMemoryDirectory" in settings) {
+    restored =
+      typeof settings.mageStashedAutoMemoryDirectory === "string"
+        ? settings.mageStashedAutoMemoryDirectory
+        : undefined;
+    if (restored !== undefined) settings.autoMemoryDirectory = restored;
+    else delete settings.autoMemoryDirectory;
+    delete settings.mageStashedAutoMemoryDirectory;
+    autoMemoryUnset = true;
+  }
+
   let backedUp = false;
-  if (removed > 0) {
+  if (removed > 0 || autoMemoryUnset) {
     ({ backedUp } = await writeClaudeSettings(target.path, settings));
-    logger.success(`Removed ${removed} mage hook(s) from ${target.path}.`);
+    const dirBit = autoMemoryUnset
+      ? restored
+        ? `autoMemoryDirectory (restored ${restored})`
+        : "autoMemoryDirectory"
+      : null;
+    const bits = [removed > 0 ? `${removed} mage hook(s)` : null, dirBit].filter(Boolean);
+    logger.success(`Unwired ${bits.join(" + ")} from ${target.path}.`);
   } else {
     logger.info(`No mage hooks found in ${target.path} — nothing removed.`);
   }
 
   const hook = await removeHook(opts);
 
-  return { path: target.path, scope: target.scope, removed, backedUp, hook };
+  return { path: target.path, scope: target.scope, removed, backedUp, autoMemoryUnset, hook };
 }
 
 /**

@@ -20,7 +20,7 @@ export {
   resolveSettingsTarget,
   upsertMageHooks,
   writeClaudeSettings,
-} from "./claude-settings.js";
+} from "./adapters/claude-code/settings.js";
 export {
   type ConnectOptions,
   type ConnectResult,

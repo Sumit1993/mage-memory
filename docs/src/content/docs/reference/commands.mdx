@@ -25,6 +25,34 @@ mage --help
 mage init --help
 ```
 
+## The three channels
+
+The `mage` binary above is only part of the surface — there are agent skills too. Sorting every name into one of **three channels** is the fastest way to keep them straight:
+
+**A · Agent skills** — invoked *inside* your coding agent as `mage:<name>`, not in a terminal. These are the verbs of everyday use; each one orchestrates plumbing calls for you. There are exactly five:
+
+| Skill | What you get |
+|---|---|
+| `mage:guide` | orient in the knowledge base — navigate notes and decisions |
+| `mage:learn` | capture a note now, or bulk-import a folder (`--from`) |
+| `mage:groom` | turn captured scratch into notes — accept or reject the batch |
+| `mage:graduate` | elevate a proven procedural note into a loadable skill |
+| `mage:optimize` | sharpen a skill's trigger — reword or demote weak ones |
+
+**B · CLI commands you type** — the terminal verbs for setup and housekeeping that doesn't belong inside the agent (`init`, `link`, `connect`, `doctor`, `dashboard`, `dream`, and friends). The rest of this page is their reference.
+
+**C · Plumbing** — hidden CLI verbs you never type by hand (`observe`, `distill`, `promote`, `stage`, `index`, `nudge`, `memory-hook`, `redact`, `ingest`). A skill or a host hook runs them for you; they appear in [the full inventory](#the-full-inventory) for transparency.
+
+**The rhythm:** skills (A) when you curate · CLI (B) at setup and check-ups · plumbing (C) never by hand. **The one hybrid:** `groom` is both the `mage:groom` skill (what you use) and a hidden `mage groom` CLI verb (what the skill calls) — every other name is cleanly one channel.
+
+```mermaid
+flowchart LR
+  setup["set up — CLI<br/>init · link · connect"] --> work["work — automatic<br/>observe · Gate-0 · nudge"]
+  work --> curate["curate — skills<br/>mage:groom · mage:learn"]
+  curate --> health["check up — CLI<br/>doctor · dashboard · dream"]
+  health --> work
+```
+
 ## Setting up a knowledge base
 
 `mage init` creates a knowledge base. With no arguments it detects what you want

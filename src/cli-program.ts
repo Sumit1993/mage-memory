@@ -1,4 +1,5 @@
 import { Command, Option } from "commander";
+import { adopt } from "./commands/adopt.js";
 import { autonomy } from "./commands/autonomy.js";
 import { connect, connectAllProjects } from "./commands/connect.js";
 import { dashboard } from "./commands/dashboard-cmd.js";
@@ -6,6 +7,7 @@ import { OPEN_WITH_TARGETS } from "./dashboard/html.js";
 import { disconnect } from "./commands/disconnect.js";
 import { distillCmd } from "./commands/distill-cmd.js";
 import { doctor } from "./commands/doctor.js";
+import { flattenCmd } from "./commands/flatten.js";
 import { dream } from "./commands/dream-cmd.js";
 import { groomCmd } from "./commands/groom-cmd.js";
 import { index } from "./commands/index-cmd.js";
@@ -14,7 +16,8 @@ import { type InitMode, type InitVisibility, init } from "./commands/init.js";
 import { link, type Storage } from "./commands/link.js";
 import { list } from "./commands/list.js";
 import { mageMigrate, reportMigrate } from "./commands/migrate.js";
-import { buildNudgeCommand } from "./commands/nudge.js";
+import { buildMemoryHookCommand } from "./adapters/claude-code/memory-hook.js";
+import { buildNudgeCommand } from "./adapters/claude-code/nudge.js";
 import { buildObserveCommand } from "./commands/observe.js";
 import { promoteCmd } from "./commands/promote-cmd.js";
 import { redactCmd } from "./commands/redact.js";
@@ -117,7 +120,7 @@ export function buildProgram(): Command {
   program
     .command("index", { hidden: true })
     .description(
-      "(Re)generate INDEX.md — the always-loaded index of notes (deterministic, idempotent)",
+      "(Re)generate INDEX.md + the Claude Code MEMORY.md twin — the always-loaded index of notes (deterministic, idempotent)",
     )
     .option(
       "-d, --dir <path>",
@@ -309,8 +312,11 @@ export function buildProgram(): Command {
   // Registration lives next to the handler (commands/observe.ts) so the flag list
   // and the ObserveOptions contract can't drift apart.
   program.addCommand(buildObserveCommand(), { hidden: true });
-  // The boundary-nudge adapter (commands/nudge.ts) — fired from the SessionStart hook.
+  // The boundary-nudge adapter (adapters/claude-code/nudge.ts) — fired from the SessionStart hook.
   program.addCommand(buildNudgeCommand(), { hidden: true });
+  // The Gate-0 capture adapter (adapters/claude-code/memory-hook.ts) — fired from
+  // PreToolUse + PostToolUse to redirect/scrub native-memory writes (ADR-0032).
+  program.addCommand(buildMemoryHookCommand(), { hidden: true });
 
   // ─── redact ──────────────────────────────────────────────────────────────────
   program
@@ -345,6 +351,18 @@ export function buildProgram(): Command {
         if (result.blocked) process.exit(2);
       },
     );
+
+  // ─── flatten ───────────────────────────────────────────────────────────────────
+  program
+    .command("flatten", { hidden: true })
+    .description(
+      "Normalize harness-shaped (Claude Code) notes to mage's flat schema (ADR-0035): --staged flattens staged blobs at the commit boundary; default sweeps the working tree (the Stop hook). Never blocks.",
+    )
+    .option("--staged", "flatten staged git changes (the pre-commit guarantee)")
+    .option("--quiet", "suppress the report")
+    .action(async (opts: { staged?: boolean; quiet?: boolean }) => {
+      await flattenCmd({ staged: opts.staged, quiet: opts.quiet });
+    });
 
   // ─── link ──────────────────────────────────────────────────────────────────
   program
@@ -439,6 +457,26 @@ export function buildProgram(): Command {
     )
     .action(async (opts: { dir?: string }) => {
       reportMigrate(await mageMigrate({ dir: opts.dir }));
+    });
+
+  // ─── adopt ─────────────────────────────────────────────────────────────────
+  program
+    .command("adopt")
+    .description(
+      "Onboard pre-existing Claude Code memories into this KB's capture inbox: place in-shape captures, report out-of-shape to distill (plan-first; never commits)",
+    )
+    .option(
+      "-d, --dir <path>",
+      "where to look for the knowledge base (default: cwd; walks up for in-repo)",
+    )
+    .option(
+      "--all",
+      "whole-machine sweep: adopt memories for every KB they belong to, not just this one",
+    )
+    .option("--dry-run", "stop at the plan; write nothing")
+    .option("-y, --yes", "non-interactive: skip the confirmation prompt")
+    .action(async (opts: { dir?: string; all?: boolean; dryRun?: boolean; yes?: boolean }) => {
+      await adopt({ dir: opts.dir, all: opts.all, dryRun: opts.dryRun, yes: opts.yes });
     });
 
   // ─── status ────────────────────────────────────────────────────────────────
