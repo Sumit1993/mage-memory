@@ -4,8 +4,15 @@
 // chapter's earned-signals (failures, external commands, corrections) into a read-only DIGEST;
 // at every firing source it also surfaces a deterministic three-part capped BACKLOG tally
 // (staged drafts · unmined closed chapters · graduation-eligible signatures, ADR-0030 §2) and
-// templates a per-AUTONOMY-LEVEL mandate (operator/approver/overseer) into `additionalContext`
-// for the host agent. mage does NOT decide what a lesson is, never calls a model, and NEVER
+// templates a per-AUTONOMY-LEVEL mandate (operator/approver/overseer). It emits on TWO channels:
+// a user-visible `systemMessage` (the terse line the human sees in the terminal) and the
+// model-only `additionalContext` (the digest + mandate the agent acts on). The mandate is written
+// to be ACTED ON warmly: at operator the agent offers in its own voice and names a genuine keeper
+// from the digest (it does not relay the raw tally); at approver/overseer it is authorized to groom
+// and then tells the user what it filed. A weekly DREAM-HEALTH tick folds a read-only rot summary
+// (stale · dangling · orphans) into both channels on its own clock — and, on the model channel,
+// asks the agent to OFFER `mage dream`. mage
+// does NOT decide what a lesson is, never calls a model, and NEVER
 // commits (ADR-0009/0013): the deterministic layer NARROWS + templates a mandate, the host model
 // JUDGES + writes uncommitted, the human's git commit confirms. Inline capture stays PRIMARY
 // (AGENTS.md); the digest only catches what the agent forgot.
@@ -18,6 +25,7 @@
 // host (fail-open, exit 0).
 
 import { Command } from "commander";
+import { type DreamReport, analyzeDream } from "../../dream.js";
 import { computeDigest, lastClosedChapter, renderDigest } from "../../distill/digest.js";
 import { readSessionStreams } from "../../distill/reader.js";
 import { type BacklogTally, computeBacklog } from "../../grooming/backlog.js";
@@ -25,11 +33,22 @@ import { type Autonomy, mandateFor } from "../../grooming/autonomy-ladder.js";
 import { readGrooming } from "../../grooming/config.js";
 import type { ObserveEvent } from "../../observe/types.js";
 import { type ResolvedDocsRoot, absolutePath, learningsPath, resolveDocsRoot } from "../../paths.js";
-import { cacheTally, cachedTally, elapsedSince, markReminded, scratchFingerprint } from "./nudge-state.js";
+import {
+  cacheTally,
+  cachedTally,
+  elapsedSince,
+  elapsedSinceDream,
+  markDreamShown,
+  markReminded,
+  scratchFingerprint,
+} from "./nudge-state.js";
 
 /** Fallback backlog-reminder window when `grooming.nudgeThrottleHours` is absent/junk (ADR-0030 §5). */
 const DEFAULT_THROTTLE_MS = 4 * 60 * 60 * 1000; // 4 hours
 const MS_PER_HOUR = 60 * 60 * 1000;
+
+/** The dream-health tick runs on its own slow clock — a read-only rot scan at most once per week. */
+const DREAM_WINDOW_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 /** SessionStart sources that fire the nudge (ADR-0030 §5): NOT `clear`. */
 const FIRING_SOURCES = new Set(["compact", "startup", "resume"]);
@@ -50,11 +69,13 @@ export interface NudgeResult {
   drafted: number;
   /** Total staged drafts pending in `.mage/staging/` after the run. */
   pending: number;
-  /** The additionalContext nudge (digest and/or backlog mandate), or null when nothing surfaced. */
+  /** The model-only additionalContext (digest · mandate · health), or null when nothing surfaced. */
   nudge: string | null;
+  /** The user-visible systemMessage (terminal-rendered), or null when nothing needs the human's eye. */
+  notice: string | null;
 }
 
-const NONE: NudgeResult = { ran: false, drafted: 0, pending: 0, nudge: null };
+const NONE: NudgeResult = { ran: false, drafted: 0, pending: 0, nudge: null, notice: null };
 
 /**
  * Render the boundary nudge (ADR-0029 digest + ADR-0030 autonomy-scaled backlog mandate) and COMPUTE
@@ -106,17 +127,81 @@ async function digestNudge(resolved: ResolvedDocsRoot, source: string, force: bo
   const mandate = showBacklog ? renderMandate(level, tally) : "";
   if (showBacklog) await markReminded(root);
 
-  const nudge = composeNudge(rendered, mandate);
-  if (nudge === null) return { ran: true, drafted: 0, pending, nudge: null };
-  return { ran: true, drafted: 0, pending, nudge };
+  // The weekly dream-health tick — a read-only rot summary on its own slow clock.
+  const health = await healthTick(root, force);
+
+  // additionalContext (model-only): the digest + autonomy mandate + a health block that tells the
+  // agent to OFFER the read-only scan (not just see the finding). systemMessage (user-visible): the
+  // terse line the human sees in the terminal — the same health summary, without the agent instruction.
+  const nudge = composeContext(rendered, mandate, healthContext(health));
+  const notice = noticeLine(tally, showBacklog, health);
+  return { ran: true, drafted: 0, pending, nudge, notice };
 }
 
-/** Join the fresh digest and the backlog mandate; null when neither has anything to say. */
-function composeNudge(digest: string, mandate: string): string | null {
-  if (digest.length > 0 && mandate.length > 0) return `${digest}\n\n${mandate}`;
-  if (digest.length > 0) return digest;
-  if (mandate.length > 0) return mandate;
-  return null;
+/** Join the present context parts (digest · mandate · health) with blank lines; null when all empty. */
+function composeContext(...parts: string[]): string | null {
+  const present = parts.filter((p) => p.length > 0);
+  return present.length > 0 ? present.join("\n\n") : null;
+}
+
+/**
+ * The weekly dream-health tick: when the dream window has elapsed (or `force`), run the pure,
+ * index-independent {@link analyzeDream} rot scan and stamp the clock; return a one-line summary
+ * ONLY when there is failure-tier rot. Fail-open — a scan error surfaces no health line, never
+ * breaks the nudge. The scan is gated to ~once/week so it never costs a normal session start.
+ */
+async function healthTick(root: string, force: boolean): Promise<string> {
+  if (!force && !(await elapsedSinceDream(root, DREAM_WINDOW_MS))) return "";
+  const report = await analyzeDream(root).catch(() => null);
+  await markDreamShown(root);
+  return report && !report.clean ? healthLine(report) : "";
+}
+
+/**
+ * The user-facing systemMessage (terminal-visible): a terse line the HUMAN sees — the backlog
+ * call-to-action when the reminder fired, and/or the health summary. null when neither surfaced.
+ * (`additionalContext` is model-only; `systemMessage` is the channel Claude Code renders to the
+ * user — so the boundary nudge is no longer invisible to the person doing the work.)
+ */
+function noticeLine(t: BacklogTally, showBacklog: boolean, health: string): string | null {
+  const lines: string[] = [];
+  if (showBacklog) {
+    const unmined = t.unminedCapped ? "9+" : String(t.unmined);
+    lines.push(
+      `mage · ${t.staged} staged · ${unmined} unmined · ${t.graduable} graduable — ` +
+        "`mage:groom` to file, `mage:learn` to capture one.",
+    );
+  }
+  if (health.length > 0) lines.push(health);
+  return lines.length > 0 ? lines.join("\n") : null;
+}
+
+/**
+ * The MODEL-facing health block: the one-line health summary the user also sees, plus a short
+ * instruction to OFFER `mage dream` (read-only) — so the agent suggests the fix rather than
+ * leaving the finding as ambient context the human never hears about. "" when there is no rot.
+ */
+function healthContext(health: string): string {
+  if (health.length === 0) return "";
+  return (
+    `${health}\n` +
+    "The knowledge base has some rot — when you check in with the user, offer to run `mage dream` " +
+    "(read-only) so they can see the stale / dangling / orphaned notes and decide what to prune."
+  );
+}
+
+/** A one-line dream-health summary (failure-tier rot only); "" when the report is clean. */
+function healthLine(r: DreamReport): string {
+  const parts: string[] = [];
+  if (r.stale.length > 0) parts.push(`${r.stale.length} stale`);
+  if (r.danglingLinks.length > 0) {
+    parts.push(`${r.danglingLinks.length} dangling link${r.danglingLinks.length === 1 ? "" : "s"}`);
+  }
+  if (r.orphans.length > 0) parts.push(`${r.orphans.length} orphan${r.orphans.length === 1 ? "" : "s"}`);
+  if (r.supersededButActive.length > 0) {
+    parts.push(`${r.supersededButActive.length} superseded-but-active`);
+  }
+  return parts.length > 0 ? `mage health · ${parts.join(" · ")} → \`mage dream\`` : "";
 }
 
 /** Events of the MOST-recently-closed chapter across all streams (latest terminator ts wins). */
@@ -198,14 +283,22 @@ function throttleWindowMs(hours: number | undefined): number {
 // ─── stdout contract ─────────────────────────────────────────────────────────────
 
 /**
- * Emit the nudge as Claude Code `additionalContext`. The structured form is the documented
- * contract for a SessionStart hook (plain stdout also works); exit 0 is required for stdout to
- * be consumed.
+ * Emit the boundary nudge to Claude Code on its two channels. `systemMessage` is USER-VISIBLE —
+ * Claude Code renders it in the terminal — so the human actually sees the backlog/health line.
+ * `hookSpecificOutput.additionalContext` is MODEL-ONLY — injected into Claude's context, never
+ * shown to the user. Either may be null (emit just the other); when both are empty, emit nothing.
+ * exit 0 is required for the output to be consumed (the command always exits 0, fail-open).
  */
-export function emitAdditionalContext(context: string): void {
-  const out = {
-    hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: context },
-  };
+export function emitNudge(notice: string | null, context: string | null): void {
+  const out: {
+    systemMessage?: string;
+    hookSpecificOutput?: { hookEventName: "SessionStart"; additionalContext: string };
+  } = {};
+  if (notice && notice.length > 0) out.systemMessage = notice;
+  if (context && context.length > 0) {
+    out.hookSpecificOutput = { hookEventName: "SessionStart", additionalContext: context };
+  }
+  if (out.systemMessage === undefined && out.hookSpecificOutput === undefined) return;
   process.stdout.write(`${JSON.stringify(out)}\n`);
 }
 
@@ -241,9 +334,9 @@ function str(v: unknown): string | undefined {
 
 /**
  * Build the `nudge` plumbing-tier command (ADR-0009 §24 step 2). Reads the hook JSON
- * on stdin, extracts `source`/`cwd`, runs the nudge, and emits the additionalContext
- * line. Wrapped fail-open: any error → silent exit 0 (a boundary nudge must never
- * break the host's session start).
+ * on stdin, extracts `source`/`cwd`, runs the nudge, and emits the user-visible
+ * `systemMessage` + the model-only `additionalContext`. Wrapped fail-open: any error →
+ * silent exit 0 (a boundary nudge must never break the host's session start).
  */
 export function buildNudgeCommand(): Command {
   return new Command("nudge")
@@ -262,7 +355,7 @@ export function buildNudgeCommand(): Command {
           cwd: opts.cwd ?? str(payload?.cwd),
           source: str(payload?.source),
         });
-        if (result.nudge !== null) emitAdditionalContext(result.nudge);
+        emitNudge(result.notice, result.nudge);
       } catch {
         // Fail open: a boundary nudge never breaks the host session start.
       }

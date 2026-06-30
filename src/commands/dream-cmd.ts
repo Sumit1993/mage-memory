@@ -25,6 +25,8 @@ export interface DreamCmdOptions {
   apply?: boolean;
   /** --reject: read ONE Proposal from stdin → append to the rejected-edit buffer. */
   reject?: boolean;
+  /** --json: emit the health report as JSON to stdout instead of the human render (default path only). */
+  json?: boolean;
 }
 
 export interface DreamResult extends DreamReport {
@@ -62,13 +64,19 @@ export async function dream(opts: DreamCmdOptions = {}): Promise<DreamResult> {
   // Hub registry enables the project drift signals (info-tier, never failures).
   const hubMeta = resolved.kind === "hub" ? await readHubMetadata(resolved.root) : null;
   const report = await analyzeDream(resolved.root, { staleDays: opts.staleDays, hubMeta });
-  renderReport(report);
   // findingCount counts ONLY failure-tier rot — the info drift is advisory.
   const findingCount =
     report.supersededButActive.length +
     report.danglingLinks.length +
     report.orphans.length +
     report.stale.length;
+  // --json: machine-readable report for tooling (a scheduled consumer, a dashboard). The human
+  // render is the default; --strict still governs the exit code in the caller, either way.
+  if (opts.json) {
+    process.stdout.write(`${JSON.stringify({ ...report, findingCount }, null, 2)}\n`);
+  } else {
+    renderReport(report);
+  }
   return { ...report, findingCount };
 }
 

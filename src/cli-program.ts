@@ -174,6 +174,7 @@ export function buildProgram(): Command {
       (v) => Number.parseInt(v, 10),
     )
     .option("--strict", "exit non-zero if any findings (for hooks/CI)")
+    .option("--json", "emit the health report as JSON to stdout (machine-readable)")
     .option(
       "--apply",
       "apply ONE confirmed Proposal JSON from stdin (the single writer; never commits)",
@@ -188,6 +189,7 @@ export function buildProgram(): Command {
         staleDays: opts.staleDays,
         apply: opts.apply,
         reject: opts.reject,
+        json: opts.json,
       });
       if (opts.strict && result.findingCount > 0) process.exit(1);
     });

@@ -282,6 +282,10 @@
           "description": "exit non-zero if any findings (for hooks/CI)"
         },
         {
+          "flags": "--json",
+          "description": "emit the health report as JSON to stdout (machine-readable)"
+        },
+        {
           "flags": "--apply",
           "description": "apply ONE confirmed Proposal JSON from stdin (the single writer; never commits)"
         },
