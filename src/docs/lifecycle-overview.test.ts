@@ -22,9 +22,14 @@ function docText(rel: string): string {
   );
 }
 
-/** The first ```mermaid fenced block in the overview page (the lifecycle diagram). */
+/**
+ * The first ```mermaid fenced block's BODY in the overview page (the lifecycle diagram).
+ * The fence info string may carry an accessibility caption after the language
+ * (`remark-mermaid-pre.mjs` turns it into the figure's aria-label/figcaption), so we
+ * skip to the newline before capturing — the caption is metadata, not diagram source.
+ */
 function lifecycleDiagram(): string {
-  const body = docText("overview.md").match(/```mermaid\n([\s\S]*?)```/)?.[1];
+  const body = docText("overview.md").match(/```mermaid[^\n]*\n([\s\S]*?)```/)?.[1];
   if (body === undefined) throw new Error("loop/overview.md has no mermaid lifecycle diagram");
   return body;
 }

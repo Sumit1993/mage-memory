@@ -28,7 +28,7 @@ You create it with:
 mage init --in-repo
 ```
 
-```mermaid
+```mermaid In-repo mode: mage init --in-repo scaffolds mage/ inside the code repo, mage connect wires capture and recall, and the loop produces notes you commit alongside the code.
 flowchart TD
   i["mage init --in-repo"] --> s["creates the repo's mage/<br/>notes · decisions · work · metadata.json · INDEX.md"]
   s --> c["mage connect — wires capture + recall"]
@@ -90,7 +90,7 @@ mage link --storage hub-owned    # external: the hub owns the docs
 
 To undo a link, `mage unlink` removes the linkage from both sides' metadata.
 
-```mermaid
+```mermaid Hub mode: mage init --hub creates a standalone knowledge base, mage link registers a code repo, and ownership decides whether that repo's notes live in the hub (external mode) or in the repo (hybrid mode).
 flowchart TD
   h["mage init --hub"] --> hs["the hub<br/>notes · decisions · projects/ · metadata.json"]
   hs --> l["in a code repo: mage link"]

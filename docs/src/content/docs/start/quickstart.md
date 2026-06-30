@@ -17,11 +17,10 @@ mage ships as an npm package. Install it globally to get the `mage` command:
 npm i -g mage-memory
 ```
 
-The latest published release is **0.0.12**. (mage is pre-1.0 and evolving; this page tracks the current published version.)
-
-Check it landed:
+This installs the latest published release. mage is pre-1.0 and evolving, so take the latest unless you need reproducibility — in which case pin a version (`npm i -g mage-memory@<version>`). Check what landed (this prints the actual installed version, so it never drifts from a number on this page):
 
 ```bash
+mage --version
 mage --help
 ```
 
@@ -80,6 +79,17 @@ mage connect
 
 If a pre-commit hook already exists, mage will not overwrite it — it tells you to add `mage redact --check --staged` to your own hook. Skip the git hook with `mage connect --no-git-hook`.
 
+## If setup looks wrong
+
+Setup touches a few places — the global CLI, per-repo hooks, and a pre-commit gate — so when something seems off, don't guess. `mage doctor` diagnoses your environment, knowledge base, and connection health and tells you what to fix:
+
+```bash
+mage doctor          # diagnose env + KB + connection health
+mage doctor --fix    # repair missing capture-sink ignore rules
+```
+
+If you need to file an issue, `mage doctor --report` prints a redacted, content-free support bundle to attach. See [Commands](../reference/commands.mdx#diagnosing-and-migrating) for the full diagnostics surface.
+
 ## Write your first note
 
 A note is a markdown file under `mage/notes/` recording insight, procedure, and pointers. Create one — for example `mage/notes/billing/payments.md`:
@@ -137,5 +147,7 @@ The capture sinks (`.mage/learnings/`, `.mage/metrics/`, `.mage/staging/`) are g
 
 - [Modes and storage](../model/modes.md) — in-repo, hub, hybrid, and external.
 - [The grooming loop](../loop/overview.md) — how mage learns from your sessions.
+- [Import an existing notes folder](../guides/import-existing-notes.md) — bring old notes or a `docs/` tree in as distilled notes.
+- [Pause, disconnect, or uninstall](../guides/uninstall-and-pause.md) — turn capture off or remove mage; your notes stay.
 - [Hooks](../reference/hooks.mdx) — every capture hook `mage connect` wires.
 - [Commands](../reference/commands.mdx) — the full CLI surface.

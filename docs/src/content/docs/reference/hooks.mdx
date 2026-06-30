@@ -62,11 +62,13 @@ The one capture-adjacent hook that does more than append is
 host summarizes a long conversation and starts a fresh chapter; the detail of the
 chapter that just closed is exactly what is most at risk of being forgotten.
 
-The nudge runs on `SessionStart` but acts only when the host reports
-`source === "compact"` — a post-compaction restart. On that one trigger it
-distills the just-closed chapter, drafts the lessons worth keeping into
-`.mage/staging/`, and surfaces them back to you as additional context. On every
-other `SessionStart` source (startup, resume, clear) it is a fast no-op.
+The nudge runs on `SessionStart` and **writes nothing itself** — it hands the
+host agent a read-only digest as additional context, and the agent decides what
+to stage. It has two halves with different triggers: the **fresh-chapter digest**
+renders only when the host reports `source === "compact"` (the one boundary where
+a chapter just closed), while the **autonomy-scaled backlog mandate** can fire on
+`compact`, `startup`, or `resume`. Only `/clear` is a fast no-op — there is
+nothing to reflect on.
 
 It lives on `SessionStart`, not `PreCompact` or `SessionEnd`, for two concrete
 reasons baked into the code:
@@ -79,7 +81,8 @@ reasons baked into the code:
 `SessionStart` with `source === "compact"` is the first moment that can both see
 the closed chapter and hand text back to you.
 
-See [The boundary nudge](../loop/nudge.md) for how staged drafts then flow into
+See [The boundary nudge](../loop/nudge.md) for the full digest-and-mandate
+contract and how the agent's resulting drafts flow into
 [Stage and groom](../loop/stage-groom.md), and the
 [Commands reference](../reference/commands.mdx) for the CLI surface behind these
 hooks.

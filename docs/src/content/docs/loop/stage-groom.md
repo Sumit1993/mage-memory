@@ -13,11 +13,11 @@ It has three epistemic states, each with its own home:
 - `.mage/staging/` — **judged-but-uncommitted drafts**. Git-ignored, kept out of the live index. This is the inbox.
 - `notes/` — committed, indexed knowledge.
 
-Drafts reach `.mage/staging/` from two feeders: `mage stage` (the agent or the boundary nudge composing a lesson directly), and — on Claude Code — the **capture inbox**, the scrubbed native-memory writes Gate-0 drops at the docs-root top. `mage groom` ingests that inbox into staging at the start of each pass, so both feeders converge on the one batch below. See [Capture on Claude Code](./capture.md#capture-on-claude-code-the-native-memory-redirect).
+Drafts reach `.mage/staging/` from two feeders: `mage stage` (the agent composing a lesson directly — including when the [boundary nudge](./nudge.md) prompts it), and — on Claude Code — the **capture inbox**, the scrubbed native-memory writes Gate-0 drops at the docs-root top. `mage groom` ingests that inbox into staging at the start of each pass, so both feeders converge on the one batch below. See [Capture on Claude Code](./capture.md#capture-on-claude-code-the-native-memory-redirect-gate-0).
 
 ## Stage: a frictionless draft
 
-When the agent notices a lesson during work — a correction you made, a gotcha that bit you, a rule worth keeping — it stages a short draft with `mage stage`. There is no per-draft confirmation prompt; staging is meant to be cheap so the agent captures at first sight instead of deferring. The boundary nudge stages forgotten lessons the same way.
+When the agent notices a lesson during work — a correction you made, a gotcha that bit you, a rule worth keeping — it stages a short draft with `mage stage`. There is no per-draft confirmation prompt; staging is meant to be cheap so the agent captures at first sight instead of deferring. The [boundary nudge](./nudge.md) surfaces forgotten lessons at the chapter boundary for the agent to stage the same way — the nudge itself writes nothing.
 
 A staged draft is small on purpose: one distilled fact plus a short *why* and *how*. The target size is the **soft lesson cap of 1200 characters**. It is genuinely soft — `mage stage` warns if a draft runs past it but never blocks. Frictionless capture matters more than a hard limit on a draft that you are about to review anyway. (The 1200-character lesson cap is far under the 6000-character cap on a full authored note.)
 
