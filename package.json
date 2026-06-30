@@ -68,7 +68,7 @@
     "yaml": "^2.9.0"
   },
   "devDependencies": {
-    "@types/node": "^25.9.3",
+    "@types/node": "^26.0.1",
     "@types/tar": "^7.0.87",
     "@vitest/coverage-v8": "^4.1.9",
     "force-graph": "^1.51.4",
