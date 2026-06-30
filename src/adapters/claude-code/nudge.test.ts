@@ -242,6 +242,32 @@ describe("mage nudge — user-visible notice (systemMessage)", () => {
   });
 });
 
+describe("mage nudge — weekly dream-health tick", () => {
+  it("folds a rot summary into BOTH channels and tells the agent to OFFER `mage dream`", async () => {
+    const { dir, root } = await withKb();
+    await seedChapter(learningsPath(root), "s1", "alpha"); // a backlog so the reminder fires alongside
+    // A stale (no last_reviewed), orphaned (no links) note → analyzeDream reports rot (not clean).
+    await mkdir(join(root, "notes"), { recursive: true });
+    await writeFile(join(root, "notes", "lonely.md"), "---\ntags: [w/r]\n---\n# Lonely\n", "utf8");
+
+    const r = await nudgeCmd({ cwd: dir, source: "startup", force: true });
+    // user channel (systemMessage): the terse health line the human sees.
+    expect(r.notice).toContain("mage health");
+    // model channel (additionalContext): the agent is told to OFFER the read-only scan, not just see it.
+    expect(r.nudge).toContain("mage dream");
+    expect(r.nudge).toContain("offer to run");
+  });
+
+  it("stays silent on health when the KB is clean (no rot to report)", async () => {
+    const { dir, root } = await withKb();
+    await seedChapter(learningsPath(root), "s1", "alpha");
+    // No notes ⇒ analyzeDream is clean ⇒ no health line on either channel.
+    const r = await nudgeCmd({ cwd: dir, source: "startup", force: true });
+    expect(r.notice).not.toContain("mage health");
+    expect(r.nudge).not.toContain("mage dream");
+  });
+});
+
 describe("emitNudge — the two-channel SessionStart contract", () => {
   function capture(fn: () => void): string {
     const writes: string[] = [];

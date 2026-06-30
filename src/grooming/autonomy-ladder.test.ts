@@ -65,6 +65,14 @@ describe("mandateFor", () => {
     expect(m).not.toContain("authorized");
   });
 
+  it("operator prose is warm + concrete — offer in your own words and name a keeper (ADR-0029)", () => {
+    const m = mandateFor("operator", line);
+    expect(m).toContain("warmly offer");
+    expect(m).toContain("in your own words");
+    expect(m).toContain("keeper"); // surface a few words about a real one, not the raw list
+    expect(m).toContain("don't relay the raw list");
+  });
+
   it("approver authorizes durable writes, uncommitted + Gate-2", () => {
     const m = mandateFor("approver", line);
     expect(m).toContain("autonomy: approver");

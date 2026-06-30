@@ -70,7 +70,8 @@ export function mandateFor(level: Autonomy, backlogLine: string): string {
       `${backlogLine}\n` +
       "You are authorized (autonomy: approver) to run `mage:groom` now and write the clearly-durable " +
       "notes into the working tree, UNCOMMITTED (Gate-2 redaction runs); leave borderline drafts staged. " +
-      "Reviewing the diff is the review; the human's `git commit` is the confirm — mage never commits."
+      "Reviewing the diff is the review; the human's `git commit` is the confirm — mage never commits. " +
+      "When you're done, tell them in one friendly line what you filed (name a real keeper) so they stay in the loop."
     );
   }
   if (level === "overseer") {
@@ -79,14 +80,20 @@ export function mandateFor(level: Autonomy, backlogLine: string): string {
       "You are authorized (autonomy: overseer) to run `mage:groom` now: write durable notes, merge related " +
       "lessons into existing notes, dispose the borderline tier, and `mage:graduate` eligible notes (Gate-2 " +
       "runs; recurrence-gated). All writes land UNCOMMITTED in the working tree — the human audits `git log` " +
-      "and `git commit`s; mage never commits."
+      "and `git commit`s; mage never commits. " +
+      "When you're done, tell them in one friendly line what you filed and graduated (name a real keeper) so they stay in the loop."
     );
   }
-  // operator (default) — ASK the human; no autonomous-write authorization.
+  // operator (default) — ASK the human; no autonomous-write authorization. The prose is deliberately
+  // warm + concrete: the agent offers in its own voice and names a genuine keeper from the digest
+  // rather than relaying a raw tally (ADR-0029 — the agent, not mage, judges what is signal).
   return (
     `${backlogLine}\n` +
-    "At a natural break in the user's work (not mid-task), surface this and ASK whether to run " +
-    "`mage:groom` now to file these lessons — or `mage:learn` to capture a specific one " +
-    "(autonomy: operator — do not write notes without their go-ahead)."
+    "At a natural pause in the user's work (never mid-task), warmly offer — in your own words, a line " +
+    "or two, not a wall of text — to tidy this up for them: run `mage:groom` to file the backlog, or " +
+    "`mage:learn` to capture one specific lesson. If a genuine keeper surfaced in the digest above " +
+    "(a gotcha, a hard-won procedure, an API/env constraint), name one or two in a few words so they " +
+    "can decide — don't relay the raw list. ASK first; do not write notes without their go-ahead " +
+    "(autonomy: operator)."
   );
 }

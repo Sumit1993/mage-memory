@@ -6,9 +6,12 @@
 // (staged drafts · unmined closed chapters · graduation-eligible signatures, ADR-0030 §2) and
 // templates a per-AUTONOMY-LEVEL mandate (operator/approver/overseer). It emits on TWO channels:
 // a user-visible `systemMessage` (the terse line the human sees in the terminal) and the
-// model-only `additionalContext` (the digest + mandate the agent acts on — at operator it ASKS
-// the user, at approver/overseer it is authorized to groom). A weekly DREAM-HEALTH tick folds a
-// read-only rot summary (stale · dangling · orphans) into both channels on its own clock. mage
+// model-only `additionalContext` (the digest + mandate the agent acts on). The mandate is written
+// to be ACTED ON warmly: at operator the agent offers in its own voice and names a genuine keeper
+// from the digest (it does not relay the raw tally); at approver/overseer it is authorized to groom
+// and then tells the user what it filed. A weekly DREAM-HEALTH tick folds a read-only rot summary
+// (stale · dangling · orphans) into both channels on its own clock — and, on the model channel,
+// asks the agent to OFFER `mage dream`. mage
 // does NOT decide what a lesson is, never calls a model, and NEVER
 // commits (ADR-0009/0013): the deterministic layer NARROWS + templates a mandate, the host model
 // JUDGES + writes uncommitted, the human's git commit confirms. Inline capture stays PRIMARY
@@ -127,9 +130,10 @@ async function digestNudge(resolved: ResolvedDocsRoot, source: string, force: bo
   // The weekly dream-health tick — a read-only rot summary on its own slow clock.
   const health = await healthTick(root, force);
 
-  // additionalContext (model-only): the digest + autonomy mandate + health, as it surfaced.
-  const nudge = composeContext(rendered, mandate, health);
-  // systemMessage (user-visible): the terse line the human sees in the terminal.
+  // additionalContext (model-only): the digest + autonomy mandate + a health block that tells the
+  // agent to OFFER the read-only scan (not just see the finding). systemMessage (user-visible): the
+  // terse line the human sees in the terminal — the same health summary, without the agent instruction.
+  const nudge = composeContext(rendered, mandate, healthContext(health));
   const notice = noticeLine(tally, showBacklog, health);
   return { ran: true, drafted: 0, pending, nudge, notice };
 }
@@ -170,6 +174,20 @@ function noticeLine(t: BacklogTally, showBacklog: boolean, health: string): stri
   }
   if (health.length > 0) lines.push(health);
   return lines.length > 0 ? lines.join("\n") : null;
+}
+
+/**
+ * The MODEL-facing health block: the one-line health summary the user also sees, plus a short
+ * instruction to OFFER `mage dream` (read-only) — so the agent suggests the fix rather than
+ * leaving the finding as ambient context the human never hears about. "" when there is no rot.
+ */
+function healthContext(health: string): string {
+  if (health.length === 0) return "";
+  return (
+    `${health}\n` +
+    "The knowledge base has some rot — when you check in with the user, offer to run `mage dream` " +
+    "(read-only) so they can see the stale / dangling / orphaned notes and decide what to prune."
+  );
 }
 
 /** A one-line dream-health summary (failure-tier rot only); "" when the report is clean. */
