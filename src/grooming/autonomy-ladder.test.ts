@@ -57,9 +57,11 @@ describe("mandateFor", () => {
     for (const level of LEVELS) expect(mandateFor(level, line).startsWith(`${line}\n`)).toBe(true);
   });
 
-  it("operator is a reminder, not an autonomous-write authorization", () => {
+  it("operator asks the human, not an autonomous-write authorization", () => {
     const m = mandateFor("operator", line);
-    expect(m).toContain("Review with `mage:groom`");
+    expect(m).toContain("autonomy: operator");
+    expect(m).toContain("ASK");
+    expect(m).toContain("mage:learn"); // offers single-insight capture too
     expect(m).not.toContain("authorized");
   });
 

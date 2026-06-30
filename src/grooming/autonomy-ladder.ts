@@ -59,7 +59,7 @@ export function coerceAutonomy(value: string): Autonomy {
 
 /**
  * Template the autonomy-scaled mandate (ADR-0030 §5): the already-rendered one-line backlog tally
- * + the level-specific instruction. Operator = a human reminder; Approver = authorized to groom +
+ * + the level-specific instruction. Operator = ask the human first; Approver = authorized to groom +
  * write durable notes uncommitted (Gate-2 runs); Overseer = + dispose the borderline tier and
  * graduate eligible notes. The caller renders `backlogLine` (it owns the tally shape); this owns
  * the per-level prose. PURE.
@@ -82,6 +82,11 @@ export function mandateFor(level: Autonomy, backlogLine: string): string {
       "and `git commit`s; mage never commits."
     );
   }
-  // operator (default) — a human reminder, no autonomous-write authorization.
-  return `${backlogLine}\nReview with \`mage:groom\` (autonomy: operator).`;
+  // operator (default) — ASK the human; no autonomous-write authorization.
+  return (
+    `${backlogLine}\n` +
+    "At a natural break in the user's work (not mid-task), surface this and ASK whether to run " +
+    "`mage:groom` now to file these lessons — or `mage:learn` to capture a specific one " +
+    "(autonomy: operator — do not write notes without their go-ahead)."
+  );
 }

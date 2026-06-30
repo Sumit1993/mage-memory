@@ -11,7 +11,7 @@ import {
 } from "../../observe/events.js";
 import type { ObserveEvent } from "../../observe/types.js";
 import { learningsPath, stagingPath } from "../../paths.js";
-import { emitAdditionalContext, nudgeCmd } from "./nudge.js";
+import { emitNudge, nudgeCmd } from "./nudge.js";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -71,7 +71,7 @@ describe("mage nudge — gating", () => {
     await seedChapter(learningsPath(root), "s1", "alpha");
     for (const source of ["clear", undefined]) {
       const r = await nudgeCmd({ cwd: dir, source });
-      expect(r).toEqual({ ran: false, drafted: 0, pending: 0, nudge: null });
+      expect(r).toEqual({ ran: false, drafted: 0, pending: 0, nudge: null, notice: null });
     }
   });
 
@@ -92,7 +92,7 @@ describe("mage nudge — gating", () => {
   it("no-ops (fail-open) when there is no knowledge base", async () => {
     const empty = await tmpDir("mage-nudge-nokb-");
     const r = await nudgeCmd({ cwd: empty, source: "compact" });
-    expect(r).toEqual({ ran: false, drafted: 0, pending: 0, nudge: null });
+    expect(r).toEqual({ ran: false, drafted: 0, pending: 0, nudge: null, notice: null });
   });
 });
 
@@ -138,6 +138,7 @@ describe("mage nudge — digest path (ADR-0029)", () => {
     const r = await nudgeCmd({ cwd: dir, source: "compact", force: true });
     expect(r.ran).toBe(true);
     expect(r.nudge).toBeNull();
+    expect(r.notice).toBeNull(); // nothing for the human to see either
   });
 
   it("a secret in observed scratch never reaches the digest (nudge re-scrubs)", async () => {
@@ -167,12 +168,13 @@ describe("mage nudge — digest path (ADR-0029)", () => {
 });
 
 describe("mage nudge — autonomy-scaled backlog mandate (ADR-0030)", () => {
-  it("operator (default) prints a plain `mage:groom` reminder, no autonomous-write authorization", async () => {
+  it("operator (default) tells the agent to ASK the user — no autonomous-write authorization", async () => {
     const { dir, root } = await withKb({ grooming: { autonomy: "operator" } });
     await seedChapter(learningsPath(root), "s1", "alpha");
     const r = await nudgeCmd({ cwd: dir, source: "startup", force: true });
     expect(r.nudge).toContain("autonomy: operator");
-    expect(r.nudge).toContain("Review with `mage:groom`");
+    expect(r.nudge).toContain("ASK");
+    expect(r.nudge).toContain("mage:learn"); // offers single-insight capture too
     expect(r.nudge).not.toContain("authorized");
   });
 
@@ -229,18 +231,47 @@ describe("mage nudge — capped backlog tally (ADR-0030 §2)", () => {
   });
 });
 
-describe("emitAdditionalContext", () => {
-  it("writes the SessionStart hookSpecificOutput JSON contract", () => {
+describe("mage nudge — user-visible notice (systemMessage)", () => {
+  it("surfaces a terminal-visible notice when the backlog reminder fires", async () => {
+    const { dir, root } = await withKb();
+    await seedChapter(learningsPath(root), "s1", "alpha");
+    const r = await nudgeCmd({ cwd: dir, source: "startup", force: true });
+    expect(r.notice).not.toBeNull();
+    expect(r.notice).toContain("mage:groom"); // file them
+    expect(r.notice).toContain("mage:learn"); // or capture one
+  });
+});
+
+describe("emitNudge — the two-channel SessionStart contract", () => {
+  function capture(fn: () => void): string {
     const writes: string[] = [];
     const spy = vi.spyOn(process.stdout, "write").mockImplementation((c: unknown) => {
       writes.push(String(c));
       return true;
     });
-    emitAdditionalContext("hello world");
+    fn();
     spy.mockRestore();
-    const out = JSON.parse(writes.join(""));
+    return writes.join("");
+  }
+
+  it("emits the user-visible systemMessage AND the model-only additionalContext", () => {
+    const out = JSON.parse(capture(() => emitNudge("see me", "context for the model")));
     expect(out).toEqual({
-      hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: "hello world" },
+      systemMessage: "see me",
+      hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: "context for the model" },
     });
+  });
+
+  it("emits additionalContext alone when there is no user notice", () => {
+    const out = JSON.parse(capture(() => emitNudge(null, "model only")));
+    expect(out).toEqual({
+      hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: "model only" },
+    });
+    expect(out.systemMessage).toBeUndefined();
+  });
+
+  it("writes nothing when both channels are empty", () => {
+    expect(capture(() => emitNudge(null, null))).toBe("");
+    expect(capture(() => emitNudge("", ""))).toBe("");
   });
 });
