@@ -1,8 +1,6 @@
 ---
 title: Optimize (context-match)
 description: How context-match feedback rewords a mis-firing skill trigger or demotes a skill that never fits — the post-graduation tuning half of the loop.
-sidebar:
-  order: 6
 ---
 
 Once a note [graduates](./promote-graduate.md) into a `mage-skill-<slug>`, that skill auto-loads into the agent's context whenever its trigger matches. But a trigger can be wrong — too broad, firing on look-alike work where the skill does no good. The **optimize** stage is the feedback that fixes that: it measures whether a loaded skill actually matched the work that followed, and tunes the trigger accordingly.
