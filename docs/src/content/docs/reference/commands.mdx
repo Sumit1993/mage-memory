@@ -41,11 +41,11 @@ The `mage` binary above is only part of the surface — there are agent skills t
 
 **B · CLI commands you type** — the terminal verbs for setup and housekeeping that doesn't belong inside the agent (`init`, `link`, `connect`, `doctor`, `dashboard`, `dream`, and friends). The rest of this page is their reference.
 
-**C · Plumbing** — hidden CLI verbs you never type by hand (`observe`, `distill`, `promote`, `stage`, `index`, `nudge`, `memory-hook`, `redact`, `ingest`). A skill or a host hook runs them for you; they appear in [the full inventory](#the-full-inventory) for transparency.
+**C · Plumbing** — hidden CLI verbs you never type by hand (`observe`, `distill`, `promote`, `stage`, `index`, `nudge`, `memory-hook`, `redact`, `ingest`, `flatten`, and friends). A skill or a host hook runs them for you; the complete, generated set is in [the full inventory](#the-full-inventory) — that table, not this list, is the authoritative roster.
 
 **The rhythm:** skills (A) when you curate · CLI (B) at setup and check-ups · plumbing (C) never by hand. **The one hybrid:** `groom` is both the `mage:groom` skill (what you use) and a hidden `mage groom` CLI verb (what the skill calls) — every other name is cleanly one channel.
 
-```mermaid
+```mermaid The rhythm of the three channels: set up with the CLI, then work is captured automatically, you curate with skills, and you check health with the CLI — looping back to the work.
 flowchart LR
   setup["set up — CLI<br/>init · link · connect"] --> work["work — automatic<br/>observe · Gate-0 · nudge"]
   work --> curate["curate — skills<br/>mage:groom · mage:learn"]
@@ -111,6 +111,13 @@ mage index
 # Regenerate the per-wing skills (run this after a new wing appears)
 mage skills
 ```
+
+`mage/INDEX.md` (along with `MEMORY.md`, and `Dashboard.md` from `mage
+dashboard`) is **generated _and_ committed**, so on a team it will sometimes
+conflict on a merge — that is expected, not a mistake. Treat these like build
+output: after merging a branch that touched notes, re-run `mage index` (and
+`mage dashboard`, if you use it) to regenerate the file rather than
+hand-resolving the conflict.
 
 `mage index` is plumbing — the hooks and the `mage:learn` flow (the
 deliberate-capture skill that drafts a note for you and writes it after you

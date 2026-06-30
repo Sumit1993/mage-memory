@@ -57,10 +57,20 @@ describe("mandateFor", () => {
     for (const level of LEVELS) expect(mandateFor(level, line).startsWith(`${line}\n`)).toBe(true);
   });
 
-  it("operator is a reminder, not an autonomous-write authorization", () => {
+  it("operator asks the human, not an autonomous-write authorization", () => {
     const m = mandateFor("operator", line);
-    expect(m).toContain("Review with `mage:groom`");
+    expect(m).toContain("autonomy: operator");
+    expect(m).toContain("ASK");
+    expect(m).toContain("mage:learn"); // offers single-insight capture too
     expect(m).not.toContain("authorized");
+  });
+
+  it("operator prose is warm + concrete — offer in your own words and name a keeper (ADR-0029)", () => {
+    const m = mandateFor("operator", line);
+    expect(m).toContain("warmly offer");
+    expect(m).toContain("in your own words");
+    expect(m).toContain("keeper"); // surface a few words about a real one, not the raw list
+    expect(m).toContain("don't relay the raw list");
   });
 
   it("approver authorizes durable writes, uncommitted + Gate-2", () => {

@@ -279,15 +279,28 @@ KB federates the two repo KBs via registry pointers, *without* merging graphs
 (bounded by [ADR-0010](../decisions/0010-durable-memory-not-coordination-layer.md)).
 Mostly a **docs/example** need (FT-04), not new machinery.
 
-#### FT-12 — skills that help users author notes/skills the mage way · (orig #16)
-**Status:** raw
-**Touches:** [ADR-0013 — procedure skills + self-grooming loop](../decisions/0013-procedure-skills-self-grooming-loop.md)
-**Sequence:** unsequenced
-Provide **skills that help users manually create notes or skills in a mage fashion**
-— guided authoring, not just the automated capture loop.
-**mage angle:** complements `mage:learn` (capture) and the grooming loop with a
-**human-in-the-loop authoring** assistant that enforces conventions (frontmatter,
-pointer-not-copy, relations). Pairs with FT-04's examples.
+#### FT-12 — a guided-authoring skill for the manual (no-chokepoint) note path · (orig #16)
+**Status:** exploring
+**Touches:** [ADR-0013 — procedure skills + self-grooming loop](../decisions/0013-procedure-skills-self-grooming-loop.md), [ADR-0030 — agent autonomy ladder](../decisions/0030-agent-autonomy-ladder.md)
+**Sequence:** unsequenced — lands **on top of** the forthcoming central frontmatter-builder (ADR-0031)
+Provide a skill that helps a human (or agent) **hand-author** a note or skill the mage
+way — guided authoring, distinct from the automated capture loop. The sharpened framing
+(2026-06-22): mage writes notes through **two paths that need different enforcement
+levers**. The **automated path** (`mage:learn` / `mage:groom` capture → `composeDraft` →
+the dream applier) has a **code chokepoint**, so conventions there belong in code — the
+writer stamps frontmatter + provenance *itself*, with no skill to forget (this is the
+central **frontmatter-builder**, the forthcoming ADR-0031). The **manual path** — someone
+opening an editor and typing a `notes/*.md` by hand — has **no chokepoint to hook**, so a
+**skill is the only lever**: it walks the author through frontmatter, pointer-not-copy, and
+relations.
+**mage angle:** build it as the *manual-path twin* of the programmatic builder, sharing
+**one** helper — the skill invokes a `mage new-note` / scaffold command that calls the
+**same** `buildNoteFrontmatter` the automated writers use, so both paths emit byte-identical
+conventions. This is the *right* home for the "programmatic + skill" marriage, **precisely
+because** the manual path has no other enforcement point — whereas the automated path must
+**not** route its stamp through a skill (that re-introduces the "agent forgets" failure
+[ADR-0030](../decisions/0030-agent-autonomy-ladder.md) exists to kill). Pairs with FT-04's
+examples.
 
 #### FT-20 — a global, user-level hub (personal cross-system memory)  ·  (soak; raw author note #3)
 **Status:** raw

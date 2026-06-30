@@ -1,8 +1,6 @@
 ---
 title: Autonomy levels
 description: "An opt-in, per-KB dial for how much of the grooming ladder the agent drains on its own — Operator, Approver, Overseer — bounded by the one floor that never moves: nothing is durable until you git commit."
-sidebar:
-  order: 6
 ---
 
 Capture is automatic — hooks (wired by [`mage connect`](../start/quickstart.md)) observe your work and the [boundary nudge](./nudge.md) surfaces what to keep. But promotion up the ladder (staged draft -> written note -> indexed -> graduated) used to wait on a human running `mage:groom`, and the maintainer forgets. That is the mechanical reason a knowledge base stalls at raw scratch and never produces notes.
@@ -18,6 +16,8 @@ That dial has three positions, named for *your* role at each:
 - **Operator** (default) — you run the loop; the agent only captures.
 - **Approver** — the agent writes the clearly-durable notes; you review the diff.
 - **Overseer** — the agent runs the whole ladder; you audit `git log`.
+
+This autonomy dial is independent of the [sensitivity dial](../reference/thresholds.mdx): the sensitivity dial scales *how readily* a recurring pattern becomes a note or a skill (the K/M thresholds), while autonomy sets *how much of that work the agent does on its own*. Tune them separately.
 
 You set it once, per knowledge base, and it lives in `metadata.json -> grooming.autonomy` (a tracked field — config is files-as-truth, never an environment variable). There is a small visible command to get or set it:
 

@@ -18,12 +18,12 @@ Two terms the rest of the page leans on:
 
 mage is **harness-agnostic**: the diagram below is the whole of it, and nothing in it is specific to any one coding agent. (How a particular host plugs in — to make capture automatic and recall un-skippable — is an opt-in adapter, covered under [Using mage with a coding agent](#using-mage-with-a-coding-agent).)
 
-```mermaid
+```mermaid The self-grooming loop: your work is captured to a git-ignored trail, becomes a draft, you groom the draft into committed notes, and a proven note graduates into a skill whose trigger optimize keeps sharp — all feeding back into the work.
 flowchart TD
   work["Your work"] --> capture["Capture — a git-ignored trail of each session (automatic)"]
 
   capture -->|"a striking insight, worth keeping now"| draft["DRAFT — staging · not yet trusted"]
-  capture -->|"at a chapter boundary: forgotten lessons"| draft
+  capture -->|"at a chapter boundary: the nudge surfaces forgotten lessons"| draft
   capture --> Distill["Distill — mine the trail"]
   Distill --> Promote["Promote — a pattern recurring across enough<br/>chapters, with no note covering it"]
   Promote --> draft
@@ -40,7 +40,7 @@ flowchart TD
 
 A note is born one of two ways, and both converge on the same `groom → notes/` gate:
 
-**The lesson path (first sight).** Always-on capture and the boundary nudge draft a short lesson the first time something is worth remembering — a striking insight kept on the spot, or a forgotten one the nudge surfaces when a chapter closes. This is the everyday path, and the one most new users will use. See [Stage and groom](./stage-groom.md) and [The boundary nudge](./nudge.md).
+**The lesson path (first sight).** Always-on capture feeds the everyday path: the agent drafts a short lesson the first time something is worth remembering — a striking insight kept on the spot, or a forgotten one the boundary nudge surfaces when a chapter closes (the nudge writes nothing itself; the agent stages). This is the path most new users will use. See [Stage and groom](./stage-groom.md) and [The boundary nudge](./nudge.md).
 
 **The recurrence path.** A deterministic engine folds the captured trail into per-signature tallies. A pattern that keeps recurring — across enough distinct chapters, with no note already covering it — surfaces as a candidate. A proven procedural note that recurs even more **graduates** into its own auto-loadable skill, and **optimize** keeps that skill's trigger sharp. See [Promote and graduate](./promote-graduate.md).
 
@@ -52,7 +52,7 @@ The chapter boundary is a **view**, not a stored state: mage derives it from the
 
 A lesson is disposable until you accept it. It passes through two transient, git-ignored states before it becomes a committed one — and this table is the whole pipeline at a glance: where each state lives, whether git keeps it, and the one thing that moves it forward.
 
-```mermaid
+```mermaid The states a lesson moves through: git-ignored throwaway scratch (raw capture, then draft) on the left flows rightward into the committed, durable side — a note, the recall index, and a skill.
 flowchart LR
   subgraph IGN["git-ignored · throwaway scratch"]
     raw["Raw capture<br/>.mage/learnings"]
@@ -86,7 +86,7 @@ mage has **no runtime** — it rides whatever hooks the host gives it. Left to i
 - **Capture.** Instead of Claude Code writing memories to its private store, mage co-opts that write, scrubs it before it touches disk, and drops it on the lesson path. See [Capture — the native-memory redirect](./capture.md).
 - **Recall.** mage's index is written as `MEMORY.md` — the same content as the portable `INDEX.md`, under the filename Claude Code's auto-load looks for — so your notes are present at launch every session without anyone having to "read the index."
 
-```mermaid
+```mermaid How the Claude Code adapter plugs into the harness-free core at two seams: Gate-0 scrubs a memory write and feeds the core's capture, and the core's recall index is written out as the auto-loaded MEMORY.md.
 flowchart LR
   subgraph CORE["mage core · harness-free"]
     cap["capture → draft"]
@@ -107,7 +107,7 @@ Strip the adapter away and the loop above is unchanged. On any other harness the
 | Stage | What it does | Page |
 |---|---|---|
 | Capture | A hook-fired trail of session events, written to a git-ignored scratch; never blocks your work. | [Capture](./capture.md) |
-| Boundary nudge | On a post-compaction start, distills the closed chapter and drafts forgotten lessons. | [The boundary nudge](./nudge.md) |
+| Boundary nudge | On a post-compaction start, surfaces a read-only digest of the closed chapter plus the grooming backlog for the agent to mine — it writes nothing itself. | [The boundary nudge](./nudge.md) |
 | Stage and groom | The lesson path: staged drafts → the `mage:groom` skill → accepted notes. | [Stage and groom](./stage-groom.md) |
 | Promote and graduate | The recurrence path: recurring signatures → note candidates → graduated skills. | [Promote and graduate](./promote-graduate.md) |
 | Optimize | Context-match rewords or demotes the generated skills. | [Optimize](./optimize.md) |
@@ -120,3 +120,5 @@ mage **writes files; you commit them.** Capture appends to a git-ignored scratch
 ## What tunes the loop
 
 Two numbers gate the recurrence path, and a sensitivity dial scales them together: **K** (how many chapters before a pattern becomes a note candidate) and **M** (how many before a proven note graduates into a skill). See [Thresholds and the dial](../reference/thresholds.mdx) for the exact values and the low / normal / high positions.
+
+A second, independent dial — the per-KB **[autonomy level](./autonomy.md)** — sets how far the host agent may act on the grooming backlog on its own (Operator / Approver / Overseer), with the one invariant that holds at every level: nothing is durable until *you* `git commit`.
