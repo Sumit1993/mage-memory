@@ -6,6 +6,7 @@ import {
   type NoteFrontmatter,
   deriveKeywords,
   effectiveFrontmatter,
+  isoDate,
   noteTitle,
   noteWings,
   readNote,
@@ -185,7 +186,11 @@ function toScanned(fm: NoteFrontmatter, body: string, abs: string, relPath: stri
     type: typeof efm.type === "string" && efm.type.trim() ? efm.type.trim() : "note",
     keywords: deriveKeywords(efm, body, abs),
     status: typeof efm.status === "string" ? efm.status : undefined,
-    lastReviewed: typeof efm.last_reviewed === "string" ? efm.last_reviewed : undefined,
+    // Accept a string OR a YAML-1.1 Date: an UNQUOTED `last_reviewed: 2026-07-01` parses to a
+    // JS Date (and editors/Obsidian linters strip the quotes on save), so a raw
+    // `typeof === "string"` check dropped it and dream falsely flagged the note "no
+    // last_reviewed date". isoDate() normalizes both to `YYYY-MM-DD` (ADR-0035 §3).
+    lastReviewed: isoDate(efm.last_reviewed),
   };
 }
 
