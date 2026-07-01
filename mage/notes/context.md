@@ -1,19 +1,51 @@
 ---
-type: reference
-tags: [mage/design]
+type: pointer
+tags:
+  - mage/design
 created: "2026-05-29"
-updated: "2026-06-09"
-last_reviewed: "2026-06-09"
+updated: 2026-07-01
+last_reviewed: 2026-07-01
 status: active
 provenance:
   repo: mage-memory
   commit: 1ec8225
-keywords: [knowledge-base, note, wing, room, index, tag, moc, skill, work-unit, artifact, note-types, glossary, distill, promote, graduate, merge, split, recurrence, self-grooming]
+sources:
+  - cc-session:3c5c8534-8611-4d9d-9087-9975da48dd44
+keywords:
+  - knowledge-base
+  - note
+  - wing
+  - room
+  - index
+  - tag
+  - moc
+  - skill
+  - work-unit
+  - artifact
+  - note-types
+  - glossary
+  - distill
+  - promote
+  - graduate
+  - merge
+  - split
+  - recurrence
+  - self-grooming
+  - autonomy
+  - operator
+  - approver
+  - overseer
+  - capture-redirect
+  - recall-import
+  - adopt
+  - notes-are-memories
+  - digest
+  - nudge
 ---
 
 # mage — context & glossary
 
-mage is a portable, file-based, self-maintaining knowledge base for software systems — durable git-backed **notes** that resist accidental loss, navigable as an Obsidian **graph**, usable by any AI coding agent. It exists because project knowledge (specs, decisions, how services connect, how to call them) scatters across in-repo/out-of-repo dirs and gets cleaned up or lost; mage gives it one durable, discoverable, portable home. mage stores **insight, procedure, and pointers** — how to act and where to look, so you do it faster next time — *not* copies of sources that already exist.
+mage is a portable, file-based, self-maintaining knowledge base for software systems — durable git-backed **notes** that resist accidental loss, navigable as an Obsidian **graph**, usable by any AI coding agent. It exists because project knowledge (specs, decisions, how services connect, how to call them) scatters across in-repo/out-of-repo dirs and gets cleaned up or lost; mage gives it one durable, discoverable, portable home. mage stores **insight, procedure, and pointers** — how to act and where to look, so you do it faster next time — *not* copies of sources that already exist. A note **is** a memory — the same unit an agent would otherwise scatter into a native memory store — made durable, curated, and portable ([ADR-0035](../decisions/0035-decouple-harness-memory-from-notes.md)).
 
 ## Language
 
@@ -24,8 +56,8 @@ The whole memory for a system — the graph of notes plus its index. Exists in f
 _Avoid_: docs, wiki, vault (as the product noun)
 
 **Note**:
-The atomic unit — one verbatim markdown file about one thing, with frontmatter (type, tags, provenance, lifecycle) and portable links to related notes.
-_Avoid_: drawer, doc, memory (as a noun), entry
+The atomic unit — one verbatim markdown file about one thing, with frontmatter (type, tags, provenance, lifecycle) and portable links to related notes. **A note is an agent's memory** ([ADR-0035](../decisions/0035-decouple-harness-memory-from-notes.md)): the host's native memory store *is* the KB, not a separate thing to bridge.
+_Avoid_: drawer, doc, entry — but **no longer "memory"** (the earlier "avoid memory as a noun" is retired by ADR-0035; a note *is* a memory)
 
 **Wing**:
 The top-level scope a note belongs to — typically a project, repo, service, or person. Realized as a nested tag (`#wing/<name>`) and/or a MOC, **not** a mandatory folder. A wing is an **optional convention, never a necessity**: untagged notes are valid (they index as *Cross-cutting*) — reach for a wing only when a base spans more than one top-level scope. The **first** tag is a note's *primary* wing (drives color + ownership); a note may carry more tags and is indexed under **each** of them (multi-home). In a hub, the whole system is itself a wing (named after the hub). See [ADR-0011](../decisions/0011-recursive-scan-hub-projects.md), [ADR-0012](../decisions/0012-wings-optional-convention-standalone-hubs.md).
@@ -89,7 +121,7 @@ A pointer to canonical external knowledge (URL, ticket, `file:line`) carried in 
 **Remember / Recall**: write to / read from the knowledge base.
 **Learn**: capture a new note from work in progress (the brownfield path) — draft → overlap-check → human-confirm → promote.
 
-**Distill**: the auto-capture sibling of Learn — read mage's *own* observed scratch (`.learnings/`) and propose durable notes from it, **on first sight** (no recurrence gate — that is 0.0.8). A deterministic `mage distill --json` reader groups un-distilled events into candidate clusters (chunked by `compact`/session boundary, salience-filtered) under a per-session **offset watermark** in `.metrics/distill.json` (advanced explicitly via `mage distill --seen` after the human dispositions a batch); the `mage:groom` judgment skill (Phase 1, first sight) reads them through four lenses — **user corrections & nudges** (first-class), error→fix, repeated workflow, tool preference — and drafts notes through Learn's shared pipeline (overlap-check → redact Gate 2 → human-confirm → write). Reads only mage's own artifacts; foreign memory stores are **ignored, not harvested**. See [ADR-0018](../decisions/0018-mage-distill-observed-scratch-reader.md).
+**Distill**: the auto-capture sibling of Learn — read mage's *own* observed scratch (`.learnings/`) and propose durable notes from it, **on first sight** (no recurrence gate — that is 0.0.8). A deterministic `mage distill --json` reader groups un-distilled events into candidate clusters (chunked by `compact`/session boundary, salience-filtered) under a per-session **offset watermark** in `.metrics/distill.json` (advanced explicitly via `mage distill --seen` after the human dispositions a batch); the `mage:groom` judgment skill (Phase 1, first sight) reads them through four lenses — **user corrections & nudges** (first-class), error→fix, repeated workflow, tool preference — and drafts notes through Learn's shared pipeline (overlap-check → redact Gate 2 → human-confirm → write). Reads only mage's own artifacts; foreign memory stores are **ignored, not harvested**. See [ADR-0018](../decisions/0018-mage-distill-observed-scratch-reader.md). **Reframed by [ADR-0029](../decisions/0029-digest-to-agent-capture.md):** mage no longer writes lesson drafts on its own judgment — `distill --json` now builds the **digest** the host agent judges and writes from (see *Boundary nudge → digest → agent* under **Capture, recall & autonomy**). And per [ADR-0032](../decisions/0032-capture-redirect-native-memory.md) foreign stores are no longer merely ignored: the host's *own* native-memory write is **redirected** into the KB inbox (capture-redirect).
 
 **Dream**: the maintenance pass that keeps memory latest+correct — flags staleness, supersedes contradictions, **merges** (consolidates) thin same-topic notes, **splits** notes that grew too big / went incoherent / hide a self-recurring slice, archives, and re-verifies notes against changed source. It is the single **Applier** of all note + skill mutations. Nothing is hard-deleted (git history + `archive/`). See [ADR-0019](../decisions/0019-mage-promote-self-grooming.md) (merge/split).
 
@@ -122,10 +154,28 @@ _Avoid_: log line, observation (as the product noun)
 _Avoid_: install/uninstall (as the product noun)
 **Supersede**: replace a note's claim with a newer one, keeping the old linked + marked (never a silent overwrite).
 
+### Capture, recall & autonomy (the autonomy track, 0029–0036)
+
+> The run to 0.1.0 — 0.1.0 is the **autonomy milestone** ([roadmap](roadmap.md) · [release sequence](plan-release-sequence.md)). ADRs 0029–0036 are `accepted` (ratified 2026-07-01); implementation rides `main`.
+
+**Boundary nudge → digest → agent**: the capture pivot ([ADR-0029](../decisions/0029-digest-to-agent-capture.md)). At a session boundary (`SessionStart(source=compact)`) mage emits a read-only **nudge** in two channels — a **user-visible** terse backlog notice (`mage: N staged · M unmined · K graduable → mage:groom`) and a **model-only digest + mandate** the host agent acts on. mage's model-free core only **narrows + compresses** the observed scratch into the digest; the **judgment** (is this a durable lesson? write it) is the host agent's. Two replay gates killed deterministic candidate-*selection*, so mage no longer writes lesson drafts itself.
+_Avoid_: miner, classifier (for the core — it narrows, it does not decide).
+
+**Autonomy ladder (Operator / Approver / Overseer)**: the opt-in, per-KB dial ([ADR-0030](../decisions/0030-agent-autonomy-ladder.md)) for how much of the grooming ladder the host agent drains autonomously. **Operator** (default, HITL) — the agent stages from the digest; the human runs `mage:groom`, judges, writes, commits. **Approver** — the agent grooms + writes clearly-durable notes into the working tree uncommitted (Gate-2 runs); the human reviews the diff + commits. **Overseer** — as Approver + disposes the borderline tier, merges, and **graduates** eligible notes; the human audits `git log` + commits. The **git commit is the irreducible human confirm at every level** (mage never commits, [ADR-0013](../decisions/0013-procedure-skills-self-grooming-loop.md)) — so mage structurally cannot reach out-of-the-loop. The dial lives in tracked `metadata.json`; it is opt-**in** (default Operator).
+_Avoid_: permission mode, autopilot.
+
+**Capture-redirect**: capture as a **redirect** of the host's native-memory write into mage's git-durable pipeline ([ADR-0032](../decisions/0032-capture-redirect-native-memory.md)) — not a CLI (`mage stage`) the agent skips. Levers: relocate the host memory dir onto the KB (`autoMemoryDirectory`), a `PreToolUse` redirect, a `PostToolUse` mirror. The native store is at most a capture **buffer**; capture always **ends in git**.
+
+**Recall-import**: recall as a deterministic **launch-load**, not a volitional pull ([ADR-0033](../decisions/0033-recall-import-bounded-index.md)). mage emits a host-auto-loaded index — Claude Code: a `MEMORY.md` twin of the bounded `INDEX.md`; other harnesses: `@import mage/INDEX.md` — so the agent holds mage's index at launch and it survives `/compact`. Only the **bounded** root is imported (it loads in full; never the per-note list).
+
+**Adopt**: the one-time onboarding of pre-existing knowledge ([ADR-0034](../decisions/0034-adopt-preexisting-knowledge.md)) — a dispatcher routing each source by **shape**: in-shape (an authored note / native memory) → **place** into the capture inbox; out-of-shape (raw prose, a foreign schema) → hand to **`learn --from`** to **distill**. Never a copy; **fails toward distill**. The backfill companion to capture-redirect (going forward) + recall-import (surfacing).
+
+**Notes are memories (one unified store)**: a mage **note** and an agent **memory** are the same unit ([ADR-0035](../decisions/0035-decouple-harness-memory-from-notes.md)) — so the host's native memory store *is* mage's notes (`autoMemoryDirectory` → the KB), not a second store to bridge. mage stops fighting the harness's frontmatter at write-time: it **scrubs secrets before disk** and **normalizes at the durable boundary** (a PostToolUse flatten + a commit-time backstop) so git stays neutral. mage's value over a raw native memory is the four things it adds: **durability** (git), **curation** (groom), **portability** (one neutral schema), **sharing** (team). **Write / Update / Recall** become native operations on the one store; **groom** is periodic curation, not a write-time tollbooth.
+
 ## Flagged ambiguities
 
 - **Wing vs Project** *(resolved, [ADR-0011](../decisions/0011-recursive-scan-hub-projects.md))*: a **hub is one KB**; a **project** is a sub-scope of it whose notes live under `projects/<name>/` and surface as a **wing** (`<name>/room`), plus a **registry entry** in the hub `metadata.json` recording its code repo. So a project *is* a wing (how it groups + indexes — tag-derived) **and** a registry entry (how it's labelled/linked). A wing need not be a project — it can be a non-repo scope (a person, an external service) or hub-level cross-cutting notes.
-- **"Memory" the quality vs the noun**: knowledge has *durable memory*; we don't call a note "a memory."
+- **"Memory" — a note IS one** *(reframed, [ADR-0035](../decisions/0035-decouple-harness-memory-from-notes.md))*: a mage note and an agent memory are the same unit — the host cannot tell them apart (it stamps notes `node_type: memory`). The earlier "we don't call a note a memory" is **retired**. mage's edge over a native memory is what it *adds*: durability (git), curation (groom), portability (one neutral schema), sharing (team).
 
 ## Example dialogue
 

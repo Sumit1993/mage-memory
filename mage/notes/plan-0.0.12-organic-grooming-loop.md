@@ -1,10 +1,12 @@
 ---
 type: plan
-tags: [mage/grooming, mage/0.0.12]
+tags:
+  - mage/grooming
+  - mage/0.0.12
 created: "2026-06-14"
-updated: "2026-06-15"
-last_reviewed: "2026-06-15"
-status: active
+updated: 2026-07-01
+last_reviewed: 2026-07-01
+status: stale-suspect
 provenance:
   repo: mage-memory
   work: 0.0.12-organic-grooming-loop
@@ -24,10 +26,36 @@ sources:
   - mage/decisions/0018-mage-distill-observed-scratch-reader.md
   - mage/decisions/0019-mage-promote-self-grooming.md
   - ~/ai-context/mage-redact-false-positives-issue.md
-keywords: [grooming, organic, lesson, first-sight, distill, staging, nudge, inline, claude-code-memory, redact, 0.0.12]
+  - cc-session:3c5c8534-8611-4d9d-9087-9975da48dd44
+keywords:
+  - grooming
+  - organic
+  - lesson
+  - first-sight
+  - distill
+  - staging
+  - nudge
+  - inline
+  - claude-code-memory
+  - redact
+  - 0.0.12
 ---
 
 # Organic grooming loop (0.0.12) — the lesson path
+
+> **Stale-suspect (2026-07-01) — read as origin design, not current behavior.** This plan
+> captures 0.0.12 *as designed on 2026-06-15*: a lesson path where **mage stages/drafts**
+> lessons on its own judgment. The **digest→agent pivot** ([ADR-0029](../decisions/0029-digest-to-agent-capture.md))
+> later **superseded that mechanic** — two replay gates killed deterministic candidate-selection,
+> so mage's model-free core now only emits a **digest** and the **host agent** judges + writes
+> (mage writes no lesson drafts itself). [ADR-0030](../decisions/0030-agent-autonomy-ladder.md)
+> then added the Operator/Approver/Overseer **autonomy dial**, and
+> [ADR-0032](../decisions/0032-capture-redirect-native-memory.md)/[0033](../decisions/0033-recall-import-bounded-index.md)
+> reworked capture (redirect the host's native-memory write into git) and recall (launch-load the
+> bounded index). The live map is the
+> [autonomy track](plan-release-sequence.md#the-autonomy-track--what-010-now-delivers-adr-00290036)
+> + the [glossary](context.md#capture-recall--autonomy-the-autonomy-track-00290036); the durable
+> `mage:groom`/`mage:learn` mechanics + `.mage/` layout below still hold.
 
 **Status: GRILLED 2026-06-15 — decisions locked; BUILT 2026-06-16.** Recorded as
 **[ADR-0024](../decisions/0024-organic-grooming-loop.md)** (this note remains the full grill

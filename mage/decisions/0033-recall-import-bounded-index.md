@@ -1,10 +1,11 @@
 ---
 type: decision
-tags: [mage/decisions]
+tags:
+  - mage/decisions
 created: "2026-06-25"
-updated: "2026-06-25"
-last_reviewed: "2026-06-25"
-status: proposed
+updated: 2026-07-01
+last_reviewed: 2026-07-01
+status: accepted
 provenance:
   repo: mage-memory
   work: adr-0033-recall-import-bounded-index
@@ -14,12 +15,24 @@ sources:
   - decisions/0032-capture-redirect-native-memory.md
   - notes/agentmemory-mining-map.md
   - https://code.claude.com/docs/en/memory
-keywords: [recall, import, at-import, claude-md, agents-md, index, bounded, root-index, progressive-disclosure, capability-adaptive, compaction]
+  - cc-session:3c5c8534-8611-4d9d-9087-9975da48dd44
+keywords:
+  - recall
+  - import
+  - at-import
+  - claude-md
+  - agents-md
+  - index
+  - bounded
+  - root-index
+  - progressive-disclosure
+  - capability-adaptive
+  - compaction
 ---
 
 # 0033 — Recall: `@import` the bounded root index into the host's auto-loaded context (the capture companion to ADR-0032)
 
-> **Status: proposed.** Recall counterpart to [ADR-0032](0032-capture-redirect-native-memory.md)
+> **Status: accepted (ratified 2026-07-01 — impl on `main`, riding 0.0.12).** Recall counterpart to [ADR-0032](0032-capture-redirect-native-memory.md)
 > (capture). Output of the 2026-06-25 grill; capture mechanism spike-validated 2026-06-25, recall-load
 > validated 2026-06-27 (see ADR-0032 §Gate).
 

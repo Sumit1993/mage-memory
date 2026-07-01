@@ -1,10 +1,11 @@
 ---
 type: decision
-tags: [mage/decisions]
+tags:
+  - mage/decisions
 created: "2026-06-25"
-updated: "2026-06-25"
-last_reviewed: "2026-06-25"
-status: proposed
+updated: 2026-07-01
+last_reviewed: 2026-07-01
+status: accepted
 provenance:
   repo: mage-memory
   work: adr-0032-capture-redirect-native-memory
@@ -16,12 +17,25 @@ sources:
   - decisions/0030-agent-autonomy-ladder.md
   - src/grooming/staging.ts
   - src/commands/stage-cmd.ts
-keywords: [capture, native-memory, automemorydirectory, relocation, coexist, nudge, redirect, staging, durability, claude-code, adapter, reflex]
+  - cc-session:3c5c8534-8611-4d9d-9087-9975da48dd44
+keywords:
+  - capture
+  - native-memory
+  - automemorydirectory
+  - relocation
+  - coexist
+  - nudge
+  - redirect
+  - staging
+  - durability
+  - claude-code
+  - adapter
+  - reflex
 ---
 
 # 0032 — Capture-redirect: co-opt the host's native-memory write into mage's git-durable pipeline (relocation where the host allows it, coexist nudge as the floor)
 
-> **Status: proposed.** Output of a grill (2026-06-25). Capture mechanism only; the
+> **Status: accepted (ratified 2026-07-01 — impl on `main`, riding 0.0.12).** Output of a grill (2026-06-25). Capture mechanism only; the
 > recall counterpart (projecting mage notes *into* the native store) is split out to a
 > companion **ADR-0033**. Ships behind the gate in [§Gate](#gate-pre-registered).
 
