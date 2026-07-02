@@ -6,7 +6,7 @@ import { dashboard } from "./commands/dashboard-cmd.js";
 import { OPEN_WITH_TARGETS } from "./dashboard/html.js";
 import { disconnect } from "./commands/disconnect.js";
 import { distillCmd } from "./commands/distill-cmd.js";
-import { doctor } from "./commands/doctor.js";
+import { doctor, readinessFooter } from "./commands/doctor.js";
 import { flattenCmd } from "./commands/flatten.js";
 import { dream } from "./commands/dream-cmd.js";
 import { groomCmd } from "./commands/groom-cmd.js";
@@ -399,6 +399,8 @@ export function buildProgram(): Command {
           yes: opts.yes,
           connect: opts.connect,
         });
+        // Setup self-verifies: surface recall+skills drift (e.g. plugin not installed) now.
+        await readinessFooter(process.cwd());
       },
     );
 
@@ -571,6 +573,8 @@ export function buildProgram(): Command {
         await connectAllProjects({ yes: opts.yes, gitHook: opts.gitHook });
       } else {
         await connect({ user: opts.user, yes: opts.yes, gitHook: opts.gitHook });
+        // Setup self-verifies: surface recall+skills drift (e.g. plugin not installed) now.
+        await readinessFooter(process.cwd());
       }
     });
 

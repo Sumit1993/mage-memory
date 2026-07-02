@@ -3,7 +3,7 @@
 // Governed by ADR-0021 and the connect-doesnt-ensure-ignores gotcha. Each helper
 // pushes one or more DoctorChecks onto the shared array.
 
-import { readdir } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import {
   type ClaudeSettings,
@@ -20,6 +20,7 @@ import type { DoctorCheck, DoctorOptions } from "../commands/doctor.js";
 import { detectRedactHook } from "../git-hooks.js";
 import { ensureGitignored } from "../gitignore.js";
 import {
+  AGENTS_FILE,
   INDEX_FILE,
   META_DIR,
   META_FILE,
@@ -34,6 +35,8 @@ import {
   type resolveDocsRoot,
 } from "../paths.js";
 import { run } from "../shell.js";
+import { scanNotes } from "../scan.js";
+import { index } from "../commands/index-cmd.js";
 
 type ResolvedKb = Awaited<ReturnType<typeof resolveDocsRoot>>;
 type Kb = NonNullable<ResolvedKb>;
@@ -54,6 +57,11 @@ export async function pushKbChecks(
   }
 
   pushKbStructureChecks(checks, kb, await exists(join(kb.root, INDEX_FILE)));
+  // Recall readiness (ADR-0033): the index must reflect what's on disk, and the AGENTS.md
+  // awareness block must not steer the agent at retired commands. Both surfaced by the
+  // 2026-07-02 soak (9-line index for 62 notes; `/mage-learn` in a stale block).
+  await pushIndexFreshnessCheck(checks, kb, opts);
+  await pushAgentsBlockCheck(checks, opts);
   // Resolve connection state ONCE: the sink-leak severity depends on whether
   // capture is actually wired (connected), and the connection check reports it.
   const conn = await resolveConnection(opts);
@@ -203,6 +211,107 @@ function pushKbStructureChecks(checks: DoctorCheck[], kb: Kb, hasIndex: boolean)
     // Missing INDEX is a freshness nag, not a leak: keep it advisory.
     optional: hasIndex ? undefined : true,
   });
+}
+
+/**
+ * Recall readiness: the generated index must reflect the notes on disk. Compares the
+ * canonical on-disk count (scanNotes) to the count INDEX.md advertises in its header
+ * (`> N notes …`) — a mismatch means the agent reads a stale map of the KB (the soak's
+ * 9-line index for 62 notes). Advisory (a just-added, not-yet-indexed note is a common,
+ * benign miss) but loud. `--fix` regenerates. Skipped when INDEX.md is absent — the
+ * structure check already nags that. Fail-open: any read error → no check pushed.
+ */
+async function pushIndexFreshnessCheck(
+  checks: DoctorCheck[],
+  kb: Kb,
+  opts: DoctorOptions,
+): Promise<void> {
+  // The index the agent actually reads: a repo's own maintained index at kb.root, but for
+  // an EXTERNAL code repo (kind "hub" whose root is a project subdir UNDER the hub) it's the
+  // HUB's root index — the vestigial projects/<name>/INDEX.md is never consulted (ADR-0011 §6).
+  const indexRoot = kb.kind === "hub" && kb.root !== kb.repo ? kb.repo : kb.root;
+  const indexPath = join(indexRoot, INDEX_FILE);
+  if (!(await exists(indexPath))) return; // absence handled by pushKbStructureChecks
+  let onDisk: number;
+  let advertised: number | null;
+  try {
+    onDisk = (await scanNotes(indexRoot)).length;
+    advertised = parseIndexCount(await readFile(indexPath, "utf8"));
+  } catch {
+    return; // fail-open — doctor never throws
+  }
+  if (advertised === null) return; // unrecognized header shape → don't false-alarm
+
+  if (advertised !== onDisk && opts.fix) {
+    await index({ dir: indexRoot, quiet: true }).catch(() => {});
+    advertised = parseIndexCount(await readFile(indexPath, "utf8").catch(() => "")) ?? advertised;
+  }
+
+  if (advertised === onDisk) {
+    checks.push({ name: "index freshness", ok: true, detail: `index reflects ${onDisk} note(s)` });
+    return;
+  }
+  checks.push({
+    name: "index freshness",
+    ok: false,
+    optional: true, // a freshness nag, not a leak — warn loudly, don't hard-fail
+    detail: `STALE — index reflects ${advertised}, ${onDisk} note(s) on disk → run \`mage index\``,
+  });
+}
+
+/** The `> N notes across M wing(s).` header count in an INDEX.md body, or null. */
+function parseIndexCount(body: string): number | null {
+  const m = body.match(/^>\s*(\d+)\s+notes?\b/m);
+  return m ? Number(m[1]) : null;
+}
+
+/** Old slash-style skill names, retired for the `mage:` plugin namespace (ADR-0013). */
+const RETIRED_SKILL_TOKENS = [
+  "/mage-learn",
+  "/mage-distill",
+  "/mage-groom",
+  "/mage-graduate",
+  "/mage-optimize",
+  "/mage-guide",
+];
+
+/**
+ * Recall readiness: the mage-owned AGENTS.md block must not steer the agent at retired
+ * command names. The 2026-07-02 soak found prismalens's block still saying `/mage-learn`
+ * (now `mage:learn`), so the agent invoked a command that no longer exists. Advisory —
+ * re-run `mage link`/`mage init` to refresh. (A full template-drift compare rides the
+ * version-stamp enabler; see plan-readiness-doctor.) Fail-open on a missing/unreadable file.
+ */
+async function pushAgentsBlockCheck(checks: DoctorCheck[], opts: DoctorOptions): Promise<void> {
+  // The AGENTS.md the SESSION reads sits at its cwd (the code repo for an external KB, the
+  // repo/hub root otherwise) — NOT at kb.repo, which for an external repo is the hub.
+  const cwd = opts.cwd ?? process.cwd();
+  let block: string;
+  try {
+    block = mageBlockOf(await readFile(join(cwd, AGENTS_FILE), "utf8"));
+  } catch {
+    return; // no AGENTS.md / unreadable → nothing to verify
+  }
+  if (!block) return; // no mage block → not our concern here
+
+  const retired = RETIRED_SKILL_TOKENS.filter((t) => block.includes(t));
+  checks.push(
+    retired.length === 0
+      ? { name: "AGENTS.md awareness", ok: true, detail: "no retired command names" }
+      : {
+          name: "AGENTS.md awareness",
+          ok: false,
+          optional: true,
+          detail: `STALE — block uses retired command name(s) ${retired.join(", ")} → re-run \`mage link\`/\`mage init\` to refresh`,
+        },
+  );
+}
+
+/** The text between the mage AGENTS.md markers, or "" when absent. */
+function mageBlockOf(agents: string): string {
+  const b = agents.indexOf("<!-- BEGIN mage -->");
+  const e = agents.indexOf("<!-- END mage -->");
+  return b >= 0 && e > b ? agents.slice(b, e) : "";
 }
 
 /**
