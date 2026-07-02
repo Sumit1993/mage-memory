@@ -2,7 +2,7 @@
 
 # mage
 
-> 63 notes. Part of the [index](INDEX.md).
+> 64 notes. Part of the [index](INDEX.md).
 
 ### build
 
@@ -93,6 +93,7 @@
 - `plan` [mage — future thoughts (the standing idea inbox)](notes/future-thoughts.md) — future-thoughts, backlog, ideas, inbox, taxonomy, hierarchy, wings, dashboard, graph, leiden, graphify, ingest
 - `reference` [Field notes — first external migrations (v0.1 dogfood)](notes/migration-field-notes.md) — field-test, migration, hub-indexing, link-awareness, bulk-import, dream, onboarding, v0.2 _(reviewed 2026-06-02)_
 - `plan` [mage — hosted documentation website (GRILLED, ready to build)](notes/plan-docs-site.md) — documentation, website, docs-site, astro, starlight, generated-docs, drift, github-pages, onboarding, reference, buildProgram _(reviewed 2026-06-18)_
+- `plan` [mage — the readiness doctor: catch recall/skills drift, not just plumbing (pre-ADR)](notes/plan-readiness-doctor.md) — doctor, readiness, drift, wiring, recall, skills, capture, plugin-install, agents-md-staleness, index-freshness, version-stamp, auto-fix
 - `plan` [mage — release sequence (0.0.x → 0.1.0)](notes/plan-release-sequence.md) — release, sequence, backlog, 0.1.0, self-grooming, procedure-skill, redaction, skillopt, observe, optimize, promotion _(reviewed 2026-06-08)_
 - `plan` [mage — roadmap](notes/roadmap.md) — roadmap, v0.1, v0.2, dream, scope, deferred, release, mcp, hub _(reviewed 2026-06-05)_
 - `pointer` [mage soak — the external dogfood targets + the read-only monitor](notes/soak-targets.md) — soak, dogfood, prismalens, sreforge, monitor, lesson-path, digest, targets, read-only, external
