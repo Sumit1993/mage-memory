@@ -1,4 +1,6 @@
-import { platform } from "node:os";
+import { readFile } from "node:fs/promises";
+import { homedir, platform } from "node:os";
+import { join } from "node:path";
 import { buildReport, renderReport } from "../doctor/report.js";
 import { pushKbChecks } from "../doctor/kb-checks.js";
 import { pushLinkChecks } from "../doctor/link-checks.js";
@@ -15,6 +17,8 @@ export interface DoctorOptions {
   report?: boolean;
   /** Working directory for KB resolution (test isolation; default process.cwd()). */
   cwd?: string;
+  /** Gather checks WITHOUT rendering or the network probe — for the setup readiness footer. */
+  quiet?: boolean;
 }
 
 export interface DoctorCheck {
@@ -31,6 +35,17 @@ export interface DoctorResult {
 }
 
 const REQUIRED_NODE_MAJOR = 20;
+
+/**
+ * The recall+skills checks the setup readiness footer surfaces — "can the agent find
+ * and act on the knowledge", the layer beyond capture plumbing (see plan-readiness-doctor).
+ */
+const READINESS_CHECKS = new Set([
+  "skills (Claude Code plugin)",
+  "INDEX.md",
+  "index freshness",
+  "AGENTS.md awareness",
+]);
 
 /**
  * Diagnostic checks. Reports environment, tool availability, network reach, and —
@@ -65,9 +80,11 @@ export async function doctor(opts: DoctorOptions = {}): Promise<DoctorResult> {
     return { passed, checks };
   }
 
-  renderChecks(checks, passed);
-  const me = await which("mage");
-  if (me) logger.detail("(mage itself is on PATH)");
+  if (!opts.quiet) {
+    renderChecks(checks, passed);
+    const me = await which("mage");
+    if (me) logger.detail("(mage itself is on PATH)");
+  }
 
   return { passed, checks };
 }
@@ -107,8 +124,8 @@ async function pushEnvChecks(checks: DoctorCheck[], opts: DoctorOptions): Promis
     optional: true,
   });
 
-  // 4. Skills install method (Claude Code plugin — informational)
-  checks.push(checkSkillsInstall());
+  // 4. Skills reachable? (mage's plugin must be installed for mage:learn/groom to exist)
+  checks.push(await checkSkillsInstall());
 
   // 5. Hub check (if cwd or --hub looks like one)
   const hubCandidate = opts.hub ? absolutePath(opts.hub) : (opts.cwd ?? process.cwd());
@@ -126,7 +143,9 @@ async function pushEnvChecks(checks: DoctorCheck[], opts: DoctorOptions): Promis
     }
   }
 
-  // 6. Network probe (optional — checks if GitHub is reachable)
+  // 6. Network probe (optional — checks if GitHub is reachable). Skipped in quiet mode:
+  // the readiness footer wants a fast, local summary, not a 5s network timeout.
+  if (opts.quiet) return;
   try {
     const r = await fetch("https://github.com", { method: "HEAD", signal: AbortSignal.timeout(5000) });
     checks.push({
@@ -164,16 +183,72 @@ function renderChecks(checks: DoctorCheck[], passed: boolean): void {
   else logger.error("Some required checks failed.");
 }
 
-function checkSkillsInstall(): DoctorCheck {
-  // mage's skills ship as a Claude Code plugin; install is user-driven via slash
-  // commands, so there is nothing to probe from the CLI — surface the how-to.
+/**
+ * Are mage's skills reachable to the host agent? They ship as a Claude Code plugin, so
+ * the hooks can nudge "capture with mage:learn" but that skill only EXISTS once the plugin
+ * is installed (the 2026-07-02 soak ran for weeks with it uninstalled). Installing is a
+ * user-driven global act, so doctor DETECTS and instructs — it never installs. Reads the
+ * host plugin registry; a `mage@<marketplace>` key means reachable. Fail-open (absent/
+ * unreadable registry → not installed). Advisory, never a hard fail.
+ */
+async function checkSkillsInstall(): Promise<DoctorCheck> {
+  const installed = await mageSkillsInstalled();
+  if (installed) {
+    return { name: "skills (Claude Code plugin)", ok: true, detail: `reachable (${installed})` };
+  }
   return {
     name: "skills (Claude Code plugin)",
-    ok: true,
+    ok: false,
+    optional: true, // user-driven global install — instruct, never auto-fix
     detail:
-      "install with `/plugin marketplace add Sumit1993/mage-memory` then `/plugin install mage@mage`",
-    optional: true,
+      "mage plugin NOT installed — mage:learn / mage:groom are unreachable → " +
+      "`/plugin marketplace add Sumit1993/mage-memory` then `/plugin install mage@mage`",
   };
+}
+
+/** Host plugin registry path (honors CLAUDE_CONFIG_DIR, else ~/.claude). */
+function pluginRegistryPath(): string {
+  const base = process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude");
+  return join(base, "plugins", "installed_plugins.json");
+}
+
+/** The installed `mage@<marketplace>` id from the host registry, or null. Fail-open. */
+async function mageSkillsInstalled(): Promise<string | null> {
+  try {
+    return mageInstalledIn(JSON.parse(await readFile(pluginRegistryPath(), "utf8")));
+  } catch {
+    return null; // no registry / unreadable / bad JSON → treat as not installed
+  }
+}
+
+/** PURE: the first `mage`/`mage@…` plugin id in a parsed installed_plugins.json, else null. */
+export function mageInstalledIn(registry: unknown): string | null {
+  const plugins = (registry as { plugins?: Record<string, unknown> } | null)?.plugins;
+  if (!plugins || typeof plugins !== "object") return null;
+  return Object.keys(plugins).find((k) => k === "mage" || k.startsWith("mage@")) ?? null;
+}
+
+/**
+ * A compact recall+skills readiness summary, printed at the END of `connect`/`link` so
+ * setup can't silently leave a unit half-wired (the soak's uninstalled-plugin and
+ * stale-index drift would have surfaced right here). Runs doctor quietly (local, no
+ * network) and shows only the readiness-relevant checks that are NOT ok; a clean run
+ * prints one success line. Advisory — never throws, never blocks the command it trails.
+ */
+export async function readinessFooter(cwd: string): Promise<void> {
+  try {
+    const { checks } = await doctor({ cwd, quiet: true });
+    const problems = checks.filter((c) => READINESS_CHECKS.has(c.name) && !c.ok);
+    logger.blank();
+    if (problems.length === 0) {
+      logger.success("readiness: recall + skills ready");
+      return;
+    }
+    logger.info("readiness — before the agent can work the way mage wants:");
+    for (const p of problems) logger.warn(`  ${p.name}: ${p.detail}`);
+  } catch {
+    /* readiness is advisory — never break the command it trails */
+  }
 }
 
 function pad(s: string): string {

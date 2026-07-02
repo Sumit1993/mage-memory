@@ -12,7 +12,7 @@ import { gitInit } from "../git.js";
 import { detectRedactHook, installRedactHook } from "../git-hooks.js";
 import { METADATA_SCHEMA, METADATA_SCHEMA_V1, exists } from "../paths.js";
 import { tmpDir } from "../../test/fixtures/kb.js";
-import { type DoctorCheck, doctor } from "./doctor.js";
+import { type DoctorCheck, doctor, mageInstalledIn, readinessFooter } from "./doctor.js";
 
 async function freshDir(prefix = "mage-doctor-"): Promise<string> {
   return tmpDir(prefix);
@@ -879,5 +879,145 @@ describe("doctor — bare-parent + hub liveness", () => {
     await makeInRepoKb(dir, { gitignoreSinks: true });
     const r = await doctor({ cwd: dir });
     expect(check(r.checks, "hub projects")).toBeUndefined();
+  });
+});
+
+// ─── recall + skills readiness (plan-readiness-doctor) ────────────────────────
+
+describe("mageInstalledIn (pure)", () => {
+  it("finds the mage@<marketplace> plugin id", () => {
+    expect(mageInstalledIn({ plugins: { "mage@mage": [{}], "other@x": [{}] } })).toBe("mage@mage");
+  });
+  it("returns null when no mage plugin is present", () => {
+    expect(mageInstalledIn({ plugins: { "frontend-design@official": [{}] } })).toBeNull();
+  });
+  it("fail-open on junk shapes", () => {
+    expect(mageInstalledIn(null)).toBeNull();
+    expect(mageInstalledIn({})).toBeNull();
+    expect(mageInstalledIn({ plugins: "nope" })).toBeNull();
+  });
+});
+
+describe("doctor — recall + skills readiness", () => {
+  let home: string;
+  let origHome: string | undefined;
+  let origCfg: string | undefined;
+  beforeEach(async () => {
+    home = await freshDir("mage-home-");
+    origHome = process.env.HOME;
+    origCfg = process.env.CLAUDE_CONFIG_DIR;
+    process.env.HOME = home;
+    process.env.CLAUDE_CONFIG_DIR = join(home, ".claude"); // isolate the plugin registry too
+  });
+  afterEach(() => {
+    if (origHome === undefined) delete process.env.HOME;
+    else process.env.HOME = origHome;
+    if (origCfg === undefined) delete process.env.CLAUDE_CONFIG_DIR;
+    else process.env.CLAUDE_CONFIG_DIR = origCfg;
+  });
+
+  async function writeNotes(dir: string, n: number): Promise<void> {
+    await mkdir(join(dir, "mage", "notes"), { recursive: true });
+    for (let i = 0; i < n; i++) {
+      await writeFile(
+        join(dir, "mage", "notes", `n${i}.md`),
+        `---\ntype: note\ntags: [demo/room]\n---\n# Note ${i}\nbody\n`,
+      );
+    }
+  }
+  async function writeInstalledPlugins(ids: string[]): Promise<void> {
+    await mkdir(join(home, ".claude", "plugins"), { recursive: true });
+    const plugins = Object.fromEntries(ids.map((id) => [id, [{ scope: "user" }]]));
+    await writeFile(
+      join(home, ".claude", "plugins", "installed_plugins.json"),
+      `${JSON.stringify({ version: 2, plugins }, null, 2)}\n`,
+    );
+  }
+  async function writeAgents(dir: string, capture: string): Promise<void> {
+    await writeFile(
+      join(dir, "AGENTS.md"),
+      `# AGENTS.md\n\n<!-- BEGIN mage -->\ncapture with ${capture}\n<!-- END mage -->\n`,
+    );
+  }
+
+  // ── skills reachable ──
+  it("skills: plugin NOT installed → advisory fail with the /plugin install hint", async () => {
+    const dir = await freshDir();
+    await makeInRepoKb(dir, { gitignoreSinks: true });
+    const c = check((await doctor({ cwd: dir, quiet: true })).checks, "skills (Claude Code plugin)");
+    expect(c?.ok).toBe(false);
+    expect(c?.optional).toBe(true);
+    expect(c?.detail).toMatch(/plugin install mage@mage/);
+  });
+  it("skills: mage@mage in the host registry → reachable", async () => {
+    const dir = await freshDir();
+    await makeInRepoKb(dir, { gitignoreSinks: true });
+    await writeInstalledPlugins(["frontend-design@official", "mage@mage"]);
+    const c = check((await doctor({ cwd: dir, quiet: true })).checks, "skills (Claude Code plugin)");
+    expect(c?.ok).toBe(true);
+    expect(c?.detail).toMatch(/reachable \(mage@mage\)/);
+  });
+
+  // ── index freshness ──
+  it("index freshness: header count < notes on disk → STALE (advisory); --fix regenerates", async () => {
+    const dir = await freshDir();
+    await makeInRepoKb(dir, { gitignoreSinks: true });
+    await writeNotes(dir, 3);
+    await writeFile(join(dir, "mage", "INDEX.md"), "# Index\n\n> 0 notes across 1 wing.\n");
+
+    const before = check((await doctor({ cwd: dir, quiet: true })).checks, "index freshness");
+    expect(before?.ok).toBe(false);
+    expect(before?.optional).toBe(true);
+    expect(before?.detail).toMatch(/STALE/);
+
+    const after = check((await doctor({ cwd: dir, fix: true, quiet: true })).checks, "index freshness");
+    expect(after?.ok).toBe(true);
+    expect(await readFile(join(dir, "mage", "INDEX.md"), "utf8")).toMatch(/> 3 notes/);
+  });
+  it("index freshness: header matches disk → ok", async () => {
+    const dir = await freshDir();
+    await makeInRepoKb(dir, { gitignoreSinks: true }); // 0 notes on disk
+    await writeFile(join(dir, "mage", "INDEX.md"), "# Index\n\n> 0 notes across 1 wing.\n");
+    expect(check((await doctor({ cwd: dir, quiet: true })).checks, "index freshness")?.ok).toBe(true);
+  });
+  it("index freshness: unrecognized header → skipped (no false alarm)", async () => {
+    const dir = await freshDir();
+    await makeInRepoKb(dir, { gitignoreSinks: true }); // INDEX is just '# Index\n'
+    await writeNotes(dir, 2);
+    expect(check((await doctor({ cwd: dir, quiet: true })).checks, "index freshness")).toBeUndefined();
+  });
+
+  // ── AGENTS.md awareness ──
+  it("AGENTS awareness: a retired /mage-learn in the block → STALE (advisory)", async () => {
+    const dir = await freshDir();
+    await makeInRepoKb(dir, { gitignoreSinks: true });
+    await writeAgents(dir, "/mage-learn");
+    const c = check((await doctor({ cwd: dir, quiet: true })).checks, "AGENTS.md awareness");
+    expect(c?.ok).toBe(false);
+    expect(c?.optional).toBe(true);
+    expect(c?.detail).toMatch(/\/mage-learn/);
+  });
+  it("AGENTS awareness: current `mage:learn` → ok", async () => {
+    const dir = await freshDir();
+    await makeInRepoKb(dir, { gitignoreSinks: true });
+    await writeAgents(dir, "mage:learn");
+    expect(check((await doctor({ cwd: dir, quiet: true })).checks, "AGENTS.md awareness")?.ok).toBe(true);
+  });
+  it("AGENTS awareness: no AGENTS.md → check skipped", async () => {
+    const dir = await freshDir();
+    await makeInRepoKb(dir, { gitignoreSinks: true });
+    expect(check((await doctor({ cwd: dir, quiet: true })).checks, "AGENTS.md awareness")).toBeUndefined();
+  });
+
+  // ── readiness footer (advisory; never throws) ──
+  it("readinessFooter resolves without throwing", async () => {
+    const dir = await freshDir();
+    await makeInRepoKb(dir, { gitignoreSinks: true });
+    const spy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    try {
+      await expect(readinessFooter(dir)).resolves.toBeUndefined();
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
