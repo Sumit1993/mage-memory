@@ -5,7 +5,7 @@ tags:
 created: "2026-07-02"
 updated: 2026-07-02
 last_reviewed: 2026-07-02
-status: proposed
+status: accepted
 provenance:
   repo: mage-memory
   work: adr-0037-readiness-doctor
@@ -33,8 +33,9 @@ keywords:
 
 # 0037 — doctor's remit extends to recall + skills readiness, on a bounded auto-fix line
 
-> **Status: proposed.** Output of a 2026-07-02 light grill of [plan-readiness-doctor](../notes/plan-readiness-doctor.md),
-> promoted after the first slice shipped (PR #54). Resolves that plan's three open questions.
+> **Status: accepted (ratified 2026-07-02).** Output of a 2026-07-02 light grill of
+> [plan-readiness-doctor](../notes/plan-readiness-doctor.md), promoted after the first slice
+> shipped (PR #54). Resolves that plan's three open questions.
 
 ## Context
 

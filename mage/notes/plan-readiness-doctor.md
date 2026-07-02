@@ -32,7 +32,7 @@ keywords:
 
 # mage — the readiness doctor: catch recall/skills drift, not just plumbing (pre-ADR)
 
-**Status: grilled 2026-07-02 → [ADR-0037](../decisions/0037-readiness-doctor-remit-and-autofix-line.md) (proposed).**
+**Status: grilled 2026-07-02 → [ADR-0037](../decisions/0037-readiness-doctor-remit-and-autofix-line.md) (accepted).**
 First slice shipped (PR #54: three checks + the setup footer). The three [open
 questions](#open-questions-for-a-grill) below are resolved in ADR-0037.
 
