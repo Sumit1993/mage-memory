@@ -100,7 +100,7 @@ describe("scanNotes — recursive deny-list walk (ADR-0011 §2)", () => {
   });
 });
 
-describe("scanNotes — date frontmatter (quoted-string invariant)", () => {
+describe("scanNotes — date frontmatter (string OR YAML-1.1 Date)", () => {
   it("keeps a quoted date as a string", async () => {
     const root = await mkVault();
     await put(root, "notes/a.md", note(["x/y"], 'last_reviewed: "2026-06-03"\n'));
@@ -108,12 +108,16 @@ describe("scanNotes — date frontmatter (quoted-string invariant)", () => {
     expect(out[0]?.lastReviewed).toBe("2026-06-03");
   });
 
-  it("drops an unquoted YAML date (Date object) without crashing", async () => {
+  it("normalizes an UNQUOTED YAML date (Date object) to YYYY-MM-DD, not undefined", async () => {
+    // Regression: unquoted `last_reviewed: 2026-06-03` parses (YAML 1.1) to a JS Date, and
+    // editors/Obsidian linters strip the quotes on save. The old `typeof === "string"` check
+    // dropped it, so `dream` falsely flagged the note "no last_reviewed date". isoDate() now
+    // accepts both shapes.
     const root = await mkVault();
     await put(root, "notes/a.md", note(["x/y"], "last_reviewed: 2026-06-03\n"));
     const out = await scanNotes(root);
     expect(out).toHaveLength(1);
-    expect(out[0]?.lastReviewed).toBeUndefined();
+    expect(out[0]?.lastReviewed).toBe("2026-06-03");
   });
 });
 

@@ -1,10 +1,11 @@
 ---
 type: decision
-tags: [mage/decisions]
+tags:
+  - mage/decisions
 created: "2026-06-28"
-updated: "2026-06-28"
-last_reviewed: "2026-06-28"
-status: proposed
+updated: 2026-07-01
+last_reviewed: 2026-07-01
+status: accepted
 provenance:
   repo: mage-memory
   work: adr-0035-notes-are-memories-unified-store
@@ -15,12 +16,25 @@ sources:
   - decisions/0005-one-canonical-memory-others-are-feeders.md
   - decisions/0004-capture-insight-not-copies.md
   - decisions/0008-visible-mage-dir-for-obsidian.md
-keywords: [notes-are-memories, unified-store, harness-format, embrace-at-rest, normalize-at-commit, posttooluse-flatten, groom-as-curation, scanner-tolerance, hard-earned-knowledge, write-update-recall, future-proof, restamp]
+  - cc-session:3c5c8534-8611-4d9d-9087-9975da48dd44
+keywords:
+  - notes-are-memories
+  - unified-store
+  - harness-format
+  - embrace-at-rest
+  - normalize-at-commit
+  - posttooluse-flatten
+  - groom-as-curation
+  - scanner-tolerance
+  - hard-earned-knowledge
+  - write-update-recall
+  - future-proof
+  - restamp
 ---
 
 # 0035 — Notes are memories: one unified store; embrace the harness format at rest, normalize at the durable boundary
 
-> **Status: proposed.** Amends [ADR-0032](0032-capture-redirect-native-memory.md). Output of the
+> **Status: accepted (ratified 2026-07-01 — impl on `main`, riding 0.0.12).** Amends [ADR-0032](0032-capture-redirect-native-memory.md). Output of the
 > 2026-06-28 comparative study (18 harnesses + memory systems) and a grill that surfaced the
 > load-bearing insight this ADR turns on: **a mage note and an agent memory are the same thing.**
 > See the charter note [[mage-is-durable-memory]].

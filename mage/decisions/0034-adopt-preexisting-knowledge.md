@@ -1,10 +1,11 @@
 ---
 type: decision
-tags: [mage/decisions]
+tags:
+  - mage/decisions
 created: "2026-06-27"
-updated: "2026-06-27"
-last_reviewed: "2026-06-27"
-status: proposed
+updated: 2026-07-01
+last_reviewed: 2026-07-01
+status: accepted
 provenance:
   repo: mage-memory
   work: adr-0034-adopt-preexisting-knowledge
@@ -16,12 +17,29 @@ sources:
   - decisions/0013-procedure-skills-self-grooming-loop.md
   - decisions/0005-one-canonical-memory-others-are-feeders.md
   - https://code.claude.com/docs/en/memory
-keywords: [adopt, onboard, dispatcher, place, distill, in-shape, out-of-shape, never-a-copy, preexisting, native-memory, learn-from, routing, transcript-cwd, scrub-at-adopt, unclaimed, connect-prompt]
+  - cc-session:3c5c8534-8611-4d9d-9087-9975da48dd44
+keywords:
+  - adopt
+  - onboard
+  - dispatcher
+  - place
+  - distill
+  - in-shape
+  - out-of-shape
+  - never-a-copy
+  - preexisting
+  - native-memory
+  - learn-from
+  - routing
+  - transcript-cwd
+  - scrub-at-adopt
+  - unclaimed
+  - connect-prompt
 ---
 
 # 0034 — Adopt: a dispatcher for onboarding pre-existing knowledge
 
-> **Status: proposed.** Output of the 2026-06-27 grill ([grill-with-docs]), which reshaped a
+> **Status: accepted (ratified 2026-07-01 — impl on `main`, dogfooded, riding 0.0.12).** Output of the 2026-06-27 grill ([grill-with-docs]), which reshaped a
 > CC-memory-specific strawman into a general **onboarding dispatcher**. The *backfill* third to
 > [ADR-0032](0032-capture-redirect-native-memory.md) (capture, going forward) and
 > [ADR-0033](0033-recall-import-bounded-index.md) (recall). A one-time hand-migration of 13 memories

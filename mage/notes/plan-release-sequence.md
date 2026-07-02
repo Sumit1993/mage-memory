@@ -1,14 +1,38 @@
 ---
 type: plan
-tags: [mage/roadmap]
+tags:
+  - mage/roadmap
 created: "2026-06-03"
-updated: "2026-06-08"
-last_reviewed: "2026-06-08"
+updated: 2026-07-01
+last_reviewed: 2026-07-01
 status: active
 provenance:
   repo: mage-memory
   work: mega-grill-skill-loop
-keywords: [release, sequence, backlog, 0.1.0, self-grooming, procedure-skill, redaction, skillopt, observe, optimize, promotion]
+sources:
+  - cc-session:3c5c8534-8611-4d9d-9087-9975da48dd44
+keywords:
+  - release
+  - sequence
+  - backlog
+  - 0.1.0
+  - self-grooming
+  - procedure-skill
+  - redaction
+  - skillopt
+  - observe
+  - optimize
+  - promotion
+  - autonomy
+  - operator
+  - approver
+  - overseer
+  - digest-to-agent
+  - capture-redirect
+  - recall-import
+  - adopt
+  - notes-are-memories
+  - native-memory
 ---
 
 # mage — release sequence (0.0.x → 0.1.0)
@@ -19,6 +43,16 @@ built. The **horizon is capped at 0.1.0 — no 1.0 is crowned** (a 2026-06-05 me
 decision). 0.1.0 ships the **full self-grooming loop**: portable KB · index · per-wing
 skills · dream · recall **plus** capture → graduate → optimize. Detail for each item
 lives in its ADR — this is the map, not a copy.
+
+**Reframed 2026-07-01 — 0.1.0 is the autonomy milestone.** Since 0.0.11 the loop has been
+made genuinely *autonomous*, and **all post-0.0.11 work serves that one vision** (the
+maintainer's, stated 2026-07-01): a durable memory that **captures, recalls, and grooms
+hard-earned knowledge with as little human friction as the maintainer opts into** — the git
+commit the one irreducible human act. Capture becomes a *redirect* (not a CLI the agent
+skips), recall a launch-*load* (not an instruction it ignores), and the host agent drains the
+grooming ladder at the maintainer's chosen autonomy level while mage's engine stays
+model-free. That is exactly the [autonomy track (ADR-0029–0036)](#the-autonomy-track--what-010-now-delivers-adr-00290036)
+below — the substance of the cut, not scope beyond it.
 
 Ordering axes: **hard dependency first, then design-locked-before-grill** (ship the
 concrete things cheaply; don't build a grill-gated feature until its design is locked).
@@ -41,9 +75,10 @@ splits collapsed). **Status** tracks where each release stands.
 | **0.0.9** | **readiness**: **setup-integrity** (connect ensures ignores · doctor KB+connection health + `--fix`/`--report` · version-drift nudge) + the **no-server dashboard** (Option D) + **icon (graph-"m")** + pre-release chores | **0020, 0021**, 0010 | — | grilled⁵ | **built⁶** |
 | **0.0.10** | **coherence**: vocabulary ADR (*every flavor is a knowledge base*; de-overload "hub") + **hub flat-vs-nested grill** → ADR + the `mage link` scaffold-consistency fix + **SDD skills removed** (the deferred ADR-0001/0002 prune) | **0022, 0023** | 0.0.9 | grilled⁷ | **shipped** |
 | **0.0.11** | **signal quality + autonomous capture** (de-noise signatures · project wings · SubagentStop · bounded ranked promotion) + **release-please adoption** (first bot-managed release) + **security cleanup** (drop gray-matter→yaml; esbuild pin) + **test-typecheck gate** | 0015, 0018, 0019 | 0.0.10 | locked | **shipped⁸** |
-| **0.0.12** | **organic grooming loop** — the *lesson path* (`mage stage`/`mage groom` + gitignored `.staging/` + boundary-nudge adapter via `mage connect` + always-on inline capture) + bundled **redact false-positives** fix | **0024** | 0.0.11 | grilled⁹ | **building** |
+| **0.0.12** | **organic grooming loop** — the *lesson path* (`mage stage`/`mage groom` + gitignored `.staging/` + boundary-nudge adapter via `mage connect` + always-on inline capture) + bundled **redact false-positives** fix. **The digest→agent pivot then reshaped it** (see ¹¹): 0.0.12 now also carries 0029–0031 | **0024, 0029–0031** | 0.0.11 | grilled⁹ | **building** (unshipped; = release-please PR #30) |
+| **Autonomy loop** | **0.1.0's substance** — digest→agent capture · the Operator/Approver/Overseer dial · provenance + reject-ledger · capture-*redirect* + launch-*load* recall · adopt · notes-are-memories. See the [autonomy track](#the-autonomy-track--what-010-now-delivers-adr-00290036) below | **0029–0036** | 0.0.12 | 6 grills, all closed¹¹ | **BUILT on `main`; ADRs ratified 2026-07-01; bake** |
 | **Docs site** | Hosted, navigable **documentation website** generated from code (drift-tested) + README reconciliation — a 0.1.0 credibility-push track | **0026** | — | grilled¹⁰ | ready |
-| **→ 0.1.0** | **Milestone: portable, self-grooming memory — the cut** (announced once a1 bakes) | — | all | — | — |
+| **→ 0.1.0** | **Milestone: portable, self-grooming memory, made autonomous — the cut** (announced once the a1 autonomy bake holds; see ¹¹) | — | all | — | — |
 
 ¹ tagged + GitHub-released; npm still at 0.0.3. · *Status legend:* **shipped · next · planned** (add `building`/`grilled`/`built` in flight).
 ³ 0.0.7 **built + dogfooded 2026-06-08** (473 tests; build+typecheck green). Built via a partitioned workflow (5 parallel module agents → serial integrate → adversarial review → fix). The review caught two real defects (fixed): a Gate-2 **bypass** — `scanStaged` silently skipped C-quoted non-ASCII staged filenames (fixed with `-z` NUL-split); and a **fail-closed** pre-commit hook that blocked every commit with a false "live secret" message when `mage` wasn't on PATH (fixed with a `command -v mage` guard → fail-open). **Dogfooding caught two more (fixed):** the Gate-2 **scope bug** — `scanStaged` scanned the *whole* repo and so blocked the commit on the redaction tool's own `src/` test fixtures; corrected to scope Gate-2 to the **docs root** (`mage/`) per ADR-0014 §2 (ADR-0018 §7 + [gotcha](gate2-blocks-own-redaction-fixtures.md)), which is also what lets mage run its own Gate-2 hook; and a `connect({user})` **test-isolation leak** that installed the hook into the real repo via `process.cwd()`. **Live-dogfooded**: `mage distill` over this repo's real `.learnings/` (four lenses, user-corrections first-class, caps/spills); scoped `redact --check --staged` (blocks a planted key masked-never-raw incl. a `café.md` non-ASCII path; skips `src/` fixtures); the pre-commit hook blocks a real secret commit and fails open when `mage` is absent; malformed `.learnings/` parsed fail-open. Post-build cleanup folded the low-severity review findings (empty-detail salience, strict correction-adjacency, prompts-only hint, `--seen` leading-colon guard, `--staged` positional warning, symlink-hook guard) + boundary tests.
@@ -107,6 +142,38 @@ focused PRs off `main`** (rebased after the `.mage/` fold #31): (1) `buildProgra
 tampered value. **Glossary gap flagged:** `context.md` predates 0.0.12 and lacks `nudge`/`stage`/`groom`/`lesson` — a
 separate cleanup the site will pressure-test.
 
+¹¹ **Autonomy track (0029–0036)** — the design that reshaped the run to 0.1.0, added *after* this
+sequence last called the path "pure build." Six grills, all closed (0029 digest→agent 2026-06-20 · 0030
+ladder 06-21 · 0032/0033 capture+recall 06-25 · 0034 adopt 06-27 · 0035/0036 notes-are-memories +
+defer-adapter 06-28). The CLI is **largely built and on `main`**, riding the unshipped 0.0.12
+(release-please PR #30; `bump-patch-for-minor-pre-major` holds it at 0.0.x until the 0.1.0 cut is taken
+by hand). See the dedicated section below.
+
+## The autonomy track — what 0.1.0 now delivers (ADR-0029–0036)
+
+Added 2026-07-01. **0.1.0 is the autonomy milestone**, and *all post-0.0.11 work serves that one
+vision:* a durable memory that **captures, recalls, and grooms hard-earned knowledge with as little
+human friction as the maintainer opts into**, the git commit the one irreducible human act. This is not
+scope beyond 0.1.0 — it *is* the cut. The [live multi-KB soak](soak-targets.md) drove every step; each
+ADR fixes a failure the previous rung's gate could not see.
+
+| ADR | The move | Status | Landed |
+|---|---|---|---|
+| **[0029](../decisions/0029-digest-to-agent-capture.md)** digest→agent | Deterministic core **narrows + compresses** into a digest; the **host model judges** (two replay gates KILLED model-free *selection* — no classifier isolates "durable lesson"). Engine stays model-free (ADR-0009). | active · **built** | 0.0.12 |
+| **[0030](../decisions/0030-agent-autonomy-ladder.md)** autonomy dial | Opt-in **Operator → Approver → Overseer** (HITL→HOTL). *Anything a human does at `mage:groom`, a capable agent can do* — only the **commit** is irreducible. The two-channel nudge is the low rung; the same tally is the work-list higher up. | active · **built** | 0.0.12 |
+| **[0031](../decisions/0031-programmatic-provenance-stamp.md)** provenance | Writer stamps `provenance`/`autonomy` at creation → the **keep-vs-`git revert` ledger** (the one signal that higher autonomy is worth it) is measurable. | active · **Phase 1 built**; Phase 2 (reject-ledger) sketched | 0.0.12 |
+| **[0032](../decisions/0032-capture-redirect-native-memory.md)** capture-redirect | Inline `mage stage` was *never run* — the native-memory write reflex won. **Co-opt it**: relocate the host memory dir onto the KB (`autoMemoryDirectory`), `PreToolUse` redirect, `PostToolUse` mirror. Capture always **ends in git**. | accepted · **built** | PR #45 |
+| **[0033](../decisions/0033-recall-import-bounded-index.md)** recall-import | Agent ignored "read `INDEX.md` first." Emit a CC-auto-loaded **`MEMORY.md`** twin of the bounded index (fallback `@import mage/INDEX.md`): a volitional pull → a deterministic launch-load that survives `/compact`. Spike PASSED 06-27. | accepted · **built** | on `main` |
+| **[0034](../decisions/0034-adopt-preexisting-knowledge.md)** adopt | `mage adopt` onboards what predates the hook — a dispatcher: in-shape → **place**, out-of-shape → `learn --from` **distills** (never a copy). | accepted · **built, dogfooded** | PR #46 |
+| **[0035](../decisions/0035-decouple-harness-memory-from-notes.md)** notes-are-memories | The load-bearing insight: **a mage note IS an agent memory** — one store. Stop fighting frontmatter at write-time; scrub secrets before disk, **normalize at the durable boundary** (PostToolUse-flatten + commit backstop); `groom` = periodic curation. | accepted · **impl building** | on `main` |
+| **[0036](../decisions/0036-defer-harness-adapter-seam.md)** defer-adapter | One harness is a *hypothetical* seam — **don't** build `HarnessAdapter` yet; consolidated CC note-shape into one `cc-note` module now (retired `schema-map.ts`). | accepted · **built** | on `main` |
+
+**What remains before the cut** (the honest gate — not "pure build"):
+1. ~~**Ratify the four `proposed` ADRs**~~ — **done 2026-07-01**: 0032 / 0033 / 0034 / 0035 are now `accepted` (impl rides `main`).
+2. **Finish the tail** — ADR-0035 normalization hardening (PostToolUse-flatten vs restamp timing + the commit-time backstop) and **ADR-0031 Phase 2** (the reject-ledger reconciler).
+3. **The a1 autonomy bake** — 0.1.0 announces once the loop is *observed working in real use*: the soak (this repo + `prismalens-docs-hub` + `sreforge-memory`), capture-redirect + launch-load recall wired and a repo opted up to Approver/Overseer, produces durable notes the maintainer **keeps** (a healthy keep-vs-revert ledger, ADR-0031) — **not** a forced graduation.
+4. **Ship 0.0.12** (merge PR #30 → tag `v0.0.12`, manual npm publish after dogfood) and, on the credibility track, the docs site (does **not** gate the code cut, ¹⁰).
+
 ## Critical path (what gates everything)
 
 `0.0.2 substrate` → **`0.0.5 mage observe`** → `0.0.6 connect + metrics` → `0.0.7 distill` → `0.0.8 self-grooming`.
@@ -144,6 +211,13 @@ files*, the human *commits the diff*. ADR-0006's "promotion deferred until wings
 proliferate" trigger is satisfied naturally: wings proliferate across the 0.0.x ladder
 before the self-grooming release (0.0.8) lands.
 
+**Reframed 2026-07-01:** the cut's *final* increment is the [autonomy track](#the-autonomy-track--what-010-now-delivers-adr-00290036)
+— the same loop made autonomous (capture-redirect · launch-load recall · the Operator/Approver/Overseer
+dial · notes-are-memories), still all human-committed. The never-auto-commit invariant is precisely what
+keeps high autonomy safe: even Overseer is human-*on*-the-loop because the commit gate is unconditional
+(ADR-0030). So 0.1.0 = the full self-grooming loop **that the agent drains for you**, up to the autonomy
+you opted into — the human still commits the diff.
+
 ## Release discipline — dogfood before publish
 
 Every release is **used locally before it ships.** `pnpm test` verifies logic in
@@ -160,7 +234,7 @@ file rotation — only reveals bugs when actually run. **Definition of done, per
    also pre-validates connect's payload→event mapping). Remove the temp hook after.
 4. Only then tag + `npm publish`.
 
-## Grills to run (remaining: 0 — the **docs-site grill** closed 2026-06-18, see ¹⁰; the **0.0.12 organic-grooming-loop grill** closed 2026-06-15, see ⁹; the **0.0.10 coherence grill** closed + shipped, see ⁷; 0.0.9 readiness grilled + closed 2026-06-09, see ⁵; the CLI path to 0.1.0 is otherwise pure build + the a1 bake)
+## Grills to run (remaining: 0 — the **docs-site grill** closed 2026-06-18, see ¹⁰; the **0.0.12 organic-grooming-loop grill** closed 2026-06-15, see ⁹; the **0.0.10 coherence grill** closed + shipped, see ⁷; 0.0.9 readiness grilled + closed 2026-06-09, see ⁵; the **six autonomy grills** 2026-06-20→06-28 all closed, see ¹¹ — but this superseded the old "pure build" read: the run to 0.1.0 is now **harden the tail (ADR-0035 normalization + ADR-0031 Phase 2) + the a1 bake**, not a fresh design — the four autonomy ADRs were ratified 2026-07-01)
 
 The 2026-06-06 observe grill ([ADR-0015](../decisions/0015-mage-observe-capture-schema.md)
 + [ADR-0016](../decisions/0016-context-match-confidence-ladder-applier.md)) pre-resolved
@@ -202,6 +276,14 @@ decide, below.
 - detailed_by [ADR-0017 — mage connect: the host hook adapter](../decisions/0017-mage-connect-host-hook-adapter.md)
 - detailed_by [ADR-0018 — mage distill: the observed-scratch reader](../decisions/0018-mage-distill-observed-scratch-reader.md)
 - detailed_by [ADR-0019 — mage promote: self-grooming](../decisions/0019-mage-promote-self-grooming.md)
+- autonomy_pivot [ADR-0029 — digest-to-agent capture](../decisions/0029-digest-to-agent-capture.md)
+- autonomy_dial [ADR-0030 — opt-in agent autonomy ladder](../decisions/0030-agent-autonomy-ladder.md)
+- autonomy_evidence [ADR-0031 — programmatic provenance + reject-ledger](../decisions/0031-programmatic-provenance-stamp.md)
+- autonomy_capture [ADR-0032 — capture-redirect native memory](../decisions/0032-capture-redirect-native-memory.md)
+- autonomy_recall [ADR-0033 — recall: import the bounded index](../decisions/0033-recall-import-bounded-index.md)
+- autonomy_backfill [ADR-0034 — adopt pre-existing knowledge](../decisions/0034-adopt-preexisting-knowledge.md)
+- autonomy_unify [ADR-0035 — notes are memories: one unified store](../decisions/0035-decouple-harness-memory-from-notes.md)
+- autonomy_seam [ADR-0036 — defer the HarnessAdapter seam](../decisions/0036-defer-harness-adapter-seam.md)
 - detailed_by [ADR-0011 — recursive scan; hub projects are wings](../decisions/0011-recursive-scan-hub-projects.md)
 - detailed_by [ADR-0012 — wings optional; standalone hubs](../decisions/0012-wings-optional-convention-standalone-hubs.md)
 - feeders_from [ADR-0005 — one canonical memory; others are feeders](../decisions/0005-one-canonical-memory-others-are-feeders.md)
