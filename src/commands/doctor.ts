@@ -143,9 +143,12 @@ async function pushEnvChecks(checks: DoctorCheck[], opts: DoctorOptions): Promis
     }
   }
 
-  // 6. Network probe (optional — checks if GitHub is reachable). Skipped in quiet mode:
-  // the readiness footer wants a fast, local summary, not a 5s network timeout.
-  if (opts.quiet) return;
+  // 6. Network probe (optional — checks if GitHub is reachable). Skipped in quiet mode
+  // (the readiness footer wants a fast, local summary) AND under vitest: the fetch can
+  // burn its full 5s AbortSignal on a slow/blocked CI runner and trip a test's own 5s
+  // deadline (the Node-22 hub-liveness timeout). It is network-only, optional, and has no
+  // bearing on the KB, so no test needs it.
+  if (opts.quiet || process.env.VITEST) return;
   try {
     const r = await fetch("https://github.com", { method: "HEAD", signal: AbortSignal.timeout(5000) });
     checks.push({
