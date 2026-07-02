@@ -30,11 +30,11 @@ keywords:
   - init
 ---
 
-# mage — the readiness doctor: catch recall/skills drift, not just plumbing (pre-ADR)
+# mage — the readiness doctor: catch recall/skills drift, not just plumbing
 
-**Status: pre-ADR.** Bulk is plan-note-level (additive, low-risk). One embedded principle
-is grill-worthy — see [Open questions](#open-questions-for-a-grill). If ratified it promotes
-to a short ADR; the check list below builds either way.
+**Status: grilled 2026-07-02 → [ADR-0037](../decisions/0037-readiness-doctor-remit-and-autofix-line.md) (accepted).**
+First slice shipped (PR #54: three checks + the setup footer). The three [open
+questions](#open-questions-for-a-grill) below are resolved in ADR-0037.
 
 ## Problem — green plumbing, misbehaving agent
 
@@ -117,7 +117,8 @@ Then staleness is a comparison: "block v1, current v3 → stale"; "index reflect
 
 ## Open questions for a grill
 
-Only these need pressure-testing before an ADR; the checks above do not.
+Grilled 2026-07-02 → resolved in [ADR-0037](../decisions/0037-readiness-doctor-remit-and-autofix-line.md);
+kept here as the record of what was pressure-tested.
 
 1. **Is inspecting `~/.claude/plugins` mage's job?** [ADR-0009](../decisions/0009-no-runtime-automation-rides-host-hooks.md)
    says "no runtime of our own." Reading host config to check "is my plugin installed"
@@ -141,4 +142,5 @@ then-current `mage doctor`.
 - ethos_from [ADR-0030 — opt-in agent autonomy ladder](../decisions/0030-agent-autonomy-ladder.md)
 - precedent [Gotcha — connect doesn't ensure the sink is gitignored](connect-doesnt-ensure-ignores.md)
 - surfaced_by [mage soak — the dogfood targets + monitor](soak-targets.md)
+- promoted_to [ADR-0037 — doctor's remit + the auto-fix line](../decisions/0037-readiness-doctor-remit-and-autofix-line.md)
 - sequenced_in [release sequence](plan-release-sequence.md)
