@@ -242,6 +242,28 @@ describe("mage nudge — user-visible notice (systemMessage)", () => {
   });
 });
 
+describe("mage nudge — compact bypasses the backlog throttle (resume→compact pattern)", () => {
+  it("a `resume` arms the throttle and mutes a following resume, but `compact` still surfaces the backlog", async () => {
+    const { dir, root } = await withKb();
+    await seedChapter(learningsPath(root), "s1", "alpha"); // one closed, unmined chapter = backlog
+
+    // First resume: never reminded → shows the backlog line AND arms the 4h throttle.
+    const first = await nudgeCmd({ cwd: dir, source: "resume" });
+    expect(first.notice).not.toBeNull();
+    expect(first.notice).toContain("mage:groom");
+
+    // A second resume moments later is inside the window → throttled, nothing user-visible.
+    const throttled = await nudgeCmd({ cwd: dir, source: "resume" });
+    expect(throttled.notice).toBeNull();
+
+    // A compact is a real chapter boundary → it BYPASSES the throttle and still surfaces the backlog,
+    // so the morning resume→compact pattern can no longer eat the compact's nudge.
+    const compact = await nudgeCmd({ cwd: dir, source: "compact" });
+    expect(compact.notice).not.toBeNull();
+    expect(compact.notice).toContain("mage:groom");
+  });
+});
+
 describe("mage nudge — weekly dream-health tick", () => {
   it("folds a rot summary into BOTH channels and tells the agent to OFFER `mage dream`", async () => {
     const { dir, root } = await withKb();

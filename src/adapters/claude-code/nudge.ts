@@ -95,9 +95,10 @@ export async function nudgeCmd(opts: NudgeOptions): Promise<NudgeResult> {
 
 /**
  * Compose the boundary nudge: on `compact`, render the just-closed chapter's earned-signal DIGEST
- * (never throttled — new content each compact); at every source, append the per-autonomy-level
- * BACKLOG mandate when the throttle window has elapsed (ADR-0030 §5). NO drafts are written. The
- * three-part tally is mtime-gated so a no-new-scratch startup reuses cached counts.
+ * (never throttled — new content each compact); append the per-autonomy-level BACKLOG mandate when
+ * the throttle window has elapsed — or immediately on `compact`, which bypasses the window so a
+ * `resume` firing seconds earlier can't eat it (ADR-0030 §5). NO drafts are written. The three-part
+ * tally is mtime-gated so a no-new-scratch startup reuses cached counts.
  */
 async function digestNudge(resolved: ResolvedDocsRoot, source: string, force: boolean): Promise<NudgeResult> {
   const { root } = resolved;
@@ -121,9 +122,13 @@ async function digestNudge(resolved: ResolvedDocsRoot, source: string, force: bo
   const tally = await backlogTally(root, sensitivity);
   const pending = tally.staged;
 
-  // The backlog line is throttled (once per window, all sources); the digest is not.
+  // The backlog line rides a throttle (once per window) so routine startups/resumes don't re-nag —
+  // EXCEPT on `compact`, a real chapter boundary the user expects to see. The morning resume→compact
+  // pattern fires a `resume` seconds before the `compact`; the resume used to arm the throttle and eat
+  // the compact's line, so `compact` now bypasses the window (the digest was never throttled either).
   const windowMs = throttleWindowMs(nudgeThrottleHours);
-  const showBacklog = hasBacklog(tally) && (force || (await elapsedSince(root, windowMs)));
+  const throttleElapsed = force || source === "compact" || (await elapsedSince(root, windowMs));
+  const showBacklog = hasBacklog(tally) && throttleElapsed;
   const mandate = showBacklog ? renderMandate(level, tally) : "";
   if (showBacklog) await markReminded(root);
 
