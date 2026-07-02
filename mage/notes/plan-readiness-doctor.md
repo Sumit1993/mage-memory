@@ -30,7 +30,7 @@ keywords:
   - init
 ---
 
-# mage — the readiness doctor: catch recall/skills drift, not just plumbing (pre-ADR)
+# mage — the readiness doctor: catch recall/skills drift, not just plumbing
 
 **Status: grilled 2026-07-02 → [ADR-0037](../decisions/0037-readiness-doctor-remit-and-autofix-line.md) (accepted).**
 First slice shipped (PR #54: three checks + the setup footer). The three [open
