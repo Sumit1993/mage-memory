@@ -384,6 +384,20 @@ describe("doctor env checks still run", () => {
   it("MAGE_HOOKS length is the expected hook count (10 base + 3 commandeer)", () => {
     expect(MAGE_HOOKS.length).toBe(13);
   });
+
+  it("skips the GitHub network probe under test (no 5s fetch → no timeout flake)", async () => {
+    const dir = await freshDir();
+    const home = await freshDir("mage-home-");
+    const origHome = process.env.HOME;
+    process.env.HOME = home;
+    try {
+      const r = await doctor({ cwd: dir });
+      expect(check(r.checks, "github reachable")).toBeUndefined();
+    } finally {
+      if (origHome === undefined) delete process.env.HOME;
+      else process.env.HOME = origHome;
+    }
+  });
 });
 
 // ─── link integrity (code-repo <-> hub references; --fix heals a moved repo) ────
