@@ -2,8 +2,17 @@
 # feature/fix PR merged to main updates it. Merging the release PR bumps the
 # version across all artifacts (package.json + the extra-files in
 # release-please-config.json), writes the CHANGELOG, tags, and cuts the GitHub
-# release. npm publish stays MANUAL — we dogfood the built artifact locally before
-# `npm publish`, so there is intentionally no publish step here.
+# release — and the `publish` job below ships that same commit to npm. Dogfood
+# happens BEFORE merging the release PR (CI builds, tests, and smoke-installs
+# the packed tarball on it); merging is the ship decision.
+#
+# Publishing authenticates via npm TRUSTED PUBLISHING (OIDC): id-token:write
+# lets pnpm (>=10.13; this repo pins 11.x via packageManager) exchange the
+# runner's OIDC token for a short-lived npm credential — no npm token secret
+# exists or is needed, and provenance attestations are generated automatically.
+# Requirement: the mage-memory package on npmjs.com must have this repo +
+# this workflow file (release-please.yml) registered as a trusted publisher
+# (package Settings -> Publishing access -> Trusted publisher).
 name: release-please
 
 on:
@@ -19,8 +28,11 @@ permissions:
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
     steps:
       - uses: googleapis/release-please-action@v5
+        id: release
         with:
           # MUST be a PAT, not the default GITHUB_TOKEN. main is branch-protected
           # with required status checks, and PRs created by GITHUB_TOKEN do NOT
@@ -31,3 +43,34 @@ jobs:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+  # Publish to npm when release-please just cut a release — i.e. this push to
+  # main was the release PR merging. Runs on the exact commit the tag points at.
+  publish:
+    name: publish to npm
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # npm trusted publishing (OIDC)
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Publish to npm
+        # prepublishOnly runs the build. --no-git-checks: the prebuild vendor
+        # step can touch the tree on the runner, and pnpm would refuse to
+        # publish from a dirty checkout otherwise.
+        run: pnpm publish --no-git-checks
