@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { tmpDir, withKb } from "../../../test/fixtures/kb.js";
@@ -290,6 +290,35 @@ describe("mage nudge — startup digest (ADR-0030 amendment)", () => {
     );
     const second = await nudgeCmd({ cwd: dir, source: "startup" });
     expect(second.nudge ?? "").not.toContain("Raw material, NOT lessons"); // watermark suppressed it
+  });
+
+  it("shows a chapter APPENDED to an existing session file (fingerprint tracks file changes, not just the dir)", async () => {
+    const { dir, root } = await withKb();
+    const learnings = learningsPath(root);
+    await seedChapter(learnings, "s1", "alpha"); // closed chapter #1
+    const first = await nudgeCmd({ cwd: dir, source: "startup" });
+    expect(first.nudge).toContain("Raw material, NOT lessons");
+    // Close a SECOND chapter by APPENDING to the SAME file — the real non-compacting flow. This bumps
+    // the file's size + mtime but NOT the `.learnings/` dir mtime; a dir-only fingerprint would stay a
+    // cache HIT and skip this keeper entirely. It must surface.
+    await appendFile(
+      join(learnings, "s1.jsonl"),
+      toJsonl([
+        buildUserPrompt(base("s1"), "now wire the betazoid path"),
+        buildToolUse(base("s1"), {
+          tool: "Bash",
+          paths: [],
+          detail: "run betazoid",
+          ok: false,
+          error_summary: "betazoid failed: 1 red",
+        }),
+        buildSessionEnd(base("s1")),
+      ]),
+      "utf8",
+    );
+    const second = await nudgeCmd({ cwd: dir, source: "startup" });
+    expect(second.nudge).toContain("Raw material, NOT lessons"); // the appended chapter surfaced
+    expect(second.nudge).toContain("betazoid failed"); // and it's the NEW chapter, not the stale one
   });
 
   it("a no-signal closed chapter surfaces no digest and no teaser at entry", async () => {

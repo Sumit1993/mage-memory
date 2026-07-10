@@ -1,4 +1,5 @@
-import { mkdir } from "node:fs/promises";
+import { appendFile, mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { BacklogTally } from "../../grooming/backlog.js";
 import { learningsPath } from "../../paths.js";
@@ -26,6 +27,19 @@ describe("scratchFingerprint", () => {
     const root = await tmpRoot();
     await mkdir(learningsPath(root), { recursive: true });
     expect(await scratchFingerprint(root)).not.toBe("");
+  });
+
+  it("changes when a session_end is APPENDED to an existing stream file (not just on dir changes)", async () => {
+    const root = await tmpRoot();
+    const learnings = learningsPath(root);
+    await mkdir(learnings, { recursive: true });
+    const file = join(learnings, "s1.jsonl");
+    await writeFile(file, '{"v":1,"ts":"2026-07-10T10:00:01Z","session":"s1","type":"user_prompt","text":"work"}\n', "utf8");
+    const before = await scratchFingerprint(root);
+    // A chapter-closing append bumps the FILE (not the .learnings/ dir) mtime — the fingerprint must
+    // still change, or the just-closed chapter's digest would be wrongly skipped on the next startup.
+    await appendFile(file, '{"v":1,"ts":"2026-07-10T10:00:02Z","session":"s1","type":"session_end"}\n', "utf8");
+    expect(await scratchFingerprint(root)).not.toBe(before);
   });
 });
 

@@ -64,6 +64,9 @@ primary; the nudge only catches what the agent forgot. Never throws (fail-open, 
 - **One shared, fingerprint-gated read.** `scanBoundary` reads the session streams ONCE and feeds both
   the digest and the backlog tally (`computeBacklogFromStreams`). A no-new-scratch startup is a cache
   hit → reads nothing, surfaces no digest. `compact` always re-reads (fresh chapter must show).
+  `scratchFingerprint` folds in the **size + mtime of each session file** (not just the `.learnings/`
+  dir mtime) — a `session_end` append closes a chapter by bumping the FILE, not the dir, so a dir-only
+  fingerprint would cache-hit and silently skip that chapter's digest.
 - **Session entry is offer-first at every autonomy level** — startup/resume drop the mandate to
   `operator` even when configured overseer, so opening the CLI never triggers autonomous grooming.
 

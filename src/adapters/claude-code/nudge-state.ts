@@ -15,7 +15,7 @@
 // FAIL-OPEN throughout: a missing/corrupt file reads as "never reminded, no cache" and a write
 // failure is swallowed — the boundary nudge must never break the host session start.
 
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { distillWatermarkPath } from "../../distill/watermark.js";
 import type { BacklogTally } from "../../grooming/backlog.js";
@@ -101,31 +101,51 @@ async function writeState(root: string, patch: Partial<NudgeState>): Promise<voi
 // ─── the seam ────────────────────────────────────────────────────────────────────
 
 /**
- * An mtime fingerprint of the scratch that feeds the backlog scan: the `.learnings/` dir mtime
- * (new/removed/rewritten session streams bump it), the distill watermark file mtime (a `mage
- * distill --seen` advances the unmined cursor), and the `.mage/staging/` dir mtime (a `mage stage`
- * adds a draft / a groom drains one — the staged count must not go stale across a stage/groom that
- * never touched `.learnings/`). "" when none can be stat'd → never gate (always recompute), the
- * safe-open behaviour.
+ * A change-fingerprint of the scratch that feeds the backlog scan AND (ADR-0030 amendment) gates the
+ * digest read. It combines: the `.learnings/` dir mtime (catches a session-file ADD/REMOVE — a new
+ * session, a rotation); the **size + mtime of EACH session stream file**; the distill watermark file
+ * mtime (a `mage distill --seen` advances the unmined cursor); and the `.mage/staging/` dir mtime (a
+ * `mage stage`/groom changes the staged count). "" when none can be stat'd → never gate (always
+ * recompute), the safe-open behaviour.
+ *
+ * Per-file size+mtime is the load-bearing part: a `session_end`/`compact` APPEND that CLOSES a chapter
+ * bumps only the FILE (not the dir) mtime, so the old dir-only fingerprint could stay unchanged and the
+ * just-closed chapter's digest would be wrongly skipped. Size changes deterministically on any append,
+ * so detection never depends on mtime granularity. The nudge runs once per session start, so the extra
+ * stats are cheap. Mirrors {@link readSessionStreams}' listing (top-level `*.jsonl`, no sidecars).
  */
 export async function scratchFingerprint(root: string): Promise<string> {
   const parts: string[] = [];
+  const learnings = learningsPath(root);
   try {
-    parts.push(String((await stat(learningsPath(root))).mtimeMs));
+    parts.push(`dir:${(await stat(learnings)).mtimeMs}`);
+    const entries = await readdir(learnings, { withFileTypes: true });
+    const files = entries
+      .filter((e) => e.isFile() && e.name.endsWith(".jsonl") && !e.name.endsWith(".skills.jsonl"))
+      .map((e) => e.name)
+      .sort(); // deterministic order so the joined fingerprint is stable
+    for (const name of files) {
+      try {
+        const s = await stat(join(learnings, name));
+        parts.push(`${name}:${s.size}:${s.mtimeMs}`);
+      } catch {
+        // A stream file vanished mid-scan (rotation) — skip it (fail-open).
+      }
+    }
   } catch {
     // No `.learnings/` yet — leave it out; the watermark/staging may still pin the fingerprint.
   }
   try {
-    parts.push(String((await stat(distillWatermarkPath(root))).mtimeMs));
+    parts.push(`wm:${(await stat(distillWatermarkPath(root))).mtimeMs}`);
   } catch {
     // No watermark yet — distill has not run; fine.
   }
   try {
-    parts.push(String((await stat(stagingPath(root))).mtimeMs));
+    parts.push(`st:${(await stat(stagingPath(root))).mtimeMs}`);
   } catch {
     // No `.mage/staging/` yet — nothing staged; fine.
   }
-  return parts.join(":");
+  return parts.join("|");
 }
 
 /** The cached tally iff a non-empty `fingerprint` matches the one pinned on disk; else null. */

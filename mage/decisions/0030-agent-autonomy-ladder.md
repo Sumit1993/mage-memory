@@ -152,9 +152,15 @@ alone; the digest was skipped.
      the scratch-fingerprint cache; the digest needs the same events, so the two now share ONE
      `readSessionStreams` call (`computeBacklog` split into a `-FromStreams` variant). A no-new-scratch
      startup is a cache hit → it reads nothing and surfaces no digest (there is no new chapter); `compact`
-     always re-reads (its appended terminator may not move the fingerprint, and the fresh chapter must
-     show — which also refreshes a would-be-stale tally). This keeps §5's "~instant startup" promise
-     literally true for the digest, at zero extra reads.
+     always re-reads (the fresh chapter must show — which also refreshes a would-be-stale tally). This
+     keeps §5's "~instant startup" promise literally true for the digest, at zero extra reads.
+   - **The fingerprint must track per-file changes, not just the dir.** A `session_end`/`compact` APPEND
+     that closes a chapter bumps only the FILE (not the `.learnings/` dir) mtime, so a dir-only
+     fingerprint would stay a cache HIT and **skip the just-closed chapter's digest** — silently losing a
+     keeper for exactly the non-compacting user this amendment serves. So `scratchFingerprint` folds in the
+     **size + mtime of each session stream file** (size changes deterministically on any append, so
+     detection never depends on mtime granularity). This also tightens the pre-existing backlog tally,
+     which shared the same blind spot.
 3. **Two channels, charter-respecting.** mage prints **one deterministic, unranked teaser line** to the
    user-visible `systemMessage` — plain-language category counts only (`mage · recent work: 3 errors · 2
    commands · 1 correction — worth saving any? → mage:learn`), never a picked "keeper", so mage stays a
