@@ -75,15 +75,17 @@ describe("mage nudge — gating", () => {
     }
   });
 
-  it("fires on startup and resume — surfacing the backlog reminder, not the fresh digest (ADR-0030)", async () => {
+  it("fires on startup and resume — surfacing the last-closed chapter's digest + the backlog line (ADR-0030 amendment)", async () => {
     const { dir, root } = await withKb();
     await seedChapter(learningsPath(root), "s1", "alpha"); // one CLOSED, unmined chapter
     for (const source of ["startup", "resume"]) {
       const r = await nudgeCmd({ cwd: dir, source, force: true });
       expect(r.ran).toBe(true);
-      // startup/resume carry no fresh chapter → no digest banner, just the backlog line.
+      // The digest now surfaces at session entry too (a session_end closed the chapter), with the
+      // offer-first entry note, alongside the backlog line.
       expect(r.nudge).not.toBeNull();
-      expect(r.nudge).not.toContain("Raw material, NOT lessons");
+      expect(r.nudge).toContain("Raw material, NOT lessons"); // the digest banner IS present now
+      expect(r.nudge).toContain("(session start)"); // the offer-first entry note
       expect(r.nudge).toContain("1 chapter unmined");
       expect(r.nudge).toContain("mage:groom");
     }
@@ -181,7 +183,9 @@ describe("mage nudge — autonomy-scaled backlog mandate (ADR-0030)", () => {
   it("approver authorizes grooming + uncommitted durable-note writes with Gate-2", async () => {
     const { dir, root } = await withKb({ grooming: { autonomy: "approver" } });
     await seedChapter(learningsPath(root), "s1", "alpha");
-    const r = await nudgeCmd({ cwd: dir, source: "startup", force: true });
+    // The autonomy-scaled mandate applies at a `compact` boundary; session ENTRY is always
+    // offer-first regardless of level (ADR-0030 amendment §4), tested separately below.
+    const r = await nudgeCmd({ cwd: dir, source: "compact", force: true });
     expect(r.nudge).toContain("autonomy: approver");
     expect(r.nudge).toContain("authorized");
     expect(r.nudge).toContain("UNCOMMITTED");
@@ -194,13 +198,95 @@ describe("mage nudge — autonomy-scaled backlog mandate (ADR-0030)", () => {
   it("overseer adds dispose-borderline + graduate", async () => {
     const { dir, root } = await withKb({ grooming: { autonomy: "overseer" } });
     await seedChapter(learningsPath(root), "s1", "alpha");
-    const r = await nudgeCmd({ cwd: dir, source: "startup", force: true });
+    // Full-autonomy mandate is a `compact`-boundary behaviour; entry is offer-first (§4, tested below).
+    const r = await nudgeCmd({ cwd: dir, source: "compact", force: true });
     expect(r.nudge).toContain("autonomy: overseer");
     expect(r.nudge).toContain("dispose");
     expect(r.nudge).toContain("graduate");
     // ADR-0030 §1 lists merge as an Overseer job — the mandate must tell the agent to merge.
     expect(r.nudge).toContain("merge related lessons into existing notes");
     expect(r.nudge).toContain("UNCOMMITTED");
+  });
+});
+
+describe("mage nudge — startup digest (ADR-0030 amendment)", () => {
+  it("session entry is offer-first even at overseer — drops to the operator mandate (§4)", async () => {
+    const { dir, root } = await withKb({ grooming: { autonomy: "overseer" } });
+    await seedChapter(learningsPath(root), "s1", "alpha");
+    const r = await nudgeCmd({ cwd: dir, source: "startup", force: true });
+    // Configured overseer, but session entry never authorizes autonomous grooming.
+    expect(r.nudge).toContain("autonomy: operator");
+    expect(r.nudge).not.toContain("dispose");
+    expect(r.nudge).not.toContain("UNCOMMITTED");
+    expect(r.nudge).toContain("(session start)"); // the offer-first entry note is present
+  });
+
+  it("prints a deterministic, UNRANKED chapter teaser to the user-visible notice (§3)", async () => {
+    const { dir, root } = await withKb();
+    await seedChapter(learningsPath(root), "s1", "alpha"); // 1 failure + 1 correction
+    const r = await nudgeCmd({ cwd: dir, source: "startup", force: true });
+    // Source-neutral, plain-language, counts-only.
+    expect(r.notice).toContain("mage · recent work:");
+    expect(r.notice).toContain("1 error"); // "failures" surface as plain "errors"
+    expect(r.notice).toContain("1 correction");
+    expect(r.notice).toContain("mage:learn"); // the actionable command in the guaranteed channel
+    // counts only — the teaser must NOT surface the failure text (mage narrows, it never ranks).
+    expect(r.notice).not.toContain("alpha tests failed");
+  });
+
+  it("shows the last-closed chapter's digest once, then de-dupes it on the next entry", async () => {
+    const { dir, root } = await withKb();
+    await seedChapter(learningsPath(root), "s1", "alpha");
+    // No `force` → the once-per-chapter watermark governs (force would bypass the de-dup).
+    const first = await nudgeCmd({ cwd: dir, source: "startup" });
+    expect(first.nudge).toContain("Raw material, NOT lessons"); // digest surfaced
+    const second = await nudgeCmd({ cwd: dir, source: "startup" });
+    // Same chapter → digest not re-shown; the backlog is also within its throttle window now,
+    // so this entry surfaces nothing at all.
+    expect(second.nudge).toBeNull();
+  });
+
+  it("a compact-shown chapter is not re-shown at the next session entry (shared watermark)", async () => {
+    const { dir, root } = await withKb();
+    await seedChapter(learningsPath(root), "s1", "alpha");
+    const onCompact = await nudgeCmd({ cwd: dir, source: "compact" });
+    expect(onCompact.nudge).toContain("Raw material, NOT lessons");
+    const onEntry = await nudgeCmd({ cwd: dir, source: "startup" });
+    // The compact path stamped the watermark; the startup path must honour it (and the backlog is
+    // now within its throttle window too, so this entry surfaces nothing at all).
+    expect(onEntry.nudge ?? "").not.toContain("Raw material, NOT lessons");
+  });
+
+  it("a new closed session after one was shown surfaces on the next entry (cache miss re-reads)", async () => {
+    const { dir, root } = await withKb();
+    await seedChapter(learningsPath(root), "s1", "alpha");
+    const first = await nudgeCmd({ cwd: dir, source: "startup" }); // no force → real cache path
+    expect(first.notice).toContain("mage · recent work:");
+    // A brand-new session file closes another (later) chapter → the scratch fingerprint changes →
+    // the shared scan is a cache MISS → it re-reads and the newer chapter surfaces.
+    await seedChapter(learningsPath(root), "s2", "betazoid");
+    const second = await nudgeCmd({ cwd: dir, source: "startup" });
+    expect(second.notice).toContain("mage · recent work:");
+    expect(second.nudge).toContain("betazoid"); // the newer chapter's digest, not the stale one
+  });
+
+  it("a no-signal closed chapter surfaces no digest and no teaser at entry", async () => {
+    const { dir, root } = await withKb();
+    const learnings = learningsPath(root);
+    await mkdir(learnings, { recursive: true });
+    // A CLOSED chapter (session_end terminator) with only benign, non-signal activity.
+    await writeFile(
+      join(learnings, "s1.jsonl"),
+      toJsonl([
+        buildUserPrompt(base("s1"), "just poking around"),
+        buildToolUse(base("s1"), { tool: "Read", paths: ["a.ts"], detail: "read a.ts", ok: true, error_summary: null }),
+        buildSessionEnd(base("s1")),
+      ]),
+      "utf8",
+    );
+    const r = await nudgeCmd({ cwd: dir, source: "startup", force: true });
+    expect(r.nudge).not.toContain("Raw material, NOT lessons");
+    expect(r.notice ?? "").not.toContain("mage · last session:");
   });
 });
 

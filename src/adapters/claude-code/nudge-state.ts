@@ -1,9 +1,11 @@
 // The boundary nudge's persisted state store (ADR-0030 §5): the throttle clock + the
 // mtime-cache, behind a small interface so the nudge orchestrates rather than owning file I/O.
 //
-// One git-ignored file under `.mage/metrics/` carries three concerns:
+// One git-ignored file under `.mage/metrics/` carries four concerns:
 //   - the BACKLOG clock — when the backlog reminder last surfaced (anti-nag, once per window);
 //   - the DREAM clock — when the read-only dream-health tick last scanned (its own, slower window);
+//   - the CHAPTER watermark — the terminator ts of the last chapter whose digest surfaced, so the
+//     digest fires at most once per chapter across the compact + startup/resume paths (ADR-0030 amend);
 //   - the MTIME CACHE — the scratch fingerprint + the tally it pinned, so a no-new-scratch
 //     startup reuses the counts instead of re-scanning.
 // They share one file (and one fail-open field-merge) but are exposed as clean per-concern
@@ -32,6 +34,12 @@ interface NudgeState {
   lastNudge: number;
   /** Epoch ms of the last dream-health scan (0 = never). */
   lastDream: number;
+  /**
+   * Terminator timestamp (the chapter's own `ts`, a string) of the last chapter whose digest
+   * surfaced — the once-per-chapter de-dup watermark (ADR-0030 amendment). Stamped by BOTH the
+   * compact and the startup/resume paths so a chapter never surfaces twice across them. "" = never.
+   */
+  lastChapterTs: string;
   /** The scratch mtime fingerprint at the last tally compute ("" = none cached). */
   fp: string;
   /** The cached three-part tally, when a fingerprint pinned it. */
@@ -43,11 +51,13 @@ async function readState(root: string): Promise<NudgeState> {
     const parsed = JSON.parse(await readFile(statePath(root), "utf8")) as Record<string, unknown>;
     const lastNudge = typeof parsed.lastNudge === "number" ? parsed.lastNudge : 0;
     const lastDream = typeof parsed.lastDream === "number" ? parsed.lastDream : 0;
+    const lastChapterTs = typeof parsed.lastChapterTs === "string" ? parsed.lastChapterTs : "";
     const fp = typeof parsed.fp === "string" ? parsed.fp : "";
     const tally = isBacklogTally(parsed.tally) ? parsed.tally : undefined;
-    return { lastNudge, lastDream, fp, tally };
+    return { lastNudge, lastDream, lastChapterTs, fp, tally };
   } catch {
-    return { lastNudge: 0, lastDream: 0, fp: "" }; // missing/corrupt → never throttled, no cache.
+    // missing/corrupt → never throttled, no chapter shown, no cache.
+    return { lastNudge: 0, lastDream: 0, lastChapterTs: "", fp: "" };
   }
 }
 
@@ -73,9 +83,10 @@ async function writeState(root: string, patch: Partial<NudgeState>): Promise<voi
   try {
     const prev = await readState(root);
     const next: NudgeState & { v: number } = {
-      v: 3,
+      v: 4,
       lastNudge: patch.lastNudge ?? prev.lastNudge,
       lastDream: patch.lastDream ?? prev.lastDream,
+      lastChapterTs: patch.lastChapterTs ?? prev.lastChapterTs,
       fp: patch.fp ?? prev.fp,
       tally: patch.tally ?? prev.tally,
     };
@@ -138,6 +149,20 @@ export async function elapsedSince(root: string, windowMs: number): Promise<bool
 /** Stamp the reminder clock to now, preserving the dream clock + mtime cache. */
 export async function markReminded(root: string): Promise<void> {
   await writeState(root, { lastNudge: Date.now() });
+}
+
+/**
+ * The terminator `ts` of the last chapter whose digest surfaced ("" = never). The nudge compares a
+ * candidate chapter's terminator `ts` against this to fire the digest at most once per chapter
+ * (ADR-0030 amendment). Fail-open: a missing/corrupt file reads "" → the candidate is treated as new.
+ */
+export async function lastShownChapterTs(root: string): Promise<string> {
+  return (await readState(root)).lastChapterTs;
+}
+
+/** Stamp the once-per-chapter watermark to `ts`, preserving the clocks + mtime cache. */
+export async function markChapterShown(root: string, ts: string): Promise<void> {
+  await writeState(root, { lastChapterTs: ts });
 }
 
 /** True iff the dream-health window has elapsed since the last scan (fail-open: yes). */

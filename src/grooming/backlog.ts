@@ -17,8 +17,8 @@
 
 import { readWatermark } from "../distill/watermark.js";
 import { unminedClosedChapters } from "../distill/digest.js";
-import { readSessionStreams } from "../distill/reader.js";
-import { learningsPath, stagingPath } from "../paths.js";
+import type { ObserveEvent } from "../observe/types.js";
+import { stagingPath } from "../paths.js";
 import { readStagedDrafts } from "./staging.js";
 import { readTally } from "./tally.js";
 import { type Sensitivity, thresholdsFor } from "./thresholds.js";
@@ -39,15 +39,22 @@ export interface BacklogTally {
 export const UNMINED_CAP = 9;
 
 /**
- * Compute the three-part capped backlog tally for a docs root (ADR-0030 §2). FAIL-OPEN:
- * every read is `.catch()`'d so a missing/corrupt artifact yields 0 for that part, never
- * throws (reachable from a SessionStart hook). The `unmined` count sums each session's
- * post-watermark closed chapters, capped at {@link UNMINED_CAP}; `graduable` reads the
- * persisted promote tally as-is (no fold). `sensitivity` scales the graduation gate M.
+ * Compute the three-part capped backlog tally from PRE-READ session streams (ADR-0030 §2). FAIL-OPEN:
+ * every read is `.catch()`'d so a missing/corrupt artifact yields 0 for that part, never throws
+ * (reachable from a SessionStart hook). The `unmined` count sums each session's post-watermark closed
+ * chapters, capped at {@link UNMINED_CAP}; `graduable` reads the persisted promote tally as-is (no
+ * fold). `sensitivity` scales the graduation gate M.
+ *
+ * The streams are hoisted OUT (rather than read here) so the boundary nudge shares its single
+ * `readSessionStreams` call across both the digest and this tally (ADR-0030 amendment).
  */
-export async function computeBacklog(root: string, sensitivity: Sensitivity): Promise<BacklogTally> {
+export async function computeBacklogFromStreams(
+  root: string,
+  sensitivity: Sensitivity,
+  streams: Array<{ session: string; events: ObserveEvent[] }>,
+): Promise<BacklogTally> {
   const staged = (await readStagedDrafts(stagingPath(root)).catch(() => [])).length;
-  const unmined = await unminedTally(root);
+  const unmined = await unminedFromStreams(root, streams);
   const graduable = await graduableTally(root, sensitivity);
   return {
     staged,
@@ -58,13 +65,15 @@ export async function computeBacklog(root: string, sensitivity: Sensitivity): Pr
 }
 
 /**
- * Sum the post-watermark closed chapters across every session stream, capped at
+ * Sum the post-watermark closed chapters across the given session streams, capped at
  * {@link UNMINED_CAP}. The watermark cursor is a per-session event OFFSET, so each
  * session's tail is counted against its own cursor (a missing cursor ⇒ 0 ⇒ count ALL of
  * that session's closed chapters). readWatermark already fails open to an empty watermark.
  */
-async function unminedTally(root: string): Promise<{ count: number }> {
-  const streams = await readSessionStreams(learningsPath(root)).catch(() => []);
+async function unminedFromStreams(
+  root: string,
+  streams: Array<{ session: string; events: ObserveEvent[] }>,
+): Promise<{ count: number }> {
   const wm = await readWatermark(root).catch(() => ({ v: 0, cursors: {} as Record<string, number> }));
   let count = 0;
   for (const { session, events } of streams) {

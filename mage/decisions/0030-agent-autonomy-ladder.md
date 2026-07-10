@@ -1,9 +1,10 @@
 ---
 type: decision
-tags: [mage/decisions]
+tags:
+  - mage/decisions
 created: "2026-06-21"
-updated: "2026-06-21"
-last_reviewed: "2026-06-21"
+updated: 2026-07-10
+last_reviewed: 2026-07-10
 status: active
 provenance:
   repo: mage-memory
@@ -19,6 +20,7 @@ sources:
   - mage/decisions/0013-procedure-skills-self-grooming-loop.md
   - mage/decisions/0009-no-runtime-automation-rides-host-hooks.md
   - mage/decisions/0001-memory-first-product-supersedes-specshub.md
+  - cc-session:38816fdd-1c3d-4bad-b3d0-e1decb93b50c
 ---
 
 # 0030 — Opt-in agent autonomy ladder for the grooming loop (Operator / Approver / Overseer)
@@ -107,7 +109,9 @@ direct tooling precedent of **Claude Code's own permission modes** (`default` �
      startup stays ~instant (recompute the tally only when `.learnings/`/watermark changed);
    - the **fresh-chapter digest is never throttled** (new content each compact); the **backlog reminder
      is throttled** to once per window across all sources — window is a **user-set value, default 4h**
-     (`grooming.nudgeThrottleHours`);
+     (`grooming.nudgeThrottleHours`); *(**amended 2026-07-10** — the digest is no longer compact-only;
+     it also surfaces at `startup`/`resume` for the last-closed chapter, offer-first, de-duped by a
+     once-per-chapter watermark rather than the time throttle. See the Amendment below.)*
    - **no escalation tier** (the growing capped count is the escalation) and **no re-nudge on growth**
      (in a continuously-compacted chat the backlog grows every compact; re-firing on growth would nag).
 
@@ -123,6 +127,47 @@ direct tooling precedent of **Claude Code's own permission modes** (`default` �
    - the generated docs data (hook-purpose table) describes the autonomy-scaled nudge;
    - a docs-site page documents the three levels with **worked examples, a diagram, and a per-level
      risk + expected-behavior table** so a user can see exactly what each level does and what they own.
+
+## Amendment (2026-07-10) — the digest surfaces at session start, not only at compact
+
+**Problem.** §5 tied the fresh-chapter digest to `compact` ("new content each compact"). But a chapter
+is closed by *either* a `compact` *or* a `session_end` (ADR-0029; `isTerminator`), and many users rarely
+compact — short sessions, `/clear`, or an early quit close a chapter via `session_end` and never trigger
+a compact. For them the digest — the "here is a specific thing worth saving" content — **never fires**.
+They saw only the throttled, model-only backlog *count*, which is near-invisible to the human. The
+session-start firing existed (`startup`/`resume` already ran the nudge) but carried the backlog line
+alone; the digest was skipped.
+
+**Decision (extends §5, does not reverse it):**
+
+1. **The digest computes on `startup`/`resume`, not only `compact`.** On session entry mage builds the
+   same earned-signal digest for the **most-recent closed chapter** of the previous session (the material
+   already exists — `session_end` closed it). The compact path is unchanged.
+2. **Shown once per chapter, not on a timer.** A new `lastChapterTs` watermark (in `nudge-throttle.json`)
+   records the terminator timestamp of the last chapter whose digest surfaced. **Both** the compact and
+   the startup paths stamp it, so the same chapter is never surfaced twice across the two paths. An
+   already-shown or empty/no-signal chapter surfaces nothing. The backlog *count* line keeps its own
+   separate 4h throttle, untouched.
+   - **One shared, fingerprint-gated read.** The backlog tally already read every session stream behind
+     the scratch-fingerprint cache; the digest needs the same events, so the two now share ONE
+     `readSessionStreams` call (`computeBacklog` split into a `-FromStreams` variant). A no-new-scratch
+     startup is a cache hit → it reads nothing and surfaces no digest (there is no new chapter); `compact`
+     always re-reads (its appended terminator may not move the fingerprint, and the fresh chapter must
+     show — which also refreshes a would-be-stale tally). This keeps §5's "~instant startup" promise
+     literally true for the digest, at zero extra reads.
+3. **Two channels, charter-respecting.** mage prints **one deterministic, unranked teaser line** to the
+   user-visible `systemMessage` — plain-language category counts only (`mage · recent work: 3 errors · 2
+   commands · 1 correction — worth saving any? → mage:learn`), never a picked "keeper", so mage stays a
+   *narrower*, not a ranker (ADR-0004, ADR-0029 §5). The phrasing is source-neutral ("recent work" is
+   honest for a compacted chapter, a prior session, or a first-run stale one), and the actionable
+   `mage:learn` lives in this GUARANTEED channel so the safety-net never depends on the agent acting. The
+   full digest still goes to the model-only `additionalContext`; the **agent** names the specific keeper.
+4. **Offer-first on entry, at every autonomy level.** Unlike the compact path, the startup digest is
+   **always offer-first** — even at Overseer it names + offers and never auto-grooms on session entry
+   (opening the CLI is the user's moment). Autonomous grooming stays at compact and natural pauses.
+
+This closes the "non-compacting user never sees a keeper" gap while preserving the model-free engine
+(ADR-0009), the no-ranking charter (ADR-0004/0029), and the commit-is-confirm floor (ADR-0013).
 
 ## Considered options
 
@@ -157,6 +202,13 @@ direct tooling precedent of **Claude Code's own permission modes** (`default` �
 - **Implemented:** §6 (the `mage:groom` autonomous mode — per-note prompt waived at Approver/Overseer,
   Gate-2 + uncommitted-writes held) and §7's **init hint** (the one-line autonomy line at `mage init`)
   are now built; the docs page (§7) ships at `docs/src/content/docs/loop/autonomy.mdx`.
+- **Amendment surface (2026-07-10):** a `lastChapterTs` field in `nudge-throttle.json` (schema bump,
+  fail-open merge) for the once-per-chapter show-watermark; a single fingerprint-gated `scanBoundary` in
+  `nudge.ts` that reads the streams once and feeds both the digest and the tally (`computeBacklog` split
+  to a `computeBacklogFromStreams` variant); and a deterministic teaser line on `systemMessage`. No
+  recurrence internals change; the compact path, the backlog count line, and its 4h throttle are
+  unchanged — and the shared read fixes a latent staleness where a compact's appended chapter could miss
+  the cached tally.
 
 ## Relations
 

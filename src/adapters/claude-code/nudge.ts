@@ -26,9 +26,9 @@
 
 import { Command } from "commander";
 import { type DreamReport, analyzeDream } from "../../dream.js";
-import { computeDigest, lastClosedChapter, renderDigest } from "../../distill/digest.js";
+import { type Digest, computeDigest, lastClosedChapter, renderDigest } from "../../distill/digest.js";
 import { readSessionStreams } from "../../distill/reader.js";
-import { type BacklogTally, computeBacklog } from "../../grooming/backlog.js";
+import { type BacklogTally, computeBacklogFromStreams } from "../../grooming/backlog.js";
 import { type Autonomy, mandateFor } from "../../grooming/autonomy-ladder.js";
 import { readGrooming } from "../../grooming/config.js";
 import type { ObserveEvent } from "../../observe/types.js";
@@ -38,6 +38,8 @@ import {
   cachedTally,
   elapsedSince,
   elapsedSinceDream,
+  lastShownChapterTs,
+  markChapterShown,
   markDreamShown,
   markReminded,
   scratchFingerprint,
@@ -52,6 +54,17 @@ const DREAM_WINDOW_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 /** SessionStart sources that fire the nudge (ADR-0030 §5): NOT `clear`. */
 const FIRING_SOURCES = new Set(["compact", "startup", "resume"]);
+
+/**
+ * The offer-first instruction appended to the digest on session ENTRY (startup/resume) — ADR-0030
+ * amendment §4. The compact path carries its own autonomy mandate; on entry the agent must NAME a
+ * genuine keeper and offer, never auto-file, whatever the autonomy level (opening the CLI is the
+ * user's moment). Kept out of the compact path so compact behaviour is unchanged.
+ */
+const ENTRY_DIGEST_NOTE =
+  "(session start) The digest above is from your LAST session's final chapter. If one entry is a " +
+  "genuine keeper (a gotcha, a hard-won procedure, an env/API constraint), name it to the user in a " +
+  "line and offer to capture it with `mage:learn` — do NOT auto-file on entry, whatever the autonomy level.";
 
 export interface NudgeOptions {
   /** Working directory used to resolve the KB (default: cwd). */
@@ -94,53 +107,149 @@ export async function nudgeCmd(opts: NudgeOptions): Promise<NudgeResult> {
 // ─── the digest + backlog nudge (ADR-0029 / ADR-0030) ───────────────────────────
 
 /**
- * Compose the boundary nudge: on `compact`, render the just-closed chapter's earned-signal DIGEST
- * (never throttled — new content each compact); append the per-autonomy-level BACKLOG mandate when
- * the throttle window has elapsed — or immediately on `compact`, which bypasses the window so a
- * `resume` firing seconds earlier can't eat it (ADR-0030 §5). NO drafts are written. The three-part
- * tally is mtime-gated so a no-new-scratch startup reuses cached counts.
+ * Compose the boundary nudge: render the last-closed chapter's earned-signal DIGEST on ANY firing
+ * source (ADR-0030 amendment — a chapter is closed by a compact OR a session_end, so startup/resume
+ * carry the prior session's final chapter), de-duped once per chapter by terminator ts; append the
+ * BACKLOG mandate when the throttle window has elapsed — or immediately on `compact`, which bypasses
+ * the window so a `resume` firing seconds earlier can't eat it (ADR-0030 §5). On session ENTRY the
+ * mandate drops to offer-first regardless of the configured autonomy. NO drafts are written. The
+ * digest + the tally SHARE ONE stream read behind the fingerprint cache (see {@link scanBoundary}),
+ * so a no-new-scratch startup reads nothing and stays ~instant.
  */
 async function digestNudge(resolved: ResolvedDocsRoot, source: string, force: boolean): Promise<NudgeResult> {
   const { root } = resolved;
-
-  // The fresh-chapter digest only exists on `compact` (a chapter just closed); startup/resume
-  // carry no fresh chapter, so they ride the backlog reminder alone.
-  let rendered = "";
-  if (source === "compact") {
-    const streams = await readSessionStreams(learningsPath(root)).catch(
-      () => [] as Array<{ session: string; events: ObserveEvent[] }>,
-    );
-    const chapter = latestClosedChapter(streams);
-    rendered = chapter.length > 0 ? renderDigest(computeDigest(chapter)) : "";
-  }
 
   // One grooming-config read (config.ts) feeds the level, the dial, and the throttle window —
   // replacing three separate metadata reads (and the old lazy import that dodged a paths cycle).
   const { autonomy: level, sensitivity, nudgeThrottleHours } = await readGrooming(resolved).catch(
     () => ({ autonomy: "operator" as Autonomy, sensitivity: "normal" as const, nudgeThrottleHours: undefined }),
   );
-  const tally = await backlogTally(root, sensitivity);
+
+  // ONE fingerprint-gated scan feeds both the digest and the tally from a single stream read.
+  const { tally, chapter } = await scanBoundary(root, sensitivity, source, force);
   const pending = tally.staged;
 
   // The backlog line rides a throttle (once per window) so routine startups/resumes don't re-nag —
   // EXCEPT on `compact`, a real chapter boundary the user expects to see. The morning resume→compact
   // pattern fires a `resume` seconds before the `compact`; the resume used to arm the throttle and eat
-  // the compact's line, so `compact` now bypasses the window (the digest was never throttled either).
+  // the compact's line, so `compact` now bypasses the window.
   const windowMs = throttleWindowMs(nudgeThrottleHours);
   const throttleElapsed = force || source === "compact" || (await elapsedSince(root, windowMs));
   const showBacklog = hasBacklog(tally) && throttleElapsed;
-  const mandate = showBacklog ? renderMandate(level, tally) : "";
+  // Offer-first on session ENTRY (ADR-0030 amendment §4): the backlog mandate is scaled by the
+  // configured autonomy only on `compact`; on startup/resume it drops to the operator (offer-first)
+  // mandate, so opening the CLI never triggers autonomous grooming, whatever the level.
+  const mandateLevel: Autonomy = source === "compact" ? level : "operator";
+  const mandate = showBacklog ? renderMandate(mandateLevel, tally) : "";
   if (showBacklog) await markReminded(root);
+
+  // Stamp the once-per-chapter watermark iff a digest surfaced this run, so the same chapter never
+  // re-surfaces across the compact + startup/resume paths.
+  if (chapter.chapterTs.length > 0) await markChapterShown(root, chapter.chapterTs);
 
   // The weekly dream-health tick — a read-only rot summary on its own slow clock.
   const health = await healthTick(root, force);
 
-  // additionalContext (model-only): the digest + autonomy mandate + a health block that tells the
-  // agent to OFFER the read-only scan (not just see the finding). systemMessage (user-visible): the
-  // terse line the human sees in the terminal — the same health summary, without the agent instruction.
-  const nudge = composeContext(rendered, mandate, healthContext(health));
-  const notice = noticeLine(tally, showBacklog, health);
+  // additionalContext (model-only): the digest (+ an offer-first note on session entry) + the autonomy
+  // mandate + a health block that tells the agent to OFFER the read-only scan. systemMessage
+  // (user-visible): the deterministic, UNRANKED chapter teaser + the backlog/health lines.
+  const digestContext =
+    chapter.rendered.length > 0 && source !== "compact"
+      ? `${chapter.rendered}\n\n${ENTRY_DIGEST_NOTE}`
+      : chapter.rendered;
+  const nudge = composeContext(digestContext, mandate, healthContext(health));
+  const notice = noticeLine(tally, showBacklog, health, chapter.teaser);
   return { ran: true, drafted: 0, pending, nudge, notice };
+}
+
+// ─── the shared, fingerprint-gated boundary scan (ADR-0030 amendment) ─────────────
+
+interface ChapterDigest {
+  /** The rendered digest markdown for `additionalContext` ("" when nothing surfaced). */
+  rendered: string;
+  /** The deterministic, unranked one-line teaser for the user-visible `systemMessage` ("" when none). */
+  teaser: string;
+  /** Terminator ts of the surfaced chapter ("" when nothing surfaced) — the watermark to stamp. */
+  chapterTs: string;
+}
+
+const NO_CHAPTER: ChapterDigest = { rendered: "", teaser: "", chapterTs: "" };
+
+/**
+ * The single fingerprint-gated read that feeds BOTH the backlog tally and the digest (ADR-0030
+ * amendment). `computeBacklogFromStreams` already needed every session stream; the digest needs the
+ * same events, so we read them ONCE and hand both consumers the result.
+ *
+ *  - `bypassCache = force || source === "compact"`: a `compact` closed a fresh chapter the user
+ *    expects to see (and its appended terminator may not bump the scratch fingerprint), so it always
+ *    re-reads — which also refreshes the tally past a would-be stale cache. `force` re-reads too.
+ *  - Otherwise a fingerprint CACHE HIT (a no-new-scratch startup/resume) reuses the cached tally and
+ *    skips the read entirely → NO_CHAPTER (nothing changed, so no fresh chapter to surface). This is
+ *    the ~instant path. A cache MISS reads once, computes the tally, pins it, and digests the chapter.
+ *
+ * Fail-open throughout (every read `.catch()`'d by its callee).
+ */
+async function scanBoundary(
+  root: string,
+  sensitivity: "low" | "normal" | "high",
+  source: string,
+  force: boolean,
+): Promise<{ tally: BacklogTally; chapter: ChapterDigest }> {
+  const bypassCache = force || source === "compact";
+  const fp = await scratchFingerprint(root);
+  const cached = bypassCache ? null : await cachedTally(root, fp);
+  if (cached) return { tally: cached, chapter: NO_CHAPTER };
+
+  const streams = await readSessionStreams(learningsPath(root)).catch(
+    () => [] as Array<{ session: string; events: ObserveEvent[] }>,
+  );
+  const tally = await computeBacklogFromStreams(root, sensitivity, streams);
+  // Pin the fresh tally to its fingerprint so a later no-change startup skips the whole scan.
+  await cacheTally(root, fp, tally);
+  const chapter = await digestFromStreams(root, streams, force);
+  return { tally, chapter };
+}
+
+/**
+ * Build the last-closed chapter's digest from PRE-READ streams, de-duped once per chapter (ADR-0030
+ * amendment). Picks the most-recently-closed chapter (latest terminator ts) and — unless it was
+ * already surfaced (its terminator ts equals the stored watermark) or carries no earned signal —
+ * returns the rendered digest + a deterministic teaser + the terminator ts to stamp. `force` bypasses
+ * the de-dup (testing / explicit re-nudge). A no-signal chapter is deliberately NOT stamped (it's
+ * cheap to re-check and never surfaces).
+ */
+async function digestFromStreams(
+  root: string,
+  streams: Array<{ session: string; events: ObserveEvent[] }>,
+  force: boolean,
+): Promise<ChapterDigest> {
+  const chapter = latestClosedChapter(streams);
+  if (chapter.length === 0) return NO_CHAPTER;
+  const ts = chapter[chapter.length - 1]?.ts ?? "";
+  // Once per chapter: a terminator ts equal to the stored watermark was already surfaced.
+  if (!force && ts.length > 0 && ts === (await lastShownChapterTs(root))) return NO_CHAPTER;
+  const digest = computeDigest(chapter);
+  if (digest.isEmpty) return NO_CHAPTER; // no earned signal → surface nothing (and don't stamp).
+  return { rendered: renderDigest(digest), teaser: teaserLine(digest), chapterTs: ts };
+}
+
+/**
+ * The deterministic, UNRANKED chapter teaser for the user-visible systemMessage (ADR-0030 amendment
+ * §3): plain-language category counts only, never a picked "keeper" — mage narrows, the agent judges
+ * (ADR-0004, ADR-0029 §5). Source-neutral ("recent work" is honest for a compacted chapter, a prior
+ * session, or a first-run stale one). "" when the digest carries no counted signal.
+ */
+function teaserLine(d: Digest): string {
+  const parts: string[] = [];
+  if (d.failures.total > 0) parts.push(`${d.failures.total} error${d.failures.total === 1 ? "" : "s"}`);
+  if (d.commands.total > 0) {
+    parts.push(`${d.commands.total} command${d.commands.total === 1 ? "" : "s"}`);
+  }
+  if (d.corrections.total > 0) {
+    parts.push(`${d.corrections.total} correction${d.corrections.total === 1 ? "" : "s"}`);
+  }
+  if (parts.length === 0) return "";
+  return `mage · recent work: ${parts.join(" · ")} — worth saving any? \`mage:learn\``;
 }
 
 /** Join the present context parts (digest · mandate · health) with blank lines; null when all empty. */
@@ -163,13 +272,15 @@ async function healthTick(root: string, force: boolean): Promise<string> {
 }
 
 /**
- * The user-facing systemMessage (terminal-visible): a terse line the HUMAN sees — the backlog
- * call-to-action when the reminder fired, and/or the health summary. null when neither surfaced.
- * (`additionalContext` is model-only; `systemMessage` is the channel Claude Code renders to the
- * user — so the boundary nudge is no longer invisible to the person doing the work.)
+ * The user-facing systemMessage (terminal-visible): terse lines the HUMAN sees — the deterministic,
+ * unranked chapter TEASER (ADR-0030 amendment §3, shown at every source once per chapter, un-throttled),
+ * the backlog call-to-action when the reminder fired, and/or the health summary. null when none
+ * surfaced. (`additionalContext` is model-only; `systemMessage` is the channel Claude Code renders to
+ * the user — so the boundary nudge is no longer invisible to the person doing the work.)
  */
-function noticeLine(t: BacklogTally, showBacklog: boolean, health: string): string | null {
+function noticeLine(t: BacklogTally, showBacklog: boolean, health: string, teaser: string): string | null {
   const lines: string[] = [];
+  if (teaser.length > 0) lines.push(teaser);
   if (showBacklog) {
     const unmined = t.unminedCapped ? "9+" : String(t.unmined);
     lines.push(
@@ -227,27 +338,11 @@ function latestClosedChapter(
   return best;
 }
 
-// ─── backlog tally (mtime-gated) ─────────────────────────────────────────────────
+// ─── backlog helpers ──────────────────────────────────────────────────────────────
 
 /** True iff any of the three backlog parts has something to report. */
 function hasBacklog(t: BacklogTally): boolean {
   return t.staged > 0 || t.unmined > 0 || t.graduable > 0;
-}
-
-/**
- * The three-part capped backlog tally, MTIME-GATED (ADR-0030 §5): recompute only when `.learnings/`
- * or the distill watermark changed since the last nudge; otherwise reuse the cached counts so a
- * no-new-scratch startup stays ~instant. Fail-open — a stat/read miss recomputes (never throttles).
- */
-async function backlogTally(root: string, sensitivity: "low" | "normal" | "high"): Promise<BacklogTally> {
-  const fp = await scratchFingerprint(root);
-  const cached = await cachedTally(root, fp);
-  if (cached) return cached;
-  const tally = await computeBacklog(root, sensitivity);
-  // Pin the fresh fingerprint + tally so a later no-change startup skips the scan (the reminder
-  // clock is stamped separately, by markReminded, when the backlog line actually surfaces).
-  await cacheTally(root, fp, tally);
-  return tally;
 }
 
 // ─── per-level mandate templating (ADR-0030 §5) ──────────────────────────────────
