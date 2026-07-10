@@ -2,7 +2,7 @@
 
 # mage
 
-> 65 notes. Part of the [index](INDEX.md).
+> 66 notes. Part of the [index](INDEX.md).
 
 ### build
 
@@ -50,7 +50,7 @@
 - `decision` [0027 — Faultline: a friction/derivation capture trigger (prefilter, not miner)](decisions/0027-faultline-friction-capture-trigger.md) — 0027, faultline, friction, derivation, capture, trigger, prefilter, miner, context, decision, consequences, gate _(superseded · reviewed 2026-06-20)_
 - `decision` [0028 — Prose-keyed capture: corrections + recurrent failures (supersedes Faultline)](decisions/0028-prose-keyed-capture.md) — 0028, prose, keyed, capture, corrections, recurrent, failures, supersedes, faultline, context, decision, consequences _(superseded · reviewed 2026-06-20)_
 - `decision` [0029 — Digest-to-agent capture: deterministic narrowing, agent judgment (supersedes prose-keyed)](decisions/0029-digest-to-agent-capture.md) — 0029, digest, agent, capture, deterministic, narrowing, judgment, supersedes, prose, keyed, context, decision _(reviewed 2026-06-20)_
-- `decision` [0030 — Opt-in agent autonomy ladder for the grooming loop (Operator / Approver / Overseer)](decisions/0030-agent-autonomy-ladder.md) — 0030, opt, agent, autonomy, ladder, grooming, loop, operator, approver, overseer, context, decision _(reviewed 2026-06-21)_
+- `decision` [0030 — Opt-in agent autonomy ladder for the grooming loop (Operator / Approver / Overseer)](decisions/0030-agent-autonomy-ladder.md) — 0030, opt, agent, autonomy, ladder, grooming, loop, operator, approver, overseer, context, decision _(reviewed 2026-07-10)_
 - `decision` [0031 — Programmatic provenance stamping + the autonomy reject-ledger (Phase 1: stamp at creation)](decisions/0031-programmatic-provenance-stamp.md) — 0031, programmatic, provenance, stamping, autonomy, reject, ledger, phase, stamp, creation, context, decision _(reviewed 2026-06-22)_
 - `decision` [0032 — Capture-redirect: co-opt the host's native-memory write into mage's git-durable pipeline (relocation where the host allows it, coexist nudge as the floor)](decisions/0032-capture-redirect-native-memory.md) — capture, native-memory, automemorydirectory, relocation, coexist, nudge, redirect, staging, durability, claude-code, adapter, reflex _(accepted · reviewed 2026-07-01)_
 - `decision` [0033 — Recall: `@import` the bounded root index into the host's auto-loaded context (the capture companion to ADR-0032)](decisions/0033-recall-import-bounded-index.md) — recall, import, at-import, claude-md, agents-md, index, bounded, root-index, progressive-disclosure, capability-adaptive, compaction _(accepted · reviewed 2026-07-01)_
@@ -66,6 +66,7 @@
 
 ### grooming
 
+- `pointer` [The boundary nudge — internals + where each piece lives](notes/boundary-nudge-internals.md) — nudge, boundary, digest, startup, session-start, watermark, once-per-chapter, teaser, two-channel, systemMessage, additionalContext, offer-first _(reviewed 2026-07-10)_
 - `plan` [0.0.11 — "signal quality + autonomous capture"](notes/plan-0.0.11-signal-and-capture.md) — signal, quality, autonomous, capture, candidate, blocker, count, compact, chapters, session, ids, serves _(reviewed 2026-06-14)_
 - `plan` [Organic grooming loop (0.0.12) — the lesson path](notes/plan-0.0.12-organic-grooming-loop.md) — grooming, organic, lesson, first-sight, distill, staging, nudge, inline, claude-code-memory, redact, 0.0.12 _(stale-suspect · reviewed 2026-07-01)_
 - `plan` [Faultline — friction/derivation capture trigger (Phase 1 plan)](notes/plan-faultline.md) — faultline, friction, derivation, capture, trigger, phase, plan, one, change, detector, src, distill _(reviewed 2026-06-20)_
