@@ -37,8 +37,9 @@ primary; the nudge only catches what the agent forgot. Never throws (fail-open, 
 ## The moving parts (by file)
 
 - **`nudge.ts`** — orchestration. `nudgeCmd` gates on `source` (fires on `compact`/`startup`/`resume`,
-  NOT `clear`) then `digestNudge` composes the output. `chapterDigest` builds the last-closed chapter's
-  digest; `teaserLine` renders the user-visible one-liner; `renderMandate` templates the autonomy line.
+  NOT `clear`) then `digestNudge` composes the output. `scanBoundary` → `digestFromStreams` builds the
+  last-closed chapter's digest (a `ChapterDigest`); `teaserLine` renders the user-visible one-liner;
+  `renderMandate` templates the autonomy line.
 - **`digest.ts`** — the pure narrowing engine. `latestClosedChapter` picks the most-recent closed
   chapter across all session streams; `computeDigest` → `renderDigest` produces the raw-material
   markdown. A chapter is closed by a terminator: **`compact` OR `session_end`** (`isTerminator`).

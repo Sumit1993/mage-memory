@@ -270,6 +270,28 @@ describe("mage nudge — startup digest (ADR-0030 amendment)", () => {
     expect(second.nudge).toContain("betazoid"); // the newer chapter's digest, not the stale one
   });
 
+  it("suppresses the re-show on a cache MISS when the latest CLOSED chapter is unchanged (watermark, not cache)", async () => {
+    const { dir, root } = await withKb();
+    const learnings = learningsPath(root);
+    await seedChapter(learnings, "s1", "alpha");
+    const first = await nudgeCmd({ cwd: dir, source: "startup" }); // shows once, stamps the watermark
+    expect(first.notice).toContain("mage · recent work:");
+    // Force a fingerprint change WITHOUT closing a new chapter: a brand-new but still-OPEN session file
+    // (no terminator) adds a dir entry → scratch fingerprint changes → the shared scan is a cache MISS →
+    // digestFromStreams runs. The latest CLOSED chapter is still s1's, so ONLY the once-per-chapter
+    // watermark can suppress the re-show. (Without it, this test would re-surface alpha.)
+    await writeFile(
+      join(learnings, "s2.jsonl"),
+      toJsonl([
+        buildUserPrompt(base("s2"), "still working, chapter not closed yet"),
+        buildToolUse(base("s2"), { tool: "Bash", paths: [], detail: "npm test", ok: false, error_summary: "still red" }),
+      ]),
+      "utf8",
+    );
+    const second = await nudgeCmd({ cwd: dir, source: "startup" });
+    expect(second.nudge ?? "").not.toContain("Raw material, NOT lessons"); // watermark suppressed it
+  });
+
   it("a no-signal closed chapter surfaces no digest and no teaser at entry", async () => {
     const { dir, root } = await withKb();
     const learnings = learningsPath(root);
@@ -286,7 +308,7 @@ describe("mage nudge — startup digest (ADR-0030 amendment)", () => {
     );
     const r = await nudgeCmd({ cwd: dir, source: "startup", force: true });
     expect(r.nudge).not.toContain("Raw material, NOT lessons");
-    expect(r.notice ?? "").not.toContain("mage · last session:");
+    expect(r.notice ?? "").not.toContain("mage · recent work:");
   });
 });
 
