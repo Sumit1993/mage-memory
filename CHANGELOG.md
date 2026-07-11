@@ -11,6 +11,21 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.13](https://github.com/Sumit1993/mage-memory/compare/v0.0.12...v0.0.13) (2026-07-11)
+
+
+### Features
+
+* **nudge:** surface the earned-signal digest at session start ([da98bf7](https://github.com/Sumit1993/mage-memory/commit/da98bf7a65b0b01b6dc7f0d07ce572ca34788fd2))
+* **nudge:** surface the earned-signal digest at session start ([ca3aa91](https://github.com/Sumit1993/mage-memory/commit/ca3aa91d02914c33b495b2ab2e78c101baf0af79))
+
+
+### Bug Fixes
+
+* **docs:** update site and base configuration for Mage Memory documen… ([432d48e](https://github.com/Sumit1993/mage-memory/commit/432d48e48f03e39a13f217fe56c6b9e81d3392e4))
+* **docs:** update site and base configuration for Mage Memory documentation ([a93f499](https://github.com/Sumit1993/mage-memory/commit/a93f49906356c444225b8bfc17edd60ca5eb765d))
+* **nudge:** detect session_end appends in the scratch fingerprint ([b8313cb](https://github.com/Sumit1993/mage-memory/commit/b8313cb24d79cd084c7e25d14c9c1e401978e343))
+
 ## [0.0.12](https://github.com/Sumit1993/mage-memory/compare/v0.0.11...v0.0.12) (2026-07-02)
 
 
