@@ -12,7 +12,7 @@
       "name": "mage",
       "source": "./",
       "description": "mage skills: mage:learn (capture durable notes) + the self-grooming loop mage:groom / mage:graduate / mage:optimize + mage:guide (how to use the knowledge base).",
-      "version": "0.0.12",
+      "version": "0.0.13",
       "author": {
         "name": "Sumit Patel"
       },
