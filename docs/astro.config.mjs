@@ -7,15 +7,11 @@ import starlightLinksValidator from 'starlight-links-validator';
 import remarkMermaidPre from './remark-mermaid-pre.mjs';
 import remarkRewriteMdLinks from './remark-rewrite-md-links.mjs';
 
-// GitHub Pages: project subpath today, future-proofed for a custom domain.
-// Repo Sumit1993/mage-memory -> https://sumit1993.github.io/mage-memory/
-const BASE = '/mage-memory';
-// Trailing-slash 'always' keeps base-aware relative links predictable on Pages.
 const TRAILING_SLASH = 'always';
 
 export default defineConfig({
-  site: 'https://sumit1993.github.io',
-  base: BASE,
+  site: 'https://mage-memory.sfun.cloud',
+  base: '/',
   trailingSlash: TRAILING_SLASH,
   // Passthrough image service: the text-first spine needs no raster optimisation,
   // and avoiding sharp keeps `astro build` free of a native image dependency (and
@@ -29,7 +25,7 @@ export default defineConfig({
     // routes on the built site (base + trailingSlash aware); without it they 404.
     remarkPlugins: [
       remarkMermaidPre,
-      [remarkRewriteMdLinks, { base: BASE, trailingSlash: TRAILING_SLASH }],
+      [remarkRewriteMdLinks, { base: '/', trailingSlash: TRAILING_SLASH }],
     ],
   },
   integrations: [
