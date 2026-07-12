@@ -358,12 +358,16 @@ export function buildProgram(): Command {
   program
     .command("flatten", { hidden: true })
     .description(
-      "Normalize harness-shaped (Claude Code) notes to mage's flat schema (ADR-0035): --staged flattens staged blobs at the commit boundary; default sweeps the working tree (the Stop hook). Never blocks.",
+      "Normalize harness-shaped (Claude Code) notes to mage's flat schema (ADR-0035): --staged flattens staged blobs at the commit boundary; --all sweeps every note under the docs root regardless of git state (the backfill for notes committed before flatten existed); default sweeps the working tree (the Stop hook). Never blocks.",
     )
     .option("--staged", "flatten staged git changes (the pre-commit guarantee)")
+    .option(
+      "--all",
+      "flatten every note under the docs root, regardless of git state (backfill; takes precedence over --staged)",
+    )
     .option("--quiet", "suppress the report")
-    .action(async (opts: { staged?: boolean; quiet?: boolean }) => {
-      await flattenCmd({ staged: opts.staged, quiet: opts.quiet });
+    .action(async (opts: { staged?: boolean; all?: boolean; quiet?: boolean }) => {
+      await flattenCmd({ staged: opts.staged, all: opts.all, quiet: opts.quiet });
     });
 
   // ─── link ──────────────────────────────────────────────────────────────────

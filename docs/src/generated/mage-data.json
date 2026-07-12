@@ -477,13 +477,17 @@
     },
     {
       "name": "flatten",
-      "summary": "Normalize harness-shaped (Claude Code) notes to mage's flat schema (ADR-0035): --staged flattens staged blobs at the commit boundary; default sweeps the working tree (the Stop hook). Never blocks.",
+      "summary": "Normalize harness-shaped (Claude Code) notes to mage's flat schema (ADR-0035): --staged flattens staged blobs at the commit boundary; --all sweeps every note under the docs root regardless of git state (the backfill for notes committed before flatten existed); default sweeps the working tree (the Stop hook). Never blocks.",
       "aliases": [],
       "hidden": true,
       "options": [
         {
           "flags": "--staged",
           "description": "flatten staged git changes (the pre-commit guarantee)"
+        },
+        {
+          "flags": "--all",
+          "description": "flatten every note under the docs root, regardless of git state (backfill; takes precedence over --staged)"
         },
         {
           "flags": "--quiet",

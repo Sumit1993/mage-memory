@@ -1,9 +1,9 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { withKb } from "../../../test/fixtures/kb.js";
+import { tmpDir, withKb } from "../../../test/fixtures/kb.js";
 import { run } from "../../shell.js";
-import { flattenCcNote, flattenStagedNotes, flattenWorktreeNotes } from "./flatten.js";
+import { flattenAllNotes, flattenCcNote, flattenStagedNotes, flattenWorktreeNotes } from "./flatten.js";
 import { isCcShaped } from "./cc-note.js";
 import { parseNote } from "../../note.js";
 
@@ -318,5 +318,63 @@ describe("flattenWorktreeNotes (the Stop sweep)", () => {
   it("fails open on a non-repo path", async () => {
     const { dir } = await withKb();
     expect(await flattenWorktreeNotes(dir)).toEqual({ flattened: [] });
+  });
+});
+
+// ─── flattenAllNotes (the ADR-0035 at-rest backfill) ───────────────────────────
+
+describe("flattenAllNotes (the --all backfill sweep)", () => {
+  it("flattens a CC-shaped note that is already COMMITTED and CLEAN — unreachable by the other two sweeps", async () => {
+    const { dir } = await withKb();
+    await initRepo(dir);
+    await addFile(dir, "mage/notes/old-cc.md", CC_FRESH);
+    await run("git", ["-C", dir, "commit", "-q", "-m", "init"], { throwOnError: true });
+
+    // Prove the note is genuinely clean and untouched by the git-state-based sweeps —
+    // the exact condition flattenWorktreeNotes/flattenStagedNotes can never see.
+    const modified = await run("git", ["-C", dir, "diff", "--name-only"]);
+    expect(modified.stdout).not.toContain("old-cc.md");
+    const staged = await run("git", ["-C", dir, "diff", "--cached", "--name-only"]);
+    expect(staged.stdout).not.toContain("old-cc.md");
+
+    const res = await flattenAllNotes(dir);
+
+    expect(res.flattened).toContain("mage/notes/old-cc.md");
+    const onDisk = await readFile(join(dir, "mage/notes/old-cc.md"), "utf8");
+    expect(onDisk).not.toContain("node_type");
+    expect(onDisk).toContain("type: pointer");
+  });
+
+  it("leaves an already-flat committed note byte-identical", async () => {
+    const { dir } = await withKb();
+    await initRepo(dir);
+    await addFile(dir, "mage/notes/plain.md", PLAIN);
+    await run("git", ["-C", dir, "commit", "-q", "-m", "init"], { throwOnError: true });
+
+    const res = await flattenAllNotes(dir);
+
+    expect(res.flattened).toHaveLength(0);
+    expect(await readFile(join(dir, "mage/notes/plain.md"), "utf8")).toBe(PLAIN);
+  });
+
+  it("skips a generated artifact (root INDEX.md) and a file outside the docs root", async () => {
+    const { dir } = await withKb();
+    await initRepo(dir);
+    // Reserved basename at the docs root — never a real note, skipped by the walk itself.
+    await addFile(dir, "mage/INDEX.md", CC_FRESH);
+    // Outside the docs root entirely (not under mage/) — never enumerated.
+    await addFile(dir, "OUTSIDE.md", CC_FRESH);
+    await run("git", ["-C", dir, "commit", "-q", "-m", "init"], { throwOnError: true });
+
+    const res = await flattenAllNotes(dir);
+
+    expect(res.flattened).toHaveLength(0);
+    expect(await readFile(join(dir, "mage/INDEX.md"), "utf8")).toBe(CC_FRESH);
+    expect(await readFile(join(dir, "OUTSIDE.md"), "utf8")).toBe(CC_FRESH);
+  });
+
+  it("fails open on a non-KB dir", async () => {
+    const dir = await tmpDir();
+    expect(await flattenAllNotes(dir)).toEqual({ flattened: [] });
   });
 });

@@ -134,6 +134,41 @@ export async function scanNotes(root: string): Promise<ScannedNote[]> {
   return out;
 }
 
+/**
+ * Enumerate every markdown NOTE path under the docs root — the raw-path counterpart
+ * to {@link scanNotes}: same {@link SKIP_DIRS} deny-list and reserved-basename
+ * discipline (RESERVED_MD + `_index.*.md`, skipped at any depth), but returns
+ * docs-root-relative POSIX paths WITHOUT parsing each note. Used where a caller
+ * needs the file list but not the parsed frontmatter (e.g. a full at-rest sweep
+ * that reads raw text itself), so it never pays for — or fails on — a parse it
+ * doesn't need. Sorted deterministically.
+ */
+export async function listNotePaths(root: string): Promise<string[]> {
+  const out: string[] = [];
+  await walkPaths(root, root, out);
+  out.sort();
+  return out;
+}
+
+async function walkPaths(dir: string, root: string, out: string[]): Promise<void> {
+  let entries: import("node:fs").Dirent[];
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const e of entries) {
+    if (e.isDirectory()) {
+      if (SKIP_DIRS.has(e.name)) continue;
+      await walkPaths(join(dir, e.name), root, out);
+      continue;
+    }
+    if (!e.name.endsWith(".md")) continue;
+    if (RESERVED_MD.has(e.name) || GEN_INDEX_RE.test(e.name)) continue;
+    out.push(toPosix(relative(root, join(dir, e.name))));
+  }
+}
+
 async function walk(dir: string, root: string, out: ScannedNote[]): Promise<void> {
   let entries: import("node:fs").Dirent[];
   try {

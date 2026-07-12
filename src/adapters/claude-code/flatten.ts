@@ -33,7 +33,7 @@ import { tmpdir } from "node:os";
 import { join, relative, resolve, sep } from "node:path";
 import { parseNote, stringifyNote } from "../../note.js";
 import { resolveDocsRoot } from "../../paths.js";
-import { isGeneratedArtifact } from "../../scan.js";
+import { isGeneratedArtifact, listNotePaths } from "../../scan.js";
 import { run } from "../../shell.js";
 import { isCcShaped, recoverCcFrontmatter } from "./cc-note.js";
 
@@ -80,6 +80,8 @@ export interface FlattenStagedResult {
 /** Git toplevel + a docs-root scope predicate/mapper, or null (no repo / no KB). */
 interface DocsScope {
   top: string;
+  /** Absolute path to the docs root itself (for a full, git-state-independent walk). */
+  root: string;
   inScope: (f: string) => boolean;
   toDocsRel: (f: string) => string;
 }
@@ -100,6 +102,7 @@ async function resolveDocsScope(repoPath: string): Promise<DocsScope | null> {
   const flat = prefix === "" || prefix === ".";
   return {
     top,
+    root: docs.root,
     inScope: flat ? () => true : (f) => f === prefix || f.startsWith(`${prefix}/`),
     toDocsRel: flat ? (f) => f : (f) => (f.startsWith(`${prefix}/`) ? f.slice(prefix.length + 1) : f),
   };
@@ -248,6 +251,53 @@ export async function flattenWorktreeNotes(repoPath: string): Promise<FlattenSta
       result.flattened.push(file);
     } catch {
       // Fail-open per file: a normalizer must never break the agent's turn.
+    }
+  }
+  return result;
+}
+
+/**
+ * Sweep EVERY note under the mage docs root, regardless of git state — the ADR-0035
+ * BACKFILL mode (`mage flatten --all`). {@link flattenWorktreeNotes} and
+ * {@link flattenStagedNotes} only ever reach a note that git currently reports as
+ * modified/untracked/staged; a CC-shaped note committed BEFORE the flatten boundary
+ * existed is clean and untouched by either, so it stays harness-shaped forever unless
+ * something walks the whole tree once. This is that one-time (or periodic) full sweep:
+ * enumerate every `.md` under the docs root ({@link listNotePaths} — the same
+ * SKIP_DIRS/reserved-name discipline `scanNotes` uses for `mage index`), skip anything
+ * mage generates ({@link isGeneratedArtifact}), then run the identical
+ * flatten-if-CC-shaped/write/re-flatten-is-a-noop pipeline as the other two sweeps.
+ * Every candidate here is already rooted AT the docs root by construction, so there is
+ * no separate `inScope` predicate to apply (unlike the git-diff-derived candidate
+ * lists above, which must filter an arbitrary repo-wide path list down to the KB).
+ * FAIL-OPEN end to end: no repo / no KB → empty result; any per-file error is skipped,
+ * never thrown. Does not touch git at all (no staging, no worktree-vs-index games) —
+ * this mode only ever rewrites files that are already clean in git's eyes, so nothing
+ * new becomes "dirty" that wasn't already going to be flattened identically on its
+ * next natural pass through the Stop/pre-commit sweeps.
+ */
+export async function flattenAllNotes(repoPath: string): Promise<FlattenStagedResult> {
+  const empty: FlattenStagedResult = { flattened: [] };
+  const scope = await resolveDocsScope(repoPath);
+  if (!scope) return empty;
+  const { top, root } = scope;
+
+  // listNotePaths returns paths already relative to the docs root — exactly the shape
+  // isGeneratedArtifact expects — so no separate inScope/toDocsRel mapping is needed here.
+  const relPaths = (await listNotePaths(root).catch(() => [] as string[])).filter(
+    (f) => !isGeneratedArtifact(f),
+  );
+
+  const result: FlattenStagedResult = { flattened: [] };
+  for (const rel of relPaths) {
+    try {
+      const abs = resolve(root, rel);
+      const { text, changed } = flattenCcNote(await readFile(abs, "utf8"));
+      if (!changed) continue; // not CC-shaped / already flat → nothing to do.
+      await writeFile(abs, text);
+      result.flattened.push(relative(top, abs).split(sep).join("/"));
+    } catch {
+      // Fail-open per file: a full-KB sweep must never abort on one pathological note.
     }
   }
   return result;
