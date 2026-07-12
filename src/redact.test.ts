@@ -315,6 +315,33 @@ describe("scanSecrets — angle-bracket doc placeholders are not secrets", () =>
     expect(redact(clean).text).toBe(clean);
   });
 
+  it("regression-hold: legit word/separator placeholders stay suppressed after the entropy gate", () => {
+    // The security gate must NOT weaken real placeholders — each is short/word-like
+    // or carries a separator, exercised in the url-credentials password position.
+    for (const inner of ["token", "your-token", "PAT", "user:pass", "api_key"]) {
+      expect(hasLiveSecret(scanSecrets(`http://user:<${inner}>@host`))).toBe(false);
+    }
+  });
+
+  it("STILL flags a secret-SHAPED value even when angle-wrapped (CodeRabbit Major)", () => {
+    // A `<...>` wrapper must not launder a secret-shaped inner value. Without the
+    // entropy gate, url-credentials would claim `<hex32>`/`<base64>` as its password
+    // span, then the shared suppressed() would DROP it — leaving a live secret. The
+    // gate forces these back to being flagged.
+    const hex32 = "0123456789abcdef0123456789abcdef"; // 32-hex (isHighEntropy passes it as a digest)
+    const alnum = "Zm9vYmFyQmF6MTIzNDU2Nzg5MEFiQ2RFZkdoSWpLbE1u"; // 44-char, no separators
+    for (const input of [
+      `http://user:<${hex32}>@host`,
+      `http://user:<${alnum}>@host`,
+      // A bare high-entropy base64 blob is still caught by the high-entropy detector
+      // (the 32-hex digest is intentionally NOT a secret in bare prose, so only the
+      // url-credentials position exercises the gate for it).
+      `key <${alnum}> end`,
+    ]) {
+      expect(hasLiveSecret(scanSecrets(input))).toBe(true);
+    }
+  });
+
   it("STILL flags a REAL credential in the same url-credentials position (no over-suppression)", () => {
     // Security guard: an UNWRAPPED live-shaped password must remain a secret — only
     // the `<...>`-wrapped placeholder is suppressed, never a real token.
