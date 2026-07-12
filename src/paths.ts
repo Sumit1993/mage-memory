@@ -93,6 +93,9 @@ export interface RedactConfig {
  *   - `autonomy` — how much of the grooming ladder the host agent drains autonomously
  *     (operator | approver | overseer, ADR-0030); absent ⇒ "operator".
  *   - `nudgeThrottleHours` — the backlog-reminder window in hours (ADR-0030); absent ⇒ 4h.
+ *   - `crownThreshold` — the pre-registered autonomy keep-rate (0..1) that would justify
+ *     raising the default autonomy (ADR-0031 P2 §7); absent ⇒ unset (the reconciler renders
+ *     `unset` and never auto-acts). Deliberately UNVALUED until soak data can calibrate it.
  * Every field is optional so an older metadata file (no grooming, or sensitivity-only)
  * still validates; defaults live in the readers (thresholds.ts), not here.
  */
@@ -100,6 +103,7 @@ export interface GroomingConfig {
   sensitivity?: "low" | "normal" | "high";
   autonomy?: "operator" | "approver" | "overseer";
   nudgeThrottleHours?: number;
+  crownThreshold?: number;
 }
 
 /**

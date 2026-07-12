@@ -31,6 +31,7 @@ import { readSessionStreams } from "../../distill/reader.js";
 import { type BacklogTally, computeBacklogFromStreams } from "../../grooming/backlog.js";
 import { type Autonomy, mandateFor } from "../../grooming/autonomy-ladder.js";
 import { readGrooming } from "../../grooming/config.js";
+import { type KeepRateSummary, reconcileKeepRate, summarizeKeepRate } from "../../grooming/reconcile.js";
 import type { ObserveEvent } from "../../observe/types.js";
 import { type ResolvedDocsRoot, absolutePath, learningsPath, resolveDocsRoot } from "../../paths.js";
 import {
@@ -119,10 +120,15 @@ export async function nudgeCmd(opts: NudgeOptions): Promise<NudgeResult> {
 async function digestNudge(resolved: ResolvedDocsRoot, source: string, force: boolean): Promise<NudgeResult> {
   const { root } = resolved;
 
-  // One grooming-config read (config.ts) feeds the level, the dial, and the throttle window —
-  // replacing three separate metadata reads (and the old lazy import that dodged a paths cycle).
-  const { autonomy: level, sensitivity, nudgeThrottleHours } = await readGrooming(resolved).catch(
-    () => ({ autonomy: "operator" as Autonomy, sensitivity: "normal" as const, nudgeThrottleHours: undefined }),
+  // One grooming-config read (config.ts) feeds the level, the dial, the throttle window, and the
+  // crown threshold — replacing separate metadata reads (and the old lazy import that dodged a cycle).
+  const { autonomy: level, sensitivity, nudgeThrottleHours, crownThreshold } = await readGrooming(resolved).catch(
+    () => ({
+      autonomy: "operator" as Autonomy,
+      sensitivity: "normal" as const,
+      nudgeThrottleHours: undefined,
+      crownThreshold: undefined,
+    }),
   );
 
   // ONE fingerprint-gated scan feeds both the digest and the tally from a single stream read.
@@ -150,6 +156,12 @@ async function digestNudge(resolved: ResolvedDocsRoot, source: string, force: bo
   // The weekly dream-health tick — a read-only rot summary on its own slow clock.
   const health = await healthTick(root, force);
 
+  // The autonomy reject-ledger reconcile (ADR-0031 P2) — deterministic, cheap, idempotent, so it
+  // runs every firing (no slow-clock gate). Fail-open: a broken reconcile surfaces no keep-rate line.
+  const keepRate = await reconcileKeepRate(root, resolved.repo)
+    .then(summarizeKeepRate)
+    .catch(() => null);
+
   // additionalContext (model-only): the digest (+ an offer-first note on session entry) + the autonomy
   // mandate + a health block that tells the agent to OFFER the read-only scan. systemMessage
   // (user-visible): the deterministic, UNRANKED chapter teaser + the backlog/health lines.
@@ -158,7 +170,7 @@ async function digestNudge(resolved: ResolvedDocsRoot, source: string, force: bo
       ? `${chapter.rendered}\n\n${ENTRY_DIGEST_NOTE}`
       : chapter.rendered;
   const nudge = composeContext(digestContext, mandate, healthContext(health));
-  const notice = noticeLine(tally, showBacklog, health, chapter.teaser);
+  const notice = noticeLine(tally, showBacklog, health, chapter.teaser, keepRateLine(keepRate, crownThreshold));
   return { ran: true, drafted: 0, pending, nudge, notice };
 }
 
@@ -278,7 +290,13 @@ async function healthTick(root: string, force: boolean): Promise<string> {
  * surfaced. (`additionalContext` is model-only; `systemMessage` is the channel Claude Code renders to
  * the user — so the boundary nudge is no longer invisible to the person doing the work.)
  */
-function noticeLine(t: BacklogTally, showBacklog: boolean, health: string, teaser: string): string | null {
+function noticeLine(
+  t: BacklogTally,
+  showBacklog: boolean,
+  health: string,
+  teaser: string,
+  keepRate: string,
+): string | null {
   const lines: string[] = [];
   if (teaser.length > 0) lines.push(teaser);
   if (showBacklog) {
@@ -289,7 +307,22 @@ function noticeLine(t: BacklogTally, showBacklog: boolean, health: string, tease
     );
   }
   if (health.length > 0) lines.push(health);
+  if (keepRate.length > 0) lines.push(keepRate);
   return lines.length > 0 ? lines.join("\n") : null;
+}
+
+/**
+ * The autonomy keep-rate line (ADR-0031 P2): the crown signal over `source === "capture"`
+ * terminals ONLY. "" (hidden) when the reconcile failed or there are no capture terminals yet —
+ * so the line appears only once the agent's autonomous notes have actually been kept or reverted.
+ */
+function keepRateLine(summary: KeepRateSummary | null, crownThreshold: number | undefined): string {
+  if (!summary || summary.capture.terminals < 1) return "";
+  const pct = Math.round(summary.capture.rate * 100);
+  const n = summary.capture.terminals;
+  const threshold =
+    typeof crownThreshold === "number" ? `${Math.round(crownThreshold * 100)}%` : "unset";
+  return `mage · autonomy keep-rate ${pct}% (${n} note${n === 1 ? "" : "s"}, threshold ${threshold})`;
 }
 
 /**
