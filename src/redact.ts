@@ -32,13 +32,29 @@ const REDACTION_MARKER = /^\[REDACTED:[A-Za-z0-9-]+\]$/;
 const ENV_PLACEHOLDER = /^\$\{[A-Za-z0-9_:.-]{1,200}\}$/;
 
 /**
+ * An angle-bracket documentation placeholder — `<token>`, `<your-token>`, `<PAT>`.
+ * The VALUE is a `<...>`-wrapped stand-in a human is meant to replace, never a
+ * literal secret, so `http://user:<token>@host` in a doc URL must not be flagged.
+ * The inner class is deliberately CONSERVATIVE (letters, digits, `_ - : . space`)
+ * and the whole value is anchored `^<...>$`; a real base64/hex token — never
+ * `<...>`-wrapped — therefore can never be suppressed by this rule.
+ */
+const ANGLE_PLACEHOLDER = /^<[A-Za-z0-9_:.\- ]{1,200}>$/;
+
+/**
  * A matched value that must NOT be treated as a secret, regardless of which
  * detector fired: an already-redacted marker (keeps redact() idempotent), an
- * `${ENV}` placeholder, or a caller-supplied allowlist literal (a confirmed false
- * positive from `metadata.redact.allow`). Applied uniformly across both scan passes.
+ * `${ENV}` placeholder, a `<…>` documentation placeholder, or a caller-supplied
+ * allowlist literal (a confirmed false positive from `metadata.redact.allow`).
+ * Applied uniformly across both scan passes.
  */
 function suppressed(raw: string, allow?: ReadonlySet<string>): boolean {
-  return REDACTION_MARKER.test(raw) || ENV_PLACEHOLDER.test(raw) || (allow?.has(raw) ?? false);
+  return (
+    REDACTION_MARKER.test(raw) ||
+    ENV_PLACEHOLDER.test(raw) ||
+    ANGLE_PLACEHOLDER.test(raw) ||
+    (allow?.has(raw) ?? false)
+  );
 }
 
 /**

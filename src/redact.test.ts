@@ -294,6 +294,62 @@ describe("scanSecrets — env placeholders are references, not secrets (0.0.12)"
   });
 });
 
+describe("scanSecrets — angle-bracket doc placeholders are not secrets", () => {
+  for (const input of [
+    // The reported FP: a doc URL whose password span is a `<token>` placeholder.
+    "http://user:<token>@host",
+    // A bare url-credentials value that is a placeholder.
+    "postgres://u:<your-token>@db.example.com:5432/app",
+    // Placeholder variants in a key=value shape.
+    "api_key=<token>",
+    "auth_token: <PAT>",
+    "password: <user:pass>",
+  ]) {
+    it(`does not flag an angle-bracket placeholder: ${input}`, () => {
+      expect(hasLiveSecret(scanSecrets(input))).toBe(false);
+    });
+  }
+
+  it("redact() leaves a `<token>` doc URL byte-for-byte untouched", () => {
+    const clean = "http://user:<token>@host";
+    expect(redact(clean).text).toBe(clean);
+  });
+
+  it("STILL flags a REAL credential in the same url-credentials position (no over-suppression)", () => {
+    // Security guard: an UNWRAPPED live-shaped password must remain a secret — only
+    // the `<...>`-wrapped placeholder is suppressed, never a real token.
+    for (const input of [
+      "http://user:s3cr3tP@ssw0rdXyz123@host",
+      "postgres://u:R3alLiveSecret9999@db",
+    ]) {
+      expect(hasLiveSecret(scanSecrets(input))).toBe(true);
+    }
+  });
+
+  it("STILL flags a real literal in a key=value shape (only the placeholder is suppressed)", () => {
+    expect(hasLiveSecret(scanSecrets("api_key='s3cr3tValue123'"))).toBe(true);
+  });
+
+  it("does NOT suppress a value that only CONTAINS an angle bracket (not fully wrapped)", () => {
+    // `abc<def` is not `^<...>$`-anchored, so it is evaluated normally. Paired with a
+    // secret keyword + sufficient length it must still be flagged.
+    expect(hasLiveSecret(scanSecrets("api_key=abc<defRealSecret99"))).toBe(true);
+  });
+
+  it("does NOT spuriously suppress `<>` or a garbage/over-long angle value", () => {
+    // Empty `<>` fails the {1,200} inner-length rule; a value carrying base64 chars
+    // (`/ + =`) outside the conservative inner class is NOT a placeholder. Neither is
+    // suppressed, so a real secret keyed value with such content still flags.
+    const overlong = `<${"a".repeat(250)}>`; // 250 inner chars > 200 cap => not a placeholder
+    for (const input of [
+      `api_key='${overlong}'`,
+      "api_key='<ab/cd+efGH1234567890=>'", // base64-ish chars outside the inner class
+    ]) {
+      expect(hasLiveSecret(scanSecrets(input))).toBe(true);
+    }
+  });
+});
+
 describe("scanSecrets — path-like runs are not high-entropy secrets (0.0.12)", () => {
   // The exact false positives from the 2026-06-14 hub commit (issue doc): the
   // high-entropy class includes '/', so slash-joined file paths trip the bar.
