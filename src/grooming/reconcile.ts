@@ -193,19 +193,21 @@ interface Observation {
  * Reconcile the reject-ledger for `docsRoot` against the git repo at `repo` (ADR-0031 §7).
  * Reads the current ledger, enumerates the stamped-autonomous notes, folds one-way terminal
  * transitions, handles deletions (seen keys absent this pass), persists, and returns the new
- * ledger. FAIL-OPEN: not a git repo, an unreadable notes dir, or any per-note error → the
- * unchanged ledger, never a throw. IDEMPOTENT: an unchanged git state re-runs to a no-op.
+ * ledger. FAIL-OPEN: not a git repo, an unreadable notes dir, or any per-note error → returns
+ * `null` WITHOUT writing (the on-disk ledger is left untouched so nothing is lost, and the caller
+ * renders no stale keep-rate line), never a throw. IDEMPOTENT: an unchanged git state re-runs to a no-op.
  */
-export async function reconcileKeepRate(docsRoot: string, repo: string): Promise<KeepRateLedger> {
+export async function reconcileKeepRate(docsRoot: string, repo: string): Promise<KeepRateLedger | null> {
   const prev = await readKeepRateLedger(docsRoot);
 
   // Enumerate the stamped-autonomous notes (frontmatter only; ScannedNote drops provenance).
-  // A NotARepoError (git unavailable) or an unreadable notes dir both leave the ledger untouched.
+  // A NotARepoError (git unavailable) or an unreadable notes dir → null, the persisted ledger
+  // untouched: reconcile advanced nothing, so the nudge must surface NO keep-rate line (not stale data).
   let observed: Map<string, Observation>;
   try {
     observed = await enumerateAutonomousNotes(docsRoot, repo);
   } catch {
-    return prev; // not a git repo, or an unreadable notes dir → fail-open, no mutation.
+    return null; // not a git repo, or an unreadable notes dir → fail-open; no write, no line.
   }
 
   const headCommit = (await getHeadCommit(repo).catch(() => null)) ?? undefined;
@@ -326,6 +328,13 @@ function classifyAbsent(prev: SeenNote, inHead: boolean): { next: SeenNote; delt
   if (prev.state === "pending") {
     const state: NoteDisposition = inHead ? "reject" : "discard";
     return { next: { ...prev, state }, deltas: [{ state, sign: 1 }] };
+  }
+  // A BASELINE keep (first seen already-committed) was NEVER added to the tally, so its deletion
+  // must be a tally NO-OP — a keep decrement here would drive `tally.<level>.keep` negative and
+  // corrupt byLevel (FIX A). Record the state transition, emit no deltas; it stays out of the
+  // headline (summarizeKeepRate skips baseline notes) exactly as it was before deletion.
+  if (prev.baseline) {
+    return { next: { ...prev, state: "reject" }, deltas: [] };
   }
   // prev.state is keep or edited (discard/reject were filtered out before calling): it was
   // counted as a terminal keep-family, now it's gone → move that count to reject.

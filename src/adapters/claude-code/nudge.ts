@@ -157,10 +157,11 @@ async function digestNudge(resolved: ResolvedDocsRoot, source: string, force: bo
   const health = await healthTick(root, force);
 
   // The autonomy reject-ledger reconcile (ADR-0031 P2) — deterministic, cheap, idempotent, so it
-  // runs every firing (no slow-clock gate). Fail-open: a broken reconcile surfaces no keep-rate line.
-  const keepRate = await reconcileKeepRate(root, resolved.repo)
-    .then(summarizeKeepRate)
-    .catch(() => null);
+  // runs every firing (no slow-clock gate). Fail-open: a failed reconcile returns null (the ledger
+  // is left untouched), and we summarize ONLY a non-null result — so a broken reconcile surfaces no
+  // stale keep-rate line.
+  const keepLedger = await reconcileKeepRate(root, resolved.repo).catch(() => null);
+  const keepRate = keepLedger ? summarizeKeepRate(keepLedger) : null;
 
   // additionalContext (model-only): the digest (+ an offer-first note on session entry) + the autonomy
   // mandate + a health block that tells the agent to OFFER the read-only scan. systemMessage
