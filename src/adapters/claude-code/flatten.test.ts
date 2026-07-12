@@ -360,7 +360,7 @@ describe("flattenAllNotes (the --all backfill sweep)", () => {
   it("skips a generated artifact (root INDEX.md) and a file outside the docs root", async () => {
     const { dir } = await withKb();
     await initRepo(dir);
-    // Reserved basename at the docs root — never a real note, skipped by the walk itself.
+    // Reserved basename AT the docs root — generated, dropped by isGeneratedArtifact.
     await addFile(dir, "mage/INDEX.md", CC_FRESH);
     // Outside the docs root entirely (not under mage/) — never enumerated.
     await addFile(dir, "OUTSIDE.md", CC_FRESH);
@@ -371,6 +371,39 @@ describe("flattenAllNotes (the --all backfill sweep)", () => {
     expect(res.flattened).toHaveLength(0);
     expect(await readFile(join(dir, "mage/INDEX.md"), "utf8")).toBe(CC_FRESH);
     expect(await readFile(join(dir, "OUTSIDE.md"), "utf8")).toBe(CC_FRESH);
+  });
+
+  it("flattens a subdirectory note that shares a reserved basename, but NOT the generated root INDEX.md", async () => {
+    const { dir } = await withKb();
+    await initRepo(dir);
+    // An AUTHORED note that merely shares the INDEX.md basename in a subdir — author
+    // content, must be reachable and flattened (isGeneratedArtifact scopes the reserved
+    // names to the docs ROOT only).
+    await addFile(dir, "mage/notes/sub/INDEX.md", CC_FRESH);
+    // The genuinely generated root index — must be left untouched.
+    await addFile(dir, "mage/INDEX.md", PLAIN);
+    await run("git", ["-C", dir, "commit", "-q", "-m", "init"], { throwOnError: true });
+
+    const res = await flattenAllNotes(dir);
+
+    expect(res.flattened).toEqual(["mage/notes/sub/INDEX.md"]);
+    expect(await readFile(join(dir, "mage/notes/sub/INDEX.md"), "utf8")).toContain("type: pointer");
+    expect(await readFile(join(dir, "mage/INDEX.md"), "utf8")).toBe(PLAIN); // root index untouched
+  });
+
+  it("flattens a STANDALONE hub KB with NO git repo (git-state-independent — the --all contract)", async () => {
+    // A hub docs root that is NOT a git repo at all. resolveDocsScope is git-gated and
+    // would no-op here; flattenAllNotes must still discover and flatten its CC notes.
+    const { dir } = await withKb({ kind: "hub" });
+    await mkdir(join(dir, "notes"), { recursive: true });
+    await writeFile(join(dir, "notes/standalone-cc.md"), CC_FRESH);
+
+    const res = await flattenAllNotes(dir);
+
+    expect(res.flattened).toEqual(["notes/standalone-cc.md"]); // docs-root-relative (no git toplevel)
+    const onDisk = await readFile(join(dir, "notes/standalone-cc.md"), "utf8");
+    expect(onDisk).not.toContain("node_type");
+    expect(onDisk).toContain("type: pointer");
   });
 
   it("fails open on a non-KB dir", async () => {

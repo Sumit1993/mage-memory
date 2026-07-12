@@ -136,12 +136,17 @@ export async function scanNotes(root: string): Promise<ScannedNote[]> {
 
 /**
  * Enumerate every markdown NOTE path under the docs root — the raw-path counterpart
- * to {@link scanNotes}: same {@link SKIP_DIRS} deny-list and reserved-basename
- * discipline (RESERVED_MD + `_index.*.md`, skipped at any depth), but returns
- * docs-root-relative POSIX paths WITHOUT parsing each note. Used where a caller
- * needs the file list but not the parsed frontmatter (e.g. a full at-rest sweep
- * that reads raw text itself), so it never pays for — or fails on — a parse it
- * doesn't need. Sorted deterministically.
+ * to {@link scanNotes}: same {@link SKIP_DIRS} deny-list, but returns docs-root-relative
+ * POSIX paths WITHOUT parsing each note. Used where a caller needs the file list but not
+ * the parsed frontmatter (e.g. a full at-rest sweep that reads raw text itself), so it
+ * never pays for — or fails on — a parse it doesn't need. Sorted deterministically.
+ *
+ * RESERVED-NAME SCOPING: unlike {@link scanNotes}, this drops ONLY the per-wing indexes
+ * (`_index.*.md`, generated at any depth). It deliberately does NOT drop the fixed
+ * RESERVED_MD basenames (INDEX.md, MEMORY.md, …), because those are generated ONLY at the
+ * docs root — a user-AUTHORED `notes/foo/INDEX.md` must still be enumerated. The caller
+ * applies {@link isGeneratedArtifact} (which scopes the fixed basenames to the root) to
+ * exclude the genuinely generated root files, keeping that policy in ONE place.
  */
 export async function listNotePaths(root: string): Promise<string[]> {
   const out: string[] = [];
@@ -164,7 +169,11 @@ async function walkPaths(dir: string, root: string, out: string[]): Promise<void
       continue;
     }
     if (!e.name.endsWith(".md")) continue;
-    if (RESERVED_MD.has(e.name) || GEN_INDEX_RE.test(e.name)) continue;
+    // Per-wing indexes are generated at any depth → never notes. The fixed RESERVED_MD
+    // basenames are root-only generated, so they are NOT skipped here (a subdir file that
+    // merely shares the name is author content); the caller's isGeneratedArtifact() drops
+    // the real root-level ones.
+    if (GEN_INDEX_RE.test(e.name)) continue;
     out.push(toPosix(relative(root, join(dir, e.name))));
   }
 }

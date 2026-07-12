@@ -80,8 +80,6 @@ export interface FlattenStagedResult {
 /** Git toplevel + a docs-root scope predicate/mapper, or null (no repo / no KB). */
 interface DocsScope {
   top: string;
-  /** Absolute path to the docs root itself (for a full, git-state-independent walk). */
-  root: string;
   inScope: (f: string) => boolean;
   toDocsRel: (f: string) => string;
 }
@@ -102,7 +100,6 @@ async function resolveDocsScope(repoPath: string): Promise<DocsScope | null> {
   const flat = prefix === "" || prefix === ".";
   return {
     top,
-    root: docs.root,
     inScope: flat ? () => true : (f) => f === prefix || f.startsWith(`${prefix}/`),
     toDocsRel: flat ? (f) => f : (f) => (f.startsWith(`${prefix}/`) ? f.slice(prefix.length + 1) : f),
   };
@@ -270,17 +267,31 @@ export async function flattenWorktreeNotes(repoPath: string): Promise<FlattenSta
  * Every candidate here is already rooted AT the docs root by construction, so there is
  * no separate `inScope` predicate to apply (unlike the git-diff-derived candidate
  * lists above, which must filter an arbitrary repo-wide path list down to the KB).
- * FAIL-OPEN end to end: no repo / no KB → empty result; any per-file error is skipped,
- * never thrown. Does not touch git at all (no staging, no worktree-vs-index games) —
- * this mode only ever rewrites files that are already clean in git's eyes, so nothing
- * new becomes "dirty" that wasn't already going to be flattened identically on its
- * next natural pass through the Stop/pre-commit sweeps.
+ *
+ * This mode enumerates from the docs root, NOT from git, so it must run in a
+ * standalone/non-git KB too — hence it resolves the root via {@link resolveDocsRoot}
+ * (the git-free resolver `mage index` uses), NOT `resolveDocsScope` (which is git-gated
+ * and would wrongly no-op a non-repo KB, contradicting the "regardless of git state"
+ * contract). git is consulted only best-effort, to report toplevel-relative paths that
+ * match the other two sweeps when this IS a repo; a standalone KB falls back to
+ * docs-root-relative paths.
+ *
+ * FAIL-OPEN end to end: no KB → empty result; any per-file error is skipped, never
+ * thrown. Does not stage or touch the index (no worktree-vs-index games) — this mode
+ * only rewrites files that are already clean in git's eyes, so nothing new becomes
+ * "dirty" that wasn't already going to be flattened identically on its next natural
+ * pass through the Stop/pre-commit sweeps.
  */
 export async function flattenAllNotes(repoPath: string): Promise<FlattenStagedResult> {
   const empty: FlattenStagedResult = { flattened: [] };
-  const scope = await resolveDocsScope(repoPath);
-  if (!scope) return empty;
-  const { top, root } = scope;
+  const docs = await resolveDocsRoot(repoPath).catch(() => null);
+  if (!docs) return empty;
+  const root = docs.root;
+
+  // Best-effort git toplevel so reported paths match the other sweeps (toplevel-relative)
+  // when this is a repo; a standalone KB reports docs-root-relative paths (top === root).
+  const topRes = await run("git", ["-C", repoPath, "rev-parse", "--show-toplevel"]);
+  const top = topRes.code === 0 && topRes.stdout.trim() ? topRes.stdout.trim() : root;
 
   // listNotePaths returns paths already relative to the docs root — exactly the shape
   // isGeneratedArtifact expects — so no separate inScope/toDocsRel mapping is needed here.
