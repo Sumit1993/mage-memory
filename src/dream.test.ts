@@ -69,6 +69,54 @@ describe("mage dream (read-only health report)", () => {
     expect(r.danglingLinks.some((f) => f.detail.includes("x.md"))).toBe(false);
   });
 
+  it("never resolves an external .md URL against the filesystem", async () => {
+    const dir = await vault();
+    await note(dir, "a.md", `---\ntags: [w/r]\nlast_reviewed: "${FRESH}"\n---\n# A\nSee [self-host](https://github.com/e2b-dev/infra/blob/main/self-host.md).\n\n## Relations\n- see_also [B](b.md)\n`);
+    await note(dir, "b.md", `---\ntags: [w/r]\nlast_reviewed: "${FRESH}"\n---\n# B\n\n## Relations\n- see_also [A](a.md)\n`);
+    const r = await analyzeDream(dir, { now: NOW });
+    expect(r.danglingLinks).toEqual([]);
+  });
+
+  it("counts [[wikilinks]] as edges, so a wikilinked note is not an orphan", async () => {
+    const dir = await vault();
+    await note(dir, "a.md", `---\ntags: [w/r]\nlast_reviewed: "${FRESH}"\n---\n# A\n\n## Relations\n- refines [[b]]\n`);
+    await note(dir, "b.md", `---\ntags: [w/r]\nlast_reviewed: "${FRESH}"\n---\n# B\n`);
+    const r = await analyzeDream(dir, { now: NOW });
+    expect(r.orphans).toEqual([]);
+    expect(r.danglingLinks).toEqual([]);
+  });
+
+  it("flags a dead wikilink, and ignores alias/heading syntax when resolving", async () => {
+    const dir = await vault();
+    await note(dir, "a.md", `---\ntags: [w/r]\nlast_reviewed: "${FRESH}"\n---\n# A\nSee [[b#some-heading|the B note]] and [[build-ledger]].\n`);
+    await note(dir, "b.md", `---\ntags: [w/r]\nlast_reviewed: "${FRESH}"\n---\n# B\n`);
+    const r = await analyzeDream(dir, { now: NOW });
+    expect(r.danglingLinks.length).toBe(1);
+    expect(r.danglingLinks[0]?.detail).toContain("[[build-ledger]]");
+    // the aliased+anchored wikilink still resolved to b.md, so neither note is an orphan
+    expect(r.orphans).toEqual([]);
+  });
+
+  it("honors a supersedes relation written as a wikilink", async () => {
+    const dir = await vault();
+    await note(dir, "old.md", `---\ntags: [w/r]\nstatus: active\nlast_reviewed: "${FRESH}"\n---\n# Old\n`);
+    await note(dir, "new.md", `---\ntags: [w/r]\nlast_reviewed: "${FRESH}"\n---\n# New\n\n## Relations\n- supersedes [[old]]\n`);
+    const r = await analyzeDream(dir, { now: NOW });
+    expect(r.supersededButActive.map((f) => f.note)).toContain("notes/old.md");
+  });
+
+  it("resolves a #fragment link by its file, for both dangling and graph reachability", async () => {
+    const dir = await vault();
+    await note(dir, "a.md", `---\ntags: [w/r]\nlast_reviewed: "${FRESH}"\n---\n# A\nSee [B](b.md#a-heading) and [gone](missing.md#x).\n`);
+    await note(dir, "b.md", `---\ntags: [w/r]\nlast_reviewed: "${FRESH}"\n---\n# B\n`);
+    const r = await analyzeDream(dir, { now: NOW });
+    // the fragment link is a real edge: neither note is an orphan
+    expect(r.orphans).toEqual([]);
+    // and a fragment on a missing file is still dangling, reported by its path
+    expect(r.danglingLinks.length).toBe(1);
+    expect(r.danglingLinks[0]?.detail).toContain("missing.md");
+  });
+
   it("flags an orphan note (no links in or out)", async () => {
     const dir = await vault();
     await note(dir, "a.md", `---\ntags: [w/r]\nlast_reviewed: "${FRESH}"\n---\n# A\n\n## Relations\n- see_also [B](b.md)\n`);

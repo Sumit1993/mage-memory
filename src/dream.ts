@@ -65,24 +65,74 @@ function stripCode(body: string): string {
   return body.replace(/```[\s\S]*?```/g, "").replace(/`[^`]*`/g, "");
 }
 
-/** All relative markdown links to `.md` targets, as written. */
+/**
+ * A `.md` link target plus an optional `#heading` fragment. The fragment is matched but
+ * NOT captured: `plan.md#the-autonomy-track` addresses a section of a file whose existence
+ * is still decided by `plan.md` alone.
+ */
+const MD_TARGET = String.raw`([^)\s]+\.md)(?:#[^)\s]*)?`;
+const LINK_RE = new RegExp(String.raw`\]\(${MD_TARGET}\)`, "g");
+
+/**
+ * An external target is not a path on disk. `https://github.com/e2b-dev/infra/blob/main/self-host.md`
+ * ends in `.md`, but resolving it against the linking note yields nonsense, so it must never
+ * reach the exists() check.
+ */
+function isExternal(target: string): boolean {
+  return /^([a-z][a-z0-9+.-]*:|\/\/)/i.test(target);
+}
+
+/** All *local* markdown links to `.md` targets, fragment stripped. */
 function extractLinks(body: string): string[] {
   const out: string[] = [];
-  const re = /\]\(([^)]+\.md)\)/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(body)) !== null) {
-    if (m[1]) out.push(m[1].trim());
+  for (const m of body.matchAll(LINK_RE)) {
+    const target = m[1]?.trim();
+    if (target && !isExternal(target)) out.push(target);
   }
   return out;
 }
 
-/** Typed relation bullets: `- <verb> [text](target.md)`. */
-const REL_RE = /^[-*]\s+([A-Za-z_]\w*)\s+\[[^\]]*\]\(([^)]+\.md)\)/;
-function extractRelations(body: string): Array<{ verb: string; target: string }> {
-  const out: Array<{ verb: string; target: string }> = [];
+/**
+ * An Obsidian wikilink: `[[target]]`, `[[target#heading]]`, `[[target^block]]`,
+ * `[[target|alias]]`, `[[dir/target]]`. Only the target is captured. A same-file link
+ * (`[[#heading]]`) has an empty target and is deliberately not matched.
+ */
+const WIKI_TARGET = String.raw`\[\[([^\]|#^]+)(?:[#^][^\]|]*)?(?:\|[^\]]*)?\]\]`;
+const WIKI_RE = new RegExp(WIKI_TARGET, "g");
+
+/** All wikilink targets, alias + fragment stripped. */
+function extractWikiLinks(body: string): string[] {
+  const out: string[] = [];
+  for (const m of body.matchAll(WIKI_RE)) {
+    const target = m[1]?.trim();
+    if (target) out.push(target);
+  }
+  return out;
+}
+
+/**
+ * Typed relation bullets, in either link form:
+ *   `- supersedes [text](target.md)`   ·   `- supersedes [[target]]`
+ */
+const REL_RE = new RegExp(
+  String.raw`^[-*]\s+([A-Za-z_]\w*)\s+(?:\[[^\]]*\]\(${MD_TARGET}\)|${WIKI_TARGET})`,
+);
+interface Relation {
+  verb: string;
+  target: string;
+  /** Wikilinks resolve by name across the vault; markdown links resolve relative to the note. */
+  wiki: boolean;
+}
+function extractRelations(body: string): Relation[] {
+  const out: Relation[] = [];
   for (const line of body.split("\n")) {
     const m = line.match(REL_RE);
-    if (m?.[1] && m[2]) out.push({ verb: m[1], target: m[2].trim() });
+    const verb = m?.[1];
+    if (!verb) continue;
+    const mdTarget = m[2]?.trim();
+    const wikiTarget = m[3]?.trim();
+    if (mdTarget && !isExternal(mdTarget)) out.push({ verb, target: mdTarget, wiki: false });
+    else if (wikiTarget) out.push({ verb, target: wikiTarget, wiki: true });
   }
   return out;
 }
@@ -90,6 +140,32 @@ function extractRelations(body: string): Array<{ verb: string; target: string }>
 /** Resolve a link target (relative to the linking note) to a root-relative posix path. */
 function resolveRel(noteRel: string, target: string): string {
   return posix.normalize(posix.join(posix.dirname(noteRel), target));
+}
+
+/**
+ * A wikilink addresses a note by NAME, not by path — `[[0011-engine-is-library]]` resolves from
+ * anywhere in the vault. Obsidian also accepts a folder-qualified form, so try the literal path
+ * first and fall back to the basename index. Ties break on the shortest path, then
+ * lexicographically, so a resolution never depends on scan order. Returns null when no note
+ * carries that name (a dead wikilink).
+ */
+function makeWikiResolver(noteRelPaths: string[]): (target: string) => string | null {
+  const byPath = new Set(noteRelPaths);
+  const byName = new Map<string, string[]>();
+  for (const rel of noteRelPaths) {
+    const name = posix.basename(rel, ".md");
+    const hits = byName.get(name);
+    if (hits) hits.push(rel);
+    else byName.set(name, [rel]);
+  }
+  for (const hits of byName.values()) {
+    hits.sort((a, b) => a.split("/").length - b.split("/").length || (a < b ? -1 : 1));
+  }
+  return (target) => {
+    const withExt = target.toLowerCase().endsWith(".md") ? target : `${target}.md`;
+    if (byPath.has(withExt)) return withExt;
+    return byName.get(posix.basename(withExt, ".md"))?.[0] ?? null;
+  };
 }
 
 function isActive(status: string | undefined): boolean {
@@ -138,6 +214,8 @@ export async function analyzeDream(root: string, opts: DreamOptions = {}): Promi
   const hasOut = new Set<string>();
   const hasIn = new Set<string>();
 
+  const resolveWiki = makeWikiResolver(scanned.map((s) => s.relPath));
+
   for (const s of scanned) {
     const body = stripCode(bodies.get(s.relPath) ?? "");
 
@@ -153,15 +231,28 @@ export async function analyzeDream(root: string, opts: DreamOptions = {}): Promi
       }
     }
 
-    for (const { verb, target } of extractRelations(body)) {
+    // Wikilinks are first-class edges: an Obsidian vault (and mage's own note format) wires
+    // notes together with `[[name]]` as often as with a relative path. Reading only markdown
+    // links makes a densely-linked note look like an orphan.
+    for (const target of extractWikiLinks(body)) {
+      const resolved = resolveWiki(target);
+      if (!resolved) {
+        danglingLinks.push({ note: s.relPath, detail: `link → [[${target}]] (target missing)` });
+        continue;
+      }
+      hasOut.add(s.relPath);
+      hasIn.add(resolved);
+    }
+
+    for (const { verb, target, wiki } of extractRelations(body)) {
       if (verb === SUPERSEDED_BY && isActive(statusOf.get(s.relPath))) {
         supersededButActive.push({
           note: s.relPath,
           detail: `superseded_by ${target}, but status is active`,
         });
       } else if (verb === SUPERSEDES) {
-        const resolved = resolveRel(s.relPath, target);
-        if (noteSet.has(resolved) && isActive(statusOf.get(resolved))) {
+        const resolved = wiki ? resolveWiki(target) : resolveRel(s.relPath, target);
+        if (resolved && noteSet.has(resolved) && isActive(statusOf.get(resolved))) {
           supersededButActive.push({
             note: resolved,
             detail: `superseded by ${s.relPath}, but status is active`,
