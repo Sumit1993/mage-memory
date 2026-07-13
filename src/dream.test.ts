@@ -97,6 +97,23 @@ describe("mage dream (read-only health report)", () => {
     expect(r.orphans).toEqual([]);
   });
 
+  it("does not call a wikilink dangling when it targets an ungroomed capture", async () => {
+    const dir = await vault();
+    await note(dir, "a.md", `---\ntags: [w/r]\nlast_reviewed: "${FRESH}"\n---\n# A\nSee [[captured]].\n`);
+    // an ungroomed CC-shaped capture: a real file on disk, deliberately excluded from the scan
+    await note(dir, "captured.md", `---\nmetadata:\n  node_type: memory\n---\n# Captured\n`);
+    const r = await analyzeDream(dir, { now: NOW });
+    expect(r.danglingLinks).toEqual([]);
+  });
+
+  it("keeps a superseded_by relation whose target is an external URL", async () => {
+    const dir = await vault();
+    await note(dir, "old.md", `---\ntags: [w/r]\nstatus: active\nlast_reviewed: "${FRESH}"\n---\n# Old\n\n## Relations\n- superseded_by [spec](https://example.com/old.md)\n`);
+    const r = await analyzeDream(dir, { now: NOW });
+    // the target never gets resolved — the finding is about THIS note's status
+    expect(r.supersededButActive.map((f) => f.note)).toContain("notes/old.md");
+  });
+
   it("honors a supersedes relation written as a wikilink", async () => {
     const dir = await vault();
     await note(dir, "old.md", `---\ntags: [w/r]\nstatus: active\nlast_reviewed: "${FRESH}"\n---\n# Old\n`);

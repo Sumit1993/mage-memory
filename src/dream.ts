@@ -131,7 +131,10 @@ function extractRelations(body: string): Relation[] {
     if (!verb) continue;
     const mdTarget = m[2]?.trim();
     const wikiTarget = m[3]?.trim();
-    if (mdTarget && !isExternal(mdTarget)) out.push({ verb, target: mdTarget, wiki: false });
+    // An external target is kept, not dropped: `superseded_by` never resolves its target —
+    // it only asserts something about THIS note's status — so filtering here would silently
+    // lose the finding. Resolution-time is the place to reject a target that isn't on disk.
+    if (mdTarget) out.push({ verb, target: mdTarget, wiki: false });
     else if (wikiTarget) out.push({ verb, target: wikiTarget, wiki: true });
   }
   return out;
@@ -214,7 +217,12 @@ export async function analyzeDream(root: string, opts: DreamOptions = {}): Promi
   const hasOut = new Set<string>();
   const hasIn = new Set<string>();
 
-  const resolveWiki = makeWikiResolver(scanned.map((s) => s.relPath));
+  // Resolve wikilinks against `deduped`, not `scanned`: a wikilink to a real on-disk note that
+  // the health scan filters out (an ungroomed CC-shaped capture) still points at something, and
+  // calling it dangling would be the very false positive this reader exists to avoid. This
+  // mirrors the markdown path, where exists() answers "is it there?" and noteSet answers
+  // "is it a node in the graph?" — two separate questions.
+  const resolveWiki = makeWikiResolver(deduped.map((s) => s.relPath));
 
   for (const s of scanned) {
     const body = stripCode(bodies.get(s.relPath) ?? "");
@@ -240,8 +248,10 @@ export async function analyzeDream(root: string, opts: DreamOptions = {}): Promi
         danglingLinks.push({ note: s.relPath, detail: `link → [[${target}]] (target missing)` });
         continue;
       }
-      hasOut.add(s.relPath);
-      hasIn.add(resolved);
+      if (noteSet.has(resolved)) {
+        hasOut.add(s.relPath);
+        hasIn.add(resolved);
+      }
     }
 
     for (const { verb, target, wiki } of extractRelations(body)) {
@@ -251,7 +261,11 @@ export async function analyzeDream(root: string, opts: DreamOptions = {}): Promi
           detail: `superseded_by ${target}, but status is active`,
         });
       } else if (verb === SUPERSEDES) {
-        const resolved = wiki ? resolveWiki(target) : resolveRel(s.relPath, target);
+        const resolved = wiki
+          ? resolveWiki(target)
+          : isExternal(target)
+            ? null
+            : resolveRel(s.relPath, target);
         if (resolved && noteSet.has(resolved) && isActive(statusOf.get(resolved))) {
           supersededButActive.push({
             note: resolved,
