@@ -2,14 +2,16 @@
 
 # mage
 
-> 70 notes. Part of the [index](INDEX.md).
+> 72 notes. Part of the [index](INDEX.md).
 
 ### build
 
 - `note` [Mage integration test framework](notes/mage-integration-test-framework.md) — mage, integration, test, framework, build
 - `note` [Mage main branch protected](notes/mage-main-branch-protected.md) — mage, main, branch, protected, build
 - `note` [Mage no biome 2space](notes/mage-no-biome-2space.md) — mage, biome, 2space, build
+- `gotcha` [Gotcha — `npx mage` in this repo runs the PUBLISHED release, not your working tree](notes/npx-mage-runs-the-published-release.md) — npx, dogfood, stale-binary, published-release, global-install, dist, dream, index, false-positive, self-hosting, verification _(reviewed 2026-07-19)_
 - `gotcha` [Test files were never type-checked (tsconfig excluded them)](notes/test-files-were-excluded-from-typecheck.md) — typecheck, tsc, tests, tsconfig, exclude, vitest, tsup, esbuild, ci, fixture _(reviewed 2026-06-15)_
+- `gotcha` [Gotcha — weakening a test's assertions to make it pass can delete its purpose](notes/weakening-a-test-can-delete-its-purpose.md) — test, vacuous, assertions, green-suite, false-confidence, behaviour-change, fixture, regression, code-review, coderabbit _(reviewed 2026-07-19)_
 
 ### capture
 
