@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { mkdir, writeFile, appendFile, readFile, stat, readdir, utimes } from "node:fs/promises";
 import * as fsPromises from "node:fs/promises";
 import { join } from "node:path";
@@ -34,6 +34,16 @@ function makeRow(session: string, ts: string): FootprintTrendRow {
 }
 
 describe("footprint-trend", () => {
+  // These fs wrappers are partial mocks delegating to the real implementation, so a
+  // `mockRejectedValueOnce` a test does not consume would leak into the next one.
+  // `mockReset` restores the implementation passed to `vi.fn(actual.x)` — do NOT
+  // re-set it from the module import, which is the mock itself.
+  afterEach(() => {
+    vi.mocked(fsPromises.appendFile).mockReset();
+    vi.mocked(fsPromises.readFile).mockReset();
+    vi.mocked(fsPromises.rm).mockReset();
+  });
+
   it("append creates the file and round-trips a row", async () => {
     const dir = await tmpDir("mage-trend-");
     const docsRoot = join(dir, "mage");
@@ -152,9 +162,6 @@ describe("footprint-trend", () => {
     expect(trend.rows.length).toBe(0);
   });
 
-  
-
-  
   it("readTrend never writes", async () => {
     const dir = await tmpDir("mage-trend-");
     const docsRoot = join(dir, "mage");
