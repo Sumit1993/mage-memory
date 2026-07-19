@@ -5,6 +5,8 @@ import { tmpDir } from "../../test/fixtures/kb.js";
 import type { HubProject } from "../paths.js";
 import { index, SCAFFOLDING_WORDS } from "./index-cmd.js";
 import { init } from "./init.js";
+import { BREACH_RATIO } from "../metrics/footprint.js";
+import { AUTO_MEMORY_MAX_BYTES } from "../adapters/claude-code/constants.js";
 
 async function vault(): Promise<string> {
   const dir = await tmpDir("mage-idx-");
@@ -367,5 +369,103 @@ describe("mage index — dedupe generated index payload (ADR-0039 §5)", () => {
     
     expect(idx).toContain("- `default` [C](notes/c.md) _(stale-suspect)_");
     expect(idx).not.toContain("2026-07-03");
+  });
+});
+
+describe("mage index — progressive degradation (ADR-0039 §7)", () => {
+  const threshold = Math.floor(BREACH_RATIO * AUTO_MEMORY_MAX_BYTES);
+
+  async function generateKb(dir: string, count: number) {
+    for (let i = 0; i < count; i++) {
+      await note(
+        dir,
+        `note${i}.md`,
+        `---
+type: default
+status: stale-suspect
+keywords: [kw${i}, ${"k".repeat(20)}]
+---
+# Note ${i} ${"t".repeat(120)}
+`
+      );
+    }
+  }
+
+  it("a small KB renders at tier 0 — no announcement, suffixes and keywords intact", async () => {
+    const dir = await vault();
+    await generateKb(dir, 5);
+    const r = await index({ dir, quiet: true });
+    expect(r.memoryTier).toBe(0);
+    const mem = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
+    expect(mem).toContain("_(stale-suspect)_");
+    expect(mem).toContain(" — kw");
+    expect(mem).not.toContain("> Lifecycle suffixes");
+  });
+
+  it("a KB just over threshold sheds tier 1 only — suffixes gone, keywords still present", async () => {
+    const dir = await vault();
+    await generateKb(dir, 110); 
+    const r = await index({ dir, quiet: true });
+    expect(r.memoryTier).toBe(1);
+    const mem = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
+    expect(mem).not.toContain("_(stale-suspect)_"); // suffixes gone
+    expect(mem).toContain(" — kw"); // keywords still present
+    expect(mem).toContain("> Lifecycle suffixes omitted");
+    expect(Buffer.byteLength(mem, "utf8")).toBeLessThanOrEqual(threshold);
+  });
+
+  it("a KB still over after tier 1 sheds tier 2 — keywords gone", async () => {
+    const dir = await vault();
+    await generateKb(dir, 130);
+    const r = await index({ dir, quiet: true });
+    expect(r.memoryTier).toBe(2);
+    const mem = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
+    expect(mem).not.toContain("_(stale-suspect)_");
+    expect(mem).not.toContain(" — kw"); // keywords gone
+    expect(mem).toContain("> Lifecycle suffixes and keyword tails omitted");
+    expect(Buffer.byteLength(mem, "utf8")).toBeLessThanOrEqual(threshold);
+  });
+
+  it("a KB still over after tier 2 falls back to tier 3 — category map", async () => {
+    const dir = await vault();
+    await generateKb(dir, 160);
+    const r = await index({ dir, quiet: true });
+    expect(r.memoryTier).toBe(3);
+    const mem = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
+    expect(mem).toContain("Fallen back to category map");
+  });
+
+  it("determinism: rendering the same fixture twice produces byte-identical output", async () => {
+    const dir = await vault();
+    await generateKb(dir, 130);
+    await index({ dir, quiet: true });
+    const first = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
+    await index({ dir, quiet: true });
+    const second = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
+    expect(second).toBe(first);
+  });
+
+  it("tier selection does not depend on note-read state", async () => {
+    const dir = await vault();
+    await generateKb(dir, 130);
+    await index({ dir, quiet: true });
+    const first = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
+    
+    await mkdir(join(dir, "mage", ".mage", "metrics"), { recursive: true });
+    await writeFile(join(dir, "mage", ".mage", "metrics", "promote.json"), JSON.stringify({ v: 4, sessions: {}, notes: {} }));
+    await index({ dir, quiet: true });
+    const second = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
+    expect(second).toBe(first);
+  });
+
+  it("INDEX.md is unaffected by tiering", async () => {
+    const dir = await vault();
+    await generateKb(dir, 130);
+    await index({ dir, quiet: true });
+    const mem = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
+    const idx = await readFile(join(dir, "mage", "INDEX.md"), "utf8");
+    expect(mem).not.toBe(idx);
+    expect(idx).toContain("Note 0"); // Unaffected by tiering
+    expect(idx).toContain("_(stale-suspect)_");
   });
 });

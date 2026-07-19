@@ -1,5 +1,7 @@
 import { readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { BREACH_RATIO } from "../metrics/footprint.js";
+import { AUTO_MEMORY_MAX_BYTES } from "../adapters/claude-code/constants.js";
 import { logger } from "../logger.js";
 import { updateGraphColorGroups } from "../obsidian.js";
 import {
@@ -29,6 +31,7 @@ export interface IndexResult {
   wings: string[];
   hierarchical: boolean;
   written: string[];
+  memoryTier: 0 | 1 | 2 | 3;
 }
 
 /**
@@ -70,7 +73,8 @@ export async function index(opts: IndexOptions = {}): Promise<IndexResult> {
   // docs-root top so CC's `autoMemoryDirectory` auto-loads it. For a single-wing
   // (or flat) KB it folds the per-note list inline (rich recall, CC self-bounds at
   // 25KB); for a multi-wing hierarchical KB it stays the bounded wings-map twin.
-  await writeFile(join(root, MEMORY_FILE), renderMemory(entries, wings, hierarchical, registry));
+  const { content: memoryContent, tier: memoryTier } = renderMemory(entries, wings, hierarchical, registry, !opts.quiet);
+  await writeFile(join(root, MEMORY_FILE), memoryContent);
   written.push(MEMORY_FILE);
 
   // Keep the Obsidian graph colored by wing (no-op without .obsidian/graph.json).
@@ -84,7 +88,7 @@ export async function index(opts: IndexOptions = {}): Promise<IndexResult> {
     );
     for (const w of written) logger.detail(w);
   }
-  return { root, noteCount: entries.length, wings, hierarchical, written };
+  return { root, noteCount: entries.length, wings, hierarchical, written, memoryTier };
 }
 
 // ─── registry decoration (ADR-0011 §3, ADR-0012 §2) ──────────────────────────
@@ -135,16 +139,18 @@ function pushLinkedRepos(lines: string[], reg: RegistryView): void {
 
 // ─── rendering ───────────────────────────────────────────────────────────────
 
-function renderFlat(entries: ScannedNote[], wings: string[], reg: RegistryView): string {
-  const lines: string[] = [GEN_MARKER, "", "# Index", "", gist(entries.length, wings.length), ""];
+function renderFlat(entries: ScannedNote[], wings: string[], reg: RegistryView, tier: 0 | 1 | 2 = 0, blockquote?: string): string {
+  const lines: string[] = [GEN_MARKER, "", "# Index", "", gist(entries.length, wings.length)];
+  if (blockquote) lines.push("", `> ${blockquote}`);
+  lines.push("");
   for (const wing of wings) {
     lines.push(`## ${wing}${wingDecoration(reg, wing)}`, "");
-    pushRooms(lines, wingEntries(entries, wing), wing, 3); // root index: rooms sit under `## wing`
+    pushRooms(lines, wingEntries(entries, wing), wing, 3, tier); // root index: rooms sit under `## wing`
   }
   const cross = entries.filter((e) => e.wings.length === 0);
   if (cross.length > 0) {
     lines.push("## Cross-cutting", "");
-    for (const e of cross) lines.push(closetLine(e));
+    for (const e of cross) lines.push(closetLine(e, tier));
     lines.push("");
   }
   pushLinkedRepos(lines, reg);
@@ -154,17 +160,20 @@ function renderFlat(entries: ScannedNote[], wings: string[], reg: RegistryView):
   return `${lines.join("\n").replace(/\n+$/, "")}\n`;
 }
 
-function renderRootHierarchical(entries: ScannedNote[], wings: string[], reg: RegistryView): string {
+function renderRootHierarchical(entries: ScannedNote[], wings: string[], reg: RegistryView, blockquote?: string): string {
   const lines: string[] = [
     GEN_MARKER,
     "",
     "# Index",
     "",
     gist(entries.length, wings.length),
+  ];
+  if (blockquote) lines.push("", `> ${blockquote}`);
+  lines.push(
     "",
     "## Wings",
     "",
-  ];
+  );
   for (const wing of wings) {
     const we = wingEntries(entries, wing);
     const types = [...new Set(we.map((e) => e.type))].sort().join(", ");
@@ -195,11 +204,39 @@ function renderMemory(
   wings: string[],
   hierarchical: boolean,
   reg: RegistryView,
-): string {
+  logWarn: boolean,
+): { content: string; tier: 0 | 1 | 2 | 3 } {
   const foldInline = !hierarchical || wings.length <= 1;
-  return foldInline
-    ? renderFlat(entries, wings, reg)
-    : renderRootHierarchical(entries, wings, reg);
+  const threshold = Math.floor(BREACH_RATIO * AUTO_MEMORY_MAX_BYTES);
+
+  if (!foldInline) {
+    return { content: renderRootHierarchical(entries, wings, reg), tier: 0 };
+  }
+
+  let content = renderFlat(entries, wings, reg, 0);
+  if (Buffer.byteLength(content, "utf8") <= threshold) return { content, tier: 0 };
+
+  const pct = Math.round(BREACH_RATIO * 100);
+  const cap = AUTO_MEMORY_MAX_BYTES.toLocaleString("en-US");
+
+  const msg1 = `Lifecycle suffixes omitted — this index would exceed ${pct}% of the\n> ${cap} B recall budget. Run \`mage footprint\` for the breakdown.`;
+  content = renderFlat(entries, wings, reg, 1, msg1);
+  if (Buffer.byteLength(content, "utf8") <= threshold) {
+    if (logWarn) logger.warn(msg1.replace(/\n> /g, " "));
+    return { content, tier: 1 };
+  }
+
+  const msg2 = `Lifecycle suffixes and keyword tails omitted — this index would exceed ${pct}% of the\n> ${cap} B recall budget. Run \`mage footprint\` for the breakdown.`;
+  content = renderFlat(entries, wings, reg, 2, msg2);
+  if (Buffer.byteLength(content, "utf8") <= threshold) {
+    if (logWarn) logger.warn(msg2.replace(/\n> /g, " "));
+    return { content, tier: 2 };
+  }
+
+  const msg3 = `Fallen back to category map (lifecycle suffixes, keyword tails, and per-note lines omitted) — this index would exceed ${pct}% of the\n> ${cap} B recall budget. Run \`mage footprint\` for the breakdown.`;
+  content = renderRootHierarchical(entries, wings, reg, msg3);
+  if (logWarn) logger.warn(msg3.replace(/\n> /g, " "));
+  return { content, tier: 3 };
 }
 
 function renderWing(wing: string, entries: ScannedNote[], reg: RegistryView): string {
@@ -211,7 +248,7 @@ function renderWing(wing: string, entries: ScannedNote[], reg: RegistryView): st
     `> ${entries.length} ${plural(entries.length, "note")}. Part of the [index](INDEX.md).`,
     "",
   ];
-  pushRooms(lines, entries, wing, 2); // per-wing index: the wing is the `#` title
+  pushRooms(lines, entries, wing, 2, 0); // per-wing index: the wing is the `#` title
   return `${lines.join("\n").replace(/\n+$/, "")}\n`;
 }
 
@@ -226,7 +263,7 @@ function renderWing(wing: string, entries: ScannedNote[], reg: RegistryView): st
  * per-wing file — an MD001 violation in a GENERATED artifact, which can only be fixed
  * here, never by editing the output.
  */
-function pushRooms(lines: string[], entries: ScannedNote[], wing: string, depth: 2 | 3): void {
+function pushRooms(lines: string[], entries: ScannedNote[], wing: string, depth: 2 | 3, tier: 0 | 1 | 2 = 0): void {
   const roomOf = (e: ScannedNote) => roomForWing(e, wing);
   const rooms = [...new Set(entries.map(roomOf))].sort((a, b) => {
     if (a === "") return -1;
@@ -236,7 +273,7 @@ function pushRooms(lines: string[], entries: ScannedNote[], wing: string, depth:
   for (const room of rooms) {
     const group = entries.filter((e) => roomOf(e) === room);
     if (room !== "") lines.push(`${"#".repeat(depth)} ${room}`, "");
-    for (const e of group) lines.push(closetLine(e));
+    for (const e of group) lines.push(closetLine(e, tier));
     lines.push("");
   }
 }
@@ -268,10 +305,11 @@ function dedupeKeywords(e: ScannedNote): string[] {
   });
 }
 
-function closetLine(e: ScannedNote): string {
+function closetLine(e: ScannedNote, tier: 0 | 1 | 2 = 0): string {
   const kept = dedupeKeywords(e);
-  const kw = kept.length ? ` — ${kept.join(", ")}` : "";
-  return `- \`${e.type}\` [${escapeLinkText(e.title)}](${encodePath(e.relPath)})${kw}${lifecycleSuffix(e)}`;
+  const kw = tier < 2 && kept.length ? ` — ${kept.join(", ")}` : "";
+  const suffix = tier < 1 ? lifecycleSuffix(e) : "";
+  return `- \`${e.type}\` [${escapeLinkText(e.title)}](${encodePath(e.relPath)})${kw}${suffix}`;
 }
 
 function lifecycleSuffix(e: ScannedNote): string {
