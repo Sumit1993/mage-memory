@@ -15,8 +15,6 @@ import { AUTO_MEMORY_MAX_BYTES } from "../adapters/claude-code/constants.js";
 
 export const WARN_RATIO = 0.7;
 export const BREACH_RATIO = 0.9;
-/** Conservative default for harnesses whose cap mage does not know (ADR-0039 §4). */
-export const DEFAULT_CAP_BYTES = 16_384;
 /** Advisory only. NEVER used to enforce anything. ADR-0039 §3. */
 export const BYTES_PER_TOKEN_EST = 4;
 
@@ -74,6 +72,9 @@ export async function measureFootprint(
   docsRoot: string,
   opts?: { capBytes?: number },
 ): Promise<Footprint> {
+  // ADR-0039 §4: the CC cap is the SOLE default — mage has no harness detection, so a
+  // second "unrecognized harness" default would be unreachable by any code path. An
+  // explicit `opts.capBytes` still overrides.
   const capBytes = opts?.capBytes ?? AUTO_MEMORY_MAX_BYTES;
   const repoRoot = dirname(docsRoot);
 
