@@ -148,19 +148,38 @@ Per [ADR-0036](0036-defer-harness-adapter-seam.md) — consolidate harness-speci
 named adapter module, invent no seam for one harness:
 
 - `src/adapters/claude-code/` owns `AUTO_MEMORY_MAX_BYTES = 25_600`, commented with its source.
-- The neutral core holds a conservative default applied when the harness is unrecognized.
+- **That constant is the sole default.** An earlier draft of this ADR had the neutral core hold
+  a second, conservative default for "an unrecognized harness" — but mage has no harness
+  detection, and building one for a harness that does not exist is precisely what
+  [ADR-0036](0036-defer-harness-adapter-seam.md) rejected. A default that no code path can
+  reach is indistinguishable from a lie about what the tool measures. When harness #2 arrives,
+  it brings both its cap **and** the detection that selects it — and that is when the seam
+  earns itself.
 - Thresholds: **warn at 70%**, **breach at 90%** (not 100%) — mage's byte count is not
   guaranteed identical to the host's, and the failure being fixed is an *invisible* cliff, so
   the instrument must fire before it, not at it.
+
+**The budget is two-dimensional: bytes AND lines.** Claude Code truncates the auto-memory file
+at **~25,600 B _or_ 200 lines**, whichever comes first. `AUTO_MEMORY_MAX_LINES = 200` is
+enforced alongside the byte cap, at the same warn/breach ratios, and **`state` is the worse of
+the two**. The report shows both.
+
+Measuring only bytes leaves a second invisible cliff, and it is not far off: this KB is at
+**57.2% of the byte budget and 55.5% of the line budget** — the byte cap binds first by only
+~4 notes, at a crossover of **175.1 B/entry** against this KB's **180.6 B/entry**, a ~3%
+margin. Below that crossover the line cap binds first and a byte-only meter reports `ok` while
+the host silently truncates — the exact failure this ADR exists to kill.
 
 **The cap governs the auto-memory file (`MEMORY.md`) only.** `AGENTS.md`, `CLAUDE.md`, and
 `INDEX.md` load via `@import` and are not governed by it. The report shows all surfaces but
 caps one, and must say so rather than implying a shared budget.
 
-**The CC cap must be wired, not merely defined.** `AUTO_MEMORY_MAX_BYTES` is resolved as the
-default when the Claude Code adapter is in play; `DEFAULT_CAP_BYTES` applies only to an
-unrecognized harness. Leaving the cap to each caller is a footgun — a constant that exists but
-is never imported reports a false budget state while every test passes.
+**The CC cap must be wired, not merely defined.** `AUTO_MEMORY_MAX_BYTES` is the resolved
+default; an explicit `opts.capBytes` still overrides it. Leaving the cap to each caller is a
+footgun — a constant that exists but is never imported reports a false budget state while every
+test passes. This is not hypothetical: it happened twice during implementation, first with
+`AUTO_MEMORY_MAX_BYTES` itself (reporting `warn` on a healthy KB) and then in mirror image with
+the core default. **No unreachable constants.**
 
 **Load modes are distinguished, and the launch total counts only what is actually loaded:**
 
@@ -203,6 +222,11 @@ failure §10 exists to prevent.
   A footprint meter that breaks session start is a catastrophic trade for observability.
 - The trend file is **bounded** by row count and/or age, following the purge conventions in
   `src/observe/store.ts`.
+- **The trend is read back and rendered by `mage footprint`.** A sampler whose output nothing
+  reads is a write-only file, not an instrument: FT-18 asked whether mage's footprint is
+  *growing*, and a single-point measurement cannot answer that. The report shows direction and
+  delta across recent samples, and says "insufficient data" rather than drawing a trend from
+  one or two rows.
 
 ### 7. Degradation is progressive, deterministic, and announced.
 
@@ -230,6 +254,14 @@ re-render. Stop at the first tier that fits.
 These counts are a function of *entry size*, not note count — this KB's real entries average
 **177 B** after §5, so its tiers engage later than the table suggests. The byte threshold is the
 contract; the note counts are illustrative only.
+
+**The ladder must be evaluated against both budget dimensions**, and this has a sharp
+consequence: **tiers 1 and 2 shed bytes but not lines.** Both leave exactly one line per entry,
+so a KB degrading under byte pressure buys itself *zero* line headroom, and every tier walks it
+closer to a line cliff a byte-only meter cannot see. **Only tier 3 (the category map) reduces
+line count.** A line breach therefore resolves to tier 3 directly; tiers 1 and 2 are no-ops
+against it. Announcements must name the dimension that triggered the degradation, so "shed
+keyword tails" never appears as the remedy for a problem it cannot fix.
 
 **Output MUST remain a pure function of the KB.** Prioritizing by note-read usage was
 considered and **rejected**: `MEMORY.md` is generated *and committed*, so usage-dependent
