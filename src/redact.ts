@@ -32,13 +32,46 @@ const REDACTION_MARKER = /^\[REDACTED:[A-Za-z0-9-]+\]$/;
 const ENV_PLACEHOLDER = /^\$\{[A-Za-z0-9_:.-]{1,200}\}$/;
 
 /**
+ * An angle-bracket documentation placeholder — `<token>`, `<your-token>`, `<PAT>`.
+ * The VALUE is a `<...>`-wrapped stand-in a human is meant to replace, never a
+ * literal secret, so `http://user:<token>@host` in a doc URL must not be flagged.
+ * The inner class is deliberately CONSERVATIVE (letters, digits, `_ - : . space`)
+ * and the whole value is anchored `^<...>$`; a real base64/hex token — never
+ * `<...>`-wrapped — therefore can never be suppressed by this rule.
+ */
+const ANGLE_PLACEHOLDER = /^<[A-Za-z0-9_:.\- ]{1,200}>$/;
+
+/**
+ * A `<…>` value is only a safe documentation placeholder when its INNER content
+ * is NOT secret-shaped. Real placeholders are short/word-like or carry a separator
+ * (`<token>`, `<your-token>`, `<api_key>`, `<user:pass>`); a secret angle-wrapped by
+ * an attacker (`<random-base64>`, `<0123…hex>`) must still be redacted — `suppressed()`
+ * is shared by every detector, so dropping such a value in the url-credentials group
+ * would leave a real secret in the clear. Gate on entropy + a long unbroken-alnum run
+ * (the latter catches 32-hex, which `isHighEntropy` treats as a digest and passes).
+ */
+function isAnglePlaceholder(raw: string): boolean {
+  if (!ANGLE_PLACEHOLDER.test(raw)) return false;
+  const inner = raw.slice(1, -1); // drop the < >
+  if (isHighEntropy(inner)) return false; // base64/random blob
+  if (/^[A-Za-z0-9]{24,}$/.test(inner)) return false; // long separator-less alnum run
+  return true;
+}
+
+/**
  * A matched value that must NOT be treated as a secret, regardless of which
  * detector fired: an already-redacted marker (keeps redact() idempotent), an
- * `${ENV}` placeholder, or a caller-supplied allowlist literal (a confirmed false
+ * `${ENV}` placeholder, a `<…>` documentation placeholder (only when not
+ * secret-shaped), or a caller-supplied allowlist literal (a confirmed false
  * positive from `metadata.redact.allow`). Applied uniformly across both scan passes.
  */
 function suppressed(raw: string, allow?: ReadonlySet<string>): boolean {
-  return REDACTION_MARKER.test(raw) || ENV_PLACEHOLDER.test(raw) || (allow?.has(raw) ?? false);
+  return (
+    REDACTION_MARKER.test(raw) ||
+    ENV_PLACEHOLDER.test(raw) ||
+    isAnglePlaceholder(raw) ||
+    (allow?.has(raw) ?? false)
+  );
 }
 
 /**
