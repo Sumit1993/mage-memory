@@ -215,14 +215,24 @@ failure §10 exists to prevent.
 ### 6. Read-time for the live report; SessionStart sampling for the trend.
 
 - `mage footprint` **stats files live**. The report is never served from cached state.
-- The existing Claude Code SessionStart hook appends one row per session to
-  `<docsRoot>/.mage/metrics/footprint.json`, following the conventions already established by
-  `src/metrics/rollup.ts` and `src/grooming/tally.ts`. The cost is paid at session start, so
-  that is when it is sampled — each trend row corresponds to a session that really paid it.
+- The existing Claude Code SessionStart hook samples once per session. The cost is paid at
+  session start, so that is when it is sampled — each trend row corresponds to a session that
+  really paid it.
+- **The trend store is append-only JSONL, not a mutated JSON document.** One line appended per
+  sample to `<docsRoot>/.mage/metrics/footprint.jsonl`; `readTrend` folds the lines, dedupes
+  by session (last write wins) and prunes. This is the convention `src/metrics/rollup.ts` and
+  `src/grooming/tally.ts` already use — append a line, fold on read.
+
+  This replaces an earlier read-modify-write design guarded by a lockfile. That design needed
+  **four fix rounds** and still carried a takeover race: a stale-lock eviction cannot verify
+  that the file it renamed away is the same one it inspected, so two processes could both
+  believe they held the lock. A single small append has no read-modify-write step, therefore no
+  lock, therefore none of that race class. **The bug was the mechanism, not the implementation.**
 - **The sampler MUST NOT throw.** Same rule as the Stop-hook metrics path: fail open, always.
-  A footprint meter that breaks session start is a catastrophic trade for observability.
-- The trend file is **bounded** by row count and/or age, following the purge conventions in
-  `src/observe/store.ts`.
+  A footprint meter that breaks session start is a catastrophic trade for observability. The
+  append-only design serves this too: there is no lock to wait on, so the write cannot block.
+- The trend is **bounded at fold/compaction time** by row count and age, following the purge
+  conventions in `src/observe/store.ts` — never by mutating the file in place at write time.
 - **The trend is read back and rendered by `mage footprint`.** A sampler whose output nothing
   reads is a write-only file, not an instrument: FT-18 asked whether mage's footprint is
   *growing*, and a single-point measurement cannot answer that. The report shows direction and
