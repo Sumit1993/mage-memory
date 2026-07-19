@@ -27,12 +27,15 @@ export interface ProvenanceStamp {
   repo?: string;
   /** Short git HEAD at creation — the `provenance.commit` staleness anchor. */
   commit?: string;
+  /** Cohort mark (ADR-0031 Phase 2): "capture" (the promote chokepoint) or "adopt". */
+  source?: "capture" | "adopt";
 }
 
 /**
  * Resolve the creation stamp for a docs root: `autonomy` iff the resolved level is
  * approver/overseer (read via `resolved.repo`, the hub-aware path — ADR-0030),
- * `repo` = the repo basename, `commit` = short HEAD (omitted when not a git repo).
+ * `repo` = the repo basename, `commit` = short HEAD (omitted when not a git repo),
+ * `source` = "capture" (the promote chokepoint IS the fresh-capture cohort — ADR-0031 P2).
  */
 export async function resolveCreationStamp(resolved: ResolvedDocsRoot): Promise<ProvenanceStamp> {
   const autonomy = await readAutonomy(resolved);
@@ -41,19 +44,21 @@ export async function resolveCreationStamp(resolved: ResolvedDocsRoot): Promise<
     ...(autonomy === "approver" || autonomy === "overseer" ? { autonomy } : {}),
     repo: basename(resolved.repo),
     ...(commit ? { commit } : {}),
+    source: "capture",
   };
 }
 
 /**
  * Merge a creation stamp into a note's frontmatter (PURE). `autonomy` is always
- * applied when present in the stamp (mage owns the authorship mark); `repo`/`commit`
- * fill ONLY when absent, so a hand-authored provenance value is never clobbered.
- * Returns `fm` untouched when the merge would add nothing.
+ * applied when present in the stamp (mage owns the authorship mark); `repo`/`commit`/
+ * `source` fill ONLY when absent, so a hand-authored (or an adopt-marked) provenance
+ * value is never clobbered. Returns `fm` untouched when the merge would add nothing.
  */
 export function stampProvenance(fm: NoteFrontmatter, stamp: ProvenanceStamp): NoteFrontmatter {
   const provenance: Provenance = { ...fm.provenance };
   if (stamp.repo !== undefined && provenance.repo === undefined) provenance.repo = stamp.repo;
   if (stamp.commit !== undefined && provenance.commit === undefined) provenance.commit = stamp.commit;
+  if (stamp.source !== undefined && provenance.source === undefined) provenance.source = stamp.source;
   if (stamp.autonomy !== undefined) provenance.autonomy = stamp.autonomy;
   return Object.keys(provenance).length > 0 ? { ...fm, provenance } : fm;
 }

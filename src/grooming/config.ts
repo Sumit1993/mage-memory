@@ -35,6 +35,8 @@ export interface ResolvedGrooming {
   autonomy: Autonomy;
   /** The backlog-reminder window in hours (ADR-0030 §5); absent/non-number ⇒ undefined (caller defaults). */
   nudgeThrottleHours: number | undefined;
+  /** The pre-registered autonomy keep-rate threshold (ADR-0031 P2 §7); absent/non-number ⇒ undefined (unset). */
+  crownThreshold: number | undefined;
 }
 
 /**
@@ -66,6 +68,7 @@ export async function readGrooming(resolved: ResolvedDocsRoot): Promise<Resolved
     sensitivity: narrowSensitivity(raw?.sensitivity),
     autonomy: narrowAutonomy(raw?.autonomy),
     nudgeThrottleHours: typeof raw?.nudgeThrottleHours === "number" ? raw.nudgeThrottleHours : undefined,
+    crownThreshold: typeof raw?.crownThreshold === "number" ? raw.crownThreshold : undefined,
   };
 }
 

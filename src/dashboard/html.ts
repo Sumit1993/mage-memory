@@ -850,9 +850,37 @@ function renderSkillRow(s: DashboardSkill): string {
 
 // ─── soak / registry tab ──────────────────────────────────────────────────────
 
+/**
+ * The autonomy keep-rate tile (ADR-0031 P2): the crown signal over `source === "capture"`
+ * terminals only. "" (no panel) when there is no keep-rate cohort yet — mirrors the nudge line,
+ * which also hides until a capture terminal exists.
+ */
+function renderKeepRate(data: DashboardData): string {
+  const k = data.keepRate;
+  if (!k) return "";
+  const pct = Math.round(k.rate * 100);
+  const threshold = k.threshold !== null ? `${Math.round(k.threshold * 100)}%` : "unset";
+  const stat = (label: string, value: number): string =>
+    `<div class="rung"><span class="rung-label">${escapeHtml(label)}</span><span class="rung-value">${escapeHtml(value)}</span></div>`;
+  return `<section class="panel">
+  <h3>Autonomy keep-rate <span class="caption-inline">(capture cohort &mdash; ADR-0031)</span></h3>
+  <div class="ladder">
+    <span class="rung-value" style="font-size:22px;font-weight:700">${escapeHtml(pct)}%</span>
+    <span class="caption-inline">of ${escapeHtml(k.terminals)} autonomous note${k.terminals === 1 ? "" : "s"} kept &middot; threshold ${escapeHtml(threshold)}</span>
+  </div>
+  <div class="ladder">
+    ${stat("keep", k.keep)}
+    ${stat("edited", k.edited)}
+    ${stat("discard", k.discard)}
+    ${stat("reject", k.reject)}
+  </div>
+</section>`;
+}
+
 function renderSoak(data: DashboardData, connectionNudge: string, ladderNudge: string): string {
   const registry = data.registry;
   const ladder = renderLadder(data, ladderNudge); // ladder + climbing is the soak signal too.
+  const keepRate = renderKeepRate(data); // the autonomy crown signal sits beside the ladder.
   // The always-available command reference lives in the Soak tab (the cockpit's
   // reference shelf), with the connection nudge near it when capture is quiet.
   const reference = renderCommandReference(data);
@@ -887,7 +915,7 @@ function renderSoak(data: DashboardData, connectionNudge: string, ladderNudge: s
   // Tab show/hide is driven entirely by the OUTER `[data-tab-section="soak"]`
   // wrapper in renderCockpitHtml; the inner panels carry no per-tab attribute, so
   // the ladder is reused as-is (no brittle string-replace).
-  return `${ladder}\n${registryHtml}\n${connection}\n${reference}`;
+  return `${ladder}\n${keepRate}\n${registryHtml}\n${connection}\n${reference}`;
 }
 
 // ─── inline CSS ───────────────────────────────────────────────────────────────
