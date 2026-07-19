@@ -79,7 +79,7 @@ growth rate this KB had **~14 notes of headroom**.
 **2. Most of the cost is redundant text.** The keyword tail is **10,967 B — 57.6%** of the
 entry lines. Of 799 keyword tokens, **52% already appear in the note's own title or path** and
 **10% are generic boilerplate** (`considered`, `options`, `consequences`, `relations`). Only
-38% carry novel signal (`stale-binary`, `false-positive`, `tsc`). **5,919 B — 23% of the entire
+~37% carry novel signal (`stale-binary`, `false-positive`, `tsc`). **~4,700 B — ~18% of the
 host cap — is spent restating titles.** This is the same mechanical-token failure already
 documented in [promote-folds-mechanical-tokens](../notes/promote-folds-mechanical-tokens.md),
 surfacing at a different consumer.
@@ -154,7 +154,15 @@ In generated index output (`MEMORY.md`, `_index.<wing>.md`):
   agent nothing actionable; suppressing it makes a visible status *mean* something.
   Status is the marker `AGENTS.md` instructs agents to act on and must survive.
 
-Projected effect: **19,291 → 11,819 B (46% of cap), headroom 14 → 68 notes.**
+**Measured effect** (implemented 2026-07-19): **19,291 → 13,187 B**, i.e. **75% → 52% of cap**;
+per-entry cost **264 → 177 B**; keyword tokens **799 → 297**; recall headroom **14 → 55 notes**.
+
+The 13,187 figure includes ADR-0039 itself as a 73rd note; like-for-like at 72 notes is
+~13,010 B (51%). An earlier draft of this ADR projected 11,819 B / 68 notes — that projection
+was **wrong**, inflated by a measurement script whose parser mis-split titles containing
+parentheses. The figures above are measured from the implemented change, not projected. Recorded
+here rather than quietly corrected, because a wrong number in an accepted ADR is exactly the
+failure §10 exists to prevent.
 
 ### 6. Read-time for the live report; SessionStart sampling for the trend.
 
