@@ -231,8 +231,20 @@ failure §10 exists to prevent.
 - **The sampler MUST NOT throw.** Same rule as the Stop-hook metrics path: fail open, always.
   A footprint meter that breaks session start is a catastrophic trade for observability. The
   append-only design serves this too: there is no lock to wait on, so the write cannot block.
-- The trend is **bounded at fold/compaction time** by row count and age, following the purge
-  conventions in `src/observe/store.ts` — never by mutating the file in place at write time.
+- The trend is **bounded logically at fold time** by row count and age — never by mutating the
+  file in place.
+
+  **Read-time compaction is forbidden.** Rewriting the live JSONL loses any sample appended
+  between the read and the rename: the append lands in the old inode, which the rename discards.
+  `mage footprint` and the SessionStart hook run independently, so that interleaving is real.
+  Physical size is bounded instead by **rotation** — a single `rename` to an archive path, the
+  convention `src/observe/store.ts` already uses (`ROTATE_MAX_BYTES` → `.archive/`). Rotation
+  cannot lose an append, because the appended-to inode *becomes* the archive rather than being
+  discarded.
+
+  This is the second time this store was fixed by removing a mechanism rather than coordinating
+  it. The rule that generalizes: **on an append-only file that a hook may write at any moment,
+  never rewrite in place — rotate.**
 - **The trend is read back and rendered by `mage footprint`.** A sampler whose output nothing
   reads is a write-only file, not an instrument: FT-18 asked whether mage's footprint is
   *growing*, and a single-point measurement cannot answer that. The report shows direction and
