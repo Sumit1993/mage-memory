@@ -2,7 +2,7 @@
 
 # mage
 
-> 78 notes. Part of the [index](INDEX.md).
+> 79 notes. Part of the [index](INDEX.md).
 
 ## build
 
@@ -67,6 +67,7 @@
 - `decision` [0037 — doctor's remit extends to recall + skills readiness, on a bounded auto-fix line](decisions/0037-readiness-doctor-remit-and-autofix-line.md) — host-config, read-only, fail-open, no-runtime, version-stamp, detect-and-instruct
 - `decision` [0038 — promote's note-proposal rung is deleted; graduate repoints to note-read usage; recurrence becomes a digest annotation](decisions/0038-promote-note-rung-deleted-graduate-on-usage.md) — failure-skeleton, annotate-never-sort, deterministic-selection, killed-pattern, adr-0029-deferral, keyword-fold
 - `decision` [0039 — measure the context footprint; bound the generated launch surface](decisions/0039-context-footprint-measure-and-bound.md) — context-window, recall-budget, launch-cost, occupancy, pointer-leverage, no-savings-claim, bytes-authoritative, keyword-dedupe, progressive-degradation, silent-truncation, ft-18
+- `decision` [0040 — version numbers are mechanical; the announcement is a named release backed by evidence](decisions/0040-versions-are-mechanical-announcement-is-named.md) — versioning, release-please, milestone, semver, silent-failure, evidence-not-number
 
 ## design
 

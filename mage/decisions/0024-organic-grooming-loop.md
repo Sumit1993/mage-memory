@@ -1,9 +1,10 @@
 ---
 type: decision
-tags: [mage/decisions]
+tags:
+  - mage/decisions
 created: "2026-06-16"
-updated: "2026-06-16"
-last_reviewed: "2026-06-16"
+updated: 2026-07-19
+last_reviewed: 2026-07-19
 status: active
 provenance:
   repo: mage-memory
@@ -21,6 +22,8 @@ sources:
   - mage/decisions/0013-procedure-skills-self-grooming-loop.md
   - mage/decisions/0018-mage-distill-observed-scratch-reader.md
   - mage/decisions/0019-mage-promote-self-grooming.md
+  - cc-session:254aa0ba-a431-4d8f-8bc5-c50d001180c5
+modified: 2026-07-19T17:38:49.623Z
 ---
 
 # 0024 — Organic grooming loop: the lesson path (inline-primary + boundary nudge)
@@ -91,10 +94,17 @@ in 0.0.11 is fine; it was simply pointed at the wrong target.
    manual `mage:learn` / `mage stage` — **lossless**. Nothing depends on a hook for *correctness*;
    inline reliability is a quality gradient (harness-dependent salience), not a correctness hole.
 
-8. **Release framing:** the loop ships as **0.0.12** (bake it). **0.1.0 is the announcement**,
+8. **Release framing:** the loop ships as **0.0.12** (bake it). ~~**0.1.0 is the announcement**~~,
    gated on **a1 = observed organic note creation in real use** — NOT an over-fit "force a
    graduation" gate. Bundled with 0.0.12: the redact false-positives fix (load-bearing because the
    loop generates more note commits).
+
+   > **Amended 2026-07-19 — [ADR-0040](0040-versions-are-mechanical-announcement-is-named.md).**
+   > The **a1 gate stands unchanged**; only its attachment to a version number is struck.
+   > `release-please` bumps the minor for *any* pre-1.0 breaking change, so 0.1.0 could be — and
+   > on 2026-07-19 nearly was — spent by an unrelated commit, silently. The announcement is now a
+   > **named GitHub release plus an ADR recording the a1 evidence**; version numbers carry no
+   > quality claim.
 
 ## Consequences
 
