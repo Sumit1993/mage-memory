@@ -2,15 +2,20 @@
 
 # mage
 
-> 73 notes. Part of the [index](INDEX.md).
+> 78 notes. Part of the [index](INDEX.md).
 
 ## build
 
+- `gotcha` [Gotcha — a throwaway measurement script is code, and its bug becomes an ADR's evidence](notes/ad-hoc-measurement-scripts-are-code.md) — analysis-script, parser, false-precision, cross-check, decision-input
+- `gotcha` [Gotcha — agy reports byte-exact compliance it did not deliver; verify the artifact, not the report](notes/agy-commit-message-compliance-is-unreliable.md) — gemini, delegation, false-compliance, trailer, verify-do-not-trust
+- `gotcha` [Gotcha — a delegate sent after a command that does not exist will find the one you forbade](notes/delegation-prompts-must-name-real-commands.md) — agy, prompt, verification-commands, nonexistent-script, house-rules
 - `note` [Mage integration test framework](notes/mage-integration-test-framework.md) — build
 - `note` [Mage main branch protected](notes/mage-main-branch-protected.md) — build
 - `note` [Mage no biome 2space](notes/mage-no-biome-2space.md) — build
 - `gotcha` [Gotcha — `npx mage` in this repo runs the PUBLISHED release, not your working tree](notes/npx-mage-runs-the-published-release.md) — dogfood, stale-binary, global-install, dist, dream, index, false-positive, self-hosting, verification
+- `gotcha` [Gotcha — a lock on a hook path is the wrong mechanism; mage already folds append-only JSONL](notes/prefer-the-repos-lock-free-convention.md) — concurrency, lockfile, read-modify-write, fold-on-read, toctou, existing-convention
 - `gotcha` [Test files were never type-checked (tsconfig excluded them)](notes/test-files-were-excluded-from-typecheck.md) — tsc, tests, exclude, vitest, tsup, esbuild, ci, fixture
+- `gotcha` [Gotcha — a constant that is defined but never imported reports a false state while every test passes](notes/unreachable-constant-reports-a-false-state.md) — dead-code, green-tests, wiring-bug, regression-test, default-parameter
 - `gotcha` [Gotcha — weakening a test's assertions to make it pass can delete its purpose](notes/weakening-a-test-can-delete-its-purpose.md) — vacuous, green-suite, false-confidence, behaviour-change, fixture, regression, code-review, coderabbit
 
 ## capture
