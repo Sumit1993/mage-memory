@@ -37,6 +37,7 @@ import {
 import { run } from "../shell.js";
 import { scanNotes } from "../scan.js";
 import { index } from "../commands/index-cmd.js";
+import { measureFootprint } from "../metrics/footprint.js";
 
 type ResolvedKb = Awaited<ReturnType<typeof resolveDocsRoot>>;
 type Kb = NonNullable<ResolvedKb>;
@@ -77,6 +78,7 @@ export async function pushKbChecks(
   // Pre-fold state layout drift (ADR-0025): an OLD `.learnings`/`.metrics`/`.staging`
   // dir at a docs root; --fix relocates it under `.mage/`.
   await pushLayoutDriftCheck(checks, kb, opts);
+  await pushFootprintBudgetCheck(checks, kb);
   // Hub-aware: a per-project liveness rollup when run AT a hub (Decision 11B).
   if (kb.kind === "hub") await pushHubProjectsCheck(checks, kb.repo);
 }
@@ -740,4 +742,52 @@ async function readOnDiskSchema(kb: Kb): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+/**
+ * ADR-0039 §8: Doctor fails on breach. Warn at 70%, fail at 90%.
+ * `--fix` does not auto-degrade.
+ */
+async function pushFootprintBudgetCheck(checks: DoctorCheck[], kb: Kb): Promise<void> {
+  let fp;
+  try {
+    fp = await measureFootprint(kb.root);
+  } catch {
+    checks.push({
+      name: "recall budget",
+      ok: false,
+      optional: true, // measurement failure skips/optional
+      detail: "failed to measure footprint",
+    });
+    return;
+  }
+
+  const { state, ratio, usedBytes, usedLines, binding } = fp.budget;
+  const pct = Math.round(ratio * 100);
+  const bindingLabel = binding === "lines" ? `${usedLines} lines` : `${usedBytes} bytes`;
+
+  if (state === "breach") {
+    checks.push({
+      name: "recall budget",
+      ok: false,
+      optional: false, // NOT optional
+      detail: `BREACH — footprint is ${pct}% of cap (${bindingLabel}); recall is silently degrading → run \`mage footprint\` for the breakdown`,
+    });
+    return;
+  }
+
+  if (state === "warn") {
+    checks.push({
+      name: "recall budget",
+      ok: true,
+      detail: `warn — footprint is ${pct}% of cap (${bindingLabel}) → run \`mage footprint\` for the breakdown`,
+    });
+    return;
+  }
+
+  checks.push({
+    name: "recall budget",
+    ok: true,
+    detail: `${pct}% used (${bindingLabel})`,
+  });
 }

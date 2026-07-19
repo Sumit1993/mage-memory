@@ -8,6 +8,7 @@ import { disconnect } from "./commands/disconnect.js";
 import { distillCmd } from "./commands/distill-cmd.js";
 import { doctor, readinessFooter } from "./commands/doctor.js";
 import { flattenCmd } from "./commands/flatten.js";
+import { footprint } from "./commands/footprint.js";
 import { dream } from "./commands/dream-cmd.js";
 import { groomCmd } from "./commands/groom-cmd.js";
 import { index } from "./commands/index-cmd.js";
@@ -157,6 +158,17 @@ export function buildProgram(): Command {
         quiet: opts.quiet,
       });
     });
+
+  // ─── footprint ─────────────────────────────────────────────────────────────
+  program
+    .command("footprint")
+    .description("report mage's context-window cost: launch surfaces, yield, pointer leverage")
+    .option("--json", "emit the measurement as JSON instead of the table")
+    .option("--quiet", "render nothing but still return the result")
+    .action(async (opts) => {
+      await footprint({ json: opts.json, quiet: opts.quiet });
+    });
+
 
   // ─── dream ───────────────────────────────────────────────────────────────────
   program

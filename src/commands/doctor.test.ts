@@ -13,6 +13,7 @@ import { detectRedactHook, installRedactHook } from "../git-hooks.js";
 import { METADATA_SCHEMA, METADATA_SCHEMA_V1, exists } from "../paths.js";
 import { tmpDir } from "../../test/fixtures/kb.js";
 import { type DoctorCheck, doctor, mageInstalledIn, readinessFooter } from "./doctor.js";
+import * as footprintModule from "../metrics/footprint.js";
 
 async function freshDir(prefix = "mage-doctor-"): Promise<string> {
   return tmpDir(prefix);
@@ -162,6 +163,53 @@ describe("diffMageHooks", () => {
     const settings = { hooks: { SessionStart: [null, 7, "x"] } } as unknown as ClaudeSettings;
     expect(() => diffMageHooks(settings)).not.toThrow();
     expect(diffMageHooks(settings).connected).toBe(false);
+  });
+});
+
+describe("doctor — recall budget (ADR-0039)", () => {
+  let home: string;
+  let origHome: string | undefined;
+  beforeEach(async () => {
+    home = await freshDir("mage-home-");
+    origHome = process.env.HOME;
+    process.env.HOME = home;
+  });
+  afterEach(() => {
+    if (origHome === undefined) delete process.env.HOME;
+    else process.env.HOME = origHome;
+  });
+
+  it("breach -> ok: false, NOT optional", async () => {
+    const dir = await freshDir();
+    await makeInRepoKb(dir, { gitignoreSinks: true });
+    vi.spyOn(footprintModule, "measureFootprint").mockResolvedValueOnce({ budget: { usedBytes: 95000, capBytes: 100000, ratio: 0.95, state: "breach", usedLines: 190, capLines: 200, byteRatio: 0.95, lineRatio: 0.95, binding: "bytes" }, yield: { sufficientData: false, sessions: 0, notesTracked: 10, notesRead: 0, notesNeverRead: 10 }, surfaces: [], pointers: { total: 0, measurable: 0, dead: 0, unmeasurable: 0, measurableBytes: 0 } });
+    const r = await doctor({ cwd: dir });
+    const c = check(r.checks, "recall budget");
+    expect(c?.ok).toBe(false);
+    expect(c?.optional).toBe(false);
+    expect(c?.detail).toMatch(/BREACH/);
+  });
+
+  it("warn -> ok: true, optional, states percentage and remedy", async () => {
+    const dir = await freshDir();
+    await makeInRepoKb(dir, { gitignoreSinks: true });
+    vi.spyOn(footprintModule, "measureFootprint").mockResolvedValueOnce({ budget: { usedBytes: 75000, capBytes: 100000, ratio: 0.75, state: "warn", usedLines: 150, capLines: 200, byteRatio: 0.75, lineRatio: 0.75, binding: "bytes" }, yield: { sufficientData: false, sessions: 0, notesTracked: 10, notesRead: 0, notesNeverRead: 10 }, surfaces: [], pointers: { total: 0, measurable: 0, dead: 0, unmeasurable: 0, measurableBytes: 0 } });
+    const r = await doctor({ cwd: dir });
+    const c = check(r.checks, "recall budget");
+    expect(c?.ok).toBe(true);
+    expect(c?.detail).toMatch(/warn/);
+    expect(c?.detail).toMatch(/mage footprint/);
+  });
+
+  it("measurement failure -> check is skipped/optional", async () => {
+    const dir = await freshDir();
+    await makeInRepoKb(dir, { gitignoreSinks: true });
+    vi.spyOn(footprintModule, "measureFootprint").mockRejectedValueOnce(new Error("measure failed"));
+    const r = await doctor({ cwd: dir });
+    const c = check(r.checks, "recall budget");
+    expect(c?.ok).toBe(false);
+    expect(c?.optional).toBe(true);
+    expect(c?.detail).toMatch(/failed/);
   });
 });
 

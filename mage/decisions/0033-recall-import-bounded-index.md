@@ -57,8 +57,8 @@ it the right recall vector:
 The binding constraint is **context cost**: imports *load in full and do not reduce context*. So we
 import only what is **bounded**. mage's index is already two files:
 
-- `INDEX.md` — the **bounded root** (a *wings* map: "51 notes across 1 wing → `_index.mage.md`",
-  ~4KB; grows with **wings** — ≈never — not with notes).
+- `INDEX.md` — the **bounded root** (a *wings* map: "N notes across 1 wing → `_index.mage.md`",
+  measured **266 B** in 2026-07; grows with **wings** — ≈never — not with notes).
 - `_index.mage.md` — the **per-note** list (grows linearly with notes).
 
 This finally realizes the shelved "MEMORY.md bridge" (`notes/agentmemory-mining-map.md` — "realized
@@ -104,7 +104,15 @@ via INDEX/AGENTS") — but *deterministically*, and via the bounded root, not a 
 
 ## Gate
 
-Low-risk (a ~4KB bounded import), so lighter than ADR-0032's:
+Low-risk (a small bounded import), so lighter than ADR-0032's:
+
+> **Correction (2026-07-19, [ADR-0039](0039-context-footprint-measure-and-bound.md)):** the
+> "~4KB" figure this gate rested on was wrong — and wrong about the *wrong file*. The `@import`
+> root (`INDEX.md`) is genuinely small: 266 B measured. But the **auto-memory twin
+> (`MEMORY.md`)**, which §1 deliberately left unbounded on the reasoning that "CC self-bounds
+> it", measured **19,291 B — 75% of Claude Code's 25,600 B cap**, growing ~264 B per note. The
+> host's self-bound is *silent truncation*, not graceful degradation. ADR-0039 supplies the
+> measurement and the budget policy this ADR deferred.
 
 - **Behavioral A/B in the soak:** with the import on, does the agent *apply* a relevant mage note
   more often (pull the right note, avoid re-deriving) than with it off? **KILL** if no measurable
@@ -114,7 +122,8 @@ Low-risk (a ~4KB bounded import), so lighter than ADR-0032's:
 ## Consequences
 
 - Recall stops depending on the agent volunteering to read a file; mage's map is *present* every
-  session and after every compaction, at a flat ~4KB cost.
+  session and after every compaction, at a small flat cost (see the Correction above — the
+  auto-memory twin's cost is neither small nor flat, and is now bounded by ADR-0039).
 - ADR-0032's relocation "recall side-effect" is struck — capture and recall are cleanly separate.
 - A new managed line in `AGENTS.md` (`@mage/INDEX.md`) that the AGENTS.md block / `mage connect`
   owns; onboarding notes the prose "read INDEX" as the non-`@import` fallback.

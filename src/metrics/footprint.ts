@@ -1,0 +1,287 @@
+import { join, dirname } from "node:path";
+import { stat, readdir, readFile } from "node:fs/promises";
+import {
+  MEMORY_FILE,
+  INDEX_FILE,
+  AGENTS_FILE,
+  CLAUDE_FILE,
+  CLAUDE_DIR,
+  AGENTS_SKILLS_DIR,
+} from "../paths.js";
+import { readTally } from "../grooming/tally.js";
+import { isGeneratedArtifact, listNotePaths } from "../scan.js";
+import { readNote, effectiveFrontmatter } from "../note.js";
+import { AUTO_MEMORY_MAX_BYTES, AUTO_MEMORY_MAX_LINES } from "../adapters/claude-code/constants.js";
+
+export const WARN_RATIO = 0.7;
+export const BREACH_RATIO = 0.9;
+/** Advisory only. NEVER used to enforce anything. ADR-0039 §3. */
+export const BYTES_PER_TOKEN_EST = 4;
+
+export function estTokens(bytes: number): number {
+  return bytes / BYTES_PER_TOKEN_EST;
+}
+
+export function formatTokensEst(bytes: number): string {
+  const k = estTokens(bytes) / 1000;
+  return `~${k.toFixed(1)}K est.`;
+}
+
+export type LoadMode = "auto-memory" | "import" | "description-only" | "on-follow";
+export type BudgetState = "ok" | "warn" | "breach";
+
+export interface SurfaceMeasurement {
+  label: string;
+  relPath: string;
+  bytes: number;
+  lines: number;
+  loadMode: LoadMode;
+  capped: boolean;
+}
+
+export interface BudgetReport {
+  usedBytes: number;
+  capBytes: number;
+  byteRatio: number;
+  usedLines: number;
+  capLines: number;
+  lineRatio: number;
+  ratio: number;
+  state: BudgetState;
+  binding: "bytes" | "lines";
+}
+
+export interface PointerLeverage {
+  total: number;
+  measurable: number;
+  dead: number;
+  unmeasurable: number;
+  measurableBytes: number;
+}
+
+export interface YieldReport {
+  sufficientData: boolean;
+  sessions: number;
+  notesTracked: number;
+  notesRead: number;
+  notesNeverRead: number;
+}
+
+export interface Footprint {
+  surfaces: SurfaceMeasurement[];
+  budget: BudgetReport;
+  pointers: PointerLeverage;
+  yield: YieldReport;
+}
+
+export async function measureFootprint(
+  docsRoot: string,
+  opts?: { capBytes?: number; capLines?: number },
+): Promise<Footprint> {
+  // ADR-0039 §4: the CC cap is the SOLE default — mage has no harness detection, so a
+  // second "unrecognized harness" default would be unreachable by any code path. An
+  // explicit `opts.capBytes` still overrides.
+  const capBytes = opts?.capBytes ?? AUTO_MEMORY_MAX_BYTES;
+  const capLines = opts?.capLines ?? AUTO_MEMORY_MAX_LINES;
+  const repoRoot = dirname(docsRoot);
+
+  const surfaces: SurfaceMeasurement[] = [];
+
+  async function addSurface(
+    label: string,
+    relPath: string,
+    absPath: string,
+    loadMode: LoadMode,
+    capped: boolean,
+  ) {
+    try {
+      const s = await stat(absPath);
+      let lines = 0;
+      if (s.isFile()) {
+        const content = await readFile(absPath, "utf-8");
+        lines = content.split("\n").length;
+        if (content.endsWith("\n")) lines--;
+      }
+      surfaces.push({ label, relPath, bytes: s.size, lines, loadMode, capped });
+    } catch {
+      // Missing files are skipped silently
+    }
+  }
+
+  // 1. auto-memory
+  await addSurface(MEMORY_FILE, MEMORY_FILE, join(docsRoot, MEMORY_FILE), "auto-memory", true);
+
+  // 2. import
+  await addSurface(INDEX_FILE, INDEX_FILE, join(docsRoot, INDEX_FILE), "import", false);
+  await addSurface(AGENTS_FILE, `../${AGENTS_FILE}`, join(repoRoot, AGENTS_FILE), "import", false);
+  await addSurface(CLAUDE_FILE, `../${CLAUDE_FILE}`, join(repoRoot, CLAUDE_FILE), "import", false);
+
+  // _index.<wing>.md + SKILL.md
+  try {
+    const entries = await readdir(docsRoot, { withFileTypes: true });
+    for (const ent of entries) {
+      if (!ent.isFile()) continue;
+      const m = /^_index\.(.+)\.md$/.exec(ent.name);
+      if (m) {
+        const wing = m[1];
+        await addSurface(ent.name, ent.name, join(docsRoot, ent.name), "on-follow", false);
+
+        // SKILL.md for claude and agents
+        const ccSkill = join(CLAUDE_DIR, "skills", `mage-wing-${wing}`, "SKILL.md");
+        const ccAbs = join(repoRoot, ccSkill);
+        let ccExists = false;
+        try {
+          ccExists = (await stat(ccAbs)).isFile();
+        } catch {}
+
+        if (ccExists) {
+          await addSurface(
+            `SKILL.md (mage-wing-${wing})`,
+            `../${ccSkill}`,
+            ccAbs,
+            "description-only",
+            false,
+          );
+        } else {
+          const agSkill = join(AGENTS_SKILLS_DIR, "skills", `mage-wing-${wing}`, "SKILL.md");
+          await addSurface(
+            `SKILL.md (mage-wing-${wing})`,
+            `../${agSkill}`,
+            join(repoRoot, agSkill),
+            "description-only",
+            false,
+          );
+        }
+      }
+    }
+  } catch {
+    // Missing docsRoot or unreadable
+  }
+
+  const usedBytes = surfaces.filter((s) => s.capped).reduce((acc, s) => acc + s.bytes, 0);
+  const usedLines = surfaces.filter((s) => s.capped).reduce((acc, s) => acc + s.lines, 0);
+  const byteRatio = capBytes > 0 ? usedBytes / capBytes : 0;
+  const lineRatio = capLines > 0 ? usedLines / capLines : 0;
+  const ratio = Math.max(byteRatio, lineRatio);
+  
+  let state: BudgetState = "ok";
+  if (ratio >= BREACH_RATIO) state = "breach";
+  else if (ratio >= WARN_RATIO) state = "warn";
+
+  const budget: BudgetReport = {
+    usedBytes,
+    capBytes,
+    byteRatio,
+    usedLines,
+    capLines,
+    lineRatio,
+    ratio,
+    state,
+    binding: lineRatio > byteRatio ? "lines" : "bytes",
+  };
+
+  const pointers: PointerLeverage = {
+    total: 0,
+    measurable: 0,
+    dead: 0,
+    unmeasurable: 0,
+    measurableBytes: 0,
+  };
+
+  let paths: string[] = [];
+  try {
+    paths = await listNotePaths(docsRoot);
+  } catch {
+    // skip
+  }
+
+  const realPaths: string[] = [];
+  for (const p of paths) {
+    // Generated artifacts are never notes. Reuse scan.ts's single-place policy rather
+    // than sniffing for one generator's marker string: `mage index`, `mage dashboard`
+    // and `mage skills` each stamp a DIFFERENT marker, so an exact-match sniff counted
+    // `Dashboard.md` as a note and over-reported `yield.notesTracked` by one.
+    if (isGeneratedArtifact(p)) continue;
+    try {
+      const note = await readNote(join(docsRoot, p));
+      realPaths.push(p);
+      const fm = effectiveFrontmatter(note.frontmatter);
+      if (Array.isArray(fm.sources)) {
+        for (const source of fm.sources) {
+          if (typeof source !== "string") continue;
+          pointers.total++;
+
+          if (source.startsWith("http://") || source.startsWith("https://")) {
+            pointers.unmeasurable++;
+          } else if (!source.includes("/") && /^[\w-]+:/.test(source)) {
+            // Note: spec says /^\w+:/ but allows 'cc-session:abc' which has a hyphen.
+            // Adjusted regex to /^[\w-]+:/ to match 'cc-session:abc'.
+            pointers.unmeasurable++;
+          } else {
+            // repo-relative
+            try {
+              let isMeasurable = false;
+              let s;
+              try {
+                s = await stat(join(docsRoot, source));
+                isMeasurable = true;
+              } catch {}
+              
+              if (!isMeasurable) {
+                try {
+                  s = await stat(join(repoRoot, source));
+                  isMeasurable = true;
+                } catch {}
+              }
+              
+              if (isMeasurable && s) {
+                pointers.measurable++;
+                pointers.measurableBytes += s.size;
+              } else {
+                pointers.dead++;
+              }
+            } catch {
+              pointers.dead++;
+            }
+          }
+        }
+      }
+    } catch {
+      // skip unreadable note
+    }
+  }
+
+  const yieldReport: YieldReport = {
+    sufficientData: false,
+    sessions: 0,
+    notesTracked: realPaths.length,
+    notesRead: 0,
+    notesNeverRead: realPaths.length,
+  };
+
+  try {
+    const tally = await readTally(docsRoot);
+    if (tally && tally.v === 4) {
+      const sessionKeys = Object.keys(tally.sessions || {});
+      yieldReport.sessions = sessionKeys.length;
+      if (sessionKeys.length >= 30) {
+        yieldReport.sufficientData = true;
+      }
+      for (const st of Object.values(tally.notes || {})) {
+        if (st.chapters >= 1) {
+          yieldReport.notesRead++;
+        }
+      }
+      yieldReport.notesNeverRead = Math.max(0, yieldReport.notesTracked - yieldReport.notesRead);
+    }
+  } catch {
+    // skip
+  }
+
+  return {
+    surfaces,
+    budget,
+    pointers,
+    yield: yieldReport,
+  };
+}
