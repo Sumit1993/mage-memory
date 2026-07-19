@@ -2,8 +2,8 @@
 # feature/fix PR merged to main updates it. Merging the release PR bumps the
 # version across all artifacts (package.json + the extra-files in
 # release-please-config.json), writes the CHANGELOG, tags, and cuts the GitHub
-# release. npm publish stays MANUAL — we dogfood the built artifact locally before
-# `npm publish`, so there is intentionally no publish step here.
+# release. When a release is cut, the publish job below pushes the built package
+# to npm via an OIDC Trusted Publisher (configured on npmjs.com) — no NPM_TOKEN.
 name: release-please
 
 on:
@@ -19,8 +19,12 @@ permissions:
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
       - uses: googleapis/release-please-action@v5
+        id: release
         with:
           # MUST be a PAT, not the default GITHUB_TOKEN. main is branch-protected
           # with required status checks, and PRs created by GITHUB_TOKEN do NOT
@@ -31,3 +35,42 @@ jobs:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+  # Publishes to npm only on the push that actually cuts a release (i.e. the
+  # merge of the release PR). Auth is OIDC via npm Trusted Publisher — no token.
+  publish:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # required for npm OIDC Trusted Publishing + provenance
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
+          persist-credentials: false # job only publishes; never pushes back
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+          cache: pnpm
+
+      # OIDC Trusted Publishing requires npm >= 11.5.1; the npm bundled with
+      # Node 22 is older, so upgrade it on the runner before publishing.
+      - name: Upgrade npm for OIDC publishing
+        run: npm install -g npm@latest
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Publish to npm
+        run: npm publish --access public

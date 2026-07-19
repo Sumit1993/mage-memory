@@ -159,17 +159,17 @@ agents.
 
 The full, navigable manual — **generated from this code and drift-tested in CI**,
 so the reference can't silently diverge from the implementation — lives at the
-**[mage documentation site](https://sumit1993.github.io/mage-memory/)**:
+**[mage documentation site](https://mage-memory.sfun.cloud/)**:
 
-- **[Start Here](https://sumit1993.github.io/mage-memory/)** — what mage is,
+- **[Start Here](https://mage-memory.sfun.cloud/)** — what mage is,
   install, and your first knowledge base.
-- **[The Model](https://sumit1993.github.io/mage-memory/model/notes/)** — notes
+- **[The Model](https://mage-memory.sfun.cloud/model/notes/)** — notes
   (insight + procedure + pointers), the graph (wings & rooms), and modes &
   storage.
-- **[The Self-Grooming Loop](https://sumit1993.github.io/mage-memory/loop/overview/)**
+- **[The Self-Grooming Loop](https://mage-memory.sfun.cloud/loop/overview/)**
   — how capture, the boundary nudge, stage & groom, promote & graduate, and
   optimize fit together, end to end.
-- **[Reference](https://sumit1993.github.io/mage-memory/reference/commands/)** —
+- **[Reference](https://mage-memory.sfun.cloud/reference/commands/)** —
   every command, hook, and threshold, rendered from the code, plus the on-disk
   layout and the two redaction gates.
 
@@ -198,7 +198,7 @@ issues at [github.com/Sumit1993/mage-memory/issues](https://github.com/Sumit1993
 Pre-1.0 and evolving — the note model, command surface, and skills reflect the
 actual CLI. See the **npm badge** above for the current release, the
 [CHANGELOG](CHANGELOG.md) for history, and the
-[documentation site](https://sumit1993.github.io/mage-memory/) for the current
+[documentation site](https://mage-memory.sfun.cloud/) for the current
 model. Expect refinement.
 
 ## License
