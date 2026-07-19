@@ -11,6 +11,7 @@ import {
 import { readTally } from "../grooming/tally.js";
 import { listNotePaths } from "../scan.js";
 import { readNote, effectiveFrontmatter } from "../note.js";
+import { AUTO_MEMORY_MAX_BYTES } from "../adapters/claude-code/constants.js";
 
 export const WARN_RATIO = 0.7;
 export const BREACH_RATIO = 0.9;
@@ -28,7 +29,7 @@ export function formatTokensEst(bytes: number): string {
   return `~${k.toFixed(1)}K est.`;
 }
 
-export type LoadMode = "auto-memory" | "import" | "description-only";
+export type LoadMode = "auto-memory" | "import" | "description-only" | "on-follow";
 export type BudgetState = "ok" | "warn" | "breach";
 
 export interface SurfaceMeasurement {
@@ -73,7 +74,7 @@ export async function measureFootprint(
   docsRoot: string,
   opts?: { capBytes?: number },
 ): Promise<Footprint> {
-  const capBytes = opts?.capBytes ?? DEFAULT_CAP_BYTES;
+  const capBytes = opts?.capBytes ?? AUTO_MEMORY_MAX_BYTES;
   const repoRoot = dirname(docsRoot);
 
   const surfaces: SurfaceMeasurement[] = [];
@@ -109,26 +110,34 @@ export async function measureFootprint(
       const m = /^_index\.(.+)\.md$/.exec(ent.name);
       if (m) {
         const wing = m[1];
-        await addSurface(ent.name, ent.name, join(docsRoot, ent.name), "import", false);
+        await addSurface(ent.name, ent.name, join(docsRoot, ent.name), "on-follow", false);
 
         // SKILL.md for claude and agents
         const ccSkill = join(CLAUDE_DIR, "skills", `mage-wing-${wing}`, "SKILL.md");
-        await addSurface(
-          `SKILL.md (mage-wing-${wing})`,
-          `../${ccSkill}`,
-          join(repoRoot, ccSkill),
-          "description-only",
-          false,
-        );
+        const ccAbs = join(repoRoot, ccSkill);
+        let ccExists = false;
+        try {
+          ccExists = (await stat(ccAbs)).isFile();
+        } catch {}
 
-        const agSkill = join(AGENTS_SKILLS_DIR, "skills", `mage-wing-${wing}`, "SKILL.md");
-        await addSurface(
-          `SKILL.md (mage-wing-${wing})`,
-          `../${agSkill}`,
-          join(repoRoot, agSkill),
-          "description-only",
-          false,
-        );
+        if (ccExists) {
+          await addSurface(
+            `SKILL.md (mage-wing-${wing})`,
+            `../${ccSkill}`,
+            ccAbs,
+            "description-only",
+            false,
+          );
+        } else {
+          const agSkill = join(AGENTS_SKILLS_DIR, "skills", `mage-wing-${wing}`, "SKILL.md");
+          await addSurface(
+            `SKILL.md (mage-wing-${wing})`,
+            `../${agSkill}`,
+            join(repoRoot, agSkill),
+            "description-only",
+            false,
+          );
+        }
       }
     }
   } catch {
@@ -181,9 +190,21 @@ export async function measureFootprint(
           } else {
             // repo-relative
             try {
-              const absSource = join(repoRoot, source);
-              const s = await stat(absSource);
-              if (s.isFile()) {
+              let isMeasurable = false;
+              let s;
+              try {
+                s = await stat(join(docsRoot, source));
+                isMeasurable = true;
+              } catch {}
+              
+              if (!isMeasurable) {
+                try {
+                  s = await stat(join(repoRoot, source));
+                  isMeasurable = true;
+                } catch {}
+              }
+              
+              if (isMeasurable && s) {
                 pointers.measurable++;
                 pointers.measurableBytes += s.size;
               } else {

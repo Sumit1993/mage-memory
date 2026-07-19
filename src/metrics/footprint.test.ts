@@ -24,6 +24,23 @@ describe("formatTokensEst", () => {
 });
 
 describe("measureFootprint", () => {
+  it("defaults to AUTO_MEMORY_MAX_BYTES when capBytes is omitted", async () => {
+    const dir = await tmpDir("mage-footprint-");
+    const docsRoot = join(dir, "mage");
+    await mkdir(docsRoot, { recursive: true });
+    
+    const footprint = await measureFootprint(docsRoot);
+    expect(footprint.budget.capBytes).toBe(25600);
+  });
+
+  it("explicit capBytes overrides the default", async () => {
+    const dir = await tmpDir("mage-footprint-");
+    const docsRoot = join(dir, "mage");
+    await mkdir(docsRoot, { recursive: true });
+    
+    const footprint = await measureFootprint(docsRoot, { capBytes: 10000 });
+    expect(footprint.budget.capBytes).toBe(10000);
+  });
   it("budget usedBytes counts ONLY the capped surface", async () => {
     const dir = await tmpDir("mage-footprint-");
     const docsRoot = join(dir, "mage");
@@ -91,7 +108,7 @@ describe("measureFootprint", () => {
     expect(footprint.budget.usedBytes).toBe(0);
   });
 
-  it("pointer classification correctly resolves files", async () => {
+  it("pointer classification correctly resolves files against both docsRoot and repoRoot", async () => {
     const dir = await tmpDir("mage-footprint-");
     const docsRoot = join(dir, "mage");
     const notesRoot = join(docsRoot, "notes");
@@ -101,10 +118,15 @@ describe("measureFootprint", () => {
     const targetFile = join(dir, "target.txt");
     await writeFile(targetFile, "a".repeat(100));
 
+    // Create docs-root target file (100 bytes)
+    const docsFile = join(docsRoot, "docs-target.txt");
+    await writeFile(docsFile, "a".repeat(100));
+
     // Create note with pointers
     const noteContent = `---
 sources:
   - target.txt
+  - docs-target.txt
   - missing.txt
   - https://example.com/docs
   - cc-session:abcdef
@@ -115,11 +137,40 @@ Note body
 
     const footprint = await measureFootprint(docsRoot, { capBytes: 10000 });
     
-    expect(footprint.pointers.total).toBe(4);
-    expect(footprint.pointers.measurable).toBe(1);
+    expect(footprint.pointers.total).toBe(5);
+    expect(footprint.pointers.measurable).toBe(2);
     expect(footprint.pointers.dead).toBe(1);
     expect(footprint.pointers.unmeasurable).toBe(2);
-    expect(footprint.pointers.measurableBytes).toBe(100);
+    expect(footprint.pointers.measurableBytes).toBe(200);
+  });
+
+  it("_index.<wing>.md is on-follow, and duplicate skills yield one description-only row", async () => {
+    const dir = await tmpDir("mage-footprint-");
+    const docsRoot = join(dir, "mage");
+    await mkdir(docsRoot, { recursive: true });
+
+    // Create an index file for a wing
+    await writeFile(join(docsRoot, "_index.foo.md"), "wing index");
+
+    // Create both claude and agents skills
+    const ccSkillDir = join(dir, ".claude", "skills", "mage-wing-foo");
+    await mkdir(ccSkillDir, { recursive: true });
+    await writeFile(join(ccSkillDir, "SKILL.md"), "cc skill");
+
+    const agSkillDir = join(dir, ".agents", "skills", "mage-wing-foo");
+    await mkdir(agSkillDir, { recursive: true });
+    await writeFile(join(agSkillDir, "SKILL.md"), "agents skill");
+
+    const footprint = await measureFootprint(docsRoot);
+    
+    const indexSurface = footprint.surfaces.find(s => s.label === "_index.foo.md");
+    expect(indexSurface).toBeDefined();
+    expect(indexSurface?.loadMode).toBe("on-follow");
+    
+    const skillSurfaces = footprint.surfaces.filter(s => s.label === "SKILL.md (mage-wing-foo)");
+    expect(skillSurfaces.length).toBe(1);
+    expect(skillSurfaces[0]!.loadMode).toBe("description-only");
+    expect(skillSurfaces[0]!.relPath).toContain(".claude"); // prefers CC when both exist
   });
 
   it("yield sufficientData is false when the tally is absent", async () => {
