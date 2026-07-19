@@ -417,6 +417,22 @@ describe("flattenAllNotes (the --all backfill sweep)", () => {
     expect(onDisk).toContain("type: pointer");
   });
 
+  it("reports docs-root-relative paths for an EXTERNAL-mode KB (docs root outside the git repo)", async () => {
+    // mode=external: the code repo is a git repo, but its docs root is hub-owned and lives in
+    // a DIFFERENT tree. Basing reported paths on the code repo's toplevel would emit `../../…`,
+    // so the docs root must win as the base whenever it isn't beneath the toplevel.
+    const { dir, root } = await withKb({ kind: "external" });
+    await initRepo(dir); // the CODE repo is a real git repo — this is what makes the probe succeed
+    await mkdir(join(root, "notes"), { recursive: true });
+    await writeFile(join(root, "notes/external-cc.md"), CC_FRESH);
+
+    const res = await flattenAllNotes(dir);
+
+    expect(res.flattened).toEqual(["notes/external-cc.md"]);
+    for (const p of res.flattened) expect(p).not.toContain(".."); // never escapes the docs root
+    expect(await readFile(join(root, "notes/external-cc.md"), "utf8")).toContain("type: pointer");
+  });
+
   it("flattens when the `git` BINARY is missing (spawn error, not a non-zero exit)", async () => {
     // The toplevel probe REJECTS (ENOENT) rather than returning code!==0 when git isn't on
     // PATH — a distinct failure mode from "not a repo". --all must still fail open to the
