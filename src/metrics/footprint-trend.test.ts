@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mkdir, writeFile, chmod, utimes, readFile } from "node:fs/promises";
+import { mkdir, writeFile, chmod, appendFile, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpDir } from "../../test/fixtures/kb.js";
 import {
@@ -36,7 +36,24 @@ describe("footprint-trend", () => {
     expect(trend.rows[0]?.lines).toBe(150);
   });
 
-  it("re-appending the SAME session id replaces, does not duplicate", async () => {
+  it("two concurrent appendTrendRow calls with different sessions -> BOTH rows present", async () => {
+    const dir = await tmpDir("mage-trend-");
+    const docsRoot = join(dir, "mage");
+    const row1 = makeRow("sess-1", new Date().toISOString());
+    const row2 = makeRow("sess-2", new Date().toISOString());
+    
+    await Promise.all([
+      appendTrendRow(docsRoot, row1),
+      appendTrendRow(docsRoot, row2),
+    ]);
+
+    const trend = await readTrend(docsRoot);
+    expect(trend.rows.length).toBe(2);
+    expect(trend.rows.map((r) => r.session)).toContain("sess-1");
+    expect(trend.rows.map((r) => r.session)).toContain("sess-2");
+  });
+
+  it("re-appending the same session id -> readTrend returns one row, the later one", async () => {
     const dir = await tmpDir("mage-trend-");
     const docsRoot = join(dir, "mage");
 
@@ -45,7 +62,7 @@ describe("footprint-trend", () => {
     await appendTrendRow(docsRoot, row1);
 
     const row2 = makeRow("sess-1", new Date().toISOString());
-    row2.bytes = 2000; // Updated
+    row2.bytes = 2000;
     await appendTrendRow(docsRoot, row2);
 
     const trend = await readTrend(docsRoot);
@@ -53,24 +70,26 @@ describe("footprint-trend", () => {
     expect(trend.rows[0]?.bytes).toBe(2000);
   });
 
-  it("rows beyond TREND_MAX_ROWS are dropped, newest kept", async () => {
+  it("a corrupt/truncated line in the middle of the file is skipped; surrounding rows survive", async () => {
     const dir = await tmpDir("mage-trend-");
     const docsRoot = join(dir, "mage");
-
-    const now = Date.now();
-    for (let i = 0; i < TREND_MAX_ROWS + 5; i++) {
-      const ts = new Date(now + i * 1000).toISOString();
-      await appendTrendRow(docsRoot, makeRow(`sess-${i}`, ts));
-    }
+    const metricsDir = join(docsRoot, ".mage", "metrics");
+    await mkdir(metricsDir, { recursive: true });
+    
+    const row1 = makeRow("sess-1", new Date().toISOString());
+    const row2 = makeRow("sess-2", new Date().toISOString());
+    
+    await writeFile(join(metricsDir, "footprint.jsonl"), JSON.stringify(row1) + "\n");
+    await appendFile(join(metricsDir, "footprint.jsonl"), "garbage{" + "\n");
+    await appendFile(join(metricsDir, "footprint.jsonl"), JSON.stringify(row2) + "\n");
 
     const trend = await readTrend(docsRoot);
-    expect(trend.rows.length).toBe(TREND_MAX_ROWS);
-    // Should keep the newest (highest index)
-    expect(trend.rows[trend.rows.length - 1]?.session).toBe(`sess-${TREND_MAX_ROWS + 4}`);
-    expect(trend.rows[0]?.session).toBe(`sess-5`);
+    expect(trend.rows.length).toBe(2);
+    expect(trend.rows.map((r) => r.session)).toContain("sess-1");
+    expect(trend.rows.map((r) => r.session)).toContain("sess-2");
   });
 
-  it("rows older than TREND_MAX_AGE_DAYS are pruned", async () => {
+  it("rows older than TREND_MAX_AGE_DAYS are pruned at fold", async () => {
     const dir = await tmpDir("mage-trend-");
     const docsRoot = join(dir, "mage");
 
@@ -86,138 +105,90 @@ describe("footprint-trend", () => {
     expect(trend.rows[0]?.session).toBe("sess-ok");
   });
 
-  it("malformed JSON on disk does NOT throw and is treated as empty", async () => {
+  it("more than TREND_MAX_ROWS -> newest TREND_MAX_ROWS kept", async () => {
     const dir = await tmpDir("mage-trend-");
     const docsRoot = join(dir, "mage");
-    const metricsDir = join(docsRoot, ".mage", "metrics");
-    await mkdir(metricsDir, { recursive: true });
-    
-    await writeFile(join(metricsDir, "footprint.json"), "garbage{");
 
-    // Reading should not throw
-    const trend = await readTrend(docsRoot);
-    expect(trend.rows.length).toBe(0);
-
-    // Appending should overwrite garbage
-    await appendTrendRow(docsRoot, makeRow("sess-1", new Date().toISOString()));
-    const trendAfter = await readTrend(docsRoot);
-    expect(trendAfter.rows.length).toBe(1);
-  });
-
-  it("unwritable path does NOT throw", async () => {
-    const dir = await tmpDir("mage-trend-");
-    const docsRoot = join(dir, "mage");
-    const metricsDir = join(docsRoot, ".mage", "metrics");
-    await mkdir(metricsDir, { recursive: true });
-
-    // Make metrics dir unwritable
-    await chmod(metricsDir, 0o444);
-
-    // Append should silently ignore
-    try {
-      await appendTrendRow(docsRoot, makeRow("sess-1", new Date().toISOString()));
-    } finally {
-      await chmod(metricsDir, 0o755); // restore to allow cleanup
+    const now = Date.now();
+    for (let i = 0; i < TREND_MAX_ROWS + 5; i++) {
+      const ts = new Date(now + i * 1000).toISOString();
+      await appendTrendRow(docsRoot, makeRow(`sess-${i}`, ts));
     }
 
     const trend = await readTrend(docsRoot);
-    expect(trend.rows.length).toBe(0); // wasn't written
+    expect(trend.rows.length).toBe(TREND_MAX_ROWS);
+    expect(trend.rows[trend.rows.length - 1]?.session).toBe(`sess-${TREND_MAX_ROWS + 4}`);
+    expect(trend.rows[0]?.session).toBe(`sess-5`);
   });
 
-  it("two concurrent appendTrendRow calls both complete without throwing, and the file is valid JSON afterwards", async () => {
+  it("missing file -> empty trend, no throw", async () => {
     const dir = await tmpDir("mage-trend-");
     const docsRoot = join(dir, "mage");
-    const row1 = makeRow("sess-1", new Date().toISOString());
-    const row2 = makeRow("sess-2", new Date().toISOString());
-    
-    await Promise.all([
-      appendTrendRow(docsRoot, row1),
-      appendTrendRow(docsRoot, row2),
-    ]);
-
-    const trend = await readTrend(docsRoot);
-    expect(trend.rows.length).toBeGreaterThan(0); // at least one succeeded
-    expect(trend.rows.map((r) => r.session)).toContain("sess-1");
-    expect(trend.rows.map((r) => r.session)).toContain("sess-2");
-    expect(trend.rows.length).toBe(2);
-  });
-
-  it("a pre-existing fresh lockfile causes the sample to be skipped, without throwing", async () => {
-    const dir = await tmpDir("mage-trend-");
-    const docsRoot = join(dir, "mage");
-    await mkdir(join(docsRoot, ".mage", "metrics"), { recursive: true });
-    await writeFile(join(docsRoot, ".mage", "metrics", "footprint.json.lock"), "foreign-token");
-
-    await appendTrendRow(docsRoot, makeRow("sess-1", new Date().toISOString()));
     const trend = await readTrend(docsRoot);
     expect(trend.rows.length).toBe(0);
   });
 
-  it("a stale (>30 s old) lockfile is taken over and the sample is written", async () => {
+  it("unwritable path -> appendTrendRow does not throw", async () => {
     const dir = await tmpDir("mage-trend-");
     const docsRoot = join(dir, "mage");
     const metricsDir = join(docsRoot, ".mage", "metrics");
     await mkdir(metricsDir, { recursive: true });
-    const lockfile = join(metricsDir, "footprint.json.lock");
-    await writeFile(lockfile, "stale-token");
+
+    await chmod(metricsDir, 0o444);
+
+    try {
+      await appendTrendRow(docsRoot, makeRow("sess-1", new Date().toISOString()));
+    } finally {
+      await chmod(metricsDir, 0o755);
+    }
+
+    const trend = await readTrend(docsRoot);
+    expect(trend.rows.length).toBe(0);
+  });
+
+  it("compaction triggers past the threshold and the file afterwards is valid and equivalent", async () => {
+    const dir = await tmpDir("mage-trend-");
+    const docsRoot = join(dir, "mage");
+
+    const now = Date.now();
+    for (let i = 0; i < TREND_MAX_ROWS * 2 + 5; i++) {
+      const ts = new Date(now + i * 1000).toISOString();
+      await appendTrendRow(docsRoot, makeRow(`sess-${i}`, ts));
+    }
+
+    const metricsDir = join(docsRoot, ".mage", "metrics");
+    const path = join(metricsDir, "footprint.jsonl");
+
+    // the above loops create 405 lines. readTrend should trigger compaction and keep only 200 rows.
+    const trend = await readTrend(docsRoot);
+    expect(trend.rows.length).toBe(TREND_MAX_ROWS);
+
+    // Verify compaction occurred: file lines should equal TREND_MAX_ROWS
+    const rawAfter = await readFile(path, "utf8");
+    const linesAfter = rawAfter.split("\n").filter((l) => l.trim().length > 0);
+    expect(linesAfter.length).toBe(TREND_MAX_ROWS);
     
-    // Set mtime to 40 seconds ago
-    const staleTime = new Date(Date.now() - 40000);
-    await utimes(lockfile, staleTime, staleTime);
-
-    await appendTrendRow(docsRoot, makeRow("sess-1", new Date().toISOString()));
-    const trend = await readTrend(docsRoot);
-    expect(trend.rows.length).toBe(1);
+    // Valid and equivalent
+    const trendAfterCompaction = await readTrend(docsRoot);
+    expect(trendAfterCompaction.rows.length).toBe(TREND_MAX_ROWS);
   });
 
-  it("the file is never left in a corrupt state (write a row, assert readTrend parses)", async () => {
-    const dir = await tmpDir("mage-trend-");
-    const docsRoot = join(dir, "mage");
-    await appendTrendRow(docsRoot, makeRow("sess-1", new Date().toISOString()));
-    const trend = await readTrend(docsRoot);
-    expect(trend.rows.length).toBe(1);
-  });
-
-  it("a process does not delete a lock it does not own", async () => {
+  it("a legacy footprint.json is folded in rather than crashing", async () => {
     const dir = await tmpDir("mage-trend-");
     const docsRoot = join(dir, "mage");
     const metricsDir = join(docsRoot, ".mage", "metrics");
     await mkdir(metricsDir, { recursive: true });
-    const lockfile = join(metricsDir, "footprint.json.lock");
-    await writeFile(lockfile, "foreign-token", "utf8");
 
-    // This will try to acquire the lock, fail after attempts, and hit finally block
-    await appendTrendRow(docsRoot, makeRow("sess-1", new Date().toISOString()));
+    const rowLegacy = makeRow("sess-legacy", new Date().toISOString());
+    const legacyDoc = { v: 1, rows: [rowLegacy] };
+    await writeFile(join(metricsDir, "footprint.json"), JSON.stringify(legacyDoc));
 
-    const lockContents = await readFile(lockfile, "utf8");
-    expect(lockContents).toBe("foreign-token"); // foreign lockfile still exists
-  });
-
-  it("stale takeover is single-winner", async () => {
-    const dir = await tmpDir("mage-trend-");
-    const docsRoot = join(dir, "mage");
-    const metricsDir = join(docsRoot, ".mage", "metrics");
-    await mkdir(metricsDir, { recursive: true });
-    const lockfile = join(metricsDir, "footprint.json.lock");
-    await writeFile(lockfile, "stale-token", "utf8");
-    
-    // Set mtime to 40 seconds ago
-    const staleTime = new Date(Date.now() - 40000);
-    await utimes(lockfile, staleTime, staleTime);
-
-    const row1 = makeRow("sess-1", new Date().toISOString());
-    const row2 = makeRow("sess-2", new Date().toISOString());
-
-    // Both will try to take over the stale lock at the same time
-    await Promise.all([
-      appendTrendRow(docsRoot, row1),
-      appendTrendRow(docsRoot, row2),
-    ]);
+    const rowNew = makeRow("sess-new", new Date().toISOString());
+    await appendTrendRow(docsRoot, rowNew);
 
     const trend = await readTrend(docsRoot);
-    expect(trend.rows.length).toBeGreaterThan(0);
-    expect(trend.rows.map((r) => r.session)).toContain("sess-1");
-    expect(trend.rows.map((r) => r.session)).toContain("sess-2");
     expect(trend.rows.length).toBe(2);
+    expect(trend.rows.map((r) => r.session)).toContain("sess-legacy");
+    expect(trend.rows.map((r) => r.session)).toContain("sess-new");
   });
 });
