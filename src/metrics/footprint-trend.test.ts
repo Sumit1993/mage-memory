@@ -1,6 +1,17 @@
-import { describe, expect, it } from "vitest";
-import { mkdir, writeFile, chmod, appendFile, readFile, stat, readdir } from "node:fs/promises";
+import { describe, expect, it, vi } from "vitest";
+import { mkdir, writeFile, appendFile, readFile, stat, readdir, utimes } from "node:fs/promises";
+import * as fsPromises from "node:fs/promises";
 import { join } from "node:path";
+
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = (await importOriginal()) as any;
+  return {
+    ...actual,
+    appendFile: vi.fn(actual.appendFile),
+    readFile: vi.fn(actual.readFile),
+    rm: vi.fn(actual.rm),
+  };
+});
 import { tmpDir } from "../../test/fixtures/kb.js";
 import {
   appendTrendRow,
@@ -132,16 +143,10 @@ describe("footprint-trend", () => {
   it("unwritable path -> appendTrendRow does not throw", async () => {
     const dir = await tmpDir("mage-trend-");
     const docsRoot = join(dir, "mage");
-    const metricsDir = join(docsRoot, ".mage", "metrics");
-    await mkdir(metricsDir, { recursive: true });
 
-    await chmod(metricsDir, 0o444);
+    vi.mocked(fsPromises.appendFile).mockRejectedValueOnce(new Error("EACCES"));
 
-    try {
-      await appendTrendRow(docsRoot, makeRow("sess-1", new Date().toISOString()));
-    } finally {
-      await chmod(metricsDir, 0o755);
-    }
+    await appendTrendRow(docsRoot, makeRow("sess-1", new Date().toISOString()));
 
     const trend = await readTrend(docsRoot);
     expect(trend.rows.length).toBe(0);
@@ -153,6 +158,13 @@ describe("footprint-trend", () => {
   it("readTrend never writes", async () => {
     const dir = await tmpDir("mage-trend-");
     const docsRoot = join(dir, "mage");
+    const metricsDir = join(docsRoot, ".mage", "metrics");
+    const archiveDir = join(metricsDir, ".archive");
+    await mkdir(archiveDir, { recursive: true });
+
+    const archiveRow = makeRow("sess-archive", new Date().toISOString());
+    const archivePath = join(archiveDir, "footprint-20230101-120000.jsonl");
+    await writeFile(archivePath, JSON.stringify(archiveRow) + "\n");
 
     const now = Date.now();
     for (let i = 0; i < TREND_MAX_ROWS * 2 + 5; i++) {
@@ -160,10 +172,10 @@ describe("footprint-trend", () => {
       await appendTrendRow(docsRoot, makeRow(`sess-${i}`, ts));
     }
 
-    const metricsDir = join(docsRoot, ".mage", "metrics");
     const path = join(metricsDir, "footprint.jsonl");
 
     const statBefore = await stat(path);
+    const archiveStatBefore = await stat(archivePath);
 
     const trend = await readTrend(docsRoot);
     expect(trend.rows.length).toBe(TREND_MAX_ROWS);
@@ -171,6 +183,10 @@ describe("footprint-trend", () => {
     const statAfter = await stat(path);
     expect(statAfter.mtimeMs).toBe(statBefore.mtimeMs);
     expect(statAfter.size).toBe(statBefore.size);
+    
+    const archiveStatAfter = await stat(archivePath);
+    expect(archiveStatAfter.mtimeMs).toBe(archiveStatBefore.mtimeMs);
+    expect(archiveStatAfter.size).toBe(archiveStatBefore.size);
   });
 
   it("Append during read is not lost", async () => {
@@ -246,7 +262,7 @@ describe("footprint-trend", () => {
     const archives = await readdir(join(metricsDir, ".archive"));
     expect(archives.length).toBe(1);
   });
-it("a legacy footprint.json is folded in rather than crashing", async () => {
+  it("a legacy footprint.json is folded in rather than crashing", async () => {
     const dir = await tmpDir("mage-trend-");
     const docsRoot = join(dir, "mage");
     const metricsDir = join(docsRoot, ".mage", "metrics");
@@ -263,5 +279,114 @@ it("a legacy footprint.json is folded in rather than crashing", async () => {
     expect(trend.rows.length).toBe(2);
     expect(trend.rows.map((r) => r.session)).toContain("sess-legacy");
     expect(trend.rows.map((r) => r.session)).toContain("sess-new");
+  });
+
+  it("rows living only in an archive appear in readTrend output", async () => {
+    const dir = await tmpDir("mage-trend-");
+    const docsRoot = join(dir, "mage");
+    const archiveDir = join(docsRoot, ".mage", "metrics", ".archive");
+    await mkdir(archiveDir, { recursive: true });
+
+    const row = makeRow("sess-archive", new Date().toISOString());
+    await writeFile(join(archiveDir, "footprint-20230101-120000.jsonl"), JSON.stringify(row) + "\n");
+
+    const trend = await readTrend(docsRoot);
+    expect(trend.rows.length).toBe(1);
+    expect(trend.rows[0]?.session).toBe("sess-archive");
+  });
+
+  it("live rows win over archive rows for the same session id", async () => {
+    const dir = await tmpDir("mage-trend-");
+    const docsRoot = join(dir, "mage");
+    const archiveDir = join(docsRoot, ".mage", "metrics", ".archive");
+    await mkdir(archiveDir, { recursive: true });
+
+    const archiveRow = makeRow("sess-conflict", new Date().toISOString());
+    archiveRow.bytes = 1000;
+    await writeFile(join(archiveDir, "footprint-20230101-120000.jsonl"), JSON.stringify(archiveRow) + "\n");
+
+    const liveRow = makeRow("sess-conflict", new Date().toISOString());
+    liveRow.bytes = 2000;
+    await appendTrendRow(docsRoot, liveRow);
+
+    const trend = await readTrend(docsRoot);
+    expect(trend.rows.length).toBe(1);
+    expect(trend.rows[0]?.bytes).toBe(2000);
+  });
+
+  it("archives are not read once the retained window is already satisfied by the live file", async () => {
+    const dir = await tmpDir("mage-trend-");
+    const docsRoot = join(dir, "mage");
+    const archiveDir = join(docsRoot, ".mage", "metrics", ".archive");
+    await mkdir(archiveDir, { recursive: true });
+
+    const archiveRow = makeRow("sess-archive", new Date().toISOString());
+    await writeFile(join(archiveDir, "footprint-20230101-120000.jsonl"), JSON.stringify(archiveRow) + "\n");
+
+    vi.mocked(fsPromises.readFile).mockClear();
+
+    const now = Date.now();
+    for (let i = 0; i < TREND_MAX_ROWS; i++) {
+      const ts = new Date(now + i * 1000).toISOString();
+      await appendTrendRow(docsRoot, makeRow(`sess-live-${i}`, ts));
+    }
+
+    const trend = await readTrend(docsRoot);
+    expect(trend.rows.length).toBe(TREND_MAX_ROWS);
+    expect(trend.rows.map((r) => r.session)).not.toContain("sess-archive");
+    
+    const archiveReads = vi.mocked(fsPromises.readFile).mock.calls.filter(call => call[0].toString().includes("footprint-20230101-120000.jsonl"));
+    expect(archiveReads.length).toBe(0);
+  });
+
+  it("archives older than TREND_MAX_AGE_DAYS are deleted by appendTrendRow", async () => {
+    const dir = await tmpDir("mage-trend-");
+    const docsRoot = join(dir, "mage");
+    const archiveDir = join(docsRoot, ".mage", "metrics", ".archive");
+    await mkdir(archiveDir, { recursive: true });
+
+    const archiveRow = makeRow("sess-old", new Date().toISOString());
+    const oldFile = join(archiveDir, "footprint-20230101-120000.jsonl");
+    await writeFile(oldFile, JSON.stringify(archiveRow) + "\n");
+    
+    const oldDate = new Date(Date.now() - (TREND_MAX_AGE_DAYS + 1) * 86_400_000);
+    await utimes(oldFile, oldDate, oldDate);
+
+    await appendTrendRow(docsRoot, makeRow("sess-new", new Date().toISOString()));
+
+    const archives = await readdir(archiveDir);
+    expect(archives).not.toContain("footprint-20230101-120000.jsonl");
+  });
+
+  it("a fresh archive is not deleted", async () => {
+    const dir = await tmpDir("mage-trend-");
+    const docsRoot = join(dir, "mage");
+    const archiveDir = join(docsRoot, ".mage", "metrics", ".archive");
+    await mkdir(archiveDir, { recursive: true });
+
+    const archiveRow = makeRow("sess-fresh", new Date().toISOString());
+    const freshFile = join(archiveDir, "footprint-fresh.jsonl");
+    await writeFile(freshFile, JSON.stringify(archiveRow) + "\n");
+
+    await appendTrendRow(docsRoot, makeRow("sess-new", new Date().toISOString()));
+
+    const archives = await readdir(archiveDir);
+    expect(archives).toContain("footprint-fresh.jsonl");
+  });
+
+  it("purge failure does not throw", async () => {
+    const dir = await tmpDir("mage-trend-");
+    const docsRoot = join(dir, "mage");
+    const archiveDir = join(docsRoot, ".mage", "metrics", ".archive");
+    await mkdir(archiveDir, { recursive: true });
+
+    vi.mocked(fsPromises.rm).mockRejectedValueOnce(new Error("Fake RM Error"));
+    
+    const oldFile = join(archiveDir, "footprint-20230102-120000.jsonl");
+    await writeFile(oldFile, "dummy");
+    const oldDate = new Date(Date.now() - (TREND_MAX_AGE_DAYS + 1) * 86_400_000);
+    await utimes(oldFile, oldDate, oldDate);
+
+    await expect(appendTrendRow(docsRoot, makeRow("sess-new", new Date().toISOString()))).resolves.toBeUndefined();
   });
 });
