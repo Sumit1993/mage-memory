@@ -41,6 +41,13 @@ in place on every SessionStart. Each fix exposed the next layer:
    *which* file it moved, so an evicting process could rename away a lock created after its own
    check.
 
+5. **And then it happened again.** The append-only replacement still compacted at read time by
+   rewriting the live file. A sample appended by the hook between the read and the rename landed
+   in the old inode and was **discarded** — the same lost-update bug, reintroduced by the
+   *cleanup* path of the fix for it. Removed in favour of **rotation** (a single `rename` to
+   `.archive/`), which cannot lose an append because the appended-to inode *becomes* the
+   archive. That is also `src/observe/store.ts`'s existing convention.
+
 **The actual lesson: the mechanism was wrong, not the implementation.** mage already stores
 concurrent-writer data as **append-only JSONL folded on read** —
 [`src/metrics/rollup.ts`](../../src/metrics/rollup.ts) folds `.mage/learnings/*.skills.jsonl`
@@ -57,9 +64,16 @@ that race class.
   fatal. That per-line tolerance is what makes append-only safe without a lock.
 - Do bounding and compaction on the **read** path (a user-invoked command may do real work), not
   the write path.
+- **Never rewrite an append-only file in place** while a hook may be appending to it — not to
+  compact, not to prune, not to tidy. **Rotate instead**: one `rename` to an archive path, per
+  `src/observe/store.ts`. Rewriting discards concurrent appends; rotation preserves them.
 - **Before designing concurrency control, grep for how this repo already does it.** Both prior
-  examples were in files read during the survey for this very change.
+  examples were in files read during the survey for this very change — and the rule had to be
+  applied *twice*, because the first fix's cleanup path reintroduced the bug it removed. Writing
+  the rule down is not the same as applying it to every path in the design.
 - Concurrency review converges one layer per round. If a small function is on its third fix,
-  stop patching and question the mechanism.
+  stop patching and question the mechanism. Ask specifically: **what still does
+  read-modify-write here?** — including maintenance paths, which is where it hides after the
+  obvious one is fixed.
 
 Relates to [unreachable-constant-reports-a-false-state](unreachable-constant-reports-a-false-state.md).
