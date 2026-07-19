@@ -98,6 +98,10 @@ export async function appendTrendRow(docsRoot: string, row: FootprintTrendRow): 
           const scratchName = `${fileLock}.stale.${Date.now()}.${Math.random().toString(36).slice(2)}`;
           await rename(fileLock, scratchName);
           await rm(scratchName, { force: true });
+          // Count the eviction against the budget: this runs on the SessionStart hook
+          // path (ADR-0039 §6), so every branch of this loop must be bounded. Skipping
+          // the increment here let sustained contention spin without limit.
+          attempts++;
           continue;
         }
       } catch {
