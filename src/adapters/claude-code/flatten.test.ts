@@ -284,6 +284,17 @@ describe("flattenStagedNotes", () => {
     const res = await flattenStagedNotes(dir);
     expect(res).toEqual({ flattened: [] });
   });
+
+  it("fails open when the `git` BINARY is missing (the probe rejects, it does not exit non-zero)", async () => {
+    const { dir } = await withKb();
+    const realPath = process.env.PATH;
+    process.env.PATH = "";
+    try {
+      expect(await flattenStagedNotes(dir)).toEqual({ flattened: [] });
+    } finally {
+      process.env.PATH = realPath;
+    }
+  });
 });
 
 describe("flattenWorktreeNotes (the Stop sweep)", () => {
@@ -404,6 +415,25 @@ describe("flattenAllNotes (the --all backfill sweep)", () => {
     const onDisk = await readFile(join(dir, "notes/standalone-cc.md"), "utf8");
     expect(onDisk).not.toContain("node_type");
     expect(onDisk).toContain("type: pointer");
+  });
+
+  it("flattens when the `git` BINARY is missing (spawn error, not a non-zero exit)", async () => {
+    // The toplevel probe REJECTS (ENOENT) rather than returning code!==0 when git isn't on
+    // PATH — a distinct failure mode from "not a repo". --all must still fail open to the
+    // docs root, since a git-less machine is exactly where a standalone KB lives.
+    const { dir } = await withKb({ kind: "hub" });
+    await mkdir(join(dir, "notes"), { recursive: true });
+    await writeFile(join(dir, "notes/no-git-binary.md"), CC_FRESH);
+
+    const realPath = process.env.PATH;
+    process.env.PATH = "";
+    try {
+      const res = await flattenAllNotes(dir);
+      expect(res.flattened).toEqual(["notes/no-git-binary.md"]);
+      expect(await readFile(join(dir, "notes/no-git-binary.md"), "utf8")).toContain("type: pointer");
+    } finally {
+      process.env.PATH = realPath;
+    }
   });
 
   it("fails open on a non-KB dir", async () => {

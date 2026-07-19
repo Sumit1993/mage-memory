@@ -85,6 +85,19 @@ interface DocsScope {
 }
 
 /**
+ * The git toplevel for `repoPath`, or null when there isn't one. FAIL-OPEN: `run` REJECTS
+ * on spawn errors (missing `git` binary, PATH issue), not just on a non-zero exit, so the
+ * probe is caught here — every caller treats "no toplevel" as "not a repo".
+ */
+async function gitToplevel(repoPath: string): Promise<string | null> {
+  const res = await run("git", ["-C", repoPath, "rev-parse", "--show-toplevel"]).catch(
+    () => null,
+  );
+  if (!res || res.code !== 0) return null;
+  return res.stdout.trim() || null;
+}
+
+/**
  * Resolve the git toplevel for `repoPath` plus a scope filter for paths under the mage
  * docs root. git's `--name-only` output is TOPLEVEL-relative, so all git ops and
  * worktree writes key off `top`. Returns null (fail-open) when there's no repo or no KB.
@@ -92,9 +105,7 @@ interface DocsScope {
 async function resolveDocsScope(repoPath: string): Promise<DocsScope | null> {
   const docs = await resolveDocsRoot(repoPath).catch(() => null);
   if (!docs) return null;
-  const topRes = await run("git", ["-C", repoPath, "rev-parse", "--show-toplevel"]);
-  if (topRes.code !== 0) return null;
-  const top = topRes.stdout.trim();
+  const top = await gitToplevel(repoPath);
   if (!top) return null;
   const prefix = relative(top, docs.root).split(sep).join("/");
   const flat = prefix === "" || prefix === ".";
@@ -290,8 +301,7 @@ export async function flattenAllNotes(repoPath: string): Promise<FlattenStagedRe
 
   // Best-effort git toplevel so reported paths match the other sweeps (toplevel-relative)
   // when this is a repo; a standalone KB reports docs-root-relative paths (top === root).
-  const topRes = await run("git", ["-C", repoPath, "rev-parse", "--show-toplevel"]);
-  const top = topRes.code === 0 && topRes.stdout.trim() ? topRes.stdout.trim() : root;
+  const top = (await gitToplevel(repoPath)) ?? root;
 
   // listNotePaths returns paths already relative to the docs root — exactly the shape
   // isGeneratedArtifact expects — so no separate inScope/toDocsRel mapping is needed here.
