@@ -140,10 +140,9 @@ async function readAndReport(
 ): Promise<PromoteResult> {
   const { root, repo } = resolved;
 
-  // Fold + persist the derived tally (the read path writes it — a derived cache, like
-  // the rollup Stop fold). repoRoot mirrors readDistill: the resolved code repo / hub.
+  // Fold the derived tally (the read path persists it — a derived cache, like the rollup
+  // Stop fold). repoRoot mirrors readDistill: the resolved code repo / hub.
   const tally = await foldTally(root, learningsPath(root), repo);
-  await writeTally(root, tally);
 
   const sensitivity = await readSensitivity(resolved);
   const thresholds = thresholdsFor(sensitivity);
@@ -151,6 +150,12 @@ async function readAndReport(
   const rejected = await readRejected(root);
   const cursors = cursorsFromTally(tally);
   const manifest = buildManifest(tally, notes, thresholds, rejected, cursors);
+
+  // Persist ONLY after the manifest is built. The write used to happen immediately after
+  // the fold, so a throw in scanNotes/readRejected/buildManifest left the watermark
+  // already advanced past events the caller never saw — the round's work was consumed
+  // without ever being reported. Ordering it last makes a failed round a true no-op.
+  await writeTally(root, tally);
 
   if (asJson) {
     process.stdout.write(JSON.stringify(manifest) + "\n");

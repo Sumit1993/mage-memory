@@ -1,47 +1,8 @@
 // Stage-1 grooming types (ADR-0019 — mage promote / self-grooming). PURE types — no
-// runtime. The deterministic promote core (signature → tally → manifest) and the
-// gitignored proposal/rejected stores all key on these shapes. See
-// mage/decisions/0019-mage-promote-self-grooming.md.
-
-// DEPRECATED (ADR-0038 §3): Lens / SignatureHit / SignatureStat belong to the keyword
-// fold, which no longer feeds the tally. They are retained only until `signature.ts` is
-// deleted in the next slice; nothing in the promote path reads them.
-
-/** The four ADR-0019 §2 lenses a signal can belong to. Corrections are first-class. */
-export type Lens = "correction" | "failure" | "workflow" | "preference";
-
-/** Per-lens hit counts for a signature (which lenses produced its evidence). */
-export type LensCounts = Record<Lens, number>;
-
-/**
- * A deterministic (wing + keywords) recurrence signature extracted from a CLOSED
- * segment. The `key` is the tally bucket id; equal keys are "the same pattern".
- */
-export interface SignatureHit {
-  /** Stable key: `${wing}::${sortedKeywords.join(",")}` — the tally bucket id. */
-  key: string;
-  /** Derived wing ("" = cross-cutting). */
-  wing: string;
-  /** Sorted, deduped, lower-cased keywords (≤ SIG_KEYWORDS). */
-  keywords: string[];
-  /** Which lens this hit came from. */
-  lens: Lens;
-  /** A short, REDACTED human hint for the proposal (≤ 160 chars). */
-  hint: string;
-}
-
-/** Per-signature accumulation in the tally (purge-surviving global counts). */
-export interface SignatureStat {
-  /** DISTINCT sessions that contributed this signature (the recurrence count). */
-  sessions: number;
-  lenses: LensCounts;
-  wing: string;
-  keywords: string[];
-  /** Lexical-max ts observed for this signature. */
-  lastSeen: string;
-  /** Representative redacted hint (first non-empty wins; stable). */
-  hint: string;
-}
+// runtime. The deterministic promote core (note reads → tally → manifest) and the
+// gitignored proposal/rejected stores all key on these shapes. The keyword-fold types
+// (Lens / SignatureHit / SignatureStat) were deleted with the fold itself — see
+// mage/decisions/0038-promote-note-rung-deleted-graduate-on-usage.md.
 
 /**
  * Per-NOTE accumulation in the tally: how many distinct compact-chapters the agent

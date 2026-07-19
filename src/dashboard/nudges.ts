@@ -77,7 +77,7 @@ export function computeNudges(data: DashboardData): Nudge[] {
     nudges.push({
       panel: "proposals",
       commands: ["mage distill", "mage promote", "mage dream"],
-      why: "No proposals yet. Generate candidates from what mage observed: distill (scratch -> notes), promote (recurring patterns -> notes), dream (health sweep).",
+      why: "No proposals yet. Generate candidates from what mage observed: distill (scratch -> notes), promote (proven notes -> skills), dream (health sweep).",
     });
   }
 
@@ -169,7 +169,7 @@ export function commandReference(data: DashboardData): CommandRefGroup[] {
       group: "Curate",
       items: [
         { cmd: "mage distill", desc: "scratch -> notes" },
-        { cmd: "mage promote", desc: "recurrence -> notes" },
+        { cmd: "mage promote", desc: "used notes -> skills" },
         { cmd: "mage:graduate", desc: "note -> skill" },
         { cmd: "mage:optimize", desc: "tune skill triggers" },
         { cmd: "mage dream", desc: "health + apply proposals" },

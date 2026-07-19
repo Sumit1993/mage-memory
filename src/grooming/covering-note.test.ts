@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ScannedNote } from "../scan.js";
 import { tmpDir } from "../../test/fixtures/kb.js";
-import { coveringNote, coveringNoteMin, isCovered } from "./covering-note.js";
+import { coveringNoteMin } from "./covering-note.js";
 
 // ─── ScannedNote fixtures ─────────────────────────────────────────────────────
 
@@ -30,27 +30,27 @@ function note(p: {
 describe("isCovered — wing aligns AND keyword overlaps", () => {
   it("covers when same wing and a keyword overlaps", () => {
     const notes = [note({ wing: "payments", keywords: ["webhook", "retry"] })];
-    expect(isCovered({ wing: "payments", keywords: ["webhook", "idempotency"] }, notes)).toBe(true);
+    expect((coveringNoteMin({ wing: "payments", keywords: ["webhook", "idempotency"] }, notes, 1) !== null)).toBe(true);
   });
 
   it("does NOT cover when wing differs even though a keyword overlaps", () => {
     const notes = [note({ wing: "billing", keywords: ["webhook"] })];
-    expect(isCovered({ wing: "payments", keywords: ["webhook"] }, notes)).toBe(false);
+    expect((coveringNoteMin({ wing: "payments", keywords: ["webhook"] }, notes, 1) !== null)).toBe(false);
   });
 
   it("does NOT cover when wing matches but no keyword overlaps", () => {
     const notes = [note({ wing: "payments", keywords: ["refund", "dispute"] })];
-    expect(isCovered({ wing: "payments", keywords: ["webhook"] }, notes)).toBe(false);
+    expect((coveringNoteMin({ wing: "payments", keywords: ["webhook"] }, notes, 1) !== null)).toBe(false);
   });
 
   it("a cross-cutting signature ('') is covered by ANY note with a keyword overlap", () => {
     const notes = [note({ wing: "billing", keywords: ["webhook"] })];
-    expect(isCovered({ wing: "", keywords: ["webhook"] }, notes)).toBe(true);
+    expect((coveringNoteMin({ wing: "", keywords: ["webhook"] }, notes, 1) !== null)).toBe(true);
   });
 
   it("matches case-insensitively on both wing and keywords", () => {
     const notes = [note({ wing: "Payments", keywords: ["WebHook"] })];
-    expect(isCovered({ wing: "payments", keywords: ["webhook"] }, notes)).toBe(true);
+    expect((coveringNoteMin({ wing: "payments", keywords: ["webhook"] }, notes, 1) !== null)).toBe(true);
   });
 
   it("matches a multi-home note's secondary wing (not just primary)", () => {
@@ -64,16 +64,16 @@ describe("isCovered — wing aligns AND keyword overlaps", () => {
         keywords: ["webhook"],
       }),
     ];
-    expect(isCovered({ wing: "payments", keywords: ["webhook"] }, notes)).toBe(true);
+    expect((coveringNoteMin({ wing: "payments", keywords: ["webhook"] }, notes, 1) !== null)).toBe(true);
   });
 
   it("a keyword-less signature is never covered", () => {
     const notes = [note({ wing: "payments", keywords: ["webhook"] })];
-    expect(isCovered({ wing: "payments", keywords: [] }, notes)).toBe(false);
+    expect((coveringNoteMin({ wing: "payments", keywords: [] }, notes, 1) !== null)).toBe(false);
   });
 
   it("returns false against an empty note set", () => {
-    expect(isCovered({ wing: "payments", keywords: ["webhook"] }, [])).toBe(false);
+    expect((coveringNoteMin({ wing: "payments", keywords: ["webhook"] }, [], 1) !== null)).toBe(false);
   });
 });
 
@@ -101,8 +101,8 @@ describe("coveringNote — returns the FIRST covering note (deterministic)", () 
     await tmpDir(); // exercise the house tmp pattern
     const a = note({ relPath: "notes/a.md", wing: "payments", keywords: ["webhook"] });
     const b = note({ relPath: "notes/b.md", wing: "payments", keywords: ["webhook", "retry"] });
-    const found = coveringNote({ wing: "payments", keywords: ["webhook"] }, [a, b]);
+    const found = coveringNoteMin({ wing: "payments", keywords: ["webhook"] }, [a, b], 1);
     expect(found?.relPath).toBe("notes/a.md"); // first in scan order wins
-    expect(coveringNote({ wing: "payments", keywords: ["refund"] }, [a, b])).toBeNull();
+    expect(coveringNoteMin({ wing: "payments", keywords: ["refund"] }, [a, b], 1)).toBeNull();
   });
 });

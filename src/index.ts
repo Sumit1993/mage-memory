@@ -240,15 +240,12 @@ export { type ScannedNote, scanNotes } from "./scan.js";
 // extraction → recurrence tally → covering-note gate → manifest builder, plus the
 // thresholds seam/dial and the gitignored proposal/rejected stores.
 export type {
-  Lens,
-  LensCounts,
   Proposal,
   ProposalAction,
   PromoteManifest,
+  NoteReadStat,
   PromoteTally,
   SessionFold,
-  SignatureHit,
-  SignatureStat,
 } from "./grooming/types.js";
 export {
   BASE_THRESHOLDS,
@@ -279,12 +276,6 @@ export {
   narrowAutonomy,
 } from "./grooming/autonomy-ladder.js";
 export {
-  keywordsFromText,
-  segmentSignatures,
-  SIG_KEYWORDS,
-  wingFromSegment,
-} from "./grooming/signature.js";
-export {
   foldSession,
   foldTally,
   PROMOTE_FILE,
@@ -293,7 +284,8 @@ export {
   readTally,
   writeTally,
 } from "./grooming/tally.js";
-export { coveringNote, isCovered } from "./grooming/covering-note.js";
+// coveringNote / isCovered deleted with the keyword fold (ADR-0038).
+export { coveringNoteMin } from "./grooming/covering-note.js";
 export {
   isRejected,
   PROPOSALS_FILE,

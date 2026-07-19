@@ -300,3 +300,4 @@ describe("promoteCmd — --seen disposition", () => {
     await expect(promoteCmd({ dir: repo, seen: "sess-1:" })).rejects.toThrow(/expected "<session>:<offset>"/);
   });
 });
+
