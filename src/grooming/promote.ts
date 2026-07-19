@@ -4,10 +4,9 @@
 // `PromoteManifest` the `mage:groom` / `mage:graduate` skills reason over.
 //
 // ONE LADDER RUNG (ADR-0038 deleted the other):
-//   note → skill (graduate): a signature covered by an existing note becomes a "graduate"
-//      proposal iff it recurred in >= thresholds.graduateSessions sessions (M) AND the
-//      covering note is PROCEDURAL (playbook/gotcha — you auto-load a procedure, not a
-//      fact, ADR-0019 §5), deduped by the note's relPath, and not rejected.
+//   note → skill (graduate): a note READ in >= thresholds.graduateSessions distinct
+//      chapters (M) earns a Procedure skill, iff it is PROCEDURAL (playbook/gotcha — you
+//      auto-load a procedure, not a fact, ADR-0019 §5) and not rejected.
 //
 // The scratch → note rung is GONE. [ADR-0038] deleted it: proposing a NEW note from
 // recurrence is the deterministic-selection pattern two pre-registered replay gates killed
@@ -15,29 +14,25 @@
 // issue #71 supplied the field evidence — ~115 buckets, 0 durable proposals). Recurrence
 // never again SELECTS what becomes a note; that judgment is the agent's, via `mage:learn`.
 //
-// TRANSITIONAL: graduate still rides this keyword-fold tally. ADR-0038 §2 repoints it to
-// note-READ recurrence (usage, not keyword recurrence) in the next PR of the sequence —
-// which is when `covered`, the K gate's absence, and the fold itself stop mattering here.
+// The signal is USAGE, not keyword recurrence (ADR-0038 §2): the tally counts distinct
+// chapters in which the agent actually opened the note. This makes ADR-0029's "graduating
+// already-human-confirmed notes by continued usage" true for the first time, and it
+// dissolves `coveringNote`'s inversion — the note is identified by the PATH READ, so a
+// fuzzy wing+keyword match can no longer mint a skill from the wrong note.
 //
 // The merge/split/reword/demote actions are NOT emitted here — merge/split are
 // judgment-constructed by the skill, reword/demote come from `mage skills --metrics`
 // (context-match), not the recurrence tally.
 //
-// Eligible proposals are RANKED strongest-first (graduate rung, then recurrence, lens
-// diversity, recency, target asc) and only the top `promotionBudget` are surfaced — a
+// Eligible proposals are RANKED strongest-first (more chapters, then recency, then target
+// asc) and only the top `promotionBudget` are surfaced — a
 // bounded, deterministic stage (0.0.11): a flood of eligible signatures (which the finer
 // compact-chapter unit can produce) never buries the strongest, and the rest are reported
 // as `deferred` for the next pass.
 
-import { coveringNote } from "./covering-note.js";
 import { isRejected } from "./proposals.js";
 import type { Thresholds } from "./thresholds.js";
-import type {
-  Proposal,
-  PromoteManifest,
-  PromoteTally,
-  SignatureStat,
-} from "./types.js";
+import type { NoteReadStat, Proposal, PromoteManifest, PromoteTally } from "./types.js";
 import type { ScannedNote } from "../scan.js";
 
 // ─── proposal constructors (PURE, stable — the rejected-buffer dedupe keys on these) ─
@@ -48,12 +43,12 @@ import type { ScannedNote } from "../scan.js";
  * wing). `payload` carries what the `mage:graduate` skill shows the human; `evidence`
  * is the recurrence rationale. PURE / stable for the rejected-buffer dedupe.
  */
-export function graduateProposalFor(note: ScannedNote, stat: SignatureStat): Proposal {
+export function graduateProposalFor(note: ScannedNote, stat: NoteReadStat): Proposal {
   return {
     action: "graduate",
     target: note.relPath,
     payload: { note: note.relPath, wing: note.wing, type: note.type },
-    evidence: `note recurred in ${stat.sessions} session(s) — a proven ${note.type}, ready to graduate to a skill`,
+    evidence: `note read in ${stat.chapters} distinct chapter(s) — a proven ${note.type}, ready to graduate to a skill`,
   };
 }
 
@@ -67,29 +62,16 @@ function isProcedural(type: string): boolean {
 /** An eligible proposal with the stat it was scored from (pre-budget ranking). */
 interface RankedProposal {
   proposal: Proposal;
-  stat: SignatureStat;
-}
-
-/** Count of distinct lenses a signature fired under (more lenses = more robust signal). */
-function lensDiversity(s: SignatureStat): number {
-  const l = s.lenses;
-  return (
-    (l.correction > 0 ? 1 : 0) +
-    (l.failure > 0 ? 1 : 0) +
-    (l.workflow > 0 ? 1 : 0) +
-    (l.preference > 0 ? 1 : 0)
-  );
+  stat: NoteReadStat;
 }
 
 /**
- * Strength comparator for the promotion budget: more recurrence, more lens diversity, more
- * recent, then target asc — a TOTAL, deterministic order so the budget is stable. The
- * rung tiebreak is gone with the note rung (ADR-0038): every proposal here is a graduate.
+ * Strength comparator for the promotion budget: more chapters, more recent, then target
+ * asc — a TOTAL, deterministic order so the budget is stable. Lens diversity is gone with
+ * the keyword fold (ADR-0038); a note read is a read, with no lens to be diverse across.
  */
 function rankProposals(a: RankedProposal, b: RankedProposal): number {
-  if (a.stat.sessions !== b.stat.sessions) return b.stat.sessions - a.stat.sessions;
-  const dl = lensDiversity(b.stat) - lensDiversity(a.stat);
-  if (dl !== 0) return dl;
+  if (a.stat.chapters !== b.stat.chapters) return b.stat.chapters - a.stat.chapters;
   if (a.stat.lastSeen !== b.stat.lastSeen) return a.stat.lastSeen < b.stat.lastSeen ? 1 : -1;
   return a.proposal.target < b.proposal.target ? -1 : a.proposal.target > b.proposal.target ? 1 : 0;
 }
@@ -111,36 +93,25 @@ export function buildManifest(
   cursors: Record<string, number>,
 ): PromoteManifest {
   const eligible: RankedProposal[] = []; // every proposal that passed its gate, pre-budget.
-  const graduateTargets = new Set<string>(); // note relPaths already proposed (dedupe).
-  let covered = 0;
+  const byRelPath = new Map(notes.map((n) => [n.relPath, n]));
+  let climbing = 0;
 
-  for (const key of Object.keys(tally.signatures)) {
-    const stat = tally.signatures[key];
-    if (stat === undefined) continue;
-    // NO K gate (ADR-0038): `promoteSessions` only ever pre-filtered the deleted note rung.
-    // M > K at every dial position, so the graduate gate below already subsumes it — keeping
-    // K here would be dead weight that reads as load-bearing.
-
-    const sig = { wing: stat.wing, keywords: stat.keywords };
-    const cover = coveringNote(sig, notes);
-
-    // An UNCOVERED signature is now a dead end: recurrence no longer proposes a new note
-    // (ADR-0038 §1). It is not even counted — `covered` describes covered signatures only.
-    if (cover === null) continue;
-
-    covered += 1;
-    // The only rung: a PROVEN (>= M) procedural note earns a Procedure skill (deduped).
-    if (
-      stat.sessions >= thresholds.graduateSessions &&
-      isProcedural(cover.type) &&
-      !graduateTargets.has(cover.relPath)
-    ) {
-      const gp = graduateProposalFor(cover, stat);
-      if (!isRejected(gp, rejected)) {
-        eligible.push({ proposal: gp, stat });
-        graduateTargets.add(cover.relPath);
-      }
+  for (const [relPath, stat] of Object.entries(tally.notes)) {
+    if (stat === undefined || stat.chapters < 1) continue;
+    if (stat.chapters < thresholds.graduateSessions) {
+      climbing += 1; // being used, not yet proven — info only.
+      continue;
     }
+    // A note read enough times but since DELETED has no graduation target. Its count is
+    // left in the tally rather than pruned: the note may return (a revert, a moved file),
+    // and the fold is not the place to decide a note is gone for good.
+    const note = byRelPath.get(relPath);
+    if (note === undefined) continue;
+    if (!isProcedural(note.type)) continue; // ADR-0019 §5 — procedures graduate, facts don't.
+
+    const gp = graduateProposalFor(note, stat);
+    if (isRejected(gp, rejected)) continue; // the human already declined — back off.
+    eligible.push({ proposal: gp, stat });
   }
 
   // Rank strongest-first, then surface only the top `promotionBudget` — the rest defer.
@@ -151,7 +122,7 @@ export function buildManifest(
   return {
     proposals: surfaced.map((e) => e.proposal),
     cursors: { ...cursors },
-    covered,
+    climbing,
     deferred: eligible.length - surfaced.length,
   };
 }

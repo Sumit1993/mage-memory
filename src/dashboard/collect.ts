@@ -287,9 +287,9 @@ function toDashboardProposal(p: Proposal): DashboardProposal {
  */
 function climbingFrom(tally: Awaited<ReturnType<typeof readTally>>): DashboardLadderClimb[] {
   const countBySessions = new Map<number, number>();
-  for (const stat of Object.values(tally.signatures)) {
-    if (stat.sessions < 2) continue;
-    countBySessions.set(stat.sessions, (countBySessions.get(stat.sessions) ?? 0) + 1);
+  for (const stat of Object.values(tally.notes)) {
+    if (stat.chapters < 2) continue;
+    countBySessions.set(stat.chapters, (countBySessions.get(stat.chapters) ?? 0) + 1);
   }
   return [...countBySessions.entries()]
     .map(([sessions, count]) => ({ sessions, count }))

@@ -88,18 +88,19 @@ async function unminedFromStreams(
 /**
  * Count persisted-tally signatures whose recurrence count is at/above the graduation gate
  * M (dial-scaled). NO re-fold — this reads `.mage/metrics/promote.json` as-is, the
- * purge-surviving global counter (ADR-0019 §1). A signature ≥ M is graduation-eligible by
- * recurrence; whether a covering note exists (the precise `mage:graduate` proposal set)
- * needs a fold we deliberately skip here, so this is the cheap UPPER-BOUND reminder, not
- * the exact proposal count. readTally fails open to an empty tally.
+ * purge-surviving global counter (ADR-0019 §1). A note READ in ≥ M chapters is
+ * graduation-eligible by usage (ADR-0038 §2); whether it is PROCEDURAL (only
+ * playbook/gotcha graduate) and un-rejected needs the note scan we deliberately skip
+ * here, so this stays the cheap UPPER-BOUND reminder, not the exact proposal count.
+ * readTally fails open to an empty tally.
  */
 async function graduableTally(root: string, sensitivity: Sensitivity): Promise<number> {
   const tally = await readTally(root).catch(() => null);
   if (!tally) return 0;
   const m = thresholdsFor(sensitivity).graduateSessions;
   let n = 0;
-  for (const stat of Object.values(tally.signatures)) {
-    if (typeof stat?.sessions === "number" && stat.sessions >= m) n += 1;
+  for (const stat of Object.values(tally.notes)) {
+    if (typeof stat?.chapters === "number" && stat.chapters >= m) n += 1;
   }
   return n;
 }
