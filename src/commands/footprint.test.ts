@@ -51,7 +51,9 @@ describe("mage footprint", () => {
     const out = lines.join("\n");
     expect(() => JSON.parse(out)).not.toThrow();
     const parsed = JSON.parse(out);
-    expect(parsed.budget).toBeDefined();
+    expect(parsed.footprint).toBeDefined();
+    expect(parsed.footprint.budget).toBeDefined();
+    expect(parsed.trend).toBeDefined();
     expect(out).not.toContain("Context footprint");
   });
 

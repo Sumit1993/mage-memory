@@ -435,6 +435,30 @@ keywords: [kw${i}, ${"k".repeat(20)}]
     expect(mem).toContain("Fallen back to category map");
   });
 
+  it("a line-only breach goes straight to tier 3 and mentions line budget", async () => {
+    const dir = await vault();
+    // 190 notes with short content: won't breach bytes, but will breach lines 
+    // threshold = 0.9 * 200 = 180 lines. 190 notes = ~190 lines + headers = >180 lines.
+    for (let i = 0; i < 190; i++) {
+      await note(
+        dir,
+        `note${i}.md`,
+        `---
+type: default
+---
+# N${i}
+`
+      );
+    }
+    const r = await index({ dir, quiet: true });
+    expect(r.memoryTier).toBe(3);
+    const mem = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
+    expect(mem).toContain("Fallen back to category map");
+    expect(mem).toContain("200-line recall budget");
+    expect(mem).toContain("per-note lines omitted");
+    expect(mem).not.toContain("keyword tails");
+  });
+
   it("determinism: rendering the same fixture twice produces byte-identical output", async () => {
     const dir = await vault();
     await generateKb(dir, 130);

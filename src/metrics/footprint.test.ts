@@ -58,7 +58,7 @@ describe("measureFootprint", () => {
     
     expect(footprint.budget.usedBytes).toBe(1000); // Only MEMORY.md counts
     expect(footprint.budget.capBytes).toBe(25600);
-    expect(footprint.budget.ratio).toBe(1000 / 25600);
+    expect(footprint.budget.byteRatio).toBe(1000 / 25600);
     expect(footprint.budget.state).toBe("ok");
     
     // Ensure both were measured
@@ -79,6 +79,7 @@ describe("measureFootprint", () => {
     await writeFile(join(docsRoot, "MEMORY.md"), "a".repeat(6999));
     let footprint = await measureFootprint(docsRoot, { capBytes });
     expect(footprint.budget.state).toBe("ok");
+    expect(footprint.budget.binding).toBe("bytes");
 
     // Exactly 70%
     await writeFile(join(docsRoot, "MEMORY.md"), "a".repeat(7000));
@@ -94,6 +95,44 @@ describe("measureFootprint", () => {
     await writeFile(join(docsRoot, "MEMORY.md"), "a".repeat(9000));
     footprint = await measureFootprint(docsRoot, { capBytes });
     expect(footprint.budget.state).toBe("breach");
+  });
+
+  it("bytes ok + lines breach -> state is breach and binding is lines", async () => {
+    const dir = await tmpDir("mage-footprint-");
+    const docsRoot = join(dir, "mage");
+    await mkdir(docsRoot, { recursive: true });
+
+    const capBytes = 25600;
+    const capLines = 200;
+    
+    // Low bytes (ok), but high lines (breach)
+    const content = "a\n".repeat(195); // 195 lines = > 90% of 200 (180 is breach)
+    await writeFile(join(docsRoot, "MEMORY.md"), content);
+    
+    const footprint = await measureFootprint(docsRoot, { capBytes, capLines });
+    expect(footprint.budget.byteRatio).toBeLessThan(0.7); // < 70% bytes
+    expect(footprint.budget.lineRatio).toBeGreaterThanOrEqual(0.9); // >= 90% lines
+    expect(footprint.budget.state).toBe("breach");
+    expect(footprint.budget.binding).toBe("lines");
+  });
+
+  it("bytes breach + lines ok -> state is breach and binding is bytes", async () => {
+    const dir = await tmpDir("mage-footprint-");
+    const docsRoot = join(dir, "mage");
+    await mkdir(docsRoot, { recursive: true });
+
+    const capBytes = 1000;
+    const capLines = 200;
+    
+    // High bytes (breach), but low lines (ok)
+    const content = "a".repeat(950); // 95% of bytes
+    await writeFile(join(docsRoot, "MEMORY.md"), content);
+    
+    const footprint = await measureFootprint(docsRoot, { capBytes, capLines });
+    expect(footprint.budget.lineRatio).toBeLessThan(0.7); // < 70% lines
+    expect(footprint.budget.byteRatio).toBeGreaterThanOrEqual(0.9); // >= 90% bytes
+    expect(footprint.budget.state).toBe("breach");
+    expect(footprint.budget.binding).toBe("bytes");
   });
 
   it("missing files are skipped, not zero-reported", async () => {

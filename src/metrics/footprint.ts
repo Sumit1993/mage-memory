@@ -1,5 +1,5 @@
 import { join, dirname } from "node:path";
-import { stat, readdir } from "node:fs/promises";
+import { stat, readdir, readFile } from "node:fs/promises";
 import {
   MEMORY_FILE,
   INDEX_FILE,
@@ -11,7 +11,7 @@ import {
 import { readTally } from "../grooming/tally.js";
 import { isGeneratedArtifact, listNotePaths } from "../scan.js";
 import { readNote, effectiveFrontmatter } from "../note.js";
-import { AUTO_MEMORY_MAX_BYTES } from "../adapters/claude-code/constants.js";
+import { AUTO_MEMORY_MAX_BYTES, AUTO_MEMORY_MAX_LINES } from "../adapters/claude-code/constants.js";
 
 export const WARN_RATIO = 0.7;
 export const BREACH_RATIO = 0.9;
@@ -34,6 +34,7 @@ export interface SurfaceMeasurement {
   label: string;
   relPath: string;
   bytes: number;
+  lines: number;
   loadMode: LoadMode;
   capped: boolean;
 }
@@ -41,8 +42,13 @@ export interface SurfaceMeasurement {
 export interface BudgetReport {
   usedBytes: number;
   capBytes: number;
+  byteRatio: number;
+  usedLines: number;
+  capLines: number;
+  lineRatio: number;
   ratio: number;
   state: BudgetState;
+  binding: "bytes" | "lines";
 }
 
 export interface PointerLeverage {
@@ -70,12 +76,13 @@ export interface Footprint {
 
 export async function measureFootprint(
   docsRoot: string,
-  opts?: { capBytes?: number },
+  opts?: { capBytes?: number; capLines?: number },
 ): Promise<Footprint> {
   // ADR-0039 §4: the CC cap is the SOLE default — mage has no harness detection, so a
   // second "unrecognized harness" default would be unreachable by any code path. An
   // explicit `opts.capBytes` still overrides.
   const capBytes = opts?.capBytes ?? AUTO_MEMORY_MAX_BYTES;
+  const capLines = opts?.capLines ?? AUTO_MEMORY_MAX_LINES;
   const repoRoot = dirname(docsRoot);
 
   const surfaces: SurfaceMeasurement[] = [];
@@ -89,7 +96,13 @@ export async function measureFootprint(
   ) {
     try {
       const s = await stat(absPath);
-      surfaces.push({ label, relPath, bytes: s.size, loadMode, capped });
+      let lines = 0;
+      if (s.isFile()) {
+        const content = await readFile(absPath, "utf-8");
+        lines = content.split("\n").length;
+        if (content.endsWith("\n")) lines--;
+      }
+      surfaces.push({ label, relPath, bytes: s.size, lines, loadMode, capped });
     } catch {
       // Missing files are skipped silently
     }
@@ -146,7 +159,11 @@ export async function measureFootprint(
   }
 
   const usedBytes = surfaces.filter((s) => s.capped).reduce((acc, s) => acc + s.bytes, 0);
-  const ratio = capBytes > 0 ? usedBytes / capBytes : 0;
+  const usedLines = surfaces.filter((s) => s.capped).reduce((acc, s) => acc + s.lines, 0);
+  const byteRatio = capBytes > 0 ? usedBytes / capBytes : 0;
+  const lineRatio = capLines > 0 ? usedLines / capLines : 0;
+  const ratio = Math.max(byteRatio, lineRatio);
+  
   let state: BudgetState = "ok";
   if (ratio >= BREACH_RATIO) state = "breach";
   else if (ratio >= WARN_RATIO) state = "warn";
@@ -154,8 +171,13 @@ export async function measureFootprint(
   const budget: BudgetReport = {
     usedBytes,
     capBytes,
+    byteRatio,
+    usedLines,
+    capLines,
+    lineRatio,
     ratio,
     state,
+    binding: lineRatio > byteRatio ? "lines" : "bytes",
   };
 
   const pointers: PointerLeverage = {

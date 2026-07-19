@@ -27,11 +27,13 @@ describe("footprint-trend", () => {
     const docsRoot = join(dir, "mage");
 
     const row = makeRow("sess-1", new Date().toISOString());
+    row.lines = 150;
     await appendTrendRow(docsRoot, row);
 
     const trend = await readTrend(docsRoot);
     expect(trend.rows.length).toBe(1);
     expect(trend.rows[0]).toEqual(row);
+    expect(trend.rows[0]?.lines).toBe(150);
   });
 
   it("re-appending the SAME session id replaces, does not duplicate", async () => {

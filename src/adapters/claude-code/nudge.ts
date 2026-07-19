@@ -114,6 +114,7 @@ export async function nudgeCmd(opts: NudgeOptions): Promise<NudgeResult> {
       session,
       ts: new Date().toISOString(),
       bytes: footprint.budget.usedBytes,
+      lines: footprint.budget.usedLines,
       ratio: footprint.budget.ratio,
       state: footprint.budget.state,
       notes: footprint.yield.notesTracked,

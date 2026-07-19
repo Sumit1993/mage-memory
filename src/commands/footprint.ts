@@ -2,6 +2,7 @@ import pc from "picocolors";
 import { logger } from "../logger.js";
 import { resolveDocsRoot } from "../paths.js";
 import { type Footprint, formatTokensEst, measureFootprint } from "../metrics/footprint.js";
+import { type FootprintTrend, readTrend } from "../metrics/footprint-trend.js";
 
 export interface FootprintOptions {
   cwd?: string;
@@ -12,6 +13,7 @@ export interface FootprintOptions {
 export interface FootprintResult {
   repo: string;
   footprint: Footprint | null;
+  trend?: FootprintTrend | null;
 }
 
 export async function footprint(opts: FootprintOptions = {}): Promise<FootprintResult> {
@@ -25,19 +27,20 @@ export async function footprint(opts: FootprintOptions = {}): Promise<FootprintR
 
   const { root, repo } = resolved;
   const footprintData = await measureFootprint(root);
+  const trendData = await readTrend(root);
 
-  if (opts.quiet) return { repo, footprint: footprintData };
+  if (opts.quiet) return { repo, footprint: footprintData, trend: trendData };
 
   if (opts.json) {
-    console.log(JSON.stringify(footprintData, null, 2));
-    return { repo, footprint: footprintData };
+    console.log(JSON.stringify({ footprint: footprintData, trend: trendData }, null, 2));
+    return { repo, footprint: footprintData, trend: trendData };
   }
 
-  renderFootprint(repo, footprintData);
-  return { repo, footprint: footprintData };
+  renderFootprint(repo, footprintData, trendData);
+  return { repo, footprint: footprintData, trend: trendData };
 }
 
-function renderFootprint(repo: string, fp: Footprint) {
+function renderFootprint(repo: string, fp: Footprint, trend: FootprintTrend) {
   const b = fp.budget;
   const p = fp.pointers;
   const y = fp.yield;
@@ -46,7 +49,8 @@ function renderFootprint(repo: string, fp: Footprint) {
   const repoName = repo.split(/[\\/]/).pop() || repo;
   logger.info(`Context footprint — ${repoName}`);
 
-  const ratioPct = b.capBytes > 0 ? (b.ratio * 100).toFixed(0) : "0";
+  const ratioPctBytes = b.capBytes > 0 ? (b.byteRatio * 100).toFixed(0) : "0";
+  const ratioPctLines = b.capLines > 0 ? (b.lineRatio * 100).toFixed(0) : "0";
 
   let stateWord: string = b.state;
   let remedyLine = "";
@@ -60,7 +64,10 @@ function renderFootprint(repo: string, fp: Footprint) {
     stateWord = pc.green(b.state);
   }
 
-  logger.info(`Recall budget: ${b.usedBytes.toLocaleString()} / ${b.capBytes.toLocaleString()} B (${ratioPct}%)   ${stateWord}`);
+  logger.info(`Recall budget:`);
+  logger.info(`  bytes: ${b.usedBytes.toLocaleString()} / ${b.capBytes.toLocaleString()} B (${ratioPctBytes}%)`);
+  logger.info(`  lines: ${b.usedLines.toLocaleString()} / ${b.capLines.toLocaleString()} lines (${ratioPctLines}%)`);
+  logger.info(`  state: ${stateWord}`);
   if (remedyLine) {
     logger.detail(remedyLine);
   }
@@ -134,6 +141,41 @@ function renderFootprint(repo: string, fp: Footprint) {
       logger.info(`  ${"dead pointers".padEnd(21)} ${p.dead.toString().padEnd(17)} -> run \`mage doctor\``);
     } else {
       logger.info(`  ${"dead pointers".padEnd(21)} 0`);
+    }
+  }
+
+  logger.blank();
+  logger.info(`Trend (last ${trend.rows.length} sessions)`);
+  if (trend.rows.length < 3) {
+    logger.info(`  insufficient data - ${trend.rows.length} sample(s)`);
+  } else {
+    const first = trend.rows[0]!;
+    const last = trend.rows[trend.rows.length - 1]!;
+    
+    let deltaBytesStr = "";
+    if (last.bytes > first.bytes) {
+      deltaBytesStr = `+${(last.bytes - first.bytes).toLocaleString()} B`;
+    } else if (last.bytes < first.bytes) {
+      deltaBytesStr = `${(last.bytes - first.bytes).toLocaleString()} B`;
+    } else {
+      deltaBytesStr = "no change";
+    }
+
+    const firstLines = typeof first.lines === "number" ? first.lines : 0;
+    const lastLines = typeof last.lines === "number" ? last.lines : 0;
+    
+    let deltaLinesStr = "";
+    if (lastLines > firstLines) {
+      deltaLinesStr = `+${(lastLines - firstLines).toLocaleString()} lines`;
+    } else if (lastLines < firstLines) {
+      deltaLinesStr = `${(lastLines - firstLines).toLocaleString()} lines`;
+    } else {
+      deltaLinesStr = "no change";
+    }
+
+    logger.info(`  ${first.bytes.toLocaleString()} B  ->  ${last.bytes.toLocaleString()} B    ${deltaBytesStr} over ${trend.rows.length} sessions`);
+    if (typeof first.lines === "number" && typeof last.lines === "number") {
+      logger.info(`  ${first.lines.toLocaleString()} lines  ->  ${last.lines.toLocaleString()} lines    ${deltaLinesStr} over ${trend.rows.length} sessions`);
     }
   }
 }

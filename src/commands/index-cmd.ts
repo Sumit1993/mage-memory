@@ -1,7 +1,7 @@
 import { readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { BREACH_RATIO } from "../metrics/footprint.js";
-import { AUTO_MEMORY_MAX_BYTES } from "../adapters/claude-code/constants.js";
+import { AUTO_MEMORY_MAX_BYTES, AUTO_MEMORY_MAX_LINES } from "../adapters/claude-code/constants.js";
 import { logger } from "../logger.js";
 import { updateGraphColorGroups } from "../obsidian.js";
 import {
@@ -207,33 +207,41 @@ function renderMemory(
   logWarn: boolean,
 ): { content: string; tier: 0 | 1 | 2 | 3 } {
   const foldInline = !hierarchical || wings.length <= 1;
-  const threshold = Math.floor(BREACH_RATIO * AUTO_MEMORY_MAX_BYTES);
+  const byteThreshold = Math.floor(BREACH_RATIO * AUTO_MEMORY_MAX_BYTES);
+  const lineThreshold = Math.floor(BREACH_RATIO * AUTO_MEMORY_MAX_LINES);
 
   if (!foldInline) {
     return { content: renderRootHierarchical(entries, wings, reg), tier: 0 };
   }
 
   let content = renderFlat(entries, wings, reg, 0);
-  if (Buffer.byteLength(content, "utf8") <= threshold) return { content, tier: 0 };
+  let lines = content.split("\n").length;
+  if (content.endsWith("\n")) lines--;
+  if (Buffer.byteLength(content, "utf8") <= byteThreshold && lines <= lineThreshold) return { content, tier: 0 };
 
   const pct = Math.round(BREACH_RATIO * 100);
-  const cap = AUTO_MEMORY_MAX_BYTES.toLocaleString("en-US");
+  const capBytes = AUTO_MEMORY_MAX_BYTES.toLocaleString("en-US");
+  const capLines = AUTO_MEMORY_MAX_LINES;
 
-  const msg1 = `Lifecycle suffixes omitted — this index would exceed ${pct}% of the\n> ${cap} B recall budget. Run \`mage footprint\` for the breakdown.`;
-  content = renderFlat(entries, wings, reg, 1, msg1);
-  if (Buffer.byteLength(content, "utf8") <= threshold) {
-    if (logWarn) logger.warn(msg1.replace(/\n> /g, " "));
-    return { content, tier: 1 };
+  if (lines <= lineThreshold) {
+    const msg1 = `Lifecycle suffixes omitted — this index would exceed ${pct}% of the\n> ${capBytes} B recall budget. Run \`mage footprint\` for the breakdown.`;
+    content = renderFlat(entries, wings, reg, 1, msg1);
+    if (Buffer.byteLength(content, "utf8") <= byteThreshold) {
+      if (logWarn) logger.warn(msg1.replace(/\n> /g, " "));
+      return { content, tier: 1 };
+    }
+
+    const msg2 = `Lifecycle suffixes and keyword tails omitted — this index would exceed ${pct}% of the\n> ${capBytes} B recall budget. Run \`mage footprint\` for the breakdown.`;
+    content = renderFlat(entries, wings, reg, 2, msg2);
+    if (Buffer.byteLength(content, "utf8") <= byteThreshold) {
+      if (logWarn) logger.warn(msg2.replace(/\n> /g, " "));
+      return { content, tier: 2 };
+    }
   }
 
-  const msg2 = `Lifecycle suffixes and keyword tails omitted — this index would exceed ${pct}% of the\n> ${cap} B recall budget. Run \`mage footprint\` for the breakdown.`;
-  content = renderFlat(entries, wings, reg, 2, msg2);
-  if (Buffer.byteLength(content, "utf8") <= threshold) {
-    if (logWarn) logger.warn(msg2.replace(/\n> /g, " "));
-    return { content, tier: 2 };
-  }
-
-  const msg3 = `Fallen back to category map (lifecycle suffixes, keyword tails, and per-note lines omitted) — this index would exceed ${pct}% of the\n> ${cap} B recall budget. Run \`mage footprint\` for the breakdown.`;
+  const triggeringDimension = lines > lineThreshold ? `${capLines}-line` : `${capBytes} B`;
+  const omitted = lines > lineThreshold ? "per-note lines omitted" : "lifecycle suffixes, keyword tails, and per-note lines omitted";
+  const msg3 = `Fallen back to category map (${omitted}) — this index would exceed ${pct}% of the\n> ${triggeringDimension} recall budget. Run \`mage footprint\` for the breakdown.`;
   content = renderRootHierarchical(entries, wings, reg, msg3);
   if (logWarn) logger.warn(msg3.replace(/\n> /g, " "));
   return { content, tier: 3 };

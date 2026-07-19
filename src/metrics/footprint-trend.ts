@@ -12,6 +12,7 @@ export interface FootprintTrendRow {
   session: string;      // observe session id
   ts: string;           // ISO timestamp
   bytes: number;        // the CAPPED surface bytes
+  lines?: number;       // the CAPPED surface lines
   ratio: number;
   state: BudgetState;
   notes: number;        // note count at sample time
@@ -37,6 +38,7 @@ function isTrendRow(r: unknown): r is FootprintTrendRow {
     typeof p.session === "string" &&
     typeof p.ts === "string" &&
     typeof p.bytes === "number" &&
+    (typeof p.lines === "number" || p.lines === undefined) &&
     typeof p.ratio === "number" &&
     typeof p.state === "string" &&
     typeof p.notes === "number"

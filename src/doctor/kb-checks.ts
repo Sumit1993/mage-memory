@@ -762,15 +762,16 @@ async function pushFootprintBudgetCheck(checks: DoctorCheck[], kb: Kb): Promise<
     return;
   }
 
-  const { state, ratio, usedBytes } = fp.budget;
+  const { state, ratio, usedBytes, usedLines, binding } = fp.budget;
   const pct = Math.round(ratio * 100);
+  const bindingLabel = binding === "lines" ? `${usedLines} lines` : `${usedBytes} bytes`;
 
   if (state === "breach") {
     checks.push({
       name: "recall budget",
       ok: false,
       optional: false, // NOT optional
-      detail: `BREACH — footprint is ${pct}% of cap (${usedBytes} bytes); recall is silently degrading → run \`mage footprint\` for the breakdown`,
+      detail: `BREACH — footprint is ${pct}% of cap (${bindingLabel}); recall is silently degrading → run \`mage footprint\` for the breakdown`,
     });
     return;
   }
@@ -779,7 +780,7 @@ async function pushFootprintBudgetCheck(checks: DoctorCheck[], kb: Kb): Promise<
     checks.push({
       name: "recall budget",
       ok: true,
-      detail: `warn — footprint is ${pct}% of cap → run \`mage footprint\` for the breakdown`,
+      detail: `warn — footprint is ${pct}% of cap (${bindingLabel}) → run \`mage footprint\` for the breakdown`,
     });
     return;
   }
@@ -787,6 +788,6 @@ async function pushFootprintBudgetCheck(checks: DoctorCheck[], kb: Kb): Promise<
   checks.push({
     name: "recall budget",
     ok: true,
-    detail: `${pct}% used`,
+    detail: `${pct}% used (${bindingLabel})`,
   });
 }

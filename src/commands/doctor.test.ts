@@ -182,7 +182,7 @@ describe("doctor — recall budget (ADR-0039)", () => {
   it("breach -> ok: false, NOT optional", async () => {
     const dir = await freshDir();
     await makeInRepoKb(dir, { gitignoreSinks: true });
-    vi.spyOn(footprintModule, "measureFootprint").mockResolvedValueOnce({ budget: { usedBytes: 95000, capBytes: 100000, ratio: 0.95, state: "breach" }, yield: { sufficientData: false, sessions: 0, notesTracked: 10, notesRead: 0, notesNeverRead: 10 }, surfaces: [], pointers: { total: 0, measurable: 0, dead: 0, unmeasurable: 0, measurableBytes: 0 } });
+    vi.spyOn(footprintModule, "measureFootprint").mockResolvedValueOnce({ budget: { usedBytes: 95000, capBytes: 100000, ratio: 0.95, state: "breach", usedLines: 190, capLines: 200, byteRatio: 0.95, lineRatio: 0.95, binding: "bytes" }, yield: { sufficientData: false, sessions: 0, notesTracked: 10, notesRead: 0, notesNeverRead: 10 }, surfaces: [], pointers: { total: 0, measurable: 0, dead: 0, unmeasurable: 0, measurableBytes: 0 } });
     const r = await doctor({ cwd: dir });
     const c = check(r.checks, "recall budget");
     expect(c?.ok).toBe(false);
@@ -193,7 +193,7 @@ describe("doctor — recall budget (ADR-0039)", () => {
   it("warn -> ok: true, optional, states percentage and remedy", async () => {
     const dir = await freshDir();
     await makeInRepoKb(dir, { gitignoreSinks: true });
-    vi.spyOn(footprintModule, "measureFootprint").mockResolvedValueOnce({ budget: { usedBytes: 75000, capBytes: 100000, ratio: 0.75, state: "warn" }, yield: { sufficientData: false, sessions: 0, notesTracked: 10, notesRead: 0, notesNeverRead: 10 }, surfaces: [], pointers: { total: 0, measurable: 0, dead: 0, unmeasurable: 0, measurableBytes: 0 } });
+    vi.spyOn(footprintModule, "measureFootprint").mockResolvedValueOnce({ budget: { usedBytes: 75000, capBytes: 100000, ratio: 0.75, state: "warn", usedLines: 150, capLines: 200, byteRatio: 0.75, lineRatio: 0.75, binding: "bytes" }, yield: { sufficientData: false, sessions: 0, notesTracked: 10, notesRead: 0, notesNeverRead: 10 }, surfaces: [], pointers: { total: 0, measurable: 0, dead: 0, unmeasurable: 0, measurableBytes: 0 } });
     const r = await doctor({ cwd: dir });
     const c = check(r.checks, "recall budget");
     expect(c?.ok).toBe(true);
