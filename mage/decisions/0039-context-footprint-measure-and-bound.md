@@ -108,10 +108,24 @@ copy. For notes actually read, the byte size of the sources they point at is a r
 bound on avoided reading** — and must be labelled as such, because the agent may never have
 read those sources.
 
-Measured pointer reality (292 source entries): 160 repo file paths (**135 resolve on disk, 25
-are dead**), 93 note→note links, 13 URLs, 26 opaque refs (`cc-session:…`). **Only ~46% are
-locally measurable.** The unmeasurable share and the dead-pointer count MUST be disclosed in
-output — no silent caps. Dead pointers are additionally a staleness signal worth surfacing.
+Measured pointer reality (307 source entries, corrected 2026-07-19): **243 resolve on disk
+(79%)** — 190 relative to the **repo root** (`src/…`) and 53 relative to the **docs root**
+(`notes/…`, `decisions/…`) — **25 are dead (8%)**, 13 are URLs and 26 are opaque refs
+(`cc-session:…`), i.e. **39 (13%) are unmeasurable**.
+
+Sources therefore use **two resolution bases**: a pointer is dead only when it resolves against
+**neither** the docs root **nor** the repo root. Resolving against one base alone
+misclassifies the other's pointers as dead — an earlier draft of this ADR said "~46%
+measurable" for exactly that reason, and it was wrong.
+
+The unmeasurable share and the dead-pointer count MUST be disclosed in output — no silent caps.
+Dead pointers are additionally a staleness signal worth surfacing.
+
+**Scope of the ceiling:** it is reported **corpus-wide** — the sources the whole KB points at —
+and labelled as such. Scoping it to only the notes actually read is the stricter reading of
+"avoided reading", but yield needs ~30 sessions before it means anything, so a read-scoped
+ceiling would render empty for a long time. Read-scoped refinement is deferred until yield
+data exists; until then the figure is a ceiling over the corpus, never over a session.
 
 ### 3. Bytes are authoritative. Tokens are advisory. No tokenizer, ever.
 
@@ -142,6 +156,20 @@ named adapter module, invent no seam for one harness:
 **The cap governs the auto-memory file (`MEMORY.md`) only.** `AGENTS.md`, `CLAUDE.md`, and
 `INDEX.md` load via `@import` and are not governed by it. The report shows all surfaces but
 caps one, and must say so rather than implying a shared budget.
+
+**The CC cap must be wired, not merely defined.** `AUTO_MEMORY_MAX_BYTES` is resolved as the
+default when the Claude Code adapter is in play; `DEFAULT_CAP_BYTES` applies only to an
+unrecognized harness. Leaving the cap to each caller is a footgun — a constant that exists but
+is never imported reports a false budget state while every test passes.
+
+**Load modes are distinguished, and the launch total counts only what is actually loaded:**
+
+- `auto-memory` — `MEMORY.md`. Paid every session. The only capped surface.
+- `import` — `INDEX.md`, `AGENTS.md`, `CLAUDE.md`. Paid every session.
+- `on-follow` — `_index.<wing>.md`. Paid **only if the agent opens it**. Measured and shown,
+  but **excluded from the launch total**; counting it would overstate launch cost by ~2×.
+- `description-only` — generated `SKILL.md`. Only the frontmatter description is resident.
+  The `.claude/` and `.agents/` mirrors are the **same skill**: count it **once**, not twice.
 
 ### 5. The generated payload is deduped.
 
