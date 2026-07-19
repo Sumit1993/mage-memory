@@ -71,13 +71,17 @@ function renderFootprint(repo: string, fp: Footprint) {
   let totalBytes = 0;
   const maxLabel = Math.max(5, ...fp.surfaces.map(s => s.label.length));
 
+  const surfaceLine = (s: (typeof fp.surfaces)[number], modeStr: string) => {
+    const label = s.label.padEnd(maxLabel);
+    const bytesStr = `${s.bytes.toLocaleString()} B`.padStart(10);
+    const estTokens = `(${formatTokensEst(s.bytes)})`.padEnd(16);
+    logger.info(`  ${label}  ${bytesStr}  ${estTokens}   ${modeStr}`);
+  };
+
   for (const s of fp.surfaces) {
     if (s.loadMode === "on-follow") continue;
 
     totalBytes += s.bytes;
-    const label = s.label.padEnd(maxLabel);
-    const bytesStr = `${s.bytes.toLocaleString()} B`.padStart(10);
-    const estTokens = `(${formatTokensEst(s.bytes)})`.padEnd(16);
 
     let modeStr = "";
     if (s.capped) {
@@ -91,11 +95,21 @@ function renderFootprint(repo: string, fp: Footprint) {
       }
     }
 
-    logger.info(`  ${label}  ${bytesStr}  ${estTokens}   ${modeStr}`);
+    surfaceLine(s, modeStr);
   }
 
   logger.info(`  ${"-".repeat(maxLabel + 12 + 16 + 14)}`);
   logger.info(`  ${"total".padEnd(maxLabel)}  ${totalBytes.toLocaleString().padStart(8)} B  ${`(${formatTokensEst(totalBytes)})`.padEnd(16)}`);
+
+  // ADR-0039 §4: on-follow surfaces are measured and SHOWN, but excluded from the
+  // launch total — counting them would overstate launch cost by ~2x. Hiding them
+  // is the other failure: `_index.<wing>.md` is the largest file mage generates.
+  const onFollow = fp.surfaces.filter((s) => s.loadMode === "on-follow");
+  if (onFollow.length > 0) {
+    logger.blank();
+    logger.info("Not in the total - paid only if the agent opens it");
+    for (const s of onFollow) surfaceLine(s, "on-follow");
+  }
 
   logger.blank();
   logger.info("Yield (note reads)");

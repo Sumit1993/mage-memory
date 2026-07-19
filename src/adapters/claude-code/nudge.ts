@@ -509,7 +509,11 @@ export function buildNudgeCommand(): Command {
         const result = await nudgeCmd({
           cwd: opts.cwd ?? str(payload?.cwd),
           source: str(payload?.source),
-          sessionId: str(payload?.sessionId),
+          // CC hook payloads are snake_case (`session_id`), same as `mage observe`
+          // reads it. Reading only `sessionId` always missed, so every sample landed
+          // on the literal session "unknown" and the one-row-per-session replace
+          // collapsed the whole trend to a single perpetually-overwritten row.
+          sessionId: str(payload?.session_id) ?? str(payload?.sessionId),
         });
         emitNudge(result.notice, result.nudge);
       } catch {

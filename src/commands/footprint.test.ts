@@ -151,6 +151,34 @@ describe("mage footprint", () => {
     expect(out).toMatch(/dead pointers/);
   });
 
+  it("an on-follow surface IS rendered, below the total, and is NOT counted in it (ADR-0039 §4)", async () => {
+    const dir = await vault();
+    // The wing index is the largest file mage generates; §4 says measured and SHOWN,
+    // but excluded from the launch total. Omitting the row entirely hid it.
+    await createSurfaceDocs(dir, "_index.foo.md", 13_157);
+
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((m?: unknown) => { lines.push(String(m)); });
+
+    await footprint({ cwd: dir });
+    const out = lines.join("\n");
+
+    expect(out).toContain("_index.foo.md");
+    expect(out).toContain("on-follow");
+    expect(out).toContain("13,157 B");
+
+    // It must appear AFTER the total line, and the total must not include its bytes.
+    const totalIdx = out.indexOf("total");
+    const wingIdx = out.indexOf("_index.foo.md");
+    expect(totalIdx).toBeGreaterThan(-1);
+    expect(wingIdx).toBeGreaterThan(totalIdx);
+
+    const totalLine = out.split("\n").find((l) => l.includes("total"));
+    const totalBytes = Number(totalLine?.match(/([\d,]+) B/)?.[1]?.replace(/,/g, ""));
+    expect(Number.isFinite(totalBytes)).toBe(true);
+    expect(totalBytes).toBeLessThan(13_157);
+  });
+
   it("the string 'saved' appears nowhere in rendered output", async () => {
     const dir = await vault();
     const lines: string[] = [];
