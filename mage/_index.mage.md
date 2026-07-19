@@ -2,7 +2,7 @@
 
 # mage
 
-> 67 notes. Part of the [index](INDEX.md).
+> 70 notes. Part of the [index](INDEX.md).
 
 ### build
 
@@ -58,6 +58,7 @@
 - `decision` [0035 — Notes are memories: one unified store; embrace the harness format at rest, normalize at the durable boundary](decisions/0035-decouple-harness-memory-from-notes.md) — notes-are-memories, unified-store, harness-format, embrace-at-rest, normalize-at-commit, posttooluse-flatten, groom-as-curation, scanner-tolerance, hard-earned-knowledge, write-update-recall, future-proof, restamp _(accepted · reviewed 2026-07-01)_
 - `decision` [0036 — Defer the `HarnessAdapter` seam until a second harness exists; consolidate CC note-shape into one named module now](decisions/0036-defer-harness-adapter-seam.md) — harness-adapter, seam, defer, hypothetical-seam, one-adapter, cc-note, neutral-core, multi-harness, premature-abstraction, second-harness, capture _(accepted · reviewed 2026-06-28)_
 - `decision` [0037 — doctor's remit extends to recall + skills readiness, on a bounded auto-fix line](decisions/0037-readiness-doctor-remit-and-autofix-line.md) — doctor, readiness, remit, recall, skills, auto-fix-line, host-config, read-only, fail-open, no-runtime, version-stamp, detect-and-instruct _(accepted · reviewed 2026-07-02)_
+- `decision` [0038 — promote's note-proposal rung is deleted; graduate repoints to note-read usage; recurrence becomes a digest annotation](decisions/0038-promote-note-rung-deleted-graduate-on-usage.md) — promote, note-proposal-rung, graduate, note-read-usage, failure-skeleton, digest-annotation, annotate-never-sort, deterministic-selection, killed-pattern, recurrence, adr-0029-deferral, keyword-fold _(accepted · reviewed 2026-07-19)_
 
 ### design
 
@@ -67,9 +68,11 @@
 ### grooming
 
 - `pointer` [The boundary nudge — internals + where each piece lives](notes/boundary-nudge-internals.md) — nudge, boundary, digest, startup, session-start, watermark, once-per-chapter, teaser, two-channel, systemMessage, additionalContext, offer-first _(reviewed 2026-07-10)_
+- `gotcha` [Gotcha — a mature KB emits no capture terminals, so the keep-rate gate cannot calibrate on it](notes/mature-kb-emits-no-capture-terminals.md) — keep-rate, crown-threshold, a1-bake, calibration, mature-kb, capture-terminals, soak, prismalens, 0.1.0, gate, autonomy _(reviewed 2026-07-19)_
 - `plan` [0.0.11 — "signal quality + autonomous capture"](notes/plan-0.0.11-signal-and-capture.md) — signal, quality, autonomous, capture, candidate, blocker, count, compact, chapters, session, ids, serves _(reviewed 2026-06-14)_
 - `plan` [Organic grooming loop (0.0.12) — the lesson path](notes/plan-0.0.12-organic-grooming-loop.md) — grooming, organic, lesson, first-sight, distill, staging, nudge, inline, claude-code-memory, redact, 0.0.12 _(stale-suspect · reviewed 2026-07-01)_
 - `plan` [Faultline — friction/derivation capture trigger (Phase 1 plan)](notes/plan-faultline.md) — faultline, friction, derivation, capture, trigger, phase, plan, one, change, detector, src, distill _(reviewed 2026-06-20)_
+- `gotcha` [Gotcha — promote's recurrence fold has near-zero precision on a mature KB](notes/promote-folds-mechanical-tokens.md) — promote, recurrence, precision, denoise, signature, keyword-fold, mechanical-tokens, watermark, rejected-buffer, soak, mature-kb _(reviewed 2026-07-19)_
 - `reference` [Replay-gate methodology — does a capture mechanism produce USEFUL knowledge?](notes/replay-gate-methodology.md) — replay, gate, methodology, capture, mechanism, produce, useful, knowledge, end, calibration, lessons, meta _(reviewed 2026-06-20)_
 
 ### plan
