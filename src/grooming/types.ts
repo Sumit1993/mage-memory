@@ -76,14 +76,22 @@ export interface Proposal {
 /** The manifest `mage promote --json` emits for the `mage:groom` / `mage:graduate` skills. */
 export interface PromoteManifest {
   /**
-   * Both ladder rungs (ADR-0019 §4): `"note"` proposals (signature ≥ K sessions, no
-   * covering note — the scratch→note catch-net) and `"graduate"` proposals (a covered,
-   * procedural note whose signature recurs ≥ M sessions — the note→skill rung).
+   * ONE ladder rung: `"graduate"` proposals only (a covered, procedural note whose
+   * signature recurs ≥ M sessions — the note→skill rung). The `"note"` rung
+   * (signature ≥ K, uncovered — the scratch→note catch-net) was deleted by ADR-0038;
+   * recurrence never proposes a NEW note. An EMPTY list is the normal result and does
+   * not imply "nothing recurred": a proposal is also absent when the covering note is
+   * non-procedural, when it was already proposed for this pass (relPath dedupe), or
+   * when the human rejected it (back-off buffer).
    */
   proposals: Proposal[];
   /** Suggested per-session watermark offsets (NOT written by the read path; `--seen` commits). */
   cursors: Record<string, number>;
-  /** Count of signatures at/above K that ARE already covered by a note (info; not proposed). */
+  /**
+   * Count of recurring signatures that ARE covered by a note (info; never proposed as
+   * notes). Counts EVERY covered signature — the K pre-filter that once ran first went
+   * with the note rung (ADR-0038), so this is no longer "at/above K".
+   */
   covered: number;
   /** Eligible proposals NOT surfaced this pass — the bounded promotion budget deferred them
    *  (strongest-first); >0 means more candidates wait for the next pass (0.0.11). */

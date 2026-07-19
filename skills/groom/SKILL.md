@@ -216,9 +216,11 @@ go looking for missed lessons in recurrence counts; there is nothing there.
      "covered": <n>                            // recurring signatures covered by notes (info)
    }
    ```
-   **Every proposal is `action: "graduate"`.** If `proposals` is empty, no note is
-   proven yet — say so and stop. An empty list is the normal, healthy result; it is
-   not a signal to go hunting.
+   **Every proposal is `action: "graduate"`.** An empty `proposals` list is the
+   normal, healthy result — and it does **not** mean "nothing recurred". A covered
+   signature yields no proposal when it is below M, when its covering note is not
+   procedural (only playbook/gotcha graduate), or when the human already rejected it.
+   Report it neutrally and stop; it is never a signal to go hunting.
 
 6. **Route graduations to `mage:graduate`.** Point at that skill — never graduate
    here, and never re-implement its confirmation flow.
@@ -243,8 +245,9 @@ mage never commits for you — it suggests, you run.
 - Phase 1 leads with **user corrections** and standing intent, not error-fix volume.
 - Phase 2 drafts nothing. An empty `proposals` list is the healthy result — never
   treat it as a prompt to mine recurrence for missed lessons (ADR-0038).
-- Every draft passes the same capture pipeline as `mage:learn` — classify,
-  overlap-check, **Gate 2**, human confirm. Captures *insight + procedure +
+- Every **Phase 1** draft passes the same capture pipeline as `mage:learn` — classify,
+  overlap-check, **Gate 2**, human confirm. (Phase 2 drafts nothing, so it never enters
+  that pipeline; it routes to `mage:graduate`.) Captures *insight + procedure +
   pointers*; points to canonical sources, never mirrors them.
 - Routes `graduate` proposals to `mage:graduate`; never graduates here.
 - Watermarks advance **only** on explicit disposition; re-runs are safe.

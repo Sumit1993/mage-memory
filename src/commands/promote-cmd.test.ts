@@ -136,29 +136,53 @@ describe("promoteCmd — read mode --json", () => {
     expect(parsed.proposals).toHaveLength(0);
   });
 
-  it("a rejected NOTE proposal is moot — the rung that produced it is gone (ADR-0038)", async () => {
-    // Pre-ADR-0038 this asserted the rejected buffer suppressing a re-offered note proposal.
-    // Nothing proposes notes now, so the buffer has nothing to suppress on this path; the
-    // graduate rung's own back-off is covered in promote.test.ts.
+  it("suppresses a GRADUATE proposal already in the rejected buffer (back-off)", async () => {
+    // Exercises the command-level rejected-buffer wiring (writeRejected → readRejected →
+    // buildManifest) on the only rung that still emits: graduate. The covering note's
+    // keywords are read back from the folded tally rather than hardcoded, so the fixture
+    // cannot drift from keywordsFromText's tokenizer.
     const { repo, docsRoot, learnings } = await tmpRepo();
-    await seedCorrection(learnings, "sess-1", PROMPT);
-    await seedCorrection(learnings, "sess-2", PROMPT);
-    await seedCorrection(learnings, "sess-3", PROMPT);
+    for (const sess of ["s1", "s2", "s3", "s4", "s5", "s6"]) {
+      await seedCorrection(learnings, sess, PROMPT); // 6 chapters ≥ graduateSessions (M=5)
+    }
     vi.spyOn(console, "log").mockImplementation(() => {});
 
-    const first = captureStdout();
+    // Fold once to materialise the signature, then author a note that covers it.
+    captureStdout();
     await promoteCmd({ dir: repo, json: true });
-    expect((JSON.parse(first[0] ?? "") as PromoteManifest).proposals).toHaveLength(0);
+    const folded = await readTally(docsRoot);
+    const sig = Object.values(folded.signatures)[0];
+    expect(sig).toBeDefined();
+    expect(sig?.sessions).toBeGreaterThanOrEqual(5);
+    await mkdir(join(docsRoot, "notes"), { recursive: true });
+    await writeFile(
+      join(docsRoot, "notes/pay.md"),
+      `---\ntype: playbook\nkeywords: [${(sig?.keywords ?? []).join(", ")}]\n---\n\n# Pay\n\nbody\n`,
+      "utf8",
+    );
+
+    // The fixture must actually PRODUCE a graduate proposal — otherwise the suppression
+    // assertion below would pass vacuously.
+    vi.restoreAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const before = captureStdout();
+    await promoteCmd({ dir: repo, json: true });
+    const unsuppressed = JSON.parse(before[0] ?? "") as PromoteManifest;
+    expect(unsuppressed.proposals).toHaveLength(1);
+    expect(unsuppressed.proposals[0]?.action).toBe("graduate");
+    expect(unsuppressed.proposals[0]?.target).toBe("notes/pay.md");
 
     await writeRejected(docsRoot, [
-      { action: "note", target: "::anything", payload: {}, evidence: "declined" },
+      { action: "graduate", target: "notes/pay.md", payload: {}, evidence: "declined" },
     ]);
 
     vi.restoreAllMocks();
     vi.spyOn(console, "log").mockImplementation(() => {});
-    const second = captureStdout();
+    const after = captureStdout();
     await promoteCmd({ dir: repo, json: true });
-    expect((JSON.parse(second[0] ?? "") as PromoteManifest).proposals).toHaveLength(0);
+    const suppressed = JSON.parse(after[0] ?? "") as PromoteManifest;
+    expect(suppressed.proposals).toHaveLength(0);
+    expect(suppressed.covered).toBe(1); // still covered — suppressed from proposal only.
   });
 
   it("persists the folded tally on the read path (derived cache, like the rollup Stop fold)", async () => {

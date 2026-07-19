@@ -5,14 +5,17 @@
 //   mage promote            → READ. Fold every CLOSED `.learnings/` segment into a
 //                             per-(wing+keywords) signature recurrence tally (counting
 //                             DISTINCT sessions), persist the derived tally (like the
-//                             rollup Stop-fold), then build the manifest of fresh
-//                             note-candidates (>= K sessions, no covering note, not
-//                             rejected). --json emits the manifest the `mage:groom`
-//                             skill drafts notes from; else a human summary.
+//                             rollup Stop-fold), then build the manifest of GRADUATION
+//                             candidates (a covered, procedural note whose signature
+//                             recurs >= M sessions, not rejected). --json emits the
+//                             manifest `mage:graduate` reads; else a human summary.
+//                             ADR-0038 deleted the note-candidate rung — recurrence
+//                             never proposes a NEW note.
 //   mage promote --seen S:N → Disposition a batch: advance session S's tally offset to
-//                             N (never-regress) and persist. Marks the proposals the
-//                             manifest's `cursors` suggested as seen. An interrupted run
-//                             never reaches here, so a re-run safely re-offers.
+//                             N (never-regress) and persist. VESTIGIAL since ADR-0038:
+//                             it existed so `mage:groom` Phase 2 could mark a reviewed
+//                             note-candidate batch, and nothing calls it now. Retained
+//                             (harmless, tested) rather than removed mid-sequence.
 //
 // This mirrors `mage distill` EXACTLY (distill-cmd.ts): the CLI does the determinism,
 // the skill does the judgment. No model lives here (ADR-0009).
@@ -174,7 +177,7 @@ function reportHuman(manifest: PromoteManifest): void {
   if (proposals.length === 0) {
     if (manifest.covered > 0) {
       logger.info(
-        `No notes ready to graduate — ${manifest.covered} recurring signature(s) covered by notes, none proven yet.`,
+        `No graduation proposals — ${manifest.covered} recurring signature(s) covered by notes. A covered signature yields no proposal when it is below M, its note is not procedural, or the proposal was rejected.`,
       );
     } else {
       logger.info("No covered recurring signatures yet.");

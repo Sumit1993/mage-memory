@@ -35,7 +35,7 @@ keywords:
   - recurrence
   - adr-0029-deferral
   - keyword-fold
-modified: 2026-07-19T07:43:46.562Z
+modified: 2026-07-19T08:09:20.741Z
 ---
 
 # 0038 — promote's note-proposal rung is deleted; graduate repoints to note-read usage; recurrence becomes a digest annotation
@@ -89,6 +89,23 @@ Two further facts, established while mapping the blast radius, shaped the decisi
 
 ## Decision
 
+> **Reading this as a state record.** Every numbered decision below is **ratified**. They
+> are NOT all shipped. This ADR is the decision; the [Sequencing](#sequencing) section is
+> the delivery plan, and each item carries its PR. At the time of writing only **§1** and
+> **§6** are in the tree — `mage promote` still folds the keyword tally, still accepts
+> `--seen`, and still reports `deferred`. Treat §2–§5, §7 as *decided, not done* until the
+> sequencing table says otherwise.
+
+| § | Decision | Lands in |
+|---|---|---|
+| 1 | Delete the note-proposal rung | **PR 1 (shipped)** |
+| 2 | Graduate repoints to note-read usage | PR 2 |
+| 3 | Delete the keyword fold | PR 2 |
+| 4 | Cross-session recurrence keyed on `failureSkeleton` | PR 3 |
+| 5 | Annotate, never sort | PR 3 |
+| 6 | Keep the `mage promote` name + manifest shape | **PR 1 (shipped)** |
+| 7 | One store, re-versioned | PR 2 |
+
 **1. The note-proposal rung is deleted.** `mage promote` no longer proposes new notes from
 recurrence. `noteProposalFor` (`promote.ts:44-51`), the `rung: "note"` branch, and the
 `promoteSessions` (K) gate at `:130` go. `mage:groom` Phase 2 — ~70 lines built entirely around
@@ -104,11 +121,25 @@ when the note was written, and the core only counts whether it gets used, which 
 deterministic core is good at. It also dissolves the `coveringNote` inversion, since the note is
 identified by the path read, not by fuzzy keyword overlap.
 
-**Correctness requirement — self-reference exclusion.** mage's own tooling reads notes
-(`mage:groom` Phase 1, `coveringNote` scanning, `mage dream`). Reads occurring inside a
-grooming/mage-command context **MUST** be excluded from the fold, or grooming inflates the very
-counts that trigger graduation and the loop feeds itself. This is a correctness condition, not an
-implementation detail.
+**Correctness requirement — self-reference exclusion.** Note reads made while the agent is
+executing a mage capture skill (`mage:groom` Phase 1's overlap-check, `mage:learn`) **MUST** be
+excluded from the fold, or grooming inflates the very counts that trigger graduation and the loop
+feeds itself. This is a correctness condition, not an implementation detail.
+
+*Scope corrected 2026-07-19 (post-ratification, before PR 2):* an earlier draft also named
+`coveringNote` scanning and `mage dream` as pollution sources. **They are not.** Observe events
+come only from Claude Code hooks (`settings.ts:64-80`), so capture sees the *agent's* tool calls
+only; the CLI reads notes via Node `fs` inside its own process and is invisible to the stream.
+The exposure is exactly one case: agent `Read` calls during skill execution.
+
+`ToolUseEvent` (`observe/types.ts:109-121`) carries no active-skill field, and there is no
+`skill_unload` event, so a grooming context can be *opened* (`SkillLoadEvent.skill`) but never
+exactly closed. **Chapter-level exclusion** is therefore the rule: if a chapter contains a mage
+capture-skill load, no note read in that chapter counts. It is coarse and it costs the genuine
+reads in grooming sessions — accepted deliberately, because this signal mints skills, so
+under-counting delays a graduation while over-counting creates a wrong one. Fail toward the
+recoverable error. The chapter unit already exists in `tally.ts`; no new tuning constant, and no
+capture-side schema change, is required.
 
 **3. The keyword fold is deleted.** `signature.ts`'s four lenses, `toolBody`, `DENOISE`, and the
 `${wing}::${keywords.join(",")}` key (`:324`) are removed. Issue #71's ~115 noise buckets are not
