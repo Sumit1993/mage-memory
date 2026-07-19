@@ -28,9 +28,9 @@ complementary gates:
 
 - **Phase 1 — first sight (`mage distill`)** — a single vivid finding earns a
   note the *first* time it is seen.
-- **Phase 2 — recurrence (`mage promote`)** — a pattern that recurred across
-  **≥ K distinct sessions** with no covering note, that no single sighting was
-  striking enough to capture. Catches the slow-burn Phase 1 misses.
+- **Phase 2 — graduation routing (`mage promote`)** — a note already proven by
+  recurrence is routed to `mage:graduate`. It does **not** propose new notes
+  (ADR-0038); Phase 1 and `mage:learn` are the only paths into the note base.
 
 **Phase 0 — pending inline drafts (`mage groom`, 0.0.12).** Before the two mining
 phases, dispose of lessons captured INLINE during work. `mage stage` parks short,
@@ -164,7 +164,8 @@ groom just the hub root and skip the fan-out.
    a one-off stack trace. You may **split** a cluster holding two unrelated
    insights or **merge** clusters that are really one; the reader's chunking is
    mechanical scaffolding, not a verdict. Drop routine clusters with no lesson.
-   Capture **on first sight** — do not wait for a recurrence here (that is Phase 2).
+   Capture **on first sight** — there is no later recurrence pass to catch a miss
+   (ADR-0038 deleted it), so a lesson skipped here is a lesson lost.
 
 3. **For each kept insight, run the SHARED CAPTURE PIPELINE** (the same back half
    `mage:learn` defines — see that skill's **Steps**; do not re-derive it):
@@ -188,68 +189,44 @@ groom just the hub root and skip the fan-out.
 
 ---
 
-## Phase 2 — recurrence (`mage promote`)
+## Phase 2 — route proven notes to graduation (`mage promote`)
 
-Phase 1 captures first sight. **Phase 2 is the catch-net for everything it
-missed:** patterns that recurred across sessions but were never striking enough
-to note once.
+Phase 1 captures first sight. **Phase 2 is no longer a catch-net.**
 
-5. **Run the deterministic recurrence reader.**
+[ADR-0038](../../mage/decisions/0038-promote-note-rung-deleted-graduate-on-usage.md)
+deleted the note-proposal rung: recurrence no longer proposes NEW notes. Proposing
+a note from a keyword fold is the deterministic-selection pattern two pre-registered
+replay gates killed (Faultline 0/62, prose-keyed 0/55), and the field evidence agreed
+— a groom across four roots produced ~115 buckets and 0 durable proposals. **If a
+lesson is worth keeping, capture it in Phase 1 or inline with `mage:learn`.** Do not
+go looking for missed lessons in recurrence counts; there is nothing there.
+
+5. **Run the deterministic reader.**
    ```bash
    mage promote --json
    ```
-   It folds every CLOSED `.mage/learnings/` segment from the last watermark forward
-   into a per-`(wing + keywords)` signature tally (distinct-session counts,
-   never-regress, survives the raw-event purge), persists the tally, and emits a
-   `PromoteManifest`:
+   It folds every CLOSED `.mage/learnings/` segment from the last watermark forward,
+   persists the tally, and emits a `PromoteManifest`:
    ```jsonc
    {
      "proposals": [
-       { "action": "note"|"graduate", "target": "…", "payload": {…}, "evidence": "…" }
+       { "action": "graduate", "target": "notes/<file>.md", "payload": {…}, "evidence": "…" }
      ],
-     "cursors": { "<session>": <offset>, … },  // advance these in step 8
-     "covered": <n>                            // signatures ≥ K already covered (info)
+     "cursors": { "<session>": <offset>, … },
+     "covered": <n>                            // recurring signatures covered by notes (info)
    }
    ```
-   Recurrence counts **distinct sessions**, never raw hits (ADR-0019 §2): "came up
-   in 3 separate sessions" is signal; "3 times in one chatty session" is not. If
-   `proposals` is empty, there is nothing recurring uncovered — say so and stop.
+   **Every proposal is `action: "graduate"`.** If `proposals` is empty, no note is
+   proven yet — say so and stop. An empty list is the normal, healthy result; it is
+   not a signal to go hunting.
 
-6. **Split the manifest by action.**
-   - Route every `action: "graduate"` proposal (a covered, proven playbook/gotcha
-     note recurring ≥ M sessions, earning its own loadable skill) to
-     **`mage:graduate`** — point at it, don't re-implement. Never graduate here.
-   - Keep the `action: "note"` proposals (a recurring signature with no covering
-     note — the catch-net's own job) for the next steps.
+6. **Route graduations to `mage:graduate`.** Point at that skill — never graduate
+   here, and never re-implement its confirmation flow.
 
-7. **Judge each `note` candidate's durability, then disposition it.** The
-   signature is **coarse on purpose** — the fold buckets, you refine. Drop
-   recurring *noise* (the same routine command carrying no insight); collapse two
-   candidates that are one lesson; split one that holds two. Lead with the
-   human-feedback signals (a `correction` that recurs is standing intent and
-   outranks a repeated stack trace). Then:
-   - **NEW note → draft it through the shared `mage:learn` capture pipeline**
-     (classify → overlap-check → Gate 2 → confirm → write), seeded from the
-     proposal's `payload.wing` / `payload.keywords` / `payload.hint` + the
-     recurrence `evidence`.
-   - **Extends an existing note → a `merge` Proposal** through the single writer
-     (prefer this over a new file when the lesson belongs to an existing note —
-     it keeps the base small early, ADR-0019 §6):
-     ```bash
-     printf '%s' '{"action":"merge","target":"notes/<file>.md","payload":{"note":"notes/<file>.md","addition":"<markdown to append>","keywords":["…"]},"evidence":"recurred in N sessions: …"}' | mage dream --apply
-     ```
-   - **Not durable → back it off** so it won't be re-surfaced:
-     ```bash
-     printf '%s' '<the note Proposal JSON>' | mage dream --reject
-     ```
-
-8. **Advance the Phase-2 watermark — only after the human dispositions the batch.**
-   ```bash
-   mage promote --seen <session>:<offset>   # one per session, from manifest.cursors
-   ```
-   **`--seen` is the ONLY thing that moves the bookmark** — the read path is pure.
-   A re-run safely re-offers, the overlap-check dedupes, and `--reject`'d
-   candidates stay backed off.
+7. **Do not disposition anything else.** There are no `note` candidates to judge,
+   no `merge` fallback to construct from a fold, and no `--seen` batch to advance
+   (`--seen` existed to mark a note-candidate batch reviewed). Recurrence is
+   plumbing that feeds graduation, not a queue for the human to grind down.
 
 ---
 
@@ -264,8 +241,8 @@ mage never commits for you — it suggests, you run.
 ## Quality bar
 
 - Phase 1 leads with **user corrections** and standing intent, not error-fix volume.
-- Phase 2 counts **distinct sessions**, never raw hits; drafts only for a recurring
-  pattern with **no covering note**; prefers a `merge` over a new file early.
+- Phase 2 drafts nothing. An empty `proposals` list is the healthy result — never
+  treat it as a prompt to mine recurrence for missed lessons (ADR-0038).
 - Every draft passes the same capture pipeline as `mage:learn` — classify,
   overlap-check, **Gate 2**, human confirm. Captures *insight + procedure +
   pointers*; points to canonical sources, never mirrors them.

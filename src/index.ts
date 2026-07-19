@@ -305,7 +305,8 @@ export {
   writeProposals,
   writeRejected,
 } from "./grooming/proposals.js";
-export { buildManifest, noteProposalFor } from "./grooming/promote.js";
+// `noteProposalFor` is GONE with the note-proposal rung (ADR-0038).
+export { buildManifest, graduateProposalFor } from "./grooming/promote.js";
 // dream applier (ADR-0019 §6 / ADR-0016 §4): the single serialized writer that turns
 // a confirmed Proposal into file changes, enforcing the §3 ceilings. The executors
 // (graduate/demote/merge/split/reword) are READ-ONLY planners; the applier is the one

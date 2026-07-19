@@ -102,8 +102,9 @@ describe("promoteCmd — read mode --json", () => {
     expect(line.endsWith("\n")).toBe(true);
     const parsed = JSON.parse(line) as PromoteManifest;
     expect(Array.isArray(parsed.proposals)).toBe(true);
-    expect(parsed.proposals).toHaveLength(1);
-    expect(parsed.proposals[0]?.action).toBe("note");
+    // ADR-0038: a recurring UNCOVERED signature no longer proposes a note. The manifest
+    // shape still holds (proposals/cursors/covered/deferred) — it is simply empty here.
+    expect(parsed.proposals).toHaveLength(0);
     expect(parsed.covered).toBe(0);
     // cursors surface each folded session's offset (closedCount = 3 events).
     expect(parsed.cursors["sess-1"]).toBe(3);
@@ -121,7 +122,9 @@ describe("promoteCmd — read mode --json", () => {
     expect(parsed.proposals).toHaveLength(0);
   });
 
-  it("the high-sensitivity dial lowers the gate (K=2) so 2 sessions surface", async () => {
+  it("the sensitivity dial no longer surfaces uncovered signatures at any setting (ADR-0038)", async () => {
+    // K (`promoteSessions`) only ever gated the deleted note rung, so lowering it can no
+    // longer make an uncovered signature surface — the dial scales `graduateSessions` alone.
     const { repo, learnings } = await tmpRepo({ sensitivity: "high" });
     await seedCorrection(learnings, "sess-1", PROMPT);
     await seedCorrection(learnings, "sess-2", PROMPT); // 2 sessions, high → K=2
@@ -130,29 +133,32 @@ describe("promoteCmd — read mode --json", () => {
     const writes = captureStdout();
     await promoteCmd({ dir: repo, json: true });
     const parsed = JSON.parse(writes[0] ?? "") as PromoteManifest;
-    expect(parsed.proposals).toHaveLength(1);
+    expect(parsed.proposals).toHaveLength(0);
   });
 
-  it("suppresses a proposal already in the rejected buffer (back-off)", async () => {
+  it("a rejected NOTE proposal is moot — the rung that produced it is gone (ADR-0038)", async () => {
+    // Pre-ADR-0038 this asserted the rejected buffer suppressing a re-offered note proposal.
+    // Nothing proposes notes now, so the buffer has nothing to suppress on this path; the
+    // graduate rung's own back-off is covered in promote.test.ts.
     const { repo, docsRoot, learnings } = await tmpRepo();
     await seedCorrection(learnings, "sess-1", PROMPT);
     await seedCorrection(learnings, "sess-2", PROMPT);
     await seedCorrection(learnings, "sess-3", PROMPT);
     vi.spyOn(console, "log").mockImplementation(() => {});
 
-    // Discover the signature key from an unsuppressed run, then reject it.
     const first = captureStdout();
     await promoteCmd({ dir: repo, json: true });
-    const target = (JSON.parse(first[0] ?? "") as PromoteManifest).proposals[0]?.target ?? "";
-    expect(target.length).toBeGreaterThan(0);
-    await writeRejected(docsRoot, [{ action: "note", target, payload: {}, evidence: "declined" }]);
+    expect((JSON.parse(first[0] ?? "") as PromoteManifest).proposals).toHaveLength(0);
+
+    await writeRejected(docsRoot, [
+      { action: "note", target: "::anything", payload: {}, evidence: "declined" },
+    ]);
 
     vi.restoreAllMocks();
     vi.spyOn(console, "log").mockImplementation(() => {});
     const second = captureStdout();
     await promoteCmd({ dir: repo, json: true });
-    const parsed = JSON.parse(second[0] ?? "") as PromoteManifest;
-    expect(parsed.proposals).toHaveLength(0);
+    expect((JSON.parse(second[0] ?? "") as PromoteManifest).proposals).toHaveLength(0);
   });
 
   it("persists the folded tally on the read path (derived cache, like the rollup Stop fold)", async () => {

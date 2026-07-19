@@ -168,21 +168,21 @@ function cursorsFromTally(tally: PromoteTally): Record<string, number> {
   return cursors;
 }
 
-/** A human-readable summary of the note-candidate proposals (one detail line each). */
+/** A human-readable summary of the graduation proposals (one detail line each). */
 function reportHuman(manifest: PromoteManifest): void {
   const proposals = manifest.proposals;
   if (proposals.length === 0) {
     if (manifest.covered > 0) {
       logger.info(
-        `No new note candidates — ${manifest.covered} recurring signature(s) already covered by notes.`,
+        `No notes ready to graduate — ${manifest.covered} recurring signature(s) covered by notes, none proven yet.`,
       );
     } else {
-      logger.info("No recurring signatures above the promote threshold yet.");
+      logger.info("No covered recurring signatures yet.");
     }
     return;
   }
   logger.success(
-    `${proposals.length} candidate(s); ${manifest.covered} recurring signature(s) already covered.`,
+    `${proposals.length} note(s) ready to graduate; ${manifest.covered} recurring signature(s) covered.`,
   );
   if (manifest.deferred > 0) {
     logger.info(
@@ -194,6 +194,6 @@ function reportHuman(manifest: PromoteManifest): void {
   }
   logger.blank();
   logger.step(
-    "Plumbing engine (you don't normally run this): mage:groom (Phase 2) turns these candidates into notes, then `mage promote --seen <session>:<offset>` commits.",
+    "Plumbing engine (you don't normally run this): mage:graduate turns a proven note into a Procedure skill. Recurrence no longer proposes NEW notes (ADR-0038) — capture those with mage:learn.",
   );
 }
