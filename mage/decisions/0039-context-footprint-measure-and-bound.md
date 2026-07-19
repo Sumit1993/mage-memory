@@ -212,8 +212,24 @@ When generation would breach the budget, tiers are shed cheapest-value-first:
 2. **Tier 2** — drop the keyword tail.
 3. **Tier 3** — fall back to the bounded category map (`INDEX.md`'s shape).
 
-Each tier is entered only if the previous was insufficient. **Exact tier trigger points are to
-be derived from measurement during implementation and recorded here on completion.**
+Each tier is entered only if the previous was insufficient.
+
+**The trigger policy is greedy, not threshold-per-tier:** render at full fidelity, and while the
+result exceeds `BREACH_RATIO × cap` (90% × 25,600 = **23,040 B**), shed the next tier and
+re-render. Stop at the first tier that fits.
+
+**Measured engagement points** (implementation, 2026-07-19; synthetic entries averaging ~218 B):
+
+| Tier | Engages at | Result |
+| --- | ---: | --- |
+| 0 — full fidelity | up to ~100 notes | ~21,800 B |
+| 1 — drop lifecycle suffix | ~110 notes | 23,980 → ~22,000 B |
+| 2 — drop keyword tail | ~130 notes | 28,340 → ~21,710 B |
+| 3 — category map | ~150 notes | fallback |
+
+These counts are a function of *entry size*, not note count — this KB's real entries average
+**177 B** after §5, so its tiers engage later than the table suggests. The byte threshold is the
+contract; the note counts are illustrative only.
 
 **Output MUST remain a pure function of the KB.** Prioritizing by note-read usage was
 considered and **rejected**: `MEMORY.md` is generated *and committed*, so usage-dependent
