@@ -1,5 +1,6 @@
 import { join } from "node:path";
-import { readFile, writeFile, mkdir, rename, rm, stat, open } from "node:fs/promises";
+import { readFile, writeFile, mkdir, rename, rm, stat } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import { metricsPath } from "../paths.js";
 import type { BudgetState } from "./footprint.js";
 
@@ -83,10 +84,10 @@ export async function appendTrendRow(docsRoot: string, row: FootprintTrendRow): 
   const fileLock = lockPath(docsRoot);
   let locked = false;
   let attempts = 0;
+  const myToken = `${process.pid}-${randomUUID()}`;
   while (attempts < 5) {
     try {
-      const fh = await open(fileLock, "wx");
-      await fh.close();
+      await writeFile(fileLock, myToken, { flag: "wx", encoding: "utf8" });
       locked = true;
       break;
     } catch (e: any) {
@@ -94,7 +95,9 @@ export async function appendTrendRow(docsRoot: string, row: FootprintTrendRow): 
       try {
         const s = await stat(fileLock);
         if (Date.now() - s.mtimeMs > 30000) {
-          await rm(fileLock, { force: true });
+          const scratchName = `${fileLock}.stale.${Date.now()}.${Math.random().toString(36).slice(2)}`;
+          await rename(fileLock, scratchName);
+          await rm(scratchName, { force: true });
           continue;
         }
       } catch {
@@ -140,6 +143,13 @@ export async function appendTrendRow(docsRoot: string, row: FootprintTrendRow): 
   } catch {
     // silently fail
   } finally {
-    await rm(fileLock, { force: true }).catch(() => {});
+    try {
+      const currentToken = await readFile(fileLock, "utf8");
+      if (currentToken === myToken) {
+        await rm(fileLock, { force: true });
+      }
+    } catch {
+      // file might be gone or taken over
+    }
   }
 }

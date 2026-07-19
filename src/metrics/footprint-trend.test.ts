@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mkdir, writeFile, chmod, utimes } from "node:fs/promises";
+import { mkdir, writeFile, chmod, utimes, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpDir } from "../../test/fixtures/kb.js";
 import {
@@ -137,13 +137,16 @@ describe("footprint-trend", () => {
 
     const trend = await readTrend(docsRoot);
     expect(trend.rows.length).toBeGreaterThan(0); // at least one succeeded
+    expect(trend.rows.map((r) => r.session)).toContain("sess-1");
+    expect(trend.rows.map((r) => r.session)).toContain("sess-2");
+    expect(trend.rows.length).toBe(2);
   });
 
   it("a pre-existing fresh lockfile causes the sample to be skipped, without throwing", async () => {
     const dir = await tmpDir("mage-trend-");
     const docsRoot = join(dir, "mage");
     await mkdir(join(docsRoot, ".mage", "metrics"), { recursive: true });
-    await writeFile(join(docsRoot, ".mage", "metrics", "footprint.json.lock"), "");
+    await writeFile(join(docsRoot, ".mage", "metrics", "footprint.json.lock"), "foreign-token");
 
     await appendTrendRow(docsRoot, makeRow("sess-1", new Date().toISOString()));
     const trend = await readTrend(docsRoot);
@@ -156,7 +159,7 @@ describe("footprint-trend", () => {
     const metricsDir = join(docsRoot, ".mage", "metrics");
     await mkdir(metricsDir, { recursive: true });
     const lockfile = join(metricsDir, "footprint.json.lock");
-    await writeFile(lockfile, "");
+    await writeFile(lockfile, "stale-token");
     
     // Set mtime to 40 seconds ago
     const staleTime = new Date(Date.now() - 40000);
@@ -173,5 +176,48 @@ describe("footprint-trend", () => {
     await appendTrendRow(docsRoot, makeRow("sess-1", new Date().toISOString()));
     const trend = await readTrend(docsRoot);
     expect(trend.rows.length).toBe(1);
+  });
+
+  it("a process does not delete a lock it does not own", async () => {
+    const dir = await tmpDir("mage-trend-");
+    const docsRoot = join(dir, "mage");
+    const metricsDir = join(docsRoot, ".mage", "metrics");
+    await mkdir(metricsDir, { recursive: true });
+    const lockfile = join(metricsDir, "footprint.json.lock");
+    await writeFile(lockfile, "foreign-token", "utf8");
+
+    // This will try to acquire the lock, fail after attempts, and hit finally block
+    await appendTrendRow(docsRoot, makeRow("sess-1", new Date().toISOString()));
+
+    const lockContents = await readFile(lockfile, "utf8");
+    expect(lockContents).toBe("foreign-token"); // foreign lockfile still exists
+  });
+
+  it("stale takeover is single-winner", async () => {
+    const dir = await tmpDir("mage-trend-");
+    const docsRoot = join(dir, "mage");
+    const metricsDir = join(docsRoot, ".mage", "metrics");
+    await mkdir(metricsDir, { recursive: true });
+    const lockfile = join(metricsDir, "footprint.json.lock");
+    await writeFile(lockfile, "stale-token", "utf8");
+    
+    // Set mtime to 40 seconds ago
+    const staleTime = new Date(Date.now() - 40000);
+    await utimes(lockfile, staleTime, staleTime);
+
+    const row1 = makeRow("sess-1", new Date().toISOString());
+    const row2 = makeRow("sess-2", new Date().toISOString());
+
+    // Both will try to take over the stale lock at the same time
+    await Promise.all([
+      appendTrendRow(docsRoot, row1),
+      appendTrendRow(docsRoot, row2),
+    ]);
+
+    const trend = await readTrend(docsRoot);
+    expect(trend.rows.length).toBeGreaterThan(0);
+    expect(trend.rows.map((r) => r.session)).toContain("sess-1");
+    expect(trend.rows.map((r) => r.session)).toContain("sess-2");
+    expect(trend.rows.length).toBe(2);
   });
 });
