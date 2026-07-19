@@ -102,8 +102,9 @@ describe("promoteCmd — read mode --json", () => {
     expect(line.endsWith("\n")).toBe(true);
     const parsed = JSON.parse(line) as PromoteManifest;
     expect(Array.isArray(parsed.proposals)).toBe(true);
-    expect(parsed.proposals).toHaveLength(1);
-    expect(parsed.proposals[0]?.action).toBe("note");
+    // ADR-0038: a recurring UNCOVERED signature no longer proposes a note. The manifest
+    // shape still holds (proposals/cursors/covered/deferred) — it is simply empty here.
+    expect(parsed.proposals).toHaveLength(0);
     expect(parsed.covered).toBe(0);
     // cursors surface each folded session's offset (closedCount = 3 events).
     expect(parsed.cursors["sess-1"]).toBe(3);
@@ -121,7 +122,9 @@ describe("promoteCmd — read mode --json", () => {
     expect(parsed.proposals).toHaveLength(0);
   });
 
-  it("the high-sensitivity dial lowers the gate (K=2) so 2 sessions surface", async () => {
+  it("the sensitivity dial no longer surfaces uncovered signatures at any setting (ADR-0038)", async () => {
+    // K (`promoteSessions`) only ever gated the deleted note rung, so lowering it can no
+    // longer make an uncovered signature surface — the dial scales `graduateSessions` alone.
     const { repo, learnings } = await tmpRepo({ sensitivity: "high" });
     await seedCorrection(learnings, "sess-1", PROMPT);
     await seedCorrection(learnings, "sess-2", PROMPT); // 2 sessions, high → K=2
@@ -130,29 +133,56 @@ describe("promoteCmd — read mode --json", () => {
     const writes = captureStdout();
     await promoteCmd({ dir: repo, json: true });
     const parsed = JSON.parse(writes[0] ?? "") as PromoteManifest;
-    expect(parsed.proposals).toHaveLength(1);
+    expect(parsed.proposals).toHaveLength(0);
   });
 
-  it("suppresses a proposal already in the rejected buffer (back-off)", async () => {
+  it("suppresses a GRADUATE proposal already in the rejected buffer (back-off)", async () => {
+    // Exercises the command-level rejected-buffer wiring (writeRejected → readRejected →
+    // buildManifest) on the only rung that still emits: graduate. The covering note's
+    // keywords are read back from the folded tally rather than hardcoded, so the fixture
+    // cannot drift from keywordsFromText's tokenizer.
     const { repo, docsRoot, learnings } = await tmpRepo();
-    await seedCorrection(learnings, "sess-1", PROMPT);
-    await seedCorrection(learnings, "sess-2", PROMPT);
-    await seedCorrection(learnings, "sess-3", PROMPT);
+    for (const sess of ["s1", "s2", "s3", "s4", "s5", "s6"]) {
+      await seedCorrection(learnings, sess, PROMPT); // 6 chapters ≥ graduateSessions (M=5)
+    }
     vi.spyOn(console, "log").mockImplementation(() => {});
 
-    // Discover the signature key from an unsuppressed run, then reject it.
-    const first = captureStdout();
+    // Fold once to materialise the signature, then author a note that covers it.
+    captureStdout();
     await promoteCmd({ dir: repo, json: true });
-    const target = (JSON.parse(first[0] ?? "") as PromoteManifest).proposals[0]?.target ?? "";
-    expect(target.length).toBeGreaterThan(0);
-    await writeRejected(docsRoot, [{ action: "note", target, payload: {}, evidence: "declined" }]);
+    const folded = await readTally(docsRoot);
+    const sig = Object.values(folded.signatures)[0];
+    expect(sig).toBeDefined();
+    expect(sig?.sessions).toBeGreaterThanOrEqual(5);
+    await mkdir(join(docsRoot, "notes"), { recursive: true });
+    await writeFile(
+      join(docsRoot, "notes/pay.md"),
+      `---\ntype: playbook\nkeywords: [${(sig?.keywords ?? []).join(", ")}]\n---\n\n# Pay\n\nbody\n`,
+      "utf8",
+    );
+
+    // The fixture must actually PRODUCE a graduate proposal — otherwise the suppression
+    // assertion below would pass vacuously.
+    vi.restoreAllMocks();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const before = captureStdout();
+    await promoteCmd({ dir: repo, json: true });
+    const unsuppressed = JSON.parse(before[0] ?? "") as PromoteManifest;
+    expect(unsuppressed.proposals).toHaveLength(1);
+    expect(unsuppressed.proposals[0]?.action).toBe("graduate");
+    expect(unsuppressed.proposals[0]?.target).toBe("notes/pay.md");
+
+    await writeRejected(docsRoot, [
+      { action: "graduate", target: "notes/pay.md", payload: {}, evidence: "declined" },
+    ]);
 
     vi.restoreAllMocks();
     vi.spyOn(console, "log").mockImplementation(() => {});
-    const second = captureStdout();
+    const after = captureStdout();
     await promoteCmd({ dir: repo, json: true });
-    const parsed = JSON.parse(second[0] ?? "") as PromoteManifest;
-    expect(parsed.proposals).toHaveLength(0);
+    const suppressed = JSON.parse(after[0] ?? "") as PromoteManifest;
+    expect(suppressed.proposals).toHaveLength(0);
+    expect(suppressed.covered).toBe(1); // still covered — suppressed from proposal only.
   });
 
   it("persists the folded tally on the read path (derived cache, like the rollup Stop fold)", async () => {

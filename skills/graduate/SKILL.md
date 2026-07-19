@@ -43,8 +43,8 @@ write through the single applier.
    ```bash
    mage promote --json
    ```
-   It emits a `PromoteManifest`. Look only at the `action: "graduate"` proposals
-   here (`mage:groom`'s Phase 2 handles the `action: "note"` catch-net):
+   It emits a `PromoteManifest`. Every proposal is now `action: "graduate"` —
+   ADR-0038 deleted the `action: "note"` rung, so there is no other kind to filter out:
    ```jsonc
    {
      "action": "graduate",
@@ -161,7 +161,8 @@ stay a note.
 ## See also
 
 - **mage:groom** (`skills/groom/SKILL.md`) — surfaces the `action: "graduate"`
-  proposals this skill applies (and the `action: "note"` catch-net it does not).
+  proposals this skill applies. The `action: "note"` rung it used to exclude is gone
+  (ADR-0038) — recurrence no longer proposes notes at all.
 - **mage:optimize** (`skills/optimize/SKILL.md`) — the post-graduation half:
   reword a mis-firing trigger, or **demote** a skill that stops earning its keep
   (skill → note, the reverse of graduation).
