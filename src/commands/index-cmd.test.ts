@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { tmpDir } from "../../test/fixtures/kb.js";
 import type { HubProject } from "../paths.js";
-import { index } from "./index-cmd.js";
+import { index, SCAFFOLDING_WORDS } from "./index-cmd.js";
 import { init } from "./init.js";
 
 async function vault(): Promise<string> {
@@ -301,5 +301,71 @@ describe("mage index — hub projects + registry (ADR-0011/0012)", () => {
     const r = await index({ dir });
     expect(r.wings.length).toBe(5);
     expect(r.hierarchical).toBe(true);
+  });
+});
+
+describe("mage index — dedupe generated index payload (ADR-0039 §5)", () => {
+  it("drops keywords redundant with title, path, or type badge", async () => {
+    const dir = await vault();
+    await note(
+      dir,
+      "foo/bar.md",
+      "---\ntype: concept\nkeywords: [foo, bar, concept, the-foo-title]\n---\n# The Foo Title\n"
+    );
+    await index({ dir });
+    const idx = await readFile(join(dir, "mage", "INDEX.md"), "utf8");
+    
+    expect(idx).toContain("- `concept` [The Foo Title](notes/foo/bar.md)");
+    expect(idx).toMatch(/- `concept` \[The Foo Title\]\(notes\/foo\/bar\.md\)$/m);
+  });
+
+  it("survives novel keywords and multi-part keywords where only SOME parts appear", async () => {
+    const dir = await vault();
+    await note(
+      dir,
+      "test.md",
+      "---\ntype: default\nkeywords: [stale-binary, the-novel]\n---\n# The Title\n"
+    );
+    await index({ dir });
+    const idx = await readFile(join(dir, "mage", "INDEX.md"), "utf8");
+    
+    expect(idx).toContain("- `default` [The Title](notes/test.md) — stale-binary, the-novel");
+  });
+
+  it("drops each scaffolding stoplist word", async () => {
+    const dir = await vault();
+    await note(
+      dir,
+      "scaffold.md",
+      `---\ntype: default\nkeywords: [${SCAFFOLDING_WORDS.join(", ")}]\n---\n# Scaffold\n`
+    );
+    await index({ dir });
+    const idx = await readFile(join(dir, "mage", "INDEX.md"), "utf8");
+    
+    expect(idx).toContain("- `default` [Scaffold](notes/scaffold.md)");
+    expect(idx).toMatch(/- `default` \[Scaffold\]\(notes\/scaffold\.md\)$/m);
+  });
+
+  it("renders no lifecycle suffix for 'accepted' status or when no caution status applies", async () => {
+    const dir = await vault();
+    await note(dir, "a.md", "---\ntype: default\nstatus: accepted\nlastReviewed: 2026-07-01\n---\n# A\n");
+    await note(dir, "b.md", "---\ntype: default\nlastReviewed: 2026-07-02\n---\n# B\n");
+    await index({ dir });
+    const idx = await readFile(join(dir, "mage", "INDEX.md"), "utf8");
+    
+    expect(idx).toContain("- `default` [A](notes/a.md)\n");
+    expect(idx).toContain("- `default` [B](notes/b.md)\n");
+    expect(idx).not.toContain("_()");
+    expect(idx).not.toContain("accepted");
+  });
+
+  it("renders suffix for 'stale-suspect' and never renders reviewed date", async () => {
+    const dir = await vault();
+    await note(dir, "c.md", "---\ntype: default\nstatus: stale-suspect\nlastReviewed: 2026-07-03\n---\n# C\n");
+    await index({ dir });
+    const idx = await readFile(join(dir, "mage", "INDEX.md"), "utf8");
+    
+    expect(idx).toContain("- `default` [C](notes/c.md) _(stale-suspect)_");
+    expect(idx).not.toContain("2026-07-03");
   });
 });

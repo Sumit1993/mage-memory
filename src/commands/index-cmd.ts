@@ -241,15 +241,43 @@ function pushRooms(lines: string[], entries: ScannedNote[], wing: string, depth:
   }
 }
 
+export const SCAFFOLDING_WORDS = [
+  "considered",
+  "options",
+  "consequences",
+  "relations",
+  "context",
+  "decision",
+];
+
+function dedupeKeywords(e: ScannedNote): string[] {
+  if (!e.keywords.length) return [];
+  const normalize = (s: string) => s.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  const allParts = new Set([
+    ...normalize(e.title),
+    ...normalize(e.relPath),
+    ...normalize(e.type),
+  ]);
+  const scaffold = new Set(SCAFFOLDING_WORDS);
+
+  return e.keywords.filter((k) => {
+    if (scaffold.has(k.trim().toLowerCase())) return false;
+    const parts = normalize(k);
+    if (parts.length === 0) return true;
+    return !parts.every((p) => allParts.has(p));
+  });
+}
+
 function closetLine(e: ScannedNote): string {
-  const kw = e.keywords.length ? ` — ${e.keywords.join(", ")}` : "";
+  const kept = dedupeKeywords(e);
+  const kw = kept.length ? ` — ${kept.join(", ")}` : "";
   return `- \`${e.type}\` [${escapeLinkText(e.title)}](${encodePath(e.relPath)})${kw}${lifecycleSuffix(e)}`;
 }
 
 function lifecycleSuffix(e: ScannedNote): string {
   const bits: string[] = [];
-  if (e.status && e.status !== "active") bits.push(e.status);
-  if (e.lastReviewed) bits.push(`reviewed ${e.lastReviewed}`);
+  const caution = new Set(["superseded", "stale-suspect", "archived", "deprecated"]);
+  if (e.status && caution.has(e.status)) bits.push(e.status);
   return bits.length ? ` _(${bits.join(" · ")})_` : "";
 }
 
