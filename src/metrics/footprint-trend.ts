@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile, writeFile, mkdir, rename, rm, stat, open } from "node:fs/promises";
 import { metricsPath } from "../paths.js";
 import type { BudgetState } from "./footprint.js";
 
@@ -25,6 +25,10 @@ export interface FootprintTrend {
 
 function footprintTrendPath(docsRoot: string): string {
   return join(metricsPath(docsRoot), "footprint.json");
+}
+
+function lockPath(docsRoot: string): string {
+  return join(metricsPath(docsRoot), "footprint.json.lock");
 }
 
 function emptyTrend(): FootprintTrend {
@@ -69,38 +73,73 @@ export async function readTrend(docsRoot: string): Promise<FootprintTrend> {
 }
 
 export async function appendTrendRow(docsRoot: string, row: FootprintTrendRow): Promise<void> {
-  const trend = await readTrend(docsRoot);
-
-  const idx = trend.rows.findIndex((r) => r.session === row.session);
-  if (idx >= 0) {
-    trend.rows[idx] = row;
-  } else {
-    trend.rows.push(row);
-  }
-
-  const nowMs = Date.now();
-  const limitMs = TREND_MAX_AGE_DAYS * 86_400_000;
-
-  // Drop older than TREND_MAX_AGE_DAYS
-  let validRows = trend.rows.filter((r) => {
-    const d = new Date(r.ts);
-    if (Number.isNaN(d.getTime())) return false;
-    return nowMs - d.getTime() <= limitMs;
-  });
-
-  // Keep at most TREND_MAX_ROWS, newest wins
-  validRows.sort((a, b) => new Date(a.ts).getTime() - new Date(b.ts).getTime());
-  if (validRows.length > TREND_MAX_ROWS) {
-    validRows = validRows.slice(validRows.length - TREND_MAX_ROWS);
-  }
-
-  trend.rows = validRows;
-  trend.v = TREND_VERSION;
-
+  const mPath = metricsPath(docsRoot);
   try {
-    await mkdir(metricsPath(docsRoot), { recursive: true });
-    await writeFile(footprintTrendPath(docsRoot), JSON.stringify(trend, null, 2) + "\n", "utf8");
+    await mkdir(mPath, { recursive: true });
   } catch {
     // silently fail if unwritable
+  }
+
+  const fileLock = lockPath(docsRoot);
+  let locked = false;
+  let attempts = 0;
+  while (attempts < 5) {
+    try {
+      const fh = await open(fileLock, "wx");
+      await fh.close();
+      locked = true;
+      break;
+    } catch (e: any) {
+      if (e.code !== "EEXIST") return;
+      try {
+        const s = await stat(fileLock);
+        if (Date.now() - s.mtimeMs > 30000) {
+          await rm(fileLock, { force: true });
+          continue;
+        }
+      } catch {
+        // file might be gone
+      }
+    }
+    await new Promise((r) => setTimeout(r, 20));
+    attempts++;
+  }
+
+  if (!locked) return;
+
+  try {
+    const trend = await readTrend(docsRoot);
+
+    const idx = trend.rows.findIndex((r) => r.session === row.session);
+    if (idx >= 0) {
+      trend.rows[idx] = row;
+    } else {
+      trend.rows.push(row);
+    }
+
+    const nowMs = Date.now();
+    const limitMs = TREND_MAX_AGE_DAYS * 86_400_000;
+
+    let validRows = trend.rows.filter((r) => {
+      const d = new Date(r.ts);
+      if (Number.isNaN(d.getTime())) return false;
+      return nowMs - d.getTime() <= limitMs;
+    });
+
+    validRows.sort((a, b) => new Date(a.ts).getTime() - new Date(b.ts).getTime());
+    if (validRows.length > TREND_MAX_ROWS) {
+      validRows = validRows.slice(validRows.length - TREND_MAX_ROWS);
+    }
+
+    trend.rows = validRows;
+    trend.v = TREND_VERSION;
+
+    const tmpPath = join(mPath, `footprint.json.tmp.${Date.now()}.${Math.random().toString(36).slice(2)}`);
+    await writeFile(tmpPath, JSON.stringify(trend, null, 2) + "\n", "utf8");
+    await rename(tmpPath, footprintTrendPath(docsRoot));
+  } catch {
+    // silently fail
+  } finally {
+    await rm(fileLock, { force: true }).catch(() => {});
   }
 }

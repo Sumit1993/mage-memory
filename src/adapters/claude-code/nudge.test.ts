@@ -12,8 +12,9 @@ import {
 import type { ObserveEvent } from "../../observe/types.js";
 import { learningsPath, stagingPath } from "../../paths.js";
 import { emitNudge, nudgeCmd } from "./nudge.js";
-import { readTrend } from "../../metrics/footprint-trend.js";
 import * as footprintModule from "../../metrics/footprint.js";
+import { buildNudgeCommand } from "./nudge.js";
+import { readTrend } from "../../metrics/footprint-trend.js";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -485,5 +486,32 @@ describe("emitNudge — the two-channel SessionStart contract", () => {
   it("writes nothing when both channels are empty", () => {
     expect(capture(() => emitNudge(null, null))).toBe("");
     expect(capture(() => emitNudge("", ""))).toBe("");
+  });
+});
+
+describe("mage nudge — CLI command parsing", () => {
+  it("treats whitespace-only session_id as missing and falls back to sessionId", async () => {
+    const { dir, root } = await withKb();
+    const cmd = buildNudgeCommand();
+    const mockStdin = {
+      on: (event: string, cb: any) => {
+        if (event === "data") cb(Buffer.from(JSON.stringify({ cwd: dir, source: "startup", session_id: "   ", sessionId: "real-id" })));
+        if (event === "end") cb();
+      },
+    };
+    const originalStdin = process.stdin;
+    Object.defineProperty(process, "stdin", { value: mockStdin });
+
+    const spy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    try {
+      await cmd.parseAsync([], { from: "user" });
+      const trend = await readTrend(root);
+      expect(trend.rows.length).toBe(1);
+      expect(trend.rows[0]?.session).toBe("real-id");
+    } finally {
+      Object.defineProperty(process, "stdin", { value: originalStdin });
+      spy.mockRestore();
+    }
   });
 });

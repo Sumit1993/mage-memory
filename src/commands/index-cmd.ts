@@ -31,7 +31,7 @@ export interface IndexResult {
   wings: string[];
   hierarchical: boolean;
   written: string[];
-  memoryTier: 0 | 1 | 2 | 3;
+  memoryTier: 0 | 1 | 2;
 }
 
 /**
@@ -139,7 +139,7 @@ function pushLinkedRepos(lines: string[], reg: RegistryView): void {
 
 // ─── rendering ───────────────────────────────────────────────────────────────
 
-function renderFlat(entries: ScannedNote[], wings: string[], reg: RegistryView, tier: 0 | 1 | 2 = 0, blockquote?: string): string {
+function renderFlat(entries: ScannedNote[], wings: string[], reg: RegistryView, tier: 0 | 1 = 0, blockquote?: string): string {
   const lines: string[] = [GEN_MARKER, "", "# Index", "", gist(entries.length, wings.length)];
   if (blockquote) lines.push("", `> ${blockquote}`);
   lines.push("");
@@ -205,7 +205,7 @@ function renderMemory(
   hierarchical: boolean,
   reg: RegistryView,
   logWarn: boolean,
-): { content: string; tier: 0 | 1 | 2 | 3 } {
+): { content: string; tier: 0 | 1 | 2 } {
   const foldInline = !hierarchical || wings.length <= 1;
   const byteThreshold = Math.floor(BREACH_RATIO * AUTO_MEMORY_MAX_BYTES);
   const lineThreshold = Math.floor(BREACH_RATIO * AUTO_MEMORY_MAX_LINES);
@@ -224,27 +224,20 @@ function renderMemory(
   const capLines = AUTO_MEMORY_MAX_LINES;
 
   if (lines <= lineThreshold) {
-    const msg1 = `Lifecycle suffixes omitted — this index would exceed ${pct}% of the\n> ${capBytes} B recall budget. Run \`mage footprint\` for the breakdown.`;
+    const msg1 = `Keyword tails omitted — this index would exceed ${pct}% of the\n> ${capBytes} B recall budget. Run \`mage footprint\` for the breakdown.`;
     content = renderFlat(entries, wings, reg, 1, msg1);
     if (Buffer.byteLength(content, "utf8") <= byteThreshold) {
       if (logWarn) logger.warn(msg1.replace(/\n> /g, " "));
       return { content, tier: 1 };
     }
-
-    const msg2 = `Lifecycle suffixes and keyword tails omitted — this index would exceed ${pct}% of the\n> ${capBytes} B recall budget. Run \`mage footprint\` for the breakdown.`;
-    content = renderFlat(entries, wings, reg, 2, msg2);
-    if (Buffer.byteLength(content, "utf8") <= byteThreshold) {
-      if (logWarn) logger.warn(msg2.replace(/\n> /g, " "));
-      return { content, tier: 2 };
-    }
   }
 
   const triggeringDimension = lines > lineThreshold ? `${capLines}-line` : `${capBytes} B`;
-  const omitted = lines > lineThreshold ? "per-note lines omitted" : "lifecycle suffixes, keyword tails, and per-note lines omitted";
-  const msg3 = `Fallen back to category map (${omitted}) — this index would exceed ${pct}% of the\n> ${triggeringDimension} recall budget. Run \`mage footprint\` for the breakdown.`;
-  content = renderRootHierarchical(entries, wings, reg, msg3);
-  if (logWarn) logger.warn(msg3.replace(/\n> /g, " "));
-  return { content, tier: 3 };
+  const omitted = lines > lineThreshold ? "per-note lines omitted" : "keyword tails and per-note lines omitted";
+  const msg2 = `Fallen back to category map (${omitted}) — this index would exceed ${pct}% of the\n> ${triggeringDimension} recall budget. Run \`mage footprint\` for the breakdown.`;
+  content = renderRootHierarchical(entries, wings, reg, msg2);
+  if (logWarn) logger.warn(msg2.replace(/\n> /g, " "));
+  return { content, tier: 2 };
 }
 
 function renderWing(wing: string, entries: ScannedNote[], reg: RegistryView): string {
@@ -271,7 +264,7 @@ function renderWing(wing: string, entries: ScannedNote[], reg: RegistryView): st
  * per-wing file — an MD001 violation in a GENERATED artifact, which can only be fixed
  * here, never by editing the output.
  */
-function pushRooms(lines: string[], entries: ScannedNote[], wing: string, depth: 2 | 3, tier: 0 | 1 | 2 = 0): void {
+function pushRooms(lines: string[], entries: ScannedNote[], wing: string, depth: 2 | 3, tier: 0 | 1 = 0): void {
   const roomOf = (e: ScannedNote) => roomForWing(e, wing);
   const rooms = [...new Set(entries.map(roomOf))].sort((a, b) => {
     if (a === "") return -1;
@@ -313,10 +306,10 @@ function dedupeKeywords(e: ScannedNote): string[] {
   });
 }
 
-function closetLine(e: ScannedNote, tier: 0 | 1 | 2 = 0): string {
+function closetLine(e: ScannedNote, tier: 0 | 1 = 0): string {
   const kept = dedupeKeywords(e);
-  const kw = tier < 2 && kept.length ? ` — ${kept.join(", ")}` : "";
-  const suffix = tier < 1 ? lifecycleSuffix(e) : "";
+  const kw = tier < 1 && kept.length ? ` — ${kept.join(", ")}` : "";
+  const suffix = lifecycleSuffix(e);
   return `- \`${e.type}\` [${escapeLinkText(e.title)}](${encodePath(e.relPath)})${kw}${suffix}`;
 }
 

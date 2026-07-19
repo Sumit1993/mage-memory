@@ -399,40 +399,48 @@ keywords: [kw${i}, ${"k".repeat(20)}]
     const mem = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
     expect(mem).toContain("_(stale-suspect)_");
     expect(mem).toContain(" — kw");
-    expect(mem).not.toContain("> Lifecycle suffixes");
+    expect(mem).not.toContain("> Keyword tails");
   });
 
-  it("a KB just over threshold sheds tier 1 only — suffixes gone, keywords still present", async () => {
+  it("a KB just over threshold sheds tier 1 only — keyword tails gone, suffixes still present", async () => {
     const dir = await vault();
     await generateKb(dir, 110); 
     const r = await index({ dir, quiet: true });
     expect(r.memoryTier).toBe(1);
     const mem = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
-    expect(mem).not.toContain("_(stale-suspect)_"); // suffixes gone
-    expect(mem).toContain(" — kw"); // keywords still present
-    expect(mem).toContain("> Lifecycle suffixes omitted");
+    expect(mem).toContain("_(stale-suspect)_"); // suffixes never gone
+    expect(mem).not.toContain(" — kw"); // keywords gone
+    expect(mem).toContain("> Keyword tails omitted");
     expect(Buffer.byteLength(mem, "utf8")).toBeLessThanOrEqual(threshold);
   });
 
-  it("a KB still over after tier 1 sheds tier 2 — keywords gone", async () => {
+  it("a KB still over after tier 1 falls back to tier 2 — category map", async () => {
     const dir = await vault();
     await generateKb(dir, 130);
     const r = await index({ dir, quiet: true });
     expect(r.memoryTier).toBe(2);
     const mem = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
-    expect(mem).not.toContain("_(stale-suspect)_");
-    expect(mem).not.toContain(" — kw"); // keywords gone
-    expect(mem).toContain("> Lifecycle suffixes and keyword tails omitted");
-    expect(Buffer.byteLength(mem, "utf8")).toBeLessThanOrEqual(threshold);
+    expect(mem).toContain("_(stale-suspect)_"); // never dropped
+    expect(mem).toContain("Fallen back to category map");
   });
 
-  it("a KB still over after tier 2 falls back to tier 3 — category map", async () => {
+  it("a degraded render (any tier) still contains caution statuses", async () => {
     const dir = await vault();
-    await generateKb(dir, 160);
+    await note(
+      dir,
+      "huge.md",
+      `---
+type: default
+status: stale-suspect
+keywords: [kw1, ${"k".repeat(30000)}]
+---
+# Huge Note
+`
+    );
     const r = await index({ dir, quiet: true });
-    expect(r.memoryTier).toBe(3);
+    expect(r.memoryTier).toBe(1); // drops keyword tails
     const mem = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
-    expect(mem).toContain("Fallen back to category map");
+    expect(mem).toContain("_(stale-suspect)_");
   });
 
   it("a line-only breach goes straight to tier 3 and mentions line budget", async () => {
@@ -451,7 +459,7 @@ type: default
       );
     }
     const r = await index({ dir, quiet: true });
-    expect(r.memoryTier).toBe(3);
+    expect(r.memoryTier).toBe(2);
     const mem = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
     expect(mem).toContain("Fallen back to category map");
     expect(mem).toContain("200-line recall budget");

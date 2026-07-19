@@ -483,7 +483,7 @@ function parseHookPayload(raw: string): Record<string, unknown> | null {
 }
 
 function str(v: unknown): string | undefined {
-  return typeof v === "string" && v.length > 0 ? v : undefined;
+  return typeof v === "string" && v.trim().length > 0 ? v : undefined;
 }
 
 // ─── CLI registration (kept next to the handler so the flag list can't drift) ──
