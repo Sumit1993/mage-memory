@@ -4,7 +4,7 @@
 
 > 72 notes. Part of the [index](INDEX.md).
 
-### build
+## build
 
 - `note` [Mage integration test framework](notes/mage-integration-test-framework.md) — mage, integration, test, framework, build
 - `note` [Mage main branch protected](notes/mage-main-branch-protected.md) — mage, main, branch, protected, build
@@ -13,15 +13,15 @@
 - `gotcha` [Test files were never type-checked (tsconfig excluded them)](notes/test-files-were-excluded-from-typecheck.md) — typecheck, tsc, tests, tsconfig, exclude, vitest, tsup, esbuild, ci, fixture _(reviewed 2026-06-15)_
 - `gotcha` [Gotcha — weakening a test's assertions to make it pass can delete its purpose](notes/weakening-a-test-can-delete-its-purpose.md) — test, vacuous, assertions, green-suite, false-confidence, behaviour-change, fixture, regression, code-review, coderabbit _(reviewed 2026-07-19)_
 
-### capture
+## capture
 
 - `gotcha` [Gotcha — `mage connect` turns on capture but does not ensure the sink is gitignored](notes/connect-doesnt-ensure-ignores.md) — connect, gitignore, capture-sink, learnings, metrics, drift, migration, doctor, safe-by-default, leak, version-bump, hook-block _(reviewed 2026-06-09)_
 
-### cli
+## cli
 
 - `plan` [Plan — 0.0.10 "coherence": shrink the command surface, close the external-KB friction](notes/plan-0.0.10-coherence.md) — consolidation, commands, coherence, friction, external-kb, hub, link, connect, distill, promote, dream, doctor _(reviewed 2026-06-13)_
 
-### decisions
+## decisions
 
 - `decision` [0001 — A memory-first product (mage) supersedes specshub](decisions/0001-memory-first-product-supersedes-specshub.md) — 0001, memory, first, product, mage, supersedes, specshub, considered, options, consequences, relations, decisions _(reviewed 2026-06-01)_
 - `decision` [0002 — mage forks specshub (clean copy, fresh history) and reorients](decisions/0002-fork-and-reorient-specshub.md) — 0002, mage, forks, specshub, clean, copy, fresh, history, reorients, considered, options, consequences _(reviewed 2026-06-01)_
@@ -62,12 +62,12 @@
 - `decision` [0037 — doctor's remit extends to recall + skills readiness, on a bounded auto-fix line](decisions/0037-readiness-doctor-remit-and-autofix-line.md) — doctor, readiness, remit, recall, skills, auto-fix-line, host-config, read-only, fail-open, no-runtime, version-stamp, detect-and-instruct _(accepted · reviewed 2026-07-02)_
 - `decision` [0038 — promote's note-proposal rung is deleted; graduate repoints to note-read usage; recurrence becomes a digest annotation](decisions/0038-promote-note-rung-deleted-graduate-on-usage.md) — promote, note-proposal-rung, graduate, note-read-usage, failure-skeleton, digest-annotation, annotate-never-sort, deterministic-selection, killed-pattern, recurrence, adr-0029-deferral, keyword-fold _(accepted · reviewed 2026-07-19)_
 
-### design
+## design
 
 - `pointer` [mage — context & glossary](notes/context.md) — knowledge-base, note, wing, room, index, tag, moc, skill, work-unit, artifact, note-types, glossary _(reviewed 2026-07-01)_
 - `principle` [mage is one durable memory — of hard-earned knowledge](notes/mage-is-durable-memory.md) — charter, identity, unified-memory, durable, portable, notes-are-memories, hard-earned-knowledge, insight, procedure, gotcha, decision, pointer _(reviewed 2026-06-28)_
 
-### grooming
+## grooming
 
 - `pointer` [The boundary nudge — internals + where each piece lives](notes/boundary-nudge-internals.md) — nudge, boundary, digest, startup, session-start, watermark, once-per-chapter, teaser, two-channel, systemMessage, additionalContext, offer-first _(reviewed 2026-07-10)_
 - `gotcha` [Gotcha — a mature KB emits no capture terminals, so the keep-rate gate cannot calibrate on it](notes/mature-kb-emits-no-capture-terminals.md) — keep-rate, crown-threshold, a1-bake, calibration, mature-kb, capture-terminals, soak, prismalens, 0.1.0, gate, autonomy _(reviewed 2026-07-19)_
@@ -77,24 +77,24 @@
 - `gotcha` [Gotcha — promote's recurrence fold has near-zero precision on a mature KB](notes/promote-folds-mechanical-tokens.md) — promote, recurrence, precision, denoise, signature, keyword-fold, mechanical-tokens, watermark, rejected-buffer, soak, mature-kb _(reviewed 2026-07-19)_
 - `reference` [Replay-gate methodology — does a capture mechanism produce USEFUL knowledge?](notes/replay-gate-methodology.md) — replay, gate, methodology, capture, mechanism, produce, useful, knowledge, end, calibration, lessons, meta _(reviewed 2026-06-20)_
 
-### plan
+## plan
 
 - `principle` [mage v0.1 — finalized locks (read alongside PLAN-v0.1.md)](notes/plan-v0.1-locks.md) — naming, brand, mage, npm, package, mage-memory, bin, locks, authority, schema _(reviewed 2026-06-01)_
 - `plan` [mage v0.1 — detailed implementation plan](notes/plan-v0.1.md) — plan, milestones, fork, vault, note-model, index, skills, v0.1, build _(archived · reviewed 2026-06-01)_
 
-### redaction
+## redaction
 
 - `gotcha` [Gotcha — scope Gate-2 to the knowledge base, not the whole repo](notes/gate2-blocks-own-redaction-fixtures.md) — gate2, pre-commit, hook, redaction, scope, docs-root, fixtures, connect, dogfood _(reviewed 2026-06-08)_
 - `gotcha` [Gotcha — a Gate-2 false positive can stall an autonomous groom; never disable the hook to unblock](notes/gate2-fp-blocks-autonomy.md) — gate2, redaction, false-positive, autonomy, overseer, approver, hook, unblock, capture, soak _(reviewed 2026-06-23)_
 - `gotcha` [Gotcha — key bodies with `-`/`_` partially leak past the high-entropy detector](notes/redaction-anthropic-key-detector.md) — gotcha, key, bodies, partially, leak, past, high, entropy, detector, mage, redaction _(reviewed 2026-06-07)_
 
-### release
+## release
 
 - `feedback` [Dogfood before release](notes/dogfood-before-release.md) — dogfood, before, release, mage
 - `feedback` [No emojis in releases](notes/no-emojis-in-releases.md) — emojis, releases, mage, release
 - `gotcha` [A release bump touches MORE than package.json — release-please now owns it](notes/release-bump-touches-many-artifacts.md) — release, release-please, version, bump, changelog, readme, badge, plugin, marketplace, consistency, hygiene, pat _(reviewed 2026-06-15)_
 
-### roadmap
+## roadmap
 
 - `reference` [Mining agentmemory's design into mage — files-native translation map](notes/agentmemory-mining-map.md) — agentmemory, iii, server-inverse, obsidian-ui, import-harvest, consolidation, auto-capture, dream, feeder, connect, mining, roadmap _(reviewed 2026-06-09)_
 - `plan` [mage — future thoughts (the standing idea inbox)](notes/future-thoughts.md) — future-thoughts, backlog, ideas, inbox, taxonomy, hierarchy, wings, dashboard, graph, leiden, graphify, ingest _(reviewed 2026-06-30)_

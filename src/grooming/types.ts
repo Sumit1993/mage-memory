@@ -31,10 +31,11 @@ export interface SessionFold {
 /**
  * The persisted promote tally — gitignored `.metrics/promote.json`.
  *
- * v2 (ADR-0038 §7) replaced the `signatures` keyword fold with `notes` (note-read
+ * v4 (ADR-0038 §7) replaced the `signatures` keyword fold with `notes` (note-read
  * usage). The per-session offset/chapter engine is UNCHANGED — it was never the bug;
  * only what gets counted per chapter changed. A `v` mismatch resets counts AND offsets
- * (`normalizeTally`), which is correct here: v1 counts are uninterpretable under v2 keys.
+ * (`normalizeTally`), which is correct here: v3 counts are uninterpretable under v4 keys.
+ * `PROMOTE_VERSION` in tally.ts is the single source of truth for the number.
  */
 export interface PromoteTally {
   v: number;

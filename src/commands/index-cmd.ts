@@ -139,7 +139,7 @@ function renderFlat(entries: ScannedNote[], wings: string[], reg: RegistryView):
   const lines: string[] = [GEN_MARKER, "", "# Index", "", gist(entries.length, wings.length), ""];
   for (const wing of wings) {
     lines.push(`## ${wing}${wingDecoration(reg, wing)}`, "");
-    pushRooms(lines, wingEntries(entries, wing), wing);
+    pushRooms(lines, wingEntries(entries, wing), wing, 3); // root index: rooms sit under `## wing`
   }
   const cross = entries.filter((e) => e.wings.length === 0);
   if (cross.length > 0) {
@@ -211,7 +211,7 @@ function renderWing(wing: string, entries: ScannedNote[], reg: RegistryView): st
     `> ${entries.length} ${plural(entries.length, "note")}. Part of the [index](INDEX.md).`,
     "",
   ];
-  pushRooms(lines, entries, wing);
+  pushRooms(lines, entries, wing, 2); // per-wing index: the wing is the `#` title
   return `${lines.join("\n").replace(/\n+$/, "")}\n`;
 }
 
@@ -219,8 +219,14 @@ function renderWing(wing: string, entries: ScannedNote[], reg: RegistryView): st
  * Append room-grouped closet lines for one wing (rooms sorted; the no-room group
  * first, unlabeled). A note's room is resolved *per wing* so a multi-homed note
  * sits under the right room in each wing it's listed in.
+ *
+ * `depth` is the room heading level, and it differs by document: the ROOT index nests
+ * rooms under an `## wing` heading (so rooms are `###`), while a per-wing index has the
+ * wing as its `#` title (so rooms are `##`). Hardcoding `###` skipped a level in the
+ * per-wing file — an MD001 violation in a GENERATED artifact, which can only be fixed
+ * here, never by editing the output.
  */
-function pushRooms(lines: string[], entries: ScannedNote[], wing: string): void {
+function pushRooms(lines: string[], entries: ScannedNote[], wing: string, depth: 2 | 3): void {
   const roomOf = (e: ScannedNote) => roomForWing(e, wing);
   const rooms = [...new Set(entries.map(roomOf))].sort((a, b) => {
     if (a === "") return -1;
@@ -229,7 +235,7 @@ function pushRooms(lines: string[], entries: ScannedNote[], wing: string): void 
   });
   for (const room of rooms) {
     const group = entries.filter((e) => roomOf(e) === room);
-    if (room !== "") lines.push(`### ${room}`, "");
+    if (room !== "") lines.push(`${"#".repeat(depth)} ${room}`, "");
     for (const e of group) lines.push(closetLine(e));
     lines.push("");
   }
