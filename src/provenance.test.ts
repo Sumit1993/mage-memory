@@ -33,6 +33,17 @@ describe("stampProvenance", () => {
     const fm: NoteFrontmatter = { type: "note" };
     expect(stampProvenance(fm, {})).toBe(fm); // same reference — no empty provenance block added
   });
+
+  it("fills source when absent (the capture cohort mark)", () => {
+    const out = stampProvenance({ type: "note" }, { repo: "mage-memory", source: "capture" });
+    expect(out.provenance).toEqual({ repo: "mage-memory", source: "capture" });
+  });
+
+  it("never clobbers a pre-set source (an adopt-marked note stays adopt)", () => {
+    const fm: NoteFrontmatter = { provenance: { source: "adopt" } };
+    const out = stampProvenance(fm, { repo: "auto", source: "capture", autonomy: "overseer" });
+    expect(out.provenance).toEqual({ source: "adopt", repo: "auto", autonomy: "overseer" });
+  });
 });
 
 // ─── resolveCreationStamp — autonomy gating, repo basename, commit fail-open ───
@@ -57,6 +68,11 @@ describe("resolveCreationStamp", () => {
     const stamp = await resolveCreationStamp(resolved);
     expect(stamp.repo).toBe(basename(resolved.repo));
     expect(stamp).not.toHaveProperty("commit"); // a fresh tmp KB is not a git repo
+  });
+
+  it("defaults source to 'capture' (the promote chokepoint is the capture cohort)", async () => {
+    const { resolved } = await withKb({ kind: "repo" });
+    expect((await resolveCreationStamp(resolved)).source).toBe("capture");
   });
 
   it("reads autonomy via resolved.repo for a hub-owned project (root !== repo)", async () => {

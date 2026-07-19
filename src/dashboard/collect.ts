@@ -28,6 +28,7 @@ import { analyzeDream } from "../dream.js";
 import { logger } from "../logger.js";
 import type { Proposal } from "../grooming/types.js";
 import { readProposals } from "../grooming/proposals.js";
+import { type KeepRateLedger, readKeepRateLedger, summarizeKeepRate } from "../grooming/reconcile.js";
 import { readTally } from "../grooming/tally.js";
 import { readRollup, summarize } from "../metrics/rollup.js";
 import { readNote, type NoteFrontmatter } from "../note.js";
@@ -45,6 +46,7 @@ import type {
   DashboardActivity,
   DashboardCommit,
   DashboardData,
+  DashboardKeepRate,
   DashboardGraphEdge,
   DashboardGraphNode,
   DashboardLadderClimb,
@@ -102,14 +104,16 @@ export async function collectDashboardData(
   const hubMeta = kind === "hub" ? await readHubMetadataSafe(root) : null;
 
   // ── every optional metrics source, each fail-open in its own reader. ──
-  const [rollup, proposals, tally, scratch, lastCommit, dream] = await Promise.all([
+  const [rollup, proposals, tally, scratch, lastCommit, dream, keepLedger] = await Promise.all([
     readRollup(root), // fail-open → empty rollup
     readProposals(root), // fail-open → []
     readTally(root), // fail-open → empty tally
     countScratch(learningsPath(root)), // fail-open → 0
     lastCommitOf(root), // fail-open → null
     analyzeDream(root, { now, staleDays, hubMeta }), // pure fs; reuses scan internally
+    readKeepRateLedger(root), // fail-open → empty ledger (READ-only; the nudge reconciles/writes)
   ]);
+  const keepRate = toDashboardKeepRate(keepLedger);
 
   const dashNotes = notes.map(toDashboardNote);
   const skills = summarizeSkills(rollup);
@@ -152,6 +156,27 @@ export async function collectDashboardData(
       lastCommit,
     },
     ...(kind === "hub" ? { registry: await buildRegistry(hubMeta) } : {}),
+    ...(keepRate ? { keepRate } : {}),
+  };
+}
+
+/**
+ * Project the reject-ledger into the dashboard tile (ADR-0031 P2) — the capture-only crown
+ * signal, mirroring {@link summarizeKeepRate}. Returns null (tile hidden) when there are no
+ * capture terminals yet. The threshold is left null here (the nudge line renders the configured
+ * value; the dashboard read-path doesn't plumb the repo config).
+ */
+function toDashboardKeepRate(ledger: KeepRateLedger): DashboardKeepRate | null {
+  const { capture } = summarizeKeepRate(ledger);
+  if (capture.terminals < 1) return null;
+  return {
+    rate: capture.rate,
+    terminals: capture.terminals,
+    keep: capture.keep,
+    edited: capture.edited,
+    discard: capture.discard,
+    reject: capture.reject,
+    threshold: null,
   };
 }
 

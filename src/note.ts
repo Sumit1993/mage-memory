@@ -15,6 +15,13 @@ export interface Provenance {
    * operator / human-confirmed. The reject-ledger's keep-vs-revert signal reads it.
    */
   autonomy?: "approver" | "overseer";
+  /**
+   * Cohort mark stamped at note creation (ADR-0031 Phase 2): "capture" = a fresh
+   * autonomous capture at the promote chokepoint (the crown keep-rate cohort);
+   * "adopt" = onboarded pre-existing knowledge (ADR-0034). Absent ⇒ legacy/unmarked.
+   * The reject-ledger reports the keep-rate over `source === "capture"` only.
+   */
+  source?: "capture" | "adopt";
 }
 
 /**

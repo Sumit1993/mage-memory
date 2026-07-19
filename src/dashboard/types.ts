@@ -196,6 +196,24 @@ export interface DashboardRegistryEntry {
   cloned: boolean;
 }
 
+/**
+ * The autonomy reject-ledger's crown signal (ADR-0031 P2) — the keep-vs-revert rate over
+ * the agent's autonomously-authored notes, `source === "capture"` cohort ONLY. Omitted from
+ * {@link DashboardData} entirely when there are no capture terminals yet (the tile hides).
+ */
+export interface DashboardKeepRate {
+  /** (keep + edited) / terminals, 0..1. */
+  rate: number;
+  /** Total capture terminals (keep + edited + discard + reject). */
+  terminals: number;
+  keep: number;
+  edited: number;
+  discard: number;
+  reject: number;
+  /** The pre-registered crown threshold (0..1), or null when unset (ADR-0031 defers the value). */
+  threshold: number | null;
+}
+
 /** The complete, JSON-serializable snapshot of ONE knowledge base (ADR-0020). */
 export interface DashboardData {
   meta: DashboardMeta;
@@ -210,4 +228,6 @@ export interface DashboardData {
   health: DashboardHealth;
   /** Hub-only registry pointers; omitted entirely for an in-repo KB. */
   registry?: DashboardRegistryEntry[];
+  /** The autonomy keep-rate crown signal (ADR-0031 P2); omitted when no capture terminals yet. */
+  keepRate?: DashboardKeepRate;
 }
