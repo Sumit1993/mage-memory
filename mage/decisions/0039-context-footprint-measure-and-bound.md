@@ -164,11 +164,12 @@ at **~25,600 B _or_ 200 lines**, whichever comes first. `AUTO_MEMORY_MAX_LINES =
 enforced alongside the byte cap, at the same warn/breach ratios, and **`state` is the worse of
 the two**. The report shows both.
 
-Measuring only bytes leaves a second invisible cliff, and it is not far off: this KB is at
-**57.2% of the byte budget and 55.5% of the line budget** — the byte cap binds first by only
-~4 notes, at a crossover of **175.1 B/entry** against this KB's **180.6 B/entry**, a ~3%
-margin. Below that crossover the line cap binds first and a byte-only meter reports `ok` while
-the host silently truncates — the exact failure this ADR exists to kill.
+Measuring only bytes leaves a second invisible cliff, and it is not far off. Measured against
+the caps: this KB is at **51.5% of the byte cap (13,187 / 25,600 B)** and **55% of the line cap
+(110 / 200)** — so **lines are already the binding dimension**, not a future concern. The
+crossover is **175.1 B/entry** against this KB's **180.6 B/entry**, a ~3% margin. Below that
+crossover the line cap binds first and a byte-only meter reports `ok` while the host silently
+truncates — the exact failure this ADR exists to kill.
 
 **The cap governs the auto-memory file (`MEMORY.md`) only.** `AGENTS.md`, `CLAUDE.md`, and
 `INDEX.md` load via `@import` and are not governed by it. The report shows all surfaces but
@@ -232,9 +233,15 @@ failure §10 exists to prevent.
 
 When generation would breach the budget, tiers are shed cheapest-value-first:
 
-1. **Tier 1** — drop the `_(…)_` suffix entirely (including caution statuses).
-2. **Tier 2** — drop the keyword tail.
-3. **Tier 3** — fall back to the bounded category map (`INDEX.md`'s shape).
+1. **Tier 1** — drop the keyword tail.
+2. **Tier 2** — fall back to the bounded category map (`INDEX.md`'s shape).
+
+**A suffix-dropping tier was specified and then deleted** (2026-07-19, on review). After §5 the
+`_(…)_` suffix contains *only* caution statuses — **~141 B across 12 notes on this KB**. A tier
+that sheds it would buy almost nothing and would strip the `stale-suspect` / `superseded` /
+`archived` markers that `AGENTS.md` instructs agents to act on, at exactly the moment the index
+is most degraded and least trustworthy. It also directly contradicted §5's "must survive".
+**Caution statuses are never shed.** The cheapest thing worth dropping is the keyword tail.
 
 Each tier is entered only if the previous was insufficient.
 
@@ -242,26 +249,26 @@ Each tier is entered only if the previous was insufficient.
 result exceeds `BREACH_RATIO × cap` (90% × 25,600 = **23,040 B**), shed the next tier and
 re-render. Stop at the first tier that fits.
 
-**Measured engagement points** (implementation, 2026-07-19; synthetic entries averaging ~218 B):
+**Measured engagement points** (implementation, 2026-07-19; synthetic entries averaging ~218 B;
+re-numbered after the suffix tier was deleted):
 
 | Tier | Engages at | Result |
 | --- | ---: | --- |
-| 0 — full fidelity | up to ~100 notes | ~21,800 B |
-| 1 — drop lifecycle suffix | ~110 notes | 23,980 → ~22,000 B |
-| 2 — drop keyword tail | ~130 notes | 28,340 → ~21,710 B |
-| 3 — category map | ~150 notes | fallback |
+| 0 — full fidelity | up to ~110 notes | ~21,800 B |
+| 1 — drop keyword tail | ~130 notes | 28,340 → ~21,710 B |
+| 2 — category map | ~150 notes | fallback |
 
 These counts are a function of *entry size*, not note count — this KB's real entries average
 **177 B** after §5, so its tiers engage later than the table suggests. The byte threshold is the
 contract; the note counts are illustrative only.
 
 **The ladder must be evaluated against both budget dimensions**, and this has a sharp
-consequence: **tiers 1 and 2 shed bytes but not lines.** Both leave exactly one line per entry,
-so a KB degrading under byte pressure buys itself *zero* line headroom, and every tier walks it
-closer to a line cliff a byte-only meter cannot see. **Only tier 3 (the category map) reduces
-line count.** A line breach therefore resolves to tier 3 directly; tiers 1 and 2 are no-ops
-against it. Announcements must name the dimension that triggered the degradation, so "shed
-keyword tails" never appears as the remedy for a problem it cannot fix.
+consequence: **tier 1 sheds bytes but not lines.** It leaves exactly one line per entry, so a KB
+degrading under byte pressure buys itself *zero* line headroom, and degrading walks it closer to
+a line cliff a byte-only meter cannot see. **Only tier 2 (the category map) reduces line
+count.** A line breach therefore resolves to tier 2 directly; tier 1 is a no-op against it.
+Announcements must name the dimension that triggered the degradation, so "shed keyword tails"
+never appears as the remedy for a problem it cannot fix.
 
 **Output MUST remain a pure function of the KB.** Prioritizing by note-read usage was
 considered and **rejected**: `MEMORY.md` is generated *and committed*, so usage-dependent
@@ -316,8 +323,9 @@ ADR-0033's *judgment* was sound and only its estimate was wrong.
   MUST be called out in the release notes rather than discovered.
 - **Yield metrics start empty.** They need ~30 sessions to mean anything. The report MUST render
   "insufficient data", never zeros, which would read as "mage is never used."
-- **~54% of pointers are not locally measurable**, so pointer leverage is a partial ceiling over
-  a partial sample. Disclosed in output, never silently omitted.
+- **~21% of pointers are not resolvable** (39 unmeasurable + 25 dead, of 307), so pointer
+  leverage is a partial ceiling over a partial sample. Disclosed in output, never silently
+  omitted.
 - mage now has an opinion about its own size, and a KB can be told it is too big. That is the
   point: the alternative was silent recall loss.
 - A second harness with a different cap moves one constant in the CC adapter — and *that* is

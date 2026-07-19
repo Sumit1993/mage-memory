@@ -57,7 +57,7 @@ it the right recall vector:
 The binding constraint is **context cost**: imports *load in full and do not reduce context*. So we
 import only what is **bounded**. mage's index is already two files:
 
-- `INDEX.md` — the **bounded root** (a *wings* map: "51 notes across 1 wing → `_index.mage.md`",
+- `INDEX.md` — the **bounded root** (a *wings* map: "N notes across 1 wing → `_index.mage.md`",
   measured **266 B** in 2026-07; grows with **wings** — ≈never — not with notes).
 - `_index.mage.md` — the **per-note** list (grows linearly with notes).
 
