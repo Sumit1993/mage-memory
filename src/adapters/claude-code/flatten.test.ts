@@ -1,9 +1,9 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { withKb } from "../../../test/fixtures/kb.js";
+import { tmpDir, withKb } from "../../../test/fixtures/kb.js";
 import { run } from "../../shell.js";
-import { flattenCcNote, flattenStagedNotes, flattenWorktreeNotes } from "./flatten.js";
+import { flattenAllNotes, flattenCcNote, flattenStagedNotes, flattenWorktreeNotes } from "./flatten.js";
 import { isCcShaped } from "./cc-note.js";
 import { parseNote } from "../../note.js";
 
@@ -284,6 +284,17 @@ describe("flattenStagedNotes", () => {
     const res = await flattenStagedNotes(dir);
     expect(res).toEqual({ flattened: [] });
   });
+
+  it("fails open when the `git` BINARY is missing (the probe rejects, it does not exit non-zero)", async () => {
+    const { dir } = await withKb();
+    const realPath = process.env.PATH;
+    process.env.PATH = "";
+    try {
+      expect(await flattenStagedNotes(dir)).toEqual({ flattened: [] });
+    } finally {
+      process.env.PATH = realPath;
+    }
+  });
 });
 
 describe("flattenWorktreeNotes (the Stop sweep)", () => {
@@ -318,5 +329,131 @@ describe("flattenWorktreeNotes (the Stop sweep)", () => {
   it("fails open on a non-repo path", async () => {
     const { dir } = await withKb();
     expect(await flattenWorktreeNotes(dir)).toEqual({ flattened: [] });
+  });
+});
+
+// ─── flattenAllNotes (the ADR-0035 at-rest backfill) ───────────────────────────
+
+describe("flattenAllNotes (the --all backfill sweep)", () => {
+  it("flattens a CC-shaped note that is already COMMITTED and CLEAN — unreachable by the other two sweeps", async () => {
+    const { dir } = await withKb();
+    await initRepo(dir);
+    await addFile(dir, "mage/notes/old-cc.md", CC_FRESH);
+    await run("git", ["-C", dir, "commit", "-q", "-m", "init"], { throwOnError: true });
+
+    // Prove the note is genuinely clean and untouched by the git-state-based sweeps —
+    // the exact condition flattenWorktreeNotes/flattenStagedNotes can never see.
+    const modified = await run("git", ["-C", dir, "diff", "--name-only"]);
+    expect(modified.stdout).not.toContain("old-cc.md");
+    const staged = await run("git", ["-C", dir, "diff", "--cached", "--name-only"]);
+    expect(staged.stdout).not.toContain("old-cc.md");
+
+    const res = await flattenAllNotes(dir);
+
+    expect(res.flattened).toContain("mage/notes/old-cc.md");
+    const onDisk = await readFile(join(dir, "mage/notes/old-cc.md"), "utf8");
+    expect(onDisk).not.toContain("node_type");
+    expect(onDisk).toContain("type: pointer");
+  });
+
+  it("leaves an already-flat committed note byte-identical", async () => {
+    const { dir } = await withKb();
+    await initRepo(dir);
+    await addFile(dir, "mage/notes/plain.md", PLAIN);
+    await run("git", ["-C", dir, "commit", "-q", "-m", "init"], { throwOnError: true });
+
+    const res = await flattenAllNotes(dir);
+
+    expect(res.flattened).toHaveLength(0);
+    expect(await readFile(join(dir, "mage/notes/plain.md"), "utf8")).toBe(PLAIN);
+  });
+
+  it("skips a generated artifact (root INDEX.md) and a file outside the docs root", async () => {
+    const { dir } = await withKb();
+    await initRepo(dir);
+    // Reserved basename AT the docs root — generated, dropped by isGeneratedArtifact.
+    await addFile(dir, "mage/INDEX.md", CC_FRESH);
+    // Outside the docs root entirely (not under mage/) — never enumerated.
+    await addFile(dir, "OUTSIDE.md", CC_FRESH);
+    await run("git", ["-C", dir, "commit", "-q", "-m", "init"], { throwOnError: true });
+
+    const res = await flattenAllNotes(dir);
+
+    expect(res.flattened).toHaveLength(0);
+    expect(await readFile(join(dir, "mage/INDEX.md"), "utf8")).toBe(CC_FRESH);
+    expect(await readFile(join(dir, "OUTSIDE.md"), "utf8")).toBe(CC_FRESH);
+  });
+
+  it("flattens a subdirectory note that shares a reserved basename, but NOT the generated root INDEX.md", async () => {
+    const { dir } = await withKb();
+    await initRepo(dir);
+    // An AUTHORED note that merely shares the INDEX.md basename in a subdir — author
+    // content, must be reachable and flattened (isGeneratedArtifact scopes the reserved
+    // names to the docs ROOT only).
+    await addFile(dir, "mage/notes/sub/INDEX.md", CC_FRESH);
+    // The genuinely generated root index — must be left untouched.
+    await addFile(dir, "mage/INDEX.md", PLAIN);
+    await run("git", ["-C", dir, "commit", "-q", "-m", "init"], { throwOnError: true });
+
+    const res = await flattenAllNotes(dir);
+
+    expect(res.flattened).toEqual(["mage/notes/sub/INDEX.md"]);
+    expect(await readFile(join(dir, "mage/notes/sub/INDEX.md"), "utf8")).toContain("type: pointer");
+    expect(await readFile(join(dir, "mage/INDEX.md"), "utf8")).toBe(PLAIN); // root index untouched
+  });
+
+  it("flattens a STANDALONE hub KB with NO git repo (git-state-independent — the --all contract)", async () => {
+    // A hub docs root that is NOT a git repo at all. resolveDocsScope is git-gated and
+    // would no-op here; flattenAllNotes must still discover and flatten its CC notes.
+    const { dir } = await withKb({ kind: "hub" });
+    await mkdir(join(dir, "notes"), { recursive: true });
+    await writeFile(join(dir, "notes/standalone-cc.md"), CC_FRESH);
+
+    const res = await flattenAllNotes(dir);
+
+    expect(res.flattened).toEqual(["notes/standalone-cc.md"]); // docs-root-relative (no git toplevel)
+    const onDisk = await readFile(join(dir, "notes/standalone-cc.md"), "utf8");
+    expect(onDisk).not.toContain("node_type");
+    expect(onDisk).toContain("type: pointer");
+  });
+
+  it("reports docs-root-relative paths for an EXTERNAL-mode KB (docs root outside the git repo)", async () => {
+    // mode=external: the code repo is a git repo, but its docs root is hub-owned and lives in
+    // a DIFFERENT tree. Basing reported paths on the code repo's toplevel would emit `../../…`,
+    // so the docs root must win as the base whenever it isn't beneath the toplevel.
+    const { dir, root } = await withKb({ kind: "external" });
+    await initRepo(dir); // the CODE repo is a real git repo — this is what makes the probe succeed
+    await mkdir(join(root, "notes"), { recursive: true });
+    await writeFile(join(root, "notes/external-cc.md"), CC_FRESH);
+
+    const res = await flattenAllNotes(dir);
+
+    expect(res.flattened).toEqual(["notes/external-cc.md"]);
+    for (const p of res.flattened) expect(p).not.toContain(".."); // never escapes the docs root
+    expect(await readFile(join(root, "notes/external-cc.md"), "utf8")).toContain("type: pointer");
+  });
+
+  it("flattens when the `git` BINARY is missing (spawn error, not a non-zero exit)", async () => {
+    // The toplevel probe REJECTS (ENOENT) rather than returning code!==0 when git isn't on
+    // PATH — a distinct failure mode from "not a repo". --all must still fail open to the
+    // docs root, since a git-less machine is exactly where a standalone KB lives.
+    const { dir } = await withKb({ kind: "hub" });
+    await mkdir(join(dir, "notes"), { recursive: true });
+    await writeFile(join(dir, "notes/no-git-binary.md"), CC_FRESH);
+
+    const realPath = process.env.PATH;
+    process.env.PATH = "";
+    try {
+      const res = await flattenAllNotes(dir);
+      expect(res.flattened).toEqual(["notes/no-git-binary.md"]);
+      expect(await readFile(join(dir, "notes/no-git-binary.md"), "utf8")).toContain("type: pointer");
+    } finally {
+      process.env.PATH = realPath;
+    }
+  });
+
+  it("fails open on a non-KB dir", async () => {
+    const dir = await tmpDir();
+    expect(await flattenAllNotes(dir)).toEqual({ flattened: [] });
   });
 });

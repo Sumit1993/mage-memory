@@ -30,10 +30,10 @@
 
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, relative, resolve, sep } from "node:path";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { parseNote, stringifyNote } from "../../note.js";
 import { resolveDocsRoot } from "../../paths.js";
-import { isGeneratedArtifact } from "../../scan.js";
+import { isGeneratedArtifact, listNotePaths } from "../../scan.js";
 import { run } from "../../shell.js";
 import { isCcShaped, recoverCcFrontmatter } from "./cc-note.js";
 
@@ -85,6 +85,25 @@ interface DocsScope {
 }
 
 /**
+ * The git toplevel for `repoPath`, or null when there isn't one. FAIL-OPEN: `run` REJECTS
+ * on spawn errors (missing `git` binary, PATH issue), not just on a non-zero exit, so the
+ * probe is caught here — every caller treats "no toplevel" as "not a repo".
+ */
+async function gitToplevel(repoPath: string): Promise<string | null> {
+  const res = await run("git", ["-C", repoPath, "rev-parse", "--show-toplevel"]).catch(
+    () => null,
+  );
+  if (!res || res.code !== 0) return null;
+  return res.stdout.trim() || null;
+}
+
+/** True when `child` is `parent` itself or nested inside it (no `../` escape). */
+function isUnder(parent: string, child: string): boolean {
+  const rel = relative(parent, child);
+  return rel === "" || (!rel.startsWith(`..${sep}`) && rel !== ".." && !isAbsolute(rel));
+}
+
+/**
  * Resolve the git toplevel for `repoPath` plus a scope filter for paths under the mage
  * docs root. git's `--name-only` output is TOPLEVEL-relative, so all git ops and
  * worktree writes key off `top`. Returns null (fail-open) when there's no repo or no KB.
@@ -92,9 +111,7 @@ interface DocsScope {
 async function resolveDocsScope(repoPath: string): Promise<DocsScope | null> {
   const docs = await resolveDocsRoot(repoPath).catch(() => null);
   if (!docs) return null;
-  const topRes = await run("git", ["-C", repoPath, "rev-parse", "--show-toplevel"]);
-  if (topRes.code !== 0) return null;
-  const top = topRes.stdout.trim();
+  const top = await gitToplevel(repoPath);
   if (!top) return null;
   const prefix = relative(top, docs.root).split(sep).join("/");
   const flat = prefix === "" || prefix === ".";
@@ -248,6 +265,71 @@ export async function flattenWorktreeNotes(repoPath: string): Promise<FlattenSta
       result.flattened.push(file);
     } catch {
       // Fail-open per file: a normalizer must never break the agent's turn.
+    }
+  }
+  return result;
+}
+
+/**
+ * Sweep EVERY note under the mage docs root, regardless of git state — the ADR-0035
+ * BACKFILL mode (`mage flatten --all`). {@link flattenWorktreeNotes} and
+ * {@link flattenStagedNotes} only ever reach a note that git currently reports as
+ * modified/untracked/staged; a CC-shaped note committed BEFORE the flatten boundary
+ * existed is clean and untouched by either, so it stays harness-shaped forever unless
+ * something walks the whole tree once. This is that one-time (or periodic) full sweep:
+ * enumerate every `.md` under the docs root ({@link listNotePaths} — the same
+ * SKIP_DIRS/reserved-name discipline `scanNotes` uses for `mage index`), skip anything
+ * mage generates ({@link isGeneratedArtifact}), then run the identical
+ * flatten-if-CC-shaped/write/re-flatten-is-a-noop pipeline as the other two sweeps.
+ * Every candidate here is already rooted AT the docs root by construction, so there is
+ * no separate `inScope` predicate to apply (unlike the git-diff-derived candidate
+ * lists above, which must filter an arbitrary repo-wide path list down to the KB).
+ *
+ * This mode enumerates from the docs root, NOT from git, so it must run in a
+ * standalone/non-git KB too — hence it resolves the root via {@link resolveDocsRoot}
+ * (the git-free resolver `mage index` uses), NOT `resolveDocsScope` (which is git-gated
+ * and would wrongly no-op a non-repo KB, contradicting the "regardless of git state"
+ * contract). git is consulted only best-effort, to report toplevel-relative paths that
+ * match the other two sweeps when this IS a repo; a standalone KB falls back to
+ * docs-root-relative paths.
+ *
+ * FAIL-OPEN end to end: no KB → empty result; any per-file error is skipped, never
+ * thrown. Does not stage or touch the index (no worktree-vs-index games) — this mode
+ * only rewrites files that are already clean in git's eyes, so nothing new becomes
+ * "dirty" that wasn't already going to be flattened identically on its next natural
+ * pass through the Stop/pre-commit sweeps.
+ */
+export async function flattenAllNotes(repoPath: string): Promise<FlattenStagedResult> {
+  const empty: FlattenStagedResult = { flattened: [] };
+  const docs = await resolveDocsRoot(repoPath).catch(() => null);
+  if (!docs) return empty;
+  const root = docs.root;
+
+  // Best-effort git toplevel so reported paths match the other sweeps (toplevel-relative)
+  // when this is a repo; a standalone KB reports docs-root-relative paths (top === root).
+  // A toplevel is only a valid BASE when the docs root actually lives under it: in
+  // mode=external the KB is hub-owned (`<hub_path>/projects/<project>/`), i.e. a different
+  // repo entirely, so `relative(top, abs)` would emit `../../…` and break the reported-path
+  // contract. Fall back to the docs root whenever it isn't beneath the toplevel.
+  const gitTop = await gitToplevel(repoPath);
+  const top = gitTop && isUnder(gitTop, root) ? gitTop : root;
+
+  // listNotePaths returns paths already relative to the docs root — exactly the shape
+  // isGeneratedArtifact expects — so no separate inScope/toDocsRel mapping is needed here.
+  const relPaths = (await listNotePaths(root).catch(() => [] as string[])).filter(
+    (f) => !isGeneratedArtifact(f),
+  );
+
+  const result: FlattenStagedResult = { flattened: [] };
+  for (const rel of relPaths) {
+    try {
+      const abs = resolve(root, rel);
+      const { text, changed } = flattenCcNote(await readFile(abs, "utf8"));
+      if (!changed) continue; // not CC-shaped / already flat → nothing to do.
+      await writeFile(abs, text);
+      result.flattened.push(relative(top, abs).split(sep).join("/"));
+    } catch {
+      // Fail-open per file: a full-KB sweep must never abort on one pathological note.
     }
   }
   return result;
