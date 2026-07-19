@@ -242,9 +242,16 @@ failure §10 exists to prevent.
   cannot lose an append, because the appended-to inode *becomes* the archive rather than being
   discarded.
 
+  Rotation moves rows out of the live file, so **`readTrend` folds the archives too** (newest
+  first, stopping once the retained window is satisfied) — otherwise the trend horizon collapses
+  to ~1 sample immediately after a rotation. Archives are **purged past `TREND_MAX_AGE_DAYS`**,
+  which is what actually bounds total storage; rotation alone only bounds the *live* file. Both
+  follow `src/observe/store.ts`'s rotate-then-purge convention. Folding and purging are safe
+  because neither rewrites a file a hook may be appending to.
+
   This is the second time this store was fixed by removing a mechanism rather than coordinating
   it. The rule that generalizes: **on an append-only file that a hook may write at any moment,
-  never rewrite in place — rotate.**
+  never rewrite in place — rotate, fold the archives on read, and purge by age.**
 - **The trend is read back and rendered by `mage footprint`.** A sampler whose output nothing
   reads is a write-only file, not an instrument: FT-18 asked whether mage's footprint is
   *growing*, and a single-point measurement cannot answer that. The report shows direction and
