@@ -264,6 +264,22 @@
       ]
     },
     {
+      "name": "footprint",
+      "summary": "report mage's context-window cost: launch surfaces, yield, pointer leverage",
+      "aliases": [],
+      "hidden": false,
+      "options": [
+        {
+          "flags": "--json",
+          "description": "emit the measurement as JSON instead of the table"
+        },
+        {
+          "flags": "--quiet",
+          "description": "render nothing but still return the result"
+        }
+      ]
+    },
+    {
       "name": "dream",
       "summary": "Report knowledge-base health, read-only: stale, superseded-but-active, dangling links, orphans",
       "aliases": [],

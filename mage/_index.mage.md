@@ -2,106 +2,107 @@
 
 # mage
 
-> 72 notes. Part of the [index](INDEX.md).
+> 73 notes. Part of the [index](INDEX.md).
 
 ## build
 
-- `note` [Mage integration test framework](notes/mage-integration-test-framework.md) — mage, integration, test, framework, build
-- `note` [Mage main branch protected](notes/mage-main-branch-protected.md) — mage, main, branch, protected, build
-- `note` [Mage no biome 2space](notes/mage-no-biome-2space.md) — mage, biome, 2space, build
-- `gotcha` [Gotcha — `npx mage` in this repo runs the PUBLISHED release, not your working tree](notes/npx-mage-runs-the-published-release.md) — npx, dogfood, stale-binary, published-release, global-install, dist, dream, index, false-positive, self-hosting, verification _(reviewed 2026-07-19)_
-- `gotcha` [Test files were never type-checked (tsconfig excluded them)](notes/test-files-were-excluded-from-typecheck.md) — typecheck, tsc, tests, tsconfig, exclude, vitest, tsup, esbuild, ci, fixture _(reviewed 2026-06-15)_
-- `gotcha` [Gotcha — weakening a test's assertions to make it pass can delete its purpose](notes/weakening-a-test-can-delete-its-purpose.md) — test, vacuous, assertions, green-suite, false-confidence, behaviour-change, fixture, regression, code-review, coderabbit _(reviewed 2026-07-19)_
+- `note` [Mage integration test framework](notes/mage-integration-test-framework.md) — build
+- `note` [Mage main branch protected](notes/mage-main-branch-protected.md) — build
+- `note` [Mage no biome 2space](notes/mage-no-biome-2space.md) — build
+- `gotcha` [Gotcha — `npx mage` in this repo runs the PUBLISHED release, not your working tree](notes/npx-mage-runs-the-published-release.md) — dogfood, stale-binary, global-install, dist, dream, index, false-positive, self-hosting, verification
+- `gotcha` [Test files were never type-checked (tsconfig excluded them)](notes/test-files-were-excluded-from-typecheck.md) — tsc, tests, exclude, vitest, tsup, esbuild, ci, fixture
+- `gotcha` [Gotcha — weakening a test's assertions to make it pass can delete its purpose](notes/weakening-a-test-can-delete-its-purpose.md) — vacuous, green-suite, false-confidence, behaviour-change, fixture, regression, code-review, coderabbit
 
 ## capture
 
-- `gotcha` [Gotcha — `mage connect` turns on capture but does not ensure the sink is gitignored](notes/connect-doesnt-ensure-ignores.md) — connect, gitignore, capture-sink, learnings, metrics, drift, migration, doctor, safe-by-default, leak, version-bump, hook-block _(reviewed 2026-06-09)_
+- `gotcha` [Gotcha — `mage connect` turns on capture but does not ensure the sink is gitignored](notes/connect-doesnt-ensure-ignores.md) — gitignore, learnings, metrics, drift, migration, doctor, safe-by-default, leak, version-bump, hook-block
 
 ## cli
 
-- `plan` [Plan — 0.0.10 "coherence": shrink the command surface, close the external-KB friction](notes/plan-0.0.10-coherence.md) — consolidation, commands, coherence, friction, external-kb, hub, link, connect, distill, promote, dream, doctor _(reviewed 2026-06-13)_
+- `plan` [Plan — 0.0.10 "coherence": shrink the command surface, close the external-KB friction](notes/plan-0.0.10-coherence.md) — consolidation, commands, hub, link, connect, distill, promote, dream, doctor
 
 ## decisions
 
-- `decision` [0001 — A memory-first product (mage) supersedes specshub](decisions/0001-memory-first-product-supersedes-specshub.md) — 0001, memory, first, product, mage, supersedes, specshub, considered, options, consequences, relations, decisions _(reviewed 2026-06-01)_
-- `decision` [0002 — mage forks specshub (clean copy, fresh history) and reorients](decisions/0002-fork-and-reorient-specshub.md) — 0002, mage, forks, specshub, clean, copy, fresh, history, reorients, considered, options, consequences _(reviewed 2026-06-01)_
-- `decision` [0003 — Track work units and notes; git-ignore only artifacts and scratch](decisions/0003-track-work-ignore-artifacts.md) — 0003, track, work, units, notes, git, ignore, only, artifacts, scratch, considered, options _(reviewed 2026-06-01)_
-- `decision` [0004 — Capture insight, procedure, and pointers — not copies of sources](decisions/0004-capture-insight-not-copies.md) — 0004, capture, insight, procedure, pointers, copies, sources, considered, options, consequences, relations, mage _(reviewed 2026-06-01)_
-- `decision` [0005 — Exactly one canonical durable memory (mage); native memories are feeders, not rivals](decisions/0005-one-canonical-memory-others-are-feeders.md) — 0005, exactly, one, canonical, durable, memory, mage, native, memories, feeders, rivals, decision _(reviewed 2026-06-01)_
-- `decision` [0006 — Two-layer recall: per-wing auto-loaded skills + a hierarchical factual index](decisions/0006-two-layer-recall-per-wing-skills.md) — 0006, two, layer, recall, per, wing, auto, loaded, skills, hierarchical, factual, index _(reviewed 2026-06-01)_
-- `decision` [0007 — Mine agentmemory's design; don't depend on it](decisions/0007-mine-agentmemory-design-not-depend.md) — 0007, mine, agentmemory, design, don, depend, considered, options, consequences, relations, mage, decisions _(reviewed 2026-06-01)_
-- `decision` [0008 — In-repo knowledge base lives in a visible `mage/` dir (not hidden `.mage/`)](decisions/0008-visible-mage-dir-for-obsidian.md) — 0008, repo, knowledge, base, lives, visible, mage, dir, hidden, considered, options, consequences _(reviewed 2026-06-01)_
-- `decision` [0009 — No runtime of our own; automation rides the host agent's hooks + the agent's reasoning](decisions/0009-no-runtime-automation-rides-host-hooks.md) — 0009, runtime, own, automation, rides, host, agent, hooks, reasoning, auto, capture, works _(reviewed 2026-06-01)_
-- `decision` [0010 — mage is durable memory, not a multi-agent coordination layer](decisions/0010-durable-memory-not-coordination-layer.md) — 0010, mage, durable, memory, multi, agent, coordination, layer, considered, options, consequences, relations _(reviewed 2026-06-01)_
-- `decision` [0011 — A hub is one vault; the scanner recurses; projects are wings](decisions/0011-recursive-scan-hub-projects.md) — 0011, hub, one, vault, scanner, recurses, projects, wings, decision, considered, options, consequences _(reviewed 2026-06-02)_
-- `decision` [0012 — A wing is an optional convention; hubs are standalone-first](decisions/0012-wings-optional-convention-standalone-hubs.md) — 0012, wing, optional, convention, hubs, standalone, first, decision, considered, options, consequences, relations _(reviewed 2026-06-03)_
-- `decision` [0013 — Procedure skills and the self-grooming loop](decisions/0013-procedure-skills-self-grooming-loop.md) — 0013, procedure, skills, self, grooming, loop, decision, considered, options, consequences, relations, mage _(reviewed 2026-06-05)_
-- `decision` [0014 — Two-gate redaction (strip secrets before write, not before display)](decisions/0014-two-gate-redaction.md) — 0014, two, gate, redaction, strip, secrets, before, write, display, decision, considered, options _(reviewed 2026-06-05)_
-- `decision` [0015 — `mage observe`: the capture schema (the keystone `.jsonl`)](decisions/0015-mage-observe-capture-schema.md) — 0015, mage, observe, capture, schema, keystone, jsonl, decision, considered, options, consequences, relations _(reviewed 2026-06-06)_
-- `decision` [0016 — Context-match, the confidence ladder, and the single applier](decisions/0016-context-match-confidence-ladder-applier.md) — 0016, context, match, confidence, ladder, single, applier, decision, considered, options, consequences, relations _(reviewed 2026-06-06)_
-- `decision` [0017 — `mage connect`: the host hook adapter (capture is opt-in)](decisions/0017-mage-connect-host-hook-adapter.md) — 0017, mage, connect, host, hook, adapter, capture, opt, decision, considered, options, consequences _(reviewed 2026-06-27)_
-- `decision` [0018 — `mage distill`: the observed-scratch reader (capture, on first sight)](decisions/0018-mage-distill-observed-scratch-reader.md) — 0018, mage, distill, observed, scratch, reader, capture, first, sight, decision, considered, options _(reviewed 2026-06-08)_
-- `decision` [0019 — `mage promote`: self-grooming (recurrence, graduation, merge/split)](decisions/0019-mage-promote-self-grooming.md) — 0019, mage, promote, self, grooming, recurrence, graduation, merge, split, decision, considered, options _(reviewed 2026-06-08)_
-- `decision` [0020 — the dashboard: a per-KB, no-server generated view (Option D)](decisions/0020-no-server-tiered-dashboards.md) — 0020, dashboard, per, server, generated, view, option, decision, considered, rejected, relations, mage _(reviewed 2026-06-09)_
-- `decision` [0021 — mage stays offline: no phone-home telemetry; signal is local + voluntarily shared](decisions/0021-offline-no-telemetry-local-signal.md) — 0021, mage, stays, offline, phone, home, telemetry, signal, local, voluntarily, shared, decision _(reviewed 2026-06-09)_
-- `decision` [0022 — Remove the spec-kit-derived SDD skills](decisions/0022-remove-sdd-skills.md) — 0022, remove, spec, kit, derived, sdd, skills, decision, consequences, relations, mage, decisions _(reviewed 2026-06-13)_
-- `decision` [0023 — A hub keeps its own notes AND flat per-project subdirs (ratification)](decisions/0023-hub-own-notes-and-flat-projects.md) — 0023, hub, keeps, own, notes, flat, per, project, subdirs, ratification, scope, separation _(reviewed 2026-06-14)_
-- `decision` [0024 — Organic grooming loop: the lesson path (inline-primary + boundary nudge)](decisions/0024-organic-grooming-loop.md) — 0024, organic, grooming, loop, lesson, path, inline, primary, boundary, nudge, context, decision _(reviewed 2026-06-16)_
-- `decision` [0025 — One transient-state home (`.mage/`) + redact config in `metadata.json`](decisions/0025-one-transient-state-home.md) — 0025, one, transient, state, home, mage, redact, config, metadata, json, context, artifact _(reviewed 2026-06-18)_
-- `decision` [0026 — A hosted documentation website, generated from code](decisions/0026-hosted-docs-website.md) — 0026, hosted, documentation, website, generated, code, context, model, isn, answerable, docs, decision _(accepted · reviewed 2026-06-18)_
-- `decision` [0027 — Faultline: a friction/derivation capture trigger (prefilter, not miner)](decisions/0027-faultline-friction-capture-trigger.md) — 0027, faultline, friction, derivation, capture, trigger, prefilter, miner, context, decision, consequences, gate _(superseded · reviewed 2026-06-20)_
-- `decision` [0028 — Prose-keyed capture: corrections + recurrent failures (supersedes Faultline)](decisions/0028-prose-keyed-capture.md) — 0028, prose, keyed, capture, corrections, recurrent, failures, supersedes, faultline, context, decision, consequences _(superseded · reviewed 2026-06-20)_
-- `decision` [0029 — Digest-to-agent capture: deterministic narrowing, agent judgment (supersedes prose-keyed)](decisions/0029-digest-to-agent-capture.md) — 0029, digest, agent, capture, deterministic, narrowing, judgment, supersedes, prose, keyed, context, decision _(reviewed 2026-06-20)_
-- `decision` [0030 — Opt-in agent autonomy ladder for the grooming loop (Operator / Approver / Overseer)](decisions/0030-agent-autonomy-ladder.md) — 0030, opt, agent, autonomy, ladder, grooming, loop, operator, approver, overseer, context, decision _(reviewed 2026-07-10)_
-- `decision` [0031 — Programmatic provenance stamping + the autonomy reject-ledger (Phase 1: stamp at creation)](decisions/0031-programmatic-provenance-stamp.md) — 0031, programmatic, provenance, stamping, autonomy, reject, ledger, phase, stamp, creation, context, decision _(reviewed 2026-06-22)_
-- `decision` [0032 — Capture-redirect: co-opt the host's native-memory write into mage's git-durable pipeline (relocation where the host allows it, coexist nudge as the floor)](decisions/0032-capture-redirect-native-memory.md) — capture, native-memory, automemorydirectory, relocation, coexist, nudge, redirect, staging, durability, claude-code, adapter, reflex _(accepted · reviewed 2026-07-01)_
-- `decision` [0033 — Recall: `@import` the bounded root index into the host's auto-loaded context (the capture companion to ADR-0032)](decisions/0033-recall-import-bounded-index.md) — recall, import, at-import, claude-md, agents-md, index, bounded, root-index, progressive-disclosure, capability-adaptive, compaction _(accepted · reviewed 2026-07-01)_
-- `decision` [0034 — Adopt: a dispatcher for onboarding pre-existing knowledge](decisions/0034-adopt-preexisting-knowledge.md) — adopt, onboard, dispatcher, place, distill, in-shape, out-of-shape, never-a-copy, preexisting, native-memory, learn-from, routing _(accepted · reviewed 2026-07-01)_
-- `decision` [0035 — Notes are memories: one unified store; embrace the harness format at rest, normalize at the durable boundary](decisions/0035-decouple-harness-memory-from-notes.md) — notes-are-memories, unified-store, harness-format, embrace-at-rest, normalize-at-commit, posttooluse-flatten, groom-as-curation, scanner-tolerance, hard-earned-knowledge, write-update-recall, future-proof, restamp _(accepted · reviewed 2026-07-01)_
-- `decision` [0036 — Defer the `HarnessAdapter` seam until a second harness exists; consolidate CC note-shape into one named module now](decisions/0036-defer-harness-adapter-seam.md) — harness-adapter, seam, defer, hypothetical-seam, one-adapter, cc-note, neutral-core, multi-harness, premature-abstraction, second-harness, capture _(accepted · reviewed 2026-06-28)_
-- `decision` [0037 — doctor's remit extends to recall + skills readiness, on a bounded auto-fix line](decisions/0037-readiness-doctor-remit-and-autofix-line.md) — doctor, readiness, remit, recall, skills, auto-fix-line, host-config, read-only, fail-open, no-runtime, version-stamp, detect-and-instruct _(accepted · reviewed 2026-07-02)_
-- `decision` [0038 — promote's note-proposal rung is deleted; graduate repoints to note-read usage; recurrence becomes a digest annotation](decisions/0038-promote-note-rung-deleted-graduate-on-usage.md) — promote, note-proposal-rung, graduate, note-read-usage, failure-skeleton, digest-annotation, annotate-never-sort, deterministic-selection, killed-pattern, recurrence, adr-0029-deferral, keyword-fold _(accepted · reviewed 2026-07-19)_
+- `decision` [0001 — A memory-first product (mage) supersedes specshub](decisions/0001-memory-first-product-supersedes-specshub.md)
+- `decision` [0002 — mage forks specshub (clean copy, fresh history) and reorients](decisions/0002-fork-and-reorient-specshub.md)
+- `decision` [0003 — Track work units and notes; git-ignore only artifacts and scratch](decisions/0003-track-work-ignore-artifacts.md)
+- `decision` [0004 — Capture insight, procedure, and pointers — not copies of sources](decisions/0004-capture-insight-not-copies.md) — mage
+- `decision` [0005 — Exactly one canonical durable memory (mage); native memories are feeders, not rivals](decisions/0005-one-canonical-memory-others-are-feeders.md)
+- `decision` [0006 — Two-layer recall: per-wing auto-loaded skills + a hierarchical factual index](decisions/0006-two-layer-recall-per-wing-skills.md)
+- `decision` [0007 — Mine agentmemory's design; don't depend on it](decisions/0007-mine-agentmemory-design-not-depend.md) — mage
+- `decision` [0008 — In-repo knowledge base lives in a visible `mage/` dir (not hidden `.mage/`)](decisions/0008-visible-mage-dir-for-obsidian.md)
+- `decision` [0009 — No runtime of our own; automation rides the host agent's hooks + the agent's reasoning](decisions/0009-no-runtime-automation-rides-host-hooks.md) — auto, capture, works
+- `decision` [0010 — mage is durable memory, not a multi-agent coordination layer](decisions/0010-durable-memory-not-coordination-layer.md)
+- `decision` [0011 — A hub is one vault; the scanner recurses; projects are wings](decisions/0011-recursive-scan-hub-projects.md)
+- `decision` [0012 — A wing is an optional convention; hubs are standalone-first](decisions/0012-wings-optional-convention-standalone-hubs.md)
+- `decision` [0013 — Procedure skills and the self-grooming loop](decisions/0013-procedure-skills-self-grooming-loop.md) — mage
+- `decision` [0014 — Two-gate redaction (strip secrets before write, not before display)](decisions/0014-two-gate-redaction.md)
+- `decision` [0015 — `mage observe`: the capture schema (the keystone `.jsonl`)](decisions/0015-mage-observe-capture-schema.md)
+- `decision` [0016 — Context-match, the confidence ladder, and the single applier](decisions/0016-context-match-confidence-ladder-applier.md)
+- `decision` [0017 — `mage connect`: the host hook adapter (capture is opt-in)](decisions/0017-mage-connect-host-hook-adapter.md)
+- `decision` [0018 — `mage distill`: the observed-scratch reader (capture, on first sight)](decisions/0018-mage-distill-observed-scratch-reader.md)
+- `decision` [0019 — `mage promote`: self-grooming (recurrence, graduation, merge/split)](decisions/0019-mage-promote-self-grooming.md)
+- `decision` [0020 — the dashboard: a per-KB, no-server generated view (Option D)](decisions/0020-no-server-tiered-dashboards.md) — rejected, mage
+- `decision` [0021 — mage stays offline: no phone-home telemetry; signal is local + voluntarily shared](decisions/0021-offline-no-telemetry-local-signal.md)
+- `decision` [0022 — Remove the spec-kit-derived SDD skills](decisions/0022-remove-sdd-skills.md) — mage
+- `decision` [0023 — A hub keeps its own notes AND flat per-project subdirs (ratification)](decisions/0023-hub-own-notes-and-flat-projects.md) — scope, separation
+- `decision` [0024 — Organic grooming loop: the lesson path (inline-primary + boundary nudge)](decisions/0024-organic-grooming-loop.md)
+- `decision` [0025 — One transient-state home (`.mage/`) + redact config in `metadata.json`](decisions/0025-one-transient-state-home.md) — artifact
+- `decision` [0026 — A hosted documentation website, generated from code](decisions/0026-hosted-docs-website.md) — model, isn, answerable
+- `decision` [0027 — Faultline: a friction/derivation capture trigger (prefilter, not miner)](decisions/0027-faultline-friction-capture-trigger.md) — gate _(superseded)_
+- `decision` [0028 — Prose-keyed capture: corrections + recurrent failures (supersedes Faultline)](decisions/0028-prose-keyed-capture.md) _(superseded)_
+- `decision` [0029 — Digest-to-agent capture: deterministic narrowing, agent judgment (supersedes prose-keyed)](decisions/0029-digest-to-agent-capture.md)
+- `decision` [0030 — Opt-in agent autonomy ladder for the grooming loop (Operator / Approver / Overseer)](decisions/0030-agent-autonomy-ladder.md)
+- `decision` [0031 — Programmatic provenance stamping + the autonomy reject-ledger (Phase 1: stamp at creation)](decisions/0031-programmatic-provenance-stamp.md)
+- `decision` [0032 — Capture-redirect: co-opt the host's native-memory write into mage's git-durable pipeline (relocation where the host allows it, coexist nudge as the floor)](decisions/0032-capture-redirect-native-memory.md) — automemorydirectory, staging, durability, claude-code, adapter, reflex
+- `decision` [0033 — Recall: `@import` the bounded root index into the host's auto-loaded context (the capture companion to ADR-0032)](decisions/0033-recall-import-bounded-index.md) — at-import, claude-md, agents-md, progressive-disclosure, capability-adaptive, compaction
+- `decision` [0034 — Adopt: a dispatcher for onboarding pre-existing knowledge](decisions/0034-adopt-preexisting-knowledge.md) — onboard, place, distill, in-shape, out-of-shape, never-a-copy, native-memory, learn-from, routing
+- `decision` [0035 — Notes are memories: one unified store; embrace the harness format at rest, normalize at the durable boundary](decisions/0035-decouple-harness-memory-from-notes.md) — normalize-at-commit, posttooluse-flatten, groom-as-curation, scanner-tolerance, hard-earned-knowledge, write-update-recall, future-proof, restamp
+- `decision` [0036 — Defer the `HarnessAdapter` seam until a second harness exists; consolidate CC note-shape into one named module now](decisions/0036-defer-harness-adapter-seam.md) — hypothetical-seam, neutral-core, multi-harness, premature-abstraction, capture
+- `decision` [0037 — doctor's remit extends to recall + skills readiness, on a bounded auto-fix line](decisions/0037-readiness-doctor-remit-and-autofix-line.md) — host-config, read-only, fail-open, no-runtime, version-stamp, detect-and-instruct
+- `decision` [0038 — promote's note-proposal rung is deleted; graduate repoints to note-read usage; recurrence becomes a digest annotation](decisions/0038-promote-note-rung-deleted-graduate-on-usage.md) — failure-skeleton, annotate-never-sort, deterministic-selection, killed-pattern, adr-0029-deferral, keyword-fold
+- `decision` [0039 — measure the context footprint; bound the generated launch surface](decisions/0039-context-footprint-measure-and-bound.md) — context-window, recall-budget, launch-cost, occupancy, pointer-leverage, no-savings-claim, bytes-authoritative, keyword-dedupe, progressive-degradation, silent-truncation, ft-18
 
 ## design
 
-- `pointer` [mage — context & glossary](notes/context.md) — knowledge-base, note, wing, room, index, tag, moc, skill, work-unit, artifact, note-types, glossary _(reviewed 2026-07-01)_
-- `principle` [mage is one durable memory — of hard-earned knowledge](notes/mage-is-durable-memory.md) — charter, identity, unified-memory, durable, portable, notes-are-memories, hard-earned-knowledge, insight, procedure, gotcha, decision, pointer _(reviewed 2026-06-28)_
+- `pointer` [mage — context & glossary](notes/context.md) — knowledge-base, note, wing, room, index, tag, moc, skill, work-unit, artifact, note-types
+- `principle` [mage is one durable memory — of hard-earned knowledge](notes/mage-is-durable-memory.md) — charter, identity, unified-memory, portable, notes-are-memories, insight, procedure, gotcha, pointer
 
 ## grooming
 
-- `pointer` [The boundary nudge — internals + where each piece lives](notes/boundary-nudge-internals.md) — nudge, boundary, digest, startup, session-start, watermark, once-per-chapter, teaser, two-channel, systemMessage, additionalContext, offer-first _(reviewed 2026-07-10)_
-- `gotcha` [Gotcha — a mature KB emits no capture terminals, so the keep-rate gate cannot calibrate on it](notes/mature-kb-emits-no-capture-terminals.md) — keep-rate, crown-threshold, a1-bake, calibration, mature-kb, capture-terminals, soak, prismalens, 0.1.0, gate, autonomy _(reviewed 2026-07-19)_
-- `plan` [0.0.11 — "signal quality + autonomous capture"](notes/plan-0.0.11-signal-and-capture.md) — signal, quality, autonomous, capture, candidate, blocker, count, compact, chapters, session, ids, serves _(reviewed 2026-06-14)_
-- `plan` [Organic grooming loop (0.0.12) — the lesson path](notes/plan-0.0.12-organic-grooming-loop.md) — grooming, organic, lesson, first-sight, distill, staging, nudge, inline, claude-code-memory, redact, 0.0.12 _(stale-suspect · reviewed 2026-07-01)_
-- `plan` [Faultline — friction/derivation capture trigger (Phase 1 plan)](notes/plan-faultline.md) — faultline, friction, derivation, capture, trigger, phase, plan, one, change, detector, src, distill _(reviewed 2026-06-20)_
-- `gotcha` [Gotcha — promote's recurrence fold has near-zero precision on a mature KB](notes/promote-folds-mechanical-tokens.md) — promote, recurrence, precision, denoise, signature, keyword-fold, mechanical-tokens, watermark, rejected-buffer, soak, mature-kb _(reviewed 2026-07-19)_
-- `reference` [Replay-gate methodology — does a capture mechanism produce USEFUL knowledge?](notes/replay-gate-methodology.md) — replay, gate, methodology, capture, mechanism, produce, useful, knowledge, end, calibration, lessons, meta _(reviewed 2026-06-20)_
+- `pointer` [The boundary nudge — internals + where each piece lives](notes/boundary-nudge-internals.md) — digest, startup, session-start, watermark, once-per-chapter, teaser, two-channel, systemMessage, additionalContext, offer-first
+- `gotcha` [Gotcha — a mature KB emits no capture terminals, so the keep-rate gate cannot calibrate on it](notes/mature-kb-emits-no-capture-terminals.md) — crown-threshold, a1-bake, calibration, soak, prismalens, 0.1.0, autonomy
+- `plan` [0.0.11 — "signal quality + autonomous capture"](notes/plan-0.0.11-signal-and-capture.md) — candidate, blocker, count, compact, chapters, session, ids, serves
+- `plan` [Organic grooming loop (0.0.12) — the lesson path](notes/plan-0.0.12-organic-grooming-loop.md) — first-sight, distill, staging, nudge, inline, claude-code-memory, redact _(stale-suspect)_
+- `plan` [Faultline — friction/derivation capture trigger (Phase 1 plan)](notes/plan-faultline.md) — one, change, detector, src, distill
+- `gotcha` [Gotcha — promote's recurrence fold has near-zero precision on a mature KB](notes/promote-folds-mechanical-tokens.md) — denoise, signature, keyword-fold, watermark, rejected-buffer, soak
+- `reference` [Replay-gate methodology — does a capture mechanism produce USEFUL knowledge?](notes/replay-gate-methodology.md) — end, calibration, lessons, meta
 
 ## plan
 
-- `principle` [mage v0.1 — finalized locks (read alongside PLAN-v0.1.md)](notes/plan-v0.1-locks.md) — naming, brand, mage, npm, package, mage-memory, bin, locks, authority, schema _(reviewed 2026-06-01)_
-- `plan` [mage v0.1 — detailed implementation plan](notes/plan-v0.1.md) — plan, milestones, fork, vault, note-model, index, skills, v0.1, build _(archived · reviewed 2026-06-01)_
+- `principle` [mage v0.1 — finalized locks (read alongside PLAN-v0.1.md)](notes/plan-v0.1-locks.md) — naming, brand, npm, package, mage-memory, bin, authority, schema
+- `plan` [mage v0.1 — detailed implementation plan](notes/plan-v0.1.md) — milestones, fork, vault, note-model, index, skills, build _(archived)_
 
 ## redaction
 
-- `gotcha` [Gotcha — scope Gate-2 to the knowledge base, not the whole repo](notes/gate2-blocks-own-redaction-fixtures.md) — gate2, pre-commit, hook, redaction, scope, docs-root, fixtures, connect, dogfood _(reviewed 2026-06-08)_
-- `gotcha` [Gotcha — a Gate-2 false positive can stall an autonomous groom; never disable the hook to unblock](notes/gate2-fp-blocks-autonomy.md) — gate2, redaction, false-positive, autonomy, overseer, approver, hook, unblock, capture, soak _(reviewed 2026-06-23)_
-- `gotcha` [Gotcha — key bodies with `-`/`_` partially leak past the high-entropy detector](notes/redaction-anthropic-key-detector.md) — gotcha, key, bodies, partially, leak, past, high, entropy, detector, mage, redaction _(reviewed 2026-06-07)_
+- `gotcha` [Gotcha — scope Gate-2 to the knowledge base, not the whole repo](notes/gate2-blocks-own-redaction-fixtures.md) — pre-commit, hook, docs-root, connect, dogfood
+- `gotcha` [Gotcha — a Gate-2 false positive can stall an autonomous groom; never disable the hook to unblock](notes/gate2-fp-blocks-autonomy.md) — redaction, overseer, approver, capture, soak
+- `gotcha` [Gotcha — key bodies with `-`/`_` partially leak past the high-entropy detector](notes/redaction-anthropic-key-detector.md) — mage
 
 ## release
 
-- `feedback` [Dogfood before release](notes/dogfood-before-release.md) — dogfood, before, release, mage
-- `feedback` [No emojis in releases](notes/no-emojis-in-releases.md) — emojis, releases, mage, release
-- `gotcha` [A release bump touches MORE than package.json — release-please now owns it](notes/release-bump-touches-many-artifacts.md) — release, release-please, version, bump, changelog, readme, badge, plugin, marketplace, consistency, hygiene, pat _(reviewed 2026-06-15)_
+- `feedback` [Dogfood before release](notes/dogfood-before-release.md) — mage
+- `feedback` [No emojis in releases](notes/no-emojis-in-releases.md) — mage, release
+- `gotcha` [A release bump touches MORE than package.json — release-please now owns it](notes/release-bump-touches-many-artifacts.md) — version, changelog, readme, badge, plugin, marketplace, consistency, hygiene, pat
 
 ## roadmap
 
-- `reference` [Mining agentmemory's design into mage — files-native translation map](notes/agentmemory-mining-map.md) — agentmemory, iii, server-inverse, obsidian-ui, import-harvest, consolidation, auto-capture, dream, feeder, connect, mining, roadmap _(reviewed 2026-06-09)_
-- `plan` [mage — future thoughts (the standing idea inbox)](notes/future-thoughts.md) — future-thoughts, backlog, ideas, inbox, taxonomy, hierarchy, wings, dashboard, graph, leiden, graphify, ingest _(reviewed 2026-06-30)_
-- `reference` [Field notes — first external migrations (v0.1 dogfood)](notes/migration-field-notes.md) — field-test, migration, hub-indexing, link-awareness, bulk-import, dream, onboarding, v0.2 _(reviewed 2026-06-02)_
-- `note` [0.1.0's last build gate: ADR-0031 Phase 2 — the reject-ledger reconciler (built; bake pending)](notes/phase2-reject-ledger-0.1.0-gate.md) — 0.1.0, gate, adr-0031, phase-2, reject-ledger, keep-rate, reconciler, provenance-source, capture-vs-adopt, a1-bake, autonomy, crown-threshold _(reviewed 2026-07-12)_
-- `plan` [mage — hosted documentation website (GRILLED, ready to build)](notes/plan-docs-site.md) — documentation, website, docs-site, astro, starlight, generated-docs, drift, github-pages, onboarding, reference, buildProgram _(reviewed 2026-06-18)_
-- `plan` [mage — the readiness doctor: catch recall/skills drift, not just plumbing](notes/plan-readiness-doctor.md) — doctor, readiness, drift, wiring, recall, skills, capture, plugin-install, agents-md-staleness, index-freshness, version-stamp, auto-fix _(reviewed 2026-07-02)_
-- `plan` [mage — release sequence (0.0.x → 0.1.0)](notes/plan-release-sequence.md) — release, sequence, backlog, 0.1.0, self-grooming, procedure-skill, redaction, skillopt, observe, optimize, promotion, autonomy _(reviewed 2026-07-01)_
-- `plan` [mage — roadmap](notes/roadmap.md) — roadmap, v0.1, v0.2, dream, scope, deferred, release, mcp, hub, autonomy, operator, approver _(reviewed 2026-07-01)_
-- `pointer` [mage soak — the external dogfood targets + the read-only monitor](notes/soak-targets.md) — soak, dogfood, prismalens, sreforge, monitor, lesson-path, digest, targets, read-only, external _(reviewed 2026-06-28)_
+- `reference` [Mining agentmemory's design into mage — files-native translation map](notes/agentmemory-mining-map.md) — iii, server-inverse, obsidian-ui, import-harvest, consolidation, auto-capture, dream, feeder, connect, roadmap
+- `plan` [mage — future thoughts (the standing idea inbox)](notes/future-thoughts.md) — backlog, ideas, taxonomy, hierarchy, wings, dashboard, graph, leiden, graphify, ingest
+- `reference` [Field notes — first external migrations (v0.1 dogfood)](notes/migration-field-notes.md) — field-test, hub-indexing, link-awareness, bulk-import, dream, onboarding, v0.2
+- `note` [0.1.0's last build gate: ADR-0031 Phase 2 — the reject-ledger reconciler (built; bake pending)](notes/phase2-reject-ledger-0.1.0-gate.md) — keep-rate, provenance-source, capture-vs-adopt, a1-bake, autonomy, crown-threshold
+- `plan` [mage — hosted documentation website (GRILLED, ready to build)](notes/plan-docs-site.md) — astro, starlight, generated-docs, drift, github-pages, onboarding, reference, buildProgram
+- `plan` [mage — the readiness doctor: catch recall/skills drift, not just plumbing](notes/plan-readiness-doctor.md) — wiring, capture, plugin-install, agents-md-staleness, index-freshness, version-stamp, auto-fix
+- `plan` [mage — release sequence (0.0.x → 0.1.0)](notes/plan-release-sequence.md) — backlog, self-grooming, procedure-skill, redaction, skillopt, observe, optimize, promotion, autonomy
+- `plan` [mage — roadmap](notes/roadmap.md) — v0.1, v0.2, dream, scope, deferred, release, mcp, hub, autonomy, operator, approver
+- `pointer` [mage soak — the external dogfood targets + the read-only monitor](notes/soak-targets.md) — prismalens, sreforge, lesson-path, digest
