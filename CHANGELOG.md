@@ -11,6 +11,61 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.14](https://github.com/Sumit1993/mage-memory/compare/v0.0.13...v0.0.14) (2026-07-19)
+
+
+### ⚠ BREAKING CHANGES
+
+* **index:** `MEMORY.md` and `_index.<wing>.md` regenerate once on the next `mage index`. Keyword tails are now deduped against each entry's own title, path and type badge; the reviewed date is dropped; and status renders only for caution states (`superseded`, `stale-suspect`, `archived`). Expect a large one-time diff in those generated files — no notes are lost, and the per-note list is unchanged. Run `mage footprint` for the new numbers.
+* **index:** dedupe generated index payload (ADR-0039 §5)
+* **promote:** graduate on note-read usage, not keyword recurrence (ADR-0038 §2/§7)
+* **promote:** delete the note-proposal rung (ADR-0038)
+
+### Features
+
+* **flatten:** add --all at-rest backfill sweep (ADR-0035) ([dce04c9](https://github.com/Sumit1993/mage-memory/commit/dce04c9f8a2e0239fe71f4050abcc8906b03deff))
+* **flatten:** add --all at-rest backfill sweep (ADR-0035) ([81166ad](https://github.com/Sumit1993/mage-memory/commit/81166adb827bcb58fb4d79d6267df40ea5e9432b))
+* **footprint:** SessionStart trend sampler + doctor budget check (ADR-0039 §6/§8) ([b5d2740](https://github.com/Sumit1993/mage-memory/commit/b5d2740eb306273c8feb41f013eed3de335e2319))
+* **footprint:** the `mage footprint` command (ADR-0039 §9) ([e2f531d](https://github.com/Sumit1993/mage-memory/commit/e2f531dd80fac77e770c662aad9a46bb1d1f98ac))
+* **footprint:** two-dimensional recall budget and trend rendering (ADR-0039) ([aa7d0d0](https://github.com/Sumit1993/mage-memory/commit/aa7d0d07a47ab2b4966dd76b412ec0051c1a9832))
+* **grooming:** ADR-0031 Phase 2 reject-ledger reconciler ([73e9caa](https://github.com/Sumit1993/mage-memory/commit/73e9caac538754c0663436f72f0d10bab4effdc1))
+* **grooming:** ADR-0031 Phase 2 reject-ledger reconciler ([89f9799](https://github.com/Sumit1993/mage-memory/commit/89f979941b8be0480672913c285f5466a0b7ae1e))
+* **index:** dedupe generated index payload (ADR-0039 §5) ([ea94cf7](https://github.com/Sumit1993/mage-memory/commit/ea94cf7ebbb41f44f5a221c29682b53e1b76adcc))
+* **index:** progressive degradation tiers for the recall budget (ADR-0039 §7) ([57c6eb8](https://github.com/Sumit1993/mage-memory/commit/57c6eb86d6296526845cd7385fa86b52688b3890))
+* **metrics:** footprint measurement module (ADR-0039 §1-4) ([978bdbf](https://github.com/Sumit1993/mage-memory/commit/978bdbf781ee98b48be78ee2ff242792ded9ccb3))
+* **promote:** delete the note-proposal rung (ADR-0038) ([c0a50a5](https://github.com/Sumit1993/mage-memory/commit/c0a50a5c4829c63e3485bcdb6b652c94e7cb122b))
+* **promote:** graduate on note-read usage, not keyword recurrence (ADR-0038 §2/§7) ([195ace4](https://github.com/Sumit1993/mage-memory/commit/195ace446fe0d181d2a80f7f2c408fda7f5af212))
+* **promote:** the note-read fold primitives (ADR-0038 §2) ([0cb2d32](https://github.com/Sumit1993/mage-memory/commit/0cb2d32303b0f9f7d6eef92be90806872ca24c46))
+
+
+### Bug Fixes
+
+* **dream:** keep external superseded_by; resolve wikilinks pre-filter ([aa2f9cb](https://github.com/Sumit1993/mage-memory/commit/aa2f9cbe180bceb71f8cab1f218942eb36b8161e))
+* **dream:** read wikilinks, skip external URLs, resolve #fragments ([db3ec1b](https://github.com/Sumit1993/mage-memory/commit/db3ec1bffa62d4b0b7ce2d3ecae0f2f76463c087))
+* **dream:** read wikilinks, skip external URLs, resolve #fragments ([a71768c](https://github.com/Sumit1993/mage-memory/commit/a71768c345266916a2a498cf42cbc522ac598b4b))
+* **flatten:** --all works without git + reaches subdir reserved-name notes (CodeRabbit) ([222cf12](https://github.com/Sumit1993/mage-memory/commit/222cf1238b75ceec1e0949f062a180321a0d0572))
+* **flatten:** guard the git toplevel probe against spawn errors ([884173d](https://github.com/Sumit1993/mage-memory/commit/884173ddcc26f2bb3a62449699b064105e2333b0))
+* **flatten:** keep --all paths docs-root-relative for external-mode KBs ([871a047](https://github.com/Sumit1993/mage-memory/commit/871a0473fbc5142af41d316ed1d7bb2519347bd1))
+* **footprint:** bound the stale-eviction retry path (CodeRabbit, PR [#74](https://github.com/Sumit1993/mage-memory/issues/74)) ([17bef72](https://github.com/Sumit1993/mage-memory/commit/17bef729392780d52ec6bef420a108f5c5901874))
+* **footprint:** drop the suffix tier, serialize trend writes (CodeRabbit, PR [#74](https://github.com/Sumit1993/mage-memory/issues/74)) ([7d58b26](https://github.com/Sumit1993/mage-memory/commit/7d58b260ff01047b014a08c448fe22498e8df26f))
+* **footprint:** fold trend archives on read, purge them by age (CodeRabbit, PR [#74](https://github.com/Sumit1993/mage-memory/issues/74)) ([2353337](https://github.com/Sumit1993/mage-memory/commit/23533378eb711b669a6749b60fe1c4104faf6b74))
+* **footprint:** make trend-lock ownership identifiable (CodeRabbit, PR [#74](https://github.com/Sumit1993/mage-memory/issues/74)) ([dd9c1e9](https://github.com/Sumit1993/mage-memory/commit/dd9c1e94bc352fbf8bc2c48c6440b59831ca2c80))
+* **footprint:** rotate the trend file instead of compacting it (CodeRabbit, PR [#74](https://github.com/Sumit1993/mage-memory/issues/74)) ([d6bbd43](https://github.com/Sumit1993/mage-memory/commit/d6bbd437b2906358f3a8073a6004c7b271103886))
+* **footprint:** show on-follow surfaces, share the generated-artifact policy, read session_id ([0d22372](https://github.com/Sumit1993/mage-memory/commit/0d22372e953ebea827431ac53006b1dd25dd2607))
+* **footprint:** wire the CC cap, resolve pointers on both bases (ADR-0039) ([db010a1](https://github.com/Sumit1993/mage-memory/commit/db010a19f8b5dca88c2da5badd00200377fd6bd8))
+* **grooming:** guard baseline tally + drop stale keep-rate on failure (CodeRabbit) ([101bd9f](https://github.com/Sumit1993/mage-memory/commit/101bd9fbba0e3ca6e3c5b25250ae99f5eb84486a))
+* **index:** keep generated heading hierarchy contiguous (CodeRabbit, PR [#73](https://github.com/Sumit1993/mage-memory/issues/73)) ([8017a3f](https://github.com/Sumit1993/mage-memory/commit/8017a3fa4a3fabd29a7611785ab835abcd786c35))
+* **promote:** address CodeRabbit review on PR [#72](https://github.com/Sumit1993/mage-memory/issues/72) ([ae491fd](https://github.com/Sumit1993/mage-memory/commit/ae491fdf87d04b7a0d3f90a59fb0ac78ad573273))
+* **redact:** do not suppress secret-shaped angle-bracket values (CodeRabbit) ([5cd5cfc](https://github.com/Sumit1993/mage-memory/commit/5cd5cfc0562c3ace0116ade9efb7d6d8e25a758f))
+* **redact:** treat &lt;…&gt; doc placeholders as safe, like ${ENV} ([f47d4e9](https://github.com/Sumit1993/mage-memory/commit/f47d4e9d8f04bba8ba3fca06d0701dd78f8ea279))
+* **redact:** treat &lt;…&gt; doc placeholders as safe, like ${ENV} (ADR-0014) ([f9607d5](https://github.com/Sumit1993/mage-memory/commit/f9607d52f7ef6dae14cd435878535fd6518d515f))
+
+
+### Miscellaneous Chores
+
+* **index:** document the one-time index regeneration ([65145d1](https://github.com/Sumit1993/mage-memory/commit/65145d1f5c2ab430ecf112f2c7f5d046f6ef0770))
+* release 0.0.14 ([13e5be2](https://github.com/Sumit1993/mage-memory/commit/13e5be21d9b9e003c5a95f786a3b3dd83ffc09e1))
+
 ## [0.0.13](https://github.com/Sumit1993/mage-memory/compare/v0.0.12...v0.0.13) (2026-07-11)
 
 
