@@ -3,8 +3,8 @@
 // one of which advances a bookmark:
 //
 //   mage promote            → READ. Fold every CLOSED `.learnings/` segment into a
-//                             per-(wing+keywords) signature recurrence tally (counting
-//                             DISTINCT sessions), persist the derived tally (like the
+//                             per-NOTE read tally (counting DISTINCT chapters, excluding
+//                             chapters that loaded a mage skill), persist it (like the
 //                             rollup Stop-fold), then build the manifest of GRADUATION
 //                             candidates (a covered, procedural note whose signature
 //                             recurs >= M sessions, not rejected). --json emits the
@@ -140,10 +140,9 @@ async function readAndReport(
 ): Promise<PromoteResult> {
   const { root, repo } = resolved;
 
-  // Fold + persist the derived tally (the read path writes it — a derived cache, like
-  // the rollup Stop fold). repoRoot mirrors readDistill: the resolved code repo / hub.
+  // Fold the derived tally (the read path persists it — a derived cache, like the rollup
+  // Stop fold). repoRoot mirrors readDistill: the resolved code repo / hub.
   const tally = await foldTally(root, learningsPath(root), repo);
-  await writeTally(root, tally);
 
   const sensitivity = await readSensitivity(resolved);
   const thresholds = thresholdsFor(sensitivity);
@@ -151,6 +150,12 @@ async function readAndReport(
   const rejected = await readRejected(root);
   const cursors = cursorsFromTally(tally);
   const manifest = buildManifest(tally, notes, thresholds, rejected, cursors);
+
+  // Persist ONLY after the manifest is built. The write used to happen immediately after
+  // the fold, so a throw in scanNotes/readRejected/buildManifest left the watermark
+  // already advanced past events the caller never saw — the round's work was consumed
+  // without ever being reported. Ordering it last makes a failed round a true no-op.
+  await writeTally(root, tally);
 
   if (asJson) {
     process.stdout.write(JSON.stringify(manifest) + "\n");
@@ -175,17 +180,17 @@ function cursorsFromTally(tally: PromoteTally): Record<string, number> {
 function reportHuman(manifest: PromoteManifest): void {
   const proposals = manifest.proposals;
   if (proposals.length === 0) {
-    if (manifest.covered > 0) {
+    if (manifest.climbing > 0) {
       logger.info(
-        `No graduation proposals — ${manifest.covered} recurring signature(s) covered by notes. A covered signature yields no proposal when it is below M, its note is not procedural, or the proposal was rejected.`,
+        `No notes ready to graduate — ${manifest.climbing} note(s) being used but below the threshold. A used note also yields no proposal when it is not procedural (only playbook/gotcha graduate) or the proposal was rejected.`,
       );
     } else {
-      logger.info("No covered recurring signatures yet.");
+      logger.info("No note reads recorded yet.");
     }
     return;
   }
   logger.success(
-    `${proposals.length} note(s) ready to graduate; ${manifest.covered} recurring signature(s) covered.`,
+    `${proposals.length} note(s) ready to graduate; ${manifest.climbing} more being used but below the threshold.`,
   );
   if (manifest.deferred > 0) {
     logger.info(

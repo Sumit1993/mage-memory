@@ -21,32 +21,12 @@ interface SigShape {
   keywords: string[];
 }
 
-// ─── isCovered / coveringNote ───────────────────────────────────────────────────
-
-/**
- * True iff ANY scanned note covers `sig`. A note covers a signature iff:
- *   - WING: the signature's wing equals "" (cross-cutting — any note can cover it) OR
- *     the note is tagged under the signature's wing (case-folded; a note is multi-home
- *     so ALL its wings are eligible, not just the primary), AND
- *   - KEYWORDS: at least one of the signature's keywords appears in the note's
- *     keywords (case-folded, exact token match — the coarse bucket the §2 signature
- *     already is).
- * A signature with no keywords is never covered (it's degenerate — but signature.ts
- * never emits one).
- */
-export function isCovered(sig: SigShape, notes: ScannedNote[]): boolean {
-  return coveringNote(sig, notes) !== null;
-}
-
-/**
- * The FIRST scanned note that covers `sig` (notes are scan-sorted by relPath, so the
- * result is deterministic), or null when none does. Same predicate as
- * {@link isCovered}; returns the note for callers that want the merge target. The
- * recurrence path's coarse bucket → ANY single shared keyword (minOverlap 1).
- */
-export function coveringNote(sig: SigShape, notes: ScannedNote[]): ScannedNote | null {
-  return coveringNoteMin(sig, notes, 1);
-}
+// ─── coveringNoteMin ───────────────────────────────────────────────────────────
+//
+// `coveringNote` / `isCovered` (minOverlap 1) were deleted with the keyword fold
+// (ADR-0038): promote no longer maps a signature onto a note — graduation binds by the
+// note PATH that was read. `staging.ts` remains, using the min-overlap form for its
+// anti-flood dedup, which is a suppression gate where a loose match is cheap.
 
 /**
  * Like {@link coveringNote}, but requires the note to share at least `minOverlap`

@@ -133,6 +133,26 @@ describe("mage index", () => {
     expect(await readFile(join(dir, "mage", "_index.a.md"), "utf8")).toContain("# a");
   });
 
+  it("keeps the heading hierarchy contiguous in BOTH index shapes (no MD001 skip)", async () => {
+    // Rooms nest one level under their document's own title: the root index puts them
+    // under `## <wing>` (so `###`), a per-wing index under its `# <wing>` (so `##`).
+    // Hardcoding `###` for both skipped a level in the per-wing file — and because that
+    // file is GENERATED, the only place to fix it is the renderer.
+    const dir = await vault();
+    for (const w of ["a", "b", "c", "d", "e"]) {
+      await note(dir, `${w}.md`, `---\ntags: [${w}/r]\n---\n# ${w}\n`);
+    }
+    await index({ dir });
+
+    const wingIdx = await readFile(join(dir, "mage", "_index.a.md"), "utf8");
+    expect(wingIdx).toContain("# a");
+    expect(wingIdx).toContain("## r"); // one level under the `# a` title
+    expect(wingIdx).not.toContain("### r"); // the skip this test exists to prevent
+
+    const root = await readFile(join(dir, "mage", "INDEX.md"), "utf8");
+    expect(root).toContain("## Wings"); // rooms are not rendered in the bounded root map
+  });
+
   it("cleans up stale per-wing index files when dropping back to flat", async () => {
     const dir = await vault();
     for (const w of ["a", "b", "c", "d", "e"]) {

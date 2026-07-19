@@ -1,7 +1,7 @@
 // The recurrence tally fold (ADR-0019 §1/§2). promote's "second deterministic fold
 // over the same scratch" — distill's sibling. Where the rollup folds skill_load
 // outcomes and distill reads first-sight clusters, this folds CLOSED segments into a
-// per-`(wing+keywords)`-signature recurrence count that COUNTS DISTINCT CHAPTERS
+// per-NOTE read count that COUNTS DISTINCT CHAPTERS
 // (compact/session_end segments clearing a min-work floor), not raw hits — a pattern
 // across 3 separate chapters is signal; 3 times in one chapter is not. A chapter is the
 // recurrence work-unit (0.0.11): a single continuously-compacted chat still accrues
@@ -11,25 +11,23 @@
 // `Math.max` fold over CLOSED segments only, fail-open read. PURE compute (foldSession)
 // + an fs orchestrator (foldTally). No model in the fold (ADR-0009).
 //
-// The global `signatures` counts SURVIVE the raw-event purge; the per-session
-// `sessions` fold-memory is PRUNABLE — when a session's `.learnings` file vanishes,
-// its fold entry is dropped while its already-counted contribution persists in
-// `signatures`. This is the purge-surviving second counter ADR-0018 §3 forward-committed.
+// The global `notes` counts SURVIVE the raw-event purge; the per-session `sessions`
+// fold-memory is PRUNABLE — when a session's `.learnings` file vanishes, its fold entry
+// is dropped while its already-counted contribution persists in `notes`. This is the
+// purge-surviving second counter ADR-0018 §3 forward-committed.
+//
+// ADR-0038 §7 swapped WHAT is counted, not HOW. The chapter segmentation, the min-work
+// floor, and the never-regress offset are unchanged — that machinery was never the bug;
+// the keyword KEY was. Chapters now contribute note READS (note-reads.ts) instead of
+// (wing+keywords) signatures.
 
 import type { Dirent } from "node:fs";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { metricsPath } from "../paths.js";
 import { type ObserveEvent, isTerminator } from "../observe/types.js";
-import type {
-  Lens,
-  LensCounts,
-  PromoteTally,
-  SessionFold,
-  SignatureHit,
-  SignatureStat,
-} from "./types.js";
-import { segmentSignatures } from "./signature.js";
+import type { NoteReadStat, PromoteTally, SessionFold } from "./types.js";
+import { chapterNoteReads } from "./note-reads.js";
 import { MIN_CHAPTER_WORK_EVENTS } from "./thresholds.js";
 
 // ─── consts ──────────────────────────────────────────────────────────────────
@@ -42,18 +40,21 @@ export const PROMOTE_FILE = "promote.json";
  * recurrence unit is a distinct compact-CHAPTER, not a session_id. v3 (0.0.11): the
  * signature KEY semantics changed — de-noised keywords (Candidate 3) + de-containered
  * project wings (Candidate 2) — so old-key buckets must rebuild under the new keys.
+ *
+ * v4 (ADR-0038 §7): the tally counts NOTE READS, not (wing+keywords) signatures. A v3
+ * bucket has no v4 interpretation — it is keyed on a different thing entirely — so the
+ * reset is the only honest migration, not a convenience. EXPECT THE VISIBLE DROP: every
+ * note's count restarts at 0 and must be re-earned from live `.learnings` against a
+ * stricter signal, so "N eligible to graduate" falls to 0 on first fold after upgrade.
+ * That is the designed outcome. Do NOT "fix" it by lowering `graduateSessions`.
  */
-export const PROMOTE_VERSION = 3;
+export const PROMOTE_VERSION = 4;
 
 /** A fresh, empty tally at the current version. */
 function emptyTally(): PromoteTally {
-  return { v: PROMOTE_VERSION, signatures: {}, sessions: {} };
+  return { v: PROMOTE_VERSION, notes: {}, sessions: {} };
 }
 
-/** A zeroed per-lens count Record with all four keys present (fully-keyed). */
-function freshLenses(): LensCounts {
-  return { correction: 0, failure: 0, workflow: 0, preference: 0 };
-}
 
 // ─── path ──────────────────────────────────────────────────────────────────────
 
@@ -93,7 +94,7 @@ function normalizeTally(parsed: unknown): PromoteTally {
   if (p.v !== PROMOTE_VERSION) return emptyTally();
   return {
     v: PROMOTE_VERSION,
-    signatures: isRecord(p.signatures) ? (p.signatures as Record<string, SignatureStat>) : {},
+    notes: isRecord(p.notes) ? (p.notes as Record<string, NoteReadStat>) : {},
     sessions: isRecord(p.sessions) ? (p.sessions as Record<string, SessionFold>) : {},
   };
 }
@@ -160,10 +161,11 @@ function segmentClosed(events: ObserveEvent[], from: number, upto: number): Segm
  *   2. Segment the region into CHAPTERS at compact/session_end boundaries.
  *   3. For EACH chapter that clears the MIN_CHAPTER_WORK_EVENTS floor, collect its
  *      distinct SignatureHits (dedupe by `key` within the chapter, merging lens).
- *   4. For each such chapter a key appears in: signatures[key].sessions += 1 and merge
- *      lens/keywords/wing/lastSeen/hint. → a key recurring across N qualifying chapters
- *      counts N, whether those chapters fall in one session or many (the unit is the
- *      chapter, so a single continuously-compacted chat accrues recurrence too).
+ *   4. For each such chapter a note is READ in: notes[rel].chapters += 1 and merge
+ *      lastSeen. → a note read across N qualifying chapters counts N, whether those
+ *      chapters fall in one session or many (the unit is the chapter, so a single
+ *      continuously-compacted chat accrues usage too). A chapter that loaded one of
+ *      mage's own skills contributes NOTHING (self-reference exclusion, ADR-0038 §2).
  *   5. sessions[session].offset = Math.max(prev.offset, closedCount) — never regress.
  *
  * Idempotent (re-folding an unchanged file adds nothing: the offset watermark skips the
@@ -176,6 +178,7 @@ export function foldSession(
   tally: PromoteTally,
   session: string,
   events: ObserveEvent[],
+  docsRoot: string,
   repoRoot: string | null,
 ): PromoteTally {
   const prevFold = tally.sessions[session] ?? { offset: 0, sigs: [] };
@@ -198,21 +201,15 @@ export function foldSession(
   //    (a compact/session_end segment clearing the min-work floor) is the recurrence
   //    work-unit; the offset watermark guarantees each is folded exactly once. ──
   const segments = segmentClosed(events, from, closedCount);
-  const signatures: Record<string, SignatureStat> = { ...tally.signatures };
+  const notes: Record<string, NoteReadStat> = { ...tally.notes };
 
   for (const seg of segments) {
     if (chapterWorkCount(events, seg) < MIN_CHAPTER_WORK_EVENTS) continue; // floor: skip trivial chapters.
     const segTs = lastTsOf(events, seg);
-    // The distinct signatures WITHIN this chapter, merging lens per key.
-    const chapterHits = new Map<string, { hit: SignatureHit; lenses: Set<Lens> }>();
-    for (const hit of segmentSignatures(events, seg, repoRoot)) {
-      const cur = chapterHits.get(hit.key);
-      if (cur === undefined) chapterHits.set(hit.key, { hit, lenses: new Set<Lens>([hit.lens]) });
-      else cur.lenses.add(hit.lens);
-    }
-    // Every qualifying chapter the key appears in bumps its recurrence count by 1.
-    for (const { hit, lenses } of chapterHits.values()) {
-      signatures[hit.key] = mergeStat(signatures[hit.key], hit, lenses, segTs, true);
+    // The distinct notes READ in this chapter — [] for a self-referential chapter, so
+    // mage's own capture skills can never inflate the counts that trigger graduation.
+    for (const rel of chapterNoteReads(events, seg, docsRoot, repoRoot)) {
+      notes[rel] = mergeRead(notes[rel], segTs);
     }
   }
 
@@ -220,7 +217,7 @@ export function foldSession(
   //    offset watermark + per-chapter granularity do) — retained empty for shape. ──
   return {
     ...tally,
-    signatures,
+    notes,
     sessions: {
       ...tally.sessions,
       [session]: { offset: Math.max(prevFold.offset, closedCount), sigs: [] },
@@ -229,31 +226,16 @@ export function foldSession(
 }
 
 /**
- * Merge one region's contribution to a signature into its global stat (immutable
- * replace). `bumpSession` adds 1 to the DISTINCT-session count ONLY when this is the
- * first time the session contributes this signature; otherwise lens/lastSeen merge
- * but the recurrence count holds. Lens counts accumulate every contributing lens.
- * `hint` is first-non-empty-wins (stable); `wing`/`keywords` adopt the hit's (they're
- * key-derived, so identical across hits of the same key).
+ * Merge one chapter's read of a note into its global stat (immutable replace). Every
+ * qualifying chapter a note is read in bumps `chapters` by exactly 1 — the read set is
+ * already deduped within the chapter, and the offset watermark guarantees a chapter is
+ * folded once, so a count can never double.
  */
-function mergeStat(
-  prev: SignatureStat | undefined,
-  hit: SignatureHit,
-  lenses: Set<Lens>,
-  lastTs: string,
-  bumpSession: boolean,
-): SignatureStat {
-  const cur: SignatureStat =
-    prev ?? { sessions: 0, lenses: freshLenses(), wing: hit.wing, keywords: hit.keywords, lastSeen: "", hint: "" };
-  const mergedLenses: LensCounts = { ...cur.lenses };
-  for (const l of lenses) mergedLenses[l] += 1;
+function mergeRead(prev: NoteReadStat | undefined, lastTs: string): NoteReadStat {
+  const cur: NoteReadStat = prev ?? { chapters: 0, lastSeen: "" };
   return {
-    sessions: cur.sessions + (bumpSession ? 1 : 0),
-    lenses: mergedLenses,
-    wing: hit.wing,
-    keywords: hit.keywords,
+    chapters: cur.chapters + 1,
     lastSeen: lastTs > cur.lastSeen ? lastTs : cur.lastSeen,
-    hint: cur.hint.length > 0 ? cur.hint : hit.hint, // first non-empty wins (stable).
   };
 }
 
@@ -283,7 +265,7 @@ function lastTsOf(events: ObserveEvent[], seg: Segment): string {
 /**
  * List the per-session `.learnings/*.jsonl` full streams, {@link foldSession} each
  * into the tally, PRUNE session-fold entries whose files have vanished (their global
- * `signatures` contribution persists — purge-safe), and return a NEW tally. Lists
+ * `notes` contribution persists — purge-safe), and return a NEW tally. Lists
  * EXACTLY like rollup.ts — top-level `*.jsonl`, EXCLUDING `*.skills.jsonl` sidecars
  * and the `.archive` subdir — and skips a torn file (fail-open). Does NOT write (the
  * caller persists; mirrors readDistill's read/compute split, but this one mutates the
@@ -304,17 +286,17 @@ export async function foldTally(
     const session = basename(file, ".jsonl");
     live.add(session);
     const events = await parseStream(join(learningsDir, file));
-    tally = foldSession(tally, session, events, repoRoot);
+    tally = foldSession(tally, session, events, docsRoot, repoRoot);
   }
 
   // Prune fold-memory for sessions whose `.learnings` file vanished. Their global
-  // `signatures` counts persist — the purge-surviving second counter (ADR-0019 §1).
+  // `notes` counts persist — the purge-surviving second counter (ADR-0019 §1).
   const prunedSessions: Record<string, SessionFold> = {};
   for (const [session, fold] of Object.entries(tally.sessions)) {
     if (live.has(session)) prunedSessions[session] = fold;
   }
 
-  return { v: PROMOTE_VERSION, signatures: tally.signatures, sessions: prunedSessions };
+  return { v: PROMOTE_VERSION, notes: tally.notes, sessions: prunedSessions };
 }
 
 /**

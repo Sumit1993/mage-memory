@@ -99,34 +99,13 @@ describe("collectDashboardData — populated KB", () => {
       watermarks: {},
     });
 
-    // promote tally — two signatures recurring: one at 3 sessions, one at 5.
+    // promote tally — two notes READ across chapters: one at 3, one at 5 (ADR-0038 §2).
     await metrics(root, "promote.json", {
       v: PROMOTE_VERSION,
-      signatures: {
-        "alpha::deploy,rollback": {
-          sessions: 5,
-          lenses: { correction: 2, failure: 1, workflow: 0, preference: 0 },
-          wing: "alpha",
-          keywords: ["deploy", "rollback"],
-          lastSeen: "2026-06-08T00:00:00.000Z",
-          hint: "rollback on failed deploy",
-        },
-        "beta::flaky,test": {
-          sessions: 3,
-          lenses: { correction: 1, failure: 0, workflow: 1, preference: 0 },
-          wing: "beta",
-          keywords: ["flaky", "test"],
-          lastSeen: "2026-06-08T00:00:00.000Z",
-          hint: "retry flaky tests",
-        },
-        "beta::oneoff": {
-          sessions: 1,
-          lenses: { correction: 0, failure: 0, workflow: 1, preference: 0 },
-          wing: "beta",
-          keywords: ["oneoff"],
-          lastSeen: "2026-06-08T00:00:00.000Z",
-          hint: "seen once",
-        },
+      notes: {
+        "notes/deploy-rollback.md": { chapters: 5, lastSeen: "2026-06-08T00:00:00.000Z" },
+        "notes/flaky-test.md": { chapters: 3, lastSeen: "2026-06-07T00:00:00.000Z" },
+        "notes/seen-once.md": { chapters: 1, lastSeen: "2026-06-06T00:00:00.000Z" },
       },
       sessions: {},
     });
@@ -190,7 +169,7 @@ describe("collectDashboardData — populated KB", () => {
     expect(data.ladder.scratch).toBe(5);
     expect(data.ladder.notes).toBe(3);
     expect(data.ladder.skills).toBe(2);
-    // climbing: a signature at 5 sessions and one at 3 (the 1-session one is dropped).
+    // climbing: a note read in 5 chapters and one in 3 (the 1-chapter one is dropped).
     expect(data.ladder.climbing).toEqual([
       { sessions: 5, count: 1 },
       { sessions: 3, count: 1 },
