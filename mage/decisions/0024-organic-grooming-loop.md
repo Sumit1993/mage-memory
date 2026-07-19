@@ -3,8 +3,8 @@ type: decision
 tags:
   - mage/decisions
 created: "2026-06-16"
-updated: 2026-06-16
-last_reviewed: 2026-06-16
+updated: 2026-07-19
+last_reviewed: 2026-07-19
 status: active
 provenance:
   repo: mage-memory
@@ -23,7 +23,7 @@ sources:
   - mage/decisions/0018-mage-distill-observed-scratch-reader.md
   - mage/decisions/0019-mage-promote-self-grooming.md
   - cc-session:254aa0ba-a431-4d8f-8bc5-c50d001180c5
-modified: 2026-07-19T17:34:00.515Z
+modified: 2026-07-19T17:38:49.623Z
 ---
 
 # 0024 — Organic grooming loop: the lesson path (inline-primary + boundary nudge)
