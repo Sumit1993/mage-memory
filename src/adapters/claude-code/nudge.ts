@@ -32,6 +32,8 @@ import { type BacklogTally, computeBacklogFromStreams } from "../../grooming/bac
 import { type Autonomy, mandateFor } from "../../grooming/autonomy-ladder.js";
 import { readGrooming } from "../../grooming/config.js";
 import { type KeepRateSummary, reconcileKeepRate, summarizeKeepRate } from "../../grooming/reconcile.js";
+import { measureFootprint } from "../../metrics/footprint.js";
+import { appendTrendRow, type FootprintTrendRow } from "../../metrics/footprint-trend.js";
 import type { ObserveEvent } from "../../observe/types.js";
 import { type ResolvedDocsRoot, absolutePath, learningsPath, resolveDocsRoot } from "../../paths.js";
 import {
@@ -72,6 +74,8 @@ export interface NudgeOptions {
   cwd?: string;
   /** The hook `source`; only compact/startup/resume act (clear + others are a no-op). */
   source?: string;
+  /** The observe session id from the hook. */
+  sessionId?: string;
   /** Bypass the anti-nag throttle (testing / explicit re-nudge). */
   force?: boolean;
 }
@@ -102,6 +106,23 @@ export async function nudgeCmd(opts: NudgeOptions): Promise<NudgeResult> {
 
   const resolved = await resolveDocsRoot(absolutePath(opts.cwd ?? process.cwd())).catch(() => null);
   if (!resolved) return NONE;
+
+  try {
+    const session = opts.sessionId && opts.sessionId.trim().length > 0 ? opts.sessionId.trim() : "unknown";
+    const footprint = await measureFootprint(resolved.root);
+    const row: FootprintTrendRow = {
+      session,
+      ts: new Date().toISOString(),
+      bytes: footprint.budget.usedBytes,
+      ratio: footprint.budget.ratio,
+      state: footprint.budget.state,
+      notes: footprint.yield.notesTracked,
+    };
+    await appendTrendRow(resolved.root, row);
+  } catch {
+    // Fail open: sampler MUST NOT throw, MUST NOT block, MUST NOT change hook output.
+  }
+
   return await digestNudge(resolved, opts.source, opts.force === true);
 }
 
@@ -488,6 +509,7 @@ export function buildNudgeCommand(): Command {
         const result = await nudgeCmd({
           cwd: opts.cwd ?? str(payload?.cwd),
           source: str(payload?.source),
+          sessionId: str(payload?.sessionId),
         });
         emitNudge(result.notice, result.nudge);
       } catch {
