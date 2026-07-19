@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { readFile, appendFile, writeFile, mkdir, rename } from "node:fs/promises";
+import { readFile, appendFile, mkdir, rename, stat } from "node:fs/promises";
 import { metricsPath } from "../paths.js";
 import type { BudgetState } from "./footprint.js";
 
@@ -7,6 +7,7 @@ export const TREND_VERSION = 1;
 /** Bounded per ADR-0039 §6 — the trend must not grow without limit. */
 export const TREND_MAX_ROWS = 200;
 export const TREND_MAX_AGE_DAYS = 90;
+export const TREND_ROTATE_MAX_BYTES = 1024 * 1024;
 
 export interface FootprintTrendRow {
   session: string;      // observe session id
@@ -54,7 +55,6 @@ function isTrendRow(r: unknown): r is FootprintTrendRow {
 }
 
 export async function readTrend(docsRoot: string): Promise<FootprintTrend> {
-  const mPath = metricsPath(docsRoot);
   const jlPath = footprintTrendPath(docsRoot);
   const legPath = legacyTrendPath(docsRoot);
 
@@ -118,18 +118,7 @@ export async function readTrend(docsRoot: string): Promise<FootprintTrend> {
     validRows = validRows.slice(validRows.length - TREND_MAX_ROWS);
   }
 
-  // 4. Compaction
-  if (totalParsedLines > TREND_MAX_ROWS * 2) {
-    try {
-      await mkdir(mPath, { recursive: true });
-      const tmpPath = join(mPath, `footprint.jsonl.tmp.${Date.now()}.${Math.random().toString(36).slice(2)}`);
-      const lines = validRows.map(r => JSON.stringify(r)).join("\n") + (validRows.length > 0 ? "\n" : "");
-      await writeFile(tmpPath, lines, "utf8");
-      await rename(tmpPath, jlPath);
-    } catch {
-      // silently fail compaction, leaving existing file intact
-    }
-  }
+  // 4. Compaction was removed - readTrend is read-only.
 
   return { v: TREND_VERSION, rows: validRows };
 }
@@ -138,8 +127,37 @@ export async function appendTrendRow(docsRoot: string, row: FootprintTrendRow): 
   const mPath = metricsPath(docsRoot);
   try {
     await mkdir(mPath, { recursive: true });
-    await appendFile(footprintTrendPath(docsRoot), JSON.stringify(row) + "\n", "utf8");
+    const jlPath = footprintTrendPath(docsRoot);
+
+    let size = 0;
+    try {
+      size = (await stat(jlPath)).size;
+    } catch {
+      // no file yet
+    }
+
+    if (size >= TREND_ROTATE_MAX_BYTES) {
+      try {
+        const archiveDir = join(mPath, ".archive");
+        await mkdir(archiveDir, { recursive: true });
+        const stamp = `${timestamp()}-${process.pid}`;
+        await rename(jlPath, join(archiveDir, `footprint-${stamp}.jsonl`));
+      } catch {
+        // rotation race / fs error - fail open, keep appending to current file
+      }
+    }
+
+    await appendFile(jlPath, JSON.stringify(row) + "\n", "utf8");
   } catch {
     // silently fail if unwritable or any other error
   }
+}
+
+function timestamp(): string {
+  const d = new Date();
+  const p = (n: number, w = 2) => String(n).padStart(w, "0");
+  return (
+    `${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}` +
+    `-${p(d.getUTCHours())}${p(d.getUTCMinutes())}${p(d.getUTCSeconds())}`
+  );
 }

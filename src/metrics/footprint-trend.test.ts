@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mkdir, writeFile, chmod, appendFile, readFile } from "node:fs/promises";
+import { mkdir, writeFile, chmod, appendFile, readFile, stat, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpDir } from "../../test/fixtures/kb.js";
 import {
@@ -7,6 +7,7 @@ import {
   readTrend,
   TREND_MAX_AGE_DAYS,
   TREND_MAX_ROWS,
+  TREND_ROTATE_MAX_BYTES,
   type FootprintTrendRow,
 } from "./footprint-trend.js";
 
@@ -146,7 +147,10 @@ describe("footprint-trend", () => {
     expect(trend.rows.length).toBe(0);
   });
 
-  it("compaction triggers past the threshold and the file afterwards is valid and equivalent", async () => {
+  
+
+  
+  it("readTrend never writes", async () => {
     const dir = await tmpDir("mage-trend-");
     const docsRoot = join(dir, "mage");
 
@@ -159,21 +163,90 @@ describe("footprint-trend", () => {
     const metricsDir = join(docsRoot, ".mage", "metrics");
     const path = join(metricsDir, "footprint.jsonl");
 
-    // the above loops create 405 lines. readTrend should trigger compaction and keep only 200 rows.
+    const statBefore = await stat(path);
+
     const trend = await readTrend(docsRoot);
     expect(trend.rows.length).toBe(TREND_MAX_ROWS);
 
-    // Verify compaction occurred: file lines should equal TREND_MAX_ROWS
-    const rawAfter = await readFile(path, "utf8");
-    const linesAfter = rawAfter.split("\n").filter((l) => l.trim().length > 0);
-    expect(linesAfter.length).toBe(TREND_MAX_ROWS);
-    
-    // Valid and equivalent
-    const trendAfterCompaction = await readTrend(docsRoot);
-    expect(trendAfterCompaction.rows.length).toBe(TREND_MAX_ROWS);
+    const statAfter = await stat(path);
+    expect(statAfter.mtimeMs).toBe(statBefore.mtimeMs);
+    expect(statAfter.size).toBe(statBefore.size);
   });
 
-  it("a legacy footprint.json is folded in rather than crashing", async () => {
+  it("Append during read is not lost", async () => {
+    const dir = await tmpDir("mage-trend-");
+    const docsRoot = join(dir, "mage");
+    // Fill so old code would compact
+    const now = Date.now();
+    for (let i = 0; i < TREND_MAX_ROWS * 2 + 5; i++) {
+      const ts = new Date(now + i * 1000).toISOString();
+      await appendTrendRow(docsRoot, makeRow(`sess-${i}`, ts));
+    }
+
+    // Interleave: read the file contents, append a new row, then call readTrend
+    // (We simulate the old compaction race by running them concurrently, or just sequentially as instructed)
+    const readPromise = readTrend(docsRoot);
+    await appendTrendRow(docsRoot, makeRow("race-row", new Date(now + 9999999).toISOString()));
+    await readPromise;
+
+    // The appended row should be present in the file and a subsequent read
+    const finalTrend = await readTrend(docsRoot);
+    expect(finalTrend.rows.map(r => r.session)).toContain("race-row");
+  });
+
+  it("Rotation triggers past TREND_ROTATE_MAX_BYTES", async () => {
+    const dir = await tmpDir("mage-trend-");
+    const docsRoot = join(dir, "mage");
+    const metricsDir = join(docsRoot, ".mage", "metrics");
+    const path = join(metricsDir, "footprint.jsonl");
+
+    // Write a large file directly to simulate hitting the rotate threshold
+    await mkdir(metricsDir, { recursive: true });
+    
+    // Create a row that is ~150B
+    const dummyRow = JSON.stringify(makeRow("dummy", new Date().toISOString())) + "\n";
+    // Write enough bytes to exceed TREND_ROTATE_MAX_BYTES (1MB)
+    const repeats = Math.ceil((TREND_ROTATE_MAX_BYTES + 100) / dummyRow.length);
+    await writeFile(path, dummyRow.repeat(repeats), "utf8");
+
+    // Now append one more row. This should trigger rotation.
+    await appendTrendRow(docsRoot, makeRow("trigger-rotate", new Date().toISOString()));
+
+    // The live file should now only contain the new row
+    const liveContents = await readFile(path, "utf8");
+    expect(liveContents).toContain("trigger-rotate");
+    expect(liveContents.length).toBeLessThan(TREND_ROTATE_MAX_BYTES);
+
+    // The archive dir should exist and have a file
+    const archiveDir = join(metricsDir, ".archive");
+    const archives = await readdir(archiveDir);
+    expect(archives.length).toBe(1);
+    expect(archives[0]).toMatch(/^footprint-.*\.jsonl$/);
+  });
+
+  it("Rotation does not throw when the archive dir does not yet exist", async () => {
+    const dir = await tmpDir("mage-trend-");
+    const docsRoot = join(dir, "mage");
+    const metricsDir = join(docsRoot, ".mage", "metrics");
+    const path = join(metricsDir, "footprint.jsonl");
+    await mkdir(metricsDir, { recursive: true });
+
+    // Make live file exceed threshold
+    const dummyRow = JSON.stringify(makeRow("dummy", new Date().toISOString())) + "\n";
+    const repeats = Math.ceil((TREND_ROTATE_MAX_BYTES + 100) / dummyRow.length);
+    await writeFile(path, dummyRow.repeat(repeats), "utf8");
+
+    // Make sure archive dir DOES NOT exist
+    // (mkdir with recursive: true handles it, but this tests the execution path)
+
+    // Append should succeed and not throw
+    await expect(appendTrendRow(docsRoot, makeRow("new-row", new Date().toISOString()))).resolves.toBeUndefined();
+
+    // Verify it rotated
+    const archives = await readdir(join(metricsDir, ".archive"));
+    expect(archives.length).toBe(1);
+  });
+it("a legacy footprint.json is folded in rather than crashing", async () => {
     const dir = await tmpDir("mage-trend-");
     const docsRoot = join(dir, "mage");
     const metricsDir = join(docsRoot, ".mage", "metrics");
