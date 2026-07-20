@@ -174,7 +174,7 @@ export function buildProgram(): Command {
   program
     .command("dream")
     .description(
-      "Report knowledge-base health, read-only: stale, superseded-but-active, dangling links, orphans",
+      "Report knowledge-base health (default), or apply a grooming proposal via stdin (--apply)",
     )
     .option(
       "-d, --dir <path>",
@@ -241,13 +241,13 @@ export function buildProgram(): Command {
   program
     .command("promote", { hidden: true })
     .description(
-      "Fold observed .mage/learnings into recurring note candidates (plumbing behind mage:groom Phase 2)",
+      "Fold note-read usage into graduate proposals (plumbing behind mage:graduate)",
     )
     .option(
       "-d, --dir <path>",
       "where to look for the knowledge base (default: cwd; walks up for in-repo)",
     )
-    .option("--json", "emit the note-candidate manifest as JSON")
+    .option("--json", "emit the graduate proposals as JSON")
     .option(
       "--seen <session:offset>",
       "advance the promote offset after a batch is dispositioned",
@@ -525,7 +525,7 @@ export function buildProgram(): Command {
   program
     .command("doctor")
     .description(
-      "Diagnose env + KB & connection health; --fix repairs ignores; --report bundles logs",
+      "Diagnose env + KB, connection, and recall readiness; --fix repairs ignores; --report bundles logs",
     )
     .option("--hub <path>", "hub root (default: cwd if it looks like a hub)")
     .option("--fix", "add any missing capture-sink ignore rules")

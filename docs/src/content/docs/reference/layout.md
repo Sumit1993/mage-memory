@@ -50,7 +50,7 @@ mage/
 Each leaf holds a different kind of working state:
 
 - **`.mage/learnings/`** — the raw capture scratch. Every hook-fired `mage observe` event appends here as JSONL. It is auto-pruned over time and rotated into a `.archive/` subdirectory; a `.last-purge` marker throttles the age-purge to once per day. This is the input the loop distills from, not a permanent record.
-- **`.mage/metrics/`** — read-only rollups and bookkeeping: the context-match results (did the skills that auto-loaded actually match the work?), the distill/promote watermarks, reject ledgers, and the boundary-nudge throttle (`nudge-throttle.json`).
+- **`.mage/metrics/`** — generated rollups and bookkeeping (read-only for you, but written by mage as it runs): the context-match results (did the skills that auto-loaded actually match the work?), the distill/promote watermarks, reject ledgers (`staged-rejects.json`, `rejected.json`), the autonomous keep-rate ledger maintained by the reconciler (`keep-rate.json`, `src/grooming/reconcile.ts`), and the boundary-nudge throttle (`nudge-throttle.json`).
 - **`.mage/staging/`** — judged-but-uncommitted lesson drafts. When the [stage and groom](../loop/stage-groom.md) step drafts a lesson, it lands here as a `<slug>.md` file, *out* of the live index, until you accept it. Accepting moves it into `notes/` and re-indexes; rejecting discards it and records the key.
 
 ### Why these stay out of git
