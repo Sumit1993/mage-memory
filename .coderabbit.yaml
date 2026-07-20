@@ -1,0 +1,23 @@
+reviews:
+  profile: chill
+  path_instructions:
+    - path: "src/**"
+      instructions: |
+        If this PR changes a CLI verb, flag, help string, generated skill content, hook behavior, file layout, or operator workflow, it must also update the documentation surface that describes that behavior — an unrelated docs/ or README change does not satisfy this. If the relevant surface is not updated, flag it as a documentation gap and name the specific stale surface (docs/src/content/docs/reference/commands.mdx, the loop/ pages, CONVENTIONS.md §10 command tiers, skills/*/SKILL.md descriptions, package.json description). If a command registration in src/cli-program.ts changes, docs/src/generated/mage-data.json must be regenerated in the same PR.
+        
+        Repo invariants to enforce:
+        - Capture insight/procedure/pointers, never copies of sources (ADR-0004).
+        - No runtime of our own: automation rides the host agent's hooks (ADR-0009). Flag anything adding daemons/watchers/servers.
+        - `mage dream --apply` is the SINGLE writer that mints skills/applies proposals; no other code path may write generated skills (ADR-0030, ADR-0038).
+        - Deterministic code never decides what a lesson is — it narrows, the agent judges (ADR-0029, ADR-0038). Flag new deterministic keep/discard classifiers of semantic content.
+        - Two-gate redaction: secrets stripped before write (ADR-0014). Flag new write paths for observed/captured content that bypass redaction.
+        - Command-tier discipline (CONVENTIONS.md §10): new commands must be explicitly visible (human verb) or `{ hidden: true }` (plumbing), and CONVENTIONS.md §10 updated.
+    - path: "skills/**"
+      instructions: |
+        If this PR changes a CLI verb, flag, help string, generated skill content, hook behavior, file layout, or operator workflow, it must also update the documentation surface that describes that behavior — an unrelated docs/ or README change does not satisfy this. If the relevant surface is not updated, flag it as a documentation gap and name the specific stale surface (docs/src/content/docs/reference/commands.mdx, the loop/ pages, CONVENTIONS.md §10 command tiers, skills/*/SKILL.md descriptions, package.json description).
+        
+        Repo invariants to enforce:
+        - Capture insight/procedure/pointers, never copies of sources (ADR-0004).
+    - path: "scripts/**"
+      instructions: |
+        If this PR changes a CLI verb, flag, help string, generated skill content, hook behavior, file layout, or operator workflow, it must also update the documentation surface that describes that behavior — an unrelated docs/ or README change does not satisfy this. If the relevant surface is not updated, flag it as a documentation gap and name the specific stale surface (docs/src/content/docs/reference/commands.mdx, the loop/ pages, CONVENTIONS.md §10 command tiers, skills/*/SKILL.md descriptions, package.json description).

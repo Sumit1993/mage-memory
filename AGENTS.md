@@ -24,6 +24,8 @@ services couple, a faster path to a source — capture it with `mage:learn`, or
 add a note under `mage/notes/` and run `mage index`. Capture the reusable
 *insight + procedure + pointers*, never a copy of the source.
 
+**Docs surfaces:** Every implementation spec handed to a coding agent must include a "Docs surfaces" deliverable section naming the specific files to update, or an explicit "none affected because …".
+
 **Commit hygiene:** mage never commits for you. It suggests `git` commands; you
 run them.
 <!-- END mage -->
