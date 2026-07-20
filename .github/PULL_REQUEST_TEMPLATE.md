@@ -24,7 +24,7 @@ pull request with green CI. Keep PRs focused and small where you can.
 
 ## Docs
 
-- [ ] every changed operator/agent-facing surface has its doc updated — list them
+- [ ] every changed operator/agent-facing surface has its doc updated — list them (e.g. commands.mdx, loop/ pages, CONVENTIONS.md, README, SKILL.md descriptions, package.json description)
 - [ ] no doc surface affected — explain why
 
 ## Related issues
