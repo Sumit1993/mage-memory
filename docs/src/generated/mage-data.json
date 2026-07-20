@@ -281,7 +281,7 @@
     },
     {
       "name": "dream",
-      "summary": "Report knowledge-base health, read-only: stale, superseded-but-active, dangling links, orphans",
+      "summary": "Report knowledge-base health (default), or apply a grooming proposal via stdin (--apply)",
       "aliases": [],
       "hidden": false,
       "options": [
@@ -345,7 +345,7 @@
     },
     {
       "name": "promote",
-      "summary": "Fold observed .mage/learnings into recurring note candidates (plumbing behind mage:groom Phase 2)",
+      "summary": "Fold note-read usage into graduate proposals (plumbing behind mage:graduate)",
       "aliases": [],
       "hidden": true,
       "options": [
@@ -355,7 +355,7 @@
         },
         {
           "flags": "--json",
-          "description": "emit the note-candidate manifest as JSON"
+          "description": "emit the graduate proposals as JSON"
         },
         {
           "flags": "--seen <session:offset>",
@@ -636,7 +636,7 @@
     },
     {
       "name": "doctor",
-      "summary": "Diagnose env + KB & connection health; --fix repairs ignores; --report bundles logs",
+      "summary": "Diagnose env + KB, connection, and recall readiness; --fix repairs ignores; --report bundles logs",
       "aliases": [],
       "hidden": false,
       "options": [

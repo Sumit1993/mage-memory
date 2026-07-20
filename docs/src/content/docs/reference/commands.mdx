@@ -142,6 +142,9 @@ involved.
 `mage dream` reports knowledge-base health, read-only: stale notes,
 superseded-but-active notes, dangling links, and orphans. It writes nothing.
 
+*(When validating links, dream parses standard `[text](path)` links and `[[wikilinks]]`, correctly resolves `#fragment` anchors to their files, and explicitly skips external URLs like `http://` or `mailto:` to keep the report focused on your local graph.)*
+
+
 ```bash
 # Read-only health report
 mage dream
@@ -157,6 +160,20 @@ mage dream --strict
 single-writer seam the grooming skills drive. You do not type those by hand; they
 are covered under the plumbing table below and in
 [Promote and graduate](../loop/promote-graduate.md).
+
+`mage footprint` reports your context footprint and recall economics. It measures the byte and line occupancy of the generated auto-memory file against the host agent's recall budget (e.g., 25,600 bytes or 200 lines). A recall-budget breach means the host will silently truncate the file, dropping your earliest memories. When this happens, `mage doctor` will point you at `mage footprint` to investigate.
+
+```bash
+# Report context footprint and pointer leverage
+mage footprint
+
+# Output as JSON for tooling
+mage footprint --json
+
+# Suppress output; for a failing exit code on breach, use `mage doctor` instead
+mage footprint --quiet
+```
+
 
 ## Linking to a hub
 
@@ -211,6 +228,9 @@ mage dashboard --open
 `--fix` repairs missing capture-sink ignore rules; `--report` prints a redacted,
 content-free support bundle to attach to bug reports. `mage migrate` upgrades a
 knowledge base's metadata to the current schema (idempotent; it never commits).
+
+Whenever you link a hub (`mage link`) or wire up capture for a single repo (`mage connect`), mage runs a fast readiness check and prints a **readiness footer**. This serves as a mini-doctor report to confirm your environment is ready to capture and recall notes without requiring a full manual `mage doctor` run.
+
 
 ```bash
 # Diagnose env + KB + connection health
