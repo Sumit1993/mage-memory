@@ -17,7 +17,7 @@ A chapter only counts toward usage if it carries real work: at least **two work 
 
 ## Graduate: a proven note becomes a loadable skill
 
-Some notes are not just facts but *procedures* — a playbook or a gotcha with a method to run. When the file for such a note is **read** across at least **M = 5** distinct compact-chapters, it has earned its own auto-loadable skill: a `mage-skill-<slug>`. The note stays as the substrate; the skill is its pushed, auto-loaded form.
+Some notes are not just facts but *procedures* — a playbook or a gotcha with a method to run. At normal sensitivity, when the file for such a note is **read** across at least **M = 5** distinct compact-chapters, it has earned its own auto-loadable skill: a `mage-skill-<slug>`. The note stays as the substrate; the skill is its pushed, auto-loaded form.
 
 Only **procedural** notes graduate. A skill is loaded into the agent's context to *do* something, so it must be an actionable procedure — you auto-load a procedure, not a fact. Principle, reference, and interface notes carry knowledge but no method to run, so they stay notes.
 
