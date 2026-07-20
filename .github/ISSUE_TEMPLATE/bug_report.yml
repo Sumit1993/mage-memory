@@ -51,3 +51,10 @@ body:
       render: shell
     validations:
       required: false
+  - type: textarea
+    id: docs-impact
+    attributes:
+      label: Docs impact
+      description: Which doc surfaces will this touch (commands.mdx, loop/ pages, CONVENTIONS.md, README, SKILL.md descriptions)? 'None' must be justified.
+    validations:
+      required: false

@@ -24,6 +24,13 @@ body:
       description: Other approaches you have tried or thought about.
     validations:
       required: false
+  - type: textarea
+    id: docs-impact
+    attributes:
+      label: Docs impact
+      description: Which doc surfaces will this touch (commands.mdx, loop/ pages, CONVENTIONS.md, README, SKILL.md descriptions)? 'None' must be justified.
+    validations:
+      required: true
   - type: checkboxes
     id: scope
     attributes:
