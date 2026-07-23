@@ -1,3 +1,6 @@
+# Dependabot config. npm (root pnpm-lock.yaml) + github-actions, weekly.
+# Grouping mirrors the auto-merge policy: low-risk minor/patch bumps are grouped
+# so they can be merged in bulk, while majors open as individual PRs for review.
 version: 2
 updates:
   - package-ecosystem: npm
@@ -9,14 +12,25 @@ updates:
       prefix: chore
       include: scope
     groups:
-      dev-dependencies:
+      dev-minor-patch:
         dependency-type: development
-      production-dependencies:
+        update-types:
+          - minor
+          - patch
+      prod-minor-patch:
         dependency-type: production
+        update-types:
+          - minor
+          - patch
 
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
       interval: weekly
+    open-pull-requests-limit: 5
     commit-message:
       prefix: ci
+    groups:
+      github-actions:
+        patterns:
+          - "*"
