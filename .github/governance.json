@@ -1,0 +1,115 @@
+{
+	"$comment": "Declarative repo governance applied by scripts/sync-repo-governance.sh (idempotent, gh-api based). Edit here; re-run the script to apply. This file was seeded as an exact snapshot of the live repository state, so the first sync is a no-op — any later diff is an intentional change. The release-please `autorelease: *` labels are deliberately NOT declared here: they are bot lifecycle state, not governance. The script never prunes, so they are left untouched.",
+	"settings": {
+		"has_issues": true,
+		"has_wiki": true,
+		"has_projects": true,
+		"allow_squash_merge": true,
+		"allow_merge_commit": false,
+		"allow_rebase_merge": false,
+		"allow_auto_merge": true,
+		"delete_branch_on_merge": true,
+		"squash_merge_commit_title": "PR_TITLE",
+		"squash_merge_commit_message": "COMMIT_MESSAGES"
+	},
+	"labels": [
+		{
+			"name": "bug",
+			"color": "d73a4a",
+			"description": "Something isn't working"
+		},
+		{
+			"name": "enhancement",
+			"color": "a2eeef",
+			"description": "New feature or request"
+		},
+		{
+			"name": "documentation",
+			"color": "0075ca",
+			"description": "Improvements or additions to documentation"
+		},
+		{
+			"name": "dependencies",
+			"color": "0366d6",
+			"description": "Pull requests that update a dependency file"
+		},
+		{
+			"name": "github_actions",
+			"color": "000000",
+			"description": "Pull requests that update GitHub Actions code"
+		},
+		{
+			"name": "javascript",
+			"color": "168700",
+			"description": "Pull requests that update javascript code"
+		},
+		{
+			"name": "good first issue",
+			"color": "7057ff",
+			"description": "Good for newcomers"
+		},
+		{
+			"name": "help wanted",
+			"color": "008672",
+			"description": "Extra attention is needed"
+		},
+		{
+			"name": "question",
+			"color": "d876e3",
+			"description": "Further information is requested"
+		},
+		{
+			"name": "duplicate",
+			"color": "cfd3d7",
+			"description": "This issue or pull request already exists"
+		},
+		{
+			"name": "invalid",
+			"color": "e4e669",
+			"description": "This doesn't seem right"
+		},
+		{
+			"name": "wontfix",
+			"color": "ffffff",
+			"description": "This will not be worked on"
+		}
+	],
+	"ruleset": {
+		"name": "main protection",
+		"target": "branch",
+		"enforcement": "active",
+		"conditions": {
+			"ref_name": {
+				"include": ["~DEFAULT_BRANCH"],
+				"exclude": []
+			}
+		},
+		"rules": [
+			{ "type": "deletion" },
+			{ "type": "non_fast_forward" },
+			{
+				"type": "pull_request",
+				"parameters": {
+					"required_approving_review_count": 0,
+					"dismiss_stale_reviews_on_push": false,
+					"require_code_owner_review": false,
+					"require_last_push_approval": false,
+					"required_review_thread_resolution": true,
+					"required_reviewers": [],
+					"allowed_merge_methods": ["squash", "merge", "rebase"]
+				}
+			},
+			{
+				"type": "required_status_checks",
+				"parameters": {
+					"strict_required_status_checks_policy": true,
+					"do_not_enforce_on_create": false,
+					"required_status_checks": [
+						{ "context": "CI gate" },
+						{ "context": "CodeRabbit", "integration_id": 347564 }
+					]
+				}
+			}
+		]
+	}
+}
