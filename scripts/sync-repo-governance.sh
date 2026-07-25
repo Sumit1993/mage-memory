@@ -24,7 +24,14 @@ REPO=""
 CONFIG=".github/governance.json"
 DRY_RUN="false"
 
-need_value() { [[ $# -ge 2 ]] || { echo "error: $1 requires a value" >&2; exit 2; }; }
+# Reject a missing, EMPTY, or option-like value. `--repo ""` is the dangerous
+# case: it passes a bare presence check, then falls through to the `gh repo view`
+# default below and applies governance to WHATEVER repo the cwd points at.
+need_value() {
+  [[ $# -ge 2 ]] || { echo "error: $1 requires a value" >&2; exit 2; }
+  [[ -n "$2" ]]  || { echo "error: $1 requires a non-empty value" >&2; exit 2; }
+  [[ "$2" != -* ]] || { echo "error: $1 requires a value, got the option '$2'" >&2; exit 2; }
+}
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
