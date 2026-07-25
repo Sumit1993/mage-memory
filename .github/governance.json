@@ -1,5 +1,5 @@
 {
-	"$comment": "Declarative repo governance applied by scripts/sync-repo-governance.sh (idempotent, gh-api based). Edit here; re-run the script to apply. This file was seeded as an exact snapshot of the live repository state, so the first sync is a no-op — any later diff is an intentional change. The release-please `autorelease: *` labels are deliberately NOT declared here: they are bot lifecycle state, not governance. The script never prunes, so they are left untouched.",
+	"$comment": "Declarative repo governance applied by scripts/sync-repo-governance.sh (idempotent, gh-api based). Edit here; re-run the script to apply. This file was seeded as an exact snapshot of the live repository state, with exactly ONE intentional delta on top: 'Validate PR title (conventional commits)' is now a REQUIRED status check. That job already ran on every PR and was simply not enforced. Everything else applies as a no-op, so any further diff is an intentional change. The release-please `autorelease: *` labels are deliberately NOT declared here: they are bot lifecycle state, not governance. The script never prunes, so they are left untouched.",
 	"settings": {
 		"has_issues": true,
 		"has_wiki": true,
@@ -106,6 +106,7 @@
 					"do_not_enforce_on_create": false,
 					"required_status_checks": [
 						{ "context": "CI gate" },
+						{ "context": "Validate PR title (conventional commits)" },
 						{ "context": "CodeRabbit", "integration_id": 347564 }
 					]
 				}

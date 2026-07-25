@@ -24,10 +24,12 @@ REPO=""
 CONFIG=".github/governance.json"
 DRY_RUN="false"
 
+need_value() { [[ $# -ge 2 ]] || { echo "error: $1 requires a value" >&2; exit 2; }; }
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --repo) REPO="$2"; shift 2 ;;
-    --config) CONFIG="$2"; shift 2 ;;
+    --repo) need_value "$@"; REPO="$2"; shift 2 ;;
+    --config) need_value "$@"; CONFIG="$2"; shift 2 ;;
     --dry-run) DRY_RUN="true"; shift ;;
     -h|--help) sed -n '2,30p' "$0"; exit 0 ;;
     *) echo "unknown arg: $1" >&2; exit 2 ;;
@@ -38,6 +40,20 @@ command -v gh >/dev/null || { echo "error: gh not found on PATH" >&2; exit 1; }
 command -v jq >/dev/null || { echo "error: jq not found on PATH" >&2; exit 1; }
 [[ -f "$CONFIG" ]] || { echo "error: config not found: $CONFIG" >&2; exit 1; }
 
+# Reject malformed governance BEFORE any API call. Without this, a jq parse
+# error or a wrong-shaped section is indistinguishable from "section absent",
+# and the script silently skips it while still reporting success — the worst
+# outcome for a tool whose job is to guarantee protection is applied.
+jq -e . "$CONFIG" >/dev/null 2>&1 || { echo "error: $CONFIG is not valid JSON" >&2; exit 1; }
+jq -e '
+  ((has("settings") | not) or (.settings | type == "object"))
+  and ((has("labels")  | not) or (.labels  | type == "array"))
+  and ((has("ruleset") | not) or ((.ruleset | type == "object") and (.ruleset.name | type == "string")))
+' "$CONFIG" >/dev/null 2>&1 || {
+  echo "error: $CONFIG has a malformed section (.settings must be an object, .labels an array, .ruleset an object with a string .name)" >&2
+  exit 1
+}
+
 if [[ -z "$REPO" ]]; then
   REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
 fi
@@ -45,6 +61,10 @@ fi
 bold() { printf '\033[1m%s\033[0m\n' "$*"; }
 info() { printf '  %s\n' "$*"; }
 warn() { printf '\033[33m  ! %s\033[0m\n' "$*" >&2; }
+# A governance sync that half-applies and still exits 0 is worse than one that
+# fails: the repo looks synced and isn't. Every mutation and every lookup that
+# decides create-vs-update goes through fail() on error.
+fail() { printf '\033[31m  x %s\033[0m\n' "$*" >&2; exit 1; }
 
 # Run a MUTATING gh call, or just print it under --dry-run. In dry-run we still
 # drain any piped stdin (so the upstream jq/echo doesn't take SIGPIPE and trip
@@ -68,8 +88,8 @@ IS_PRIVATE="$(gh api "repos/$REPO" --jq .private 2>/dev/null || echo "unknown")"
 bold "Settings"
 if jq -e '.settings' "$CONFIG" >/dev/null; then
   jq -c '.settings' "$CONFIG" | mutate api --method PATCH "repos/$REPO" --input - >/dev/null \
-    && info "applied repository settings" \
-    || warn "settings PATCH failed (need admin?)"
+    || fail "settings PATCH failed (need admin?)"
+  info "applied repository settings"
 else
   info "no .settings in config — skipped"
 fi
@@ -78,19 +98,29 @@ fi
 # 2. Labels (upsert: create if missing, else update color/description)
 # ---------------------------------------------------------------------------
 bold "Labels"
-label_count="$(jq '.labels | length' "$CONFIG" 2>/dev/null || echo 0)"
-for ((i = 0; i < label_count; i++)); do
-  name="$(jq -r ".labels[$i].name" "$CONFIG")"
-  enc="$(jq -rn --arg s "$name" '$s|@uri')"
-  body="$(jq -c ".labels[$i]" "$CONFIG")"
-  if gh api "repos/$REPO/labels/$enc" >/dev/null 2>&1; then
-    echo "$body" | mutate api --method PATCH "repos/$REPO/labels/$enc" --input - >/dev/null \
-      && info "updated label: $name" || warn "failed to update label: $name"
-  else
-    echo "$body" | mutate api --method POST "repos/$REPO/labels" --input - >/dev/null \
-      && info "created label: $name" || warn "failed to create label: $name"
-  fi
-done
+label_count="$(jq '(.labels // []) | length' "$CONFIG")"
+if ((label_count > 0)); then
+  # List labels ONCE, paginated. The previous per-label existence probe used
+  # `gh api ... 2>/dev/null` and treated ANY failure — network, 403, rate limit —
+  # as "label missing", falling through to create. It also never paginated.
+  existing_labels="$(gh api --paginate "repos/$REPO/labels" | jq -s 'add // []')" \
+    || fail "could not list labels for $REPO"
+
+  for ((i = 0; i < label_count; i++)); do
+    name="$(jq -r ".labels[$i].name" "$CONFIG")"
+    enc="$(jq -rn --arg s "$name" '$s|@uri')"
+    body="$(jq -c ".labels[$i]" "$CONFIG")"
+    if printf '%s' "$existing_labels" | jq -e --arg n "$name" 'any(.[]; .name == $n)' >/dev/null; then
+      echo "$body" | mutate api --method PATCH "repos/$REPO/labels/$enc" --input - >/dev/null \
+        || fail "failed to update label: $name"
+      info "updated label: $name"
+    else
+      echo "$body" | mutate api --method POST "repos/$REPO/labels" --input - >/dev/null \
+        || fail "failed to create label: $name"
+      info "created label: $name"
+    fi
+  done
+fi
 
 # ---------------------------------------------------------------------------
 # 3. Branch-protection ruleset (create-or-update by name)
@@ -102,14 +132,27 @@ if jq -e '.ruleset' "$CONFIG" >/dev/null; then
   if [[ "$IS_PRIVATE" == "true" ]]; then
     warn "repo is PRIVATE — rulesets require GitHub Pro; the call may 403."
   fi
-  # Existing ruleset id by name (empty if none / not readable).
-  rs_id="$(gh api "repos/$REPO/rulesets" --jq ".[] | select(.name==\"$rs_name\") | .id" 2>/dev/null || true)"
+  # Resolve the existing ruleset by name. This lookup decides CREATE vs UPDATE,
+  # so it must fail CLOSED: the old `|| true` turned any lookup error into
+  # "none found" and fell through to CREATE, adding a SECOND overlapping ruleset
+  # on the branch. Overlapping rulesets compose as a union of restrictions, so
+  # that failure is silent, cumulative, and awkward to unpick. It also never
+  # paginated — an existing ruleset beyond the first 30 was invisible.
+  rs_list="$(gh api --paginate "repos/$REPO/rulesets" | jq -s 'add // []')" \
+    || fail "could not list rulesets for $REPO — refusing to continue, since creating a duplicate is worse than doing nothing"
+  rs_matches="$(printf '%s' "$rs_list" | jq --arg n "$rs_name" '[.[] | select(.name == $n)] | length')"
+  ((rs_matches <= 1)) \
+    || fail "found $rs_matches rulesets named \"$rs_name\" on $REPO — resolve by hand before syncing"
+  rs_id="$(printf '%s' "$rs_list" | jq -r --arg n "$rs_name" 'first(.[] | select(.name == $n) | .id) // empty')"
+
   if [[ -n "$rs_id" ]]; then
     echo "$rs_body" | mutate api --method PUT "repos/$REPO/rulesets/$rs_id" --input - >/dev/null \
-      && info "updated ruleset: $rs_name (#$rs_id)" || warn "failed to update ruleset: $rs_name"
+      || fail "failed to update ruleset: $rs_name (#$rs_id)"
+    info "updated ruleset: $rs_name (#$rs_id)"
   else
     echo "$rs_body" | mutate api --method POST "repos/$REPO/rulesets" --input - >/dev/null \
-      && info "created ruleset: $rs_name" || warn "failed to create ruleset: $rs_name (Pro required for private repos)"
+      || fail "failed to create ruleset: $rs_name (Pro required for private repos)"
+    info "created ruleset: $rs_name"
   fi
 else
   info "no .ruleset in config — skipped"
