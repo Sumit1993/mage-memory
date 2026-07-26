@@ -7,6 +7,15 @@ updates:
     directory: "/"
     schedule:
       interval: weekly
+    # This repo pins pnpm 11 (see packageManager), which verifies the lockfile
+    # against a supply-chain minimum-release-age policy. A bump proposed the
+    # moment a version lands cannot install
+    # (ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION) and the PR sits red until the
+    # package ages out -- this is what put #84/#85/#88 red simultaneously.
+    # Dependabot already applies a 3-day cooldown by default; 7 gives margin.
+    # Cooldown covers VERSION updates only -- security updates are never delayed.
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 5
     commit-message:
       prefix: chore

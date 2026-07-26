@@ -106,8 +106,7 @@
 					"do_not_enforce_on_create": false,
 					"required_status_checks": [
 						{ "context": "CI gate" },
-						{ "context": "Validate PR title (conventional commits)" },
-						{ "context": "CodeRabbit", "integration_id": 347564 }
+						{ "context": "Validate PR title (conventional commits)" }
 					]
 				}
 			}
