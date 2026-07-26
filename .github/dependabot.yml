@@ -7,6 +7,14 @@ updates:
     directory: "/"
     schedule:
       interval: weekly
+    # pnpm 11 verifies the lockfile against a supply-chain minimum-release-age
+    # policy, so a bump proposed the moment a version lands cannot install
+    # (ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION) and the PR sits red until the
+    # package ages out. Cooldown holds the PR back until the version is old
+    # enough to pass, which removes the red-PR churn without delaying anything
+    # that could have merged sooner anyway.
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 5
     commit-message:
       prefix: chore
