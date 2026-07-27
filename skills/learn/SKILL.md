@@ -44,10 +44,11 @@ to avoid), and **pointers** to canonical sources — never a copy of the source
 
    If a better home wins, route the content there (`mage/work/` for plans/specs/tasks, `mage/decisions/` for decisions, a repo doc for current truth, a skill for instructions) instead of authoring a note. This is **guidance, not a gate** — never phrase it as a hard block (ADR-0035 §4 forbids write-time tollbooths; if the user still requests a note, author it).
 
-3. **Classify the finding.** Pick a `type` (open vocab — see `CONVENTIONS.md`):
-   `interface`, `tooling`, `topology`, `relationship`, `playbook`, `gotcha`,
-   `pointer`, `trail`, `decision`, `principle`, `note`. Pick the **wing** (project /
-   repo / service / person) and **room** (topic) → tag `#<wing>/<room>`.
+3. **Classify the finding.** Pick a `type` (see `CONVENTIONS.md`). Memory genre —
+   recall-bearing: `gotcha`, `procedure`, `pointer`, `principle`, `feedback`,
+   `reference`, `note`. Non-memory genres: `decision`, `plan`, `tasks`, `spec`.
+   Any other string is legal but lands **unclassified** (rung 3). Pick the **wing**
+   (project / repo / service / person) and **room** (topic) → tag `#<wing>/<room>`.
 
 4. **Overlap-check (on-write, ADR-0004).** Read `mage/INDEX.md` (and the
    per-wing `_index.<wing>.md` if present) for notes on the same topic or
@@ -92,11 +93,11 @@ to avoid), and **pointers** to canonical sources — never a copy of the source
    redaction gate.
 
 10. **Suggest follow-ups (never auto-run):**
-   ```bash
-   mage index          # refresh INDEX.md
-   mage skills         # refresh per-wing skills (if a new wing appeared)
-   git -C <repo> add mage && git -C <repo> commit -m "note: <title> (#<wing>)"
-   ```
+    ```bash
+    mage index          # refresh INDEX.md
+    mage skills         # refresh per-wing skills (if a new wing appeared)
+    git -C <repo> add mage && git -C <repo> commit -m "note: <title> (#<wing>)"
+    ```
 
 ## Bulk import — mage:learn --from <dir>
 

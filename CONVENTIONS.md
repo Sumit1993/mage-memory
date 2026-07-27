@@ -180,14 +180,14 @@ mistakes. Three ingredients:
 > output you can't regenerate cheaply), snapshot it into the owning work unit's
 > `work/<slug>/artifacts/` directory and point `sources:` at the snapshot.
 
-Litmus test before saving: *"Does this help me do it faster or avoid a mistake
-next time?"* If it's just an archive of what you read, it doesn't belong.
+Litmus test before saving: apply the **memory test** in §6. If it's just an
+archive of what you read, it doesn't belong.
 
 ---
 
 ## 6. Note-type vocabulary, genres, and recall rungs
 
-`type` is an open vocabulary, but every note type maps onto a **genre** that decides its recall rung ([ADR-0041](mage/decisions/0041-genre-decides-the-recall-rung.md)). Only **memory** genre notes populate the always-loaded recall index (`INDEX.md`/`MEMORY.md`). Non-memory types (`plan`, `spec`, `tasks`, `decision`) remain legal types for storage and linking, but are non-memory genres (`work`, `doc`, `decision` per ADR-0041) excluded from always-loaded recall — authored deliberately, never the default destination for captured knowledge.
+`type` is an open vocabulary, but every note type maps onto a **genre** that decides its recall rung ([ADR-0041](mage/decisions/0041-genre-decides-the-recall-rung.md)). Only **memory** genre notes will populate the always-loaded recall index (`INDEX.md`/`MEMORY.md`) once the scanner genre filter ships (ADR-0041 — not yet implemented; today's index carries every genre). Non-memory types (`plan`, `spec`, `tasks`, `decision`) remain legal types for storage and linking, but are non-memory genres (`work`, `doc`, `decision` per ADR-0041) that will be excluded from always-loaded recall — authored deliberately, never the default destination for captured knowledge.
 
 | `type:` | Genre | Recall Rung | Purpose & Lifecycle |
 |---|---|---|---|
@@ -195,11 +195,12 @@ next time?"* If it's just an archive of what you read, it doesn't belong.
 | `decision` | **decision** | 3 (on demand) | Settled architectural choice (supersede/amend, never edit in place; `mage/decisions/`). |
 | `plan` `tasks` | **work** | 3 (on demand) | Task lists & work plans (complete and archive; lives in `mage/work/`). |
 | `spec` `doc` | **doc** | 3 (on demand) | System specification / current truth (expire on falsification). |
+| anything else | **unclassified** | 3 (on demand) | Doctor annotates; never rejected. |
 
 ### Memory test (4 properties)
 A finding belongs in a **memory** note if:
-1. **Recallable:** Small (~1–3 KB, single-purpose) to surface unbidden at point of need.
-2. **Actionable:** Alters immediate decisions or prevents repeating a footgun.
+1. **Recallable:** Small and single-purpose — well under the `noteSizeCap` split threshold — so it can surface unbidden at point of need.
+2. **Actionable:** *"Does this help me do it faster or avoid a mistake next time?"* It alters an immediate decision or prevents repeating a footgun.
 3. **Survives its source:** Holds non-obvious insight not re-derivable from code or git history.
 4. **Has no better home:** Pass the **better home** ladder first before authoring a note.
 

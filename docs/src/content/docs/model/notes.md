@@ -25,18 +25,20 @@ For example, instead of pasting a service's entire API reference into a note, yo
 
 ## Note types and genres
 
-A note carries an optional `type` in its frontmatter. Per ADR-0041, `type` maps to a **genre** that decides its recall rung. Only memory-genre notes populate the always-loaded recall index (`INDEX.md`):
+A note carries an optional `type` in its frontmatter. Per ADR-0041, `type` maps to a **genre** that decides its recall rung. Only memory-genre notes will populate the always-loaded recall index (`INDEX.md`) once the scanner genre filter ships (ADR-0041 — not yet implemented; today's index carries every genre):
 
-- **gotcha** / **playbook** / **procedure** — gotchas and reusable procedures (procedural notes that can graduate into skills).
-- **interface** / **pointer** / **reference** / **principle** / **note** — insight, contracts, wayfinding, and durable rules forming the recall-bearing memory set.
+- **gotcha** / **procedure** — traps and reusable procedures (procedural notes that can graduate into skills).
+- **pointer** / **reference** / **principle** / **feedback** / **note** — wayfinding, durable rules, and insight.
 
-Non-memory types (`plan`, `spec`, `tasks`, `decision`) remain legal note types for storage and linking, but are non-memory genres (`work`, `doc`, `decision` per ADR-0041) excluded from always-loaded recall — authored deliberately rather than as default destinations for captured knowledge:
+Any string is legal; unrecognized types are unclassified and sit at rung 3 (on-demand only). Legacy strings (`playbook`, `interface`, `tooling`, `topology`, `relationship`, `trail`) remain legal but map to **unclassified** (rung 3).
+
+Non-memory types (`plan`, `spec`, `tasks`, `decision`) remain legal note types for storage and linking, but are non-memory genres (`work`, `doc`, `decision` per ADR-0041) that will be excluded from always-loaded recall — authored deliberately rather than as default destinations for captured knowledge:
 - **decision** — an ADR: a choice, the reasoning, and what it rules out (stored in `mage/decisions/`).
 - **spec** / **plan** / **tasks** — specifications, forward work plans, and checklists (stored in `mage/work/` or repo docs).
 
 Before authoring a memory note, walk the **better home** ladder (code comment → ticket/`mage/work/` → doc beside code → artifact+pointer → skill → decision → memory) to ensure memory is the right home.
 
-The two procedural types — **playbook** and **gotcha** — are special: only procedural notes can later [graduate](../loop/promote-graduate.md) into their own auto-loaded skill, because you push a procedure but you pull a fact.
+The two procedural types — **procedure** and **gotcha** — are special: only procedural notes can later [graduate](../loop/promote-graduate.md) into their own auto-loaded skill, because you push a procedure but you pull a fact.
 
 ## Frontmatter and the lifecycle fields
 
