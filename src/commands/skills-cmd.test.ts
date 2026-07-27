@@ -19,6 +19,15 @@ async function note(dir: string, rel: string, content: string): Promise<void> {
   await mkdir(join(p, ".."), { recursive: true });
   await writeFile(p, content);
 }
+async function decision(
+  dir: string,
+  rel: string,
+  content: string,
+): Promise<void> {
+  const p = join(dir, "mage", "decisions", rel);
+  await mkdir(join(p, ".."), { recursive: true });
+  await writeFile(p, content);
+}
 const skillFile = (dir: string, wing: string) =>
   join(dir, ".claude/skills", `mage-wing-${wing}`, "SKILL.md");
 
@@ -34,9 +43,22 @@ async function stream(
 }
 
 /** A session that loads a mage skill and then immediately ends (CLOSED via terminator). */
-function closedLoadEvents(session: string, matched: boolean): Array<Record<string, unknown>> {
+function closedLoadEvents(
+  session: string,
+  matched: boolean,
+): Array<Record<string, unknown>> {
   return [
-    { v: 1, ts: "2026-06-07T00:00:00.000Z", session, type: "session_start", harness: "x", cwd: "/r", repo_root: "/r", mage_version: "0.0.6", source: "startup" },
+    {
+      v: 1,
+      ts: "2026-06-07T00:00:00.000Z",
+      session,
+      type: "session_start",
+      harness: "x",
+      cwd: "/r",
+      repo_root: "/r",
+      mage_version: "0.0.6",
+      source: "startup",
+    },
     {
       v: 1,
       ts: "2026-06-07T00:00:01.000Z",
@@ -48,9 +70,27 @@ function closedLoadEvents(session: string, matched: boolean): Array<Record<strin
       trigger_hash: "h1",
     },
     matched
-      ? { v: 1, ts: "2026-06-07T00:00:02.000Z", session, type: "user_prompt", text: "fix the rollup fold" }
-      : { v: 1, ts: "2026-06-07T00:00:02.000Z", session, type: "user_prompt", text: "nothing relevant here" },
-    { v: 1, ts: "2026-06-07T00:00:03.000Z", session, type: "session_end", reason: "done" },
+      ? {
+          v: 1,
+          ts: "2026-06-07T00:00:02.000Z",
+          session,
+          type: "user_prompt",
+          text: "fix the rollup fold",
+        }
+      : {
+          v: 1,
+          ts: "2026-06-07T00:00:02.000Z",
+          session,
+          type: "user_prompt",
+          text: "nothing relevant here",
+        },
+    {
+      v: 1,
+      ts: "2026-06-07T00:00:03.000Z",
+      session,
+      type: "session_end",
+      reason: "done",
+    },
   ];
 }
 
@@ -60,12 +100,18 @@ describe("mage skills", () => {
     await note(dir, "a.md", "---\ntags: [alpha/x]\n---\n# A\n");
     const r = await skills({ dir });
     expect(r.wings).toEqual(["alpha"]);
-    expect(await readFile(skillFile(dir, "alpha"), "utf8")).toContain("# alpha");
+    expect(await readFile(skillFile(dir, "alpha"), "utf8")).toContain(
+      "# alpha",
+    );
   });
 
   it("cross-lists a multi-homed note into every tagged wing's skill (ADR-0012 §5)", async () => {
     const dir = await vault();
-    await note(dir, "rel.md", "---\ntype: relationship\ntags: [a/x, b/y]\n---\n# My Rel\n");
+    await note(
+      dir,
+      "rel.md",
+      "---\ntype: relationship\ntags: [a/x, b/y]\n---\n# My Rel\n",
+    );
     const r = await skills({ dir });
     expect(r.wings).toEqual(["a", "b"]);
     expect(await readFile(skillFile(dir, "a"), "utf8")).toContain("My Rel");
@@ -87,6 +133,82 @@ describe("mage skills", () => {
     const r = await skills({ dir });
     expect(r.wings).toContain("proj");
   });
+
+  it("includes governing decisions (accepted, non-superseded) sorted and deduped in wing skill", async () => {
+    const dir = await vault();
+    // ADRs under mage/decisions
+    await decision(
+      dir,
+      "0004-accepted-second.md",
+      "---\ntype: decision\nstatus: accepted\n---\n# 0004 — Second Accepted Decision\n",
+    );
+    await decision(
+      dir,
+      "0001-accepted-first.md",
+      "---\ntype: decision\nstatus: accepted\n---\n# 0001 — First Accepted Decision\n",
+    );
+    await decision(
+      dir,
+      "0002-proposed.md",
+      "---\ntype: decision\nstatus: proposed\n---\n# 0002 — Proposed Decision\n",
+    );
+    await decision(
+      dir,
+      "0003-superseded.md",
+      "---\ntype: decision\nstatus: superseded\n---\n# 0003 — Superseded Decision\n",
+    );
+
+    // Notes in wing alpha
+    await note(
+      dir,
+      "n1.md",
+      "---\ntags: [alpha/x]\n---\n# Note 1\nLink to [ADR 0004](../decisions/0004-accepted-second.md) and [ADR 0002](../decisions/0002-proposed.md).",
+    );
+    await note(
+      dir,
+      "n2.md",
+      "---\ntags: [alpha/y]\n---\n# Note 2\nLink to [ADR 0001](../decisions/0001-accepted-first.md) and duplicate link to [ADR 0004](../decisions/0004-accepted-second.md) and [ADR 0003](../decisions/0003-superseded.md).",
+    );
+    await note(
+      dir,
+      "n3.md",
+      "---\ntags: [alpha/z]\n---\n# Note 3\nNo ADR links here.",
+    );
+
+    // Note in wing beta with no ADR links
+    await note(
+      dir,
+      "n4.md",
+      "---\ntags: [beta/w]\n---\n# Note 4\nNo ADR links.",
+    );
+
+    await skills({ dir });
+
+    const alphaSkill = await readFile(skillFile(dir, "alpha"), "utf8");
+    expect(alphaSkill).toContain("## Governing decisions");
+    expect(alphaSkill).toContain(
+      "- [0001 — First Accepted Decision](mage/decisions/0001-accepted-first.md)",
+    );
+    expect(alphaSkill).toContain(
+      "- [0004 — Second Accepted Decision](mage/decisions/0004-accepted-second.md)",
+    );
+    expect(alphaSkill).not.toContain("0002 — Proposed Decision");
+    expect(alphaSkill).not.toContain("0003 — Superseded Decision");
+
+    // Check numerical ordering (0001 appears before 0004)
+    const pos0001 = alphaSkill.indexOf("0001 — First Accepted Decision");
+    const pos0004 = alphaSkill.indexOf("0004 — Second Accepted Decision");
+    expect(pos0001).toBeGreaterThan(-1);
+    expect(pos0004).toBeGreaterThan(pos0001);
+
+    // Check deduplication (0004 appears exactly once in the list)
+    const matches0004 = alphaSkill.match(/0004 — Second Accepted Decision/g);
+    expect(matches0004?.length).toBe(1);
+
+    // Wing with zero governing ADRs gets no Governing decisions section
+    const betaSkill = await readFile(skillFile(dir, "beta"), "utf8");
+    expect(betaSkill).not.toContain("Governing decisions");
+  });
 });
 
 describe("mage skills --metrics (read-only)", () => {
@@ -100,8 +222,13 @@ describe("mage skills --metrics (read-only)", () => {
     expect(spy).not.toHaveBeenCalled();
     expect(r.metricsRows).toBeDefined();
     // The rollup file was written under <root>/.mage/metrics/context-match.json.
-    const rollupRaw = await readFile(join(dir, "mage", ".mage", "metrics", "context-match.json"), "utf8");
-    const rollup = JSON.parse(rollupRaw) as { skills: Record<string, { loads: number; matches: number }> };
+    const rollupRaw = await readFile(
+      join(dir, "mage", ".mage", "metrics", "context-match.json"),
+      "utf8",
+    );
+    const rollup = JSON.parse(rollupRaw) as {
+      skills: Record<string, { loads: number; matches: number }>;
+    };
     const stat = rollup.skills["mage-wing-mage::h1"];
     expect(stat).toBeDefined();
     expect(stat?.loads).toBe(1);
@@ -160,7 +287,11 @@ describe("mage skills --metrics (read-only)", () => {
 
     await skills({ dir, metrics: true, json: true });
 
-    const parsed = JSON.parse(lines.join("\n")) as Array<{ skill: string; loads: number; matchRate: number }>;
+    const parsed = JSON.parse(lines.join("\n")) as Array<{
+      skill: string;
+      loads: number;
+      matchRate: number;
+    }>;
     expect(Array.isArray(parsed)).toBe(true);
     expect(parsed[0]?.skill).toBe("mage-wing-mage");
     expect(parsed[0]?.loads).toBe(1);

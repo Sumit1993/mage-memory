@@ -15,8 +15,60 @@ Procedural entry point for the **mage** wing. mage notes hold the facts; this sk
 - Open only the notes a task touches; follow their `[text](path.md)` links.
 - Treat notes as point-in-time: verify `status: stale-suspect` or stale `last_reviewed` notes against the current code before relying on them.
 
-_No playbook/gotcha/interface notes tagged `#mage` yet — capture them with `mage:learn`._
+## mage playbooks & gotchas
+
+- `gotcha` Gotcha — a throwaway measurement script is code, and its bug becomes an ADR's evidence — `notes/ad-hoc-measurement-scripts-are-code.md`
+- `gotcha` Gotcha — agy reports byte-exact compliance it did not deliver; verify the artifact, not the report — `notes/agy-commit-message-compliance-is-unreliable.md`
+- `gotcha` Gotcha — `mage connect` turns on capture but does not ensure the sink is gitignored — `notes/connect-doesnt-ensure-ignores.md`
+- `gotcha` Gotcha — a delegate sent after a command that does not exist will find the one you forbade — `notes/delegation-prompts-must-name-real-commands.md`
+- `gotcha` Gotcha — scope Gate-2 to the knowledge base, not the whole repo — `notes/gate2-blocks-own-redaction-fixtures.md`
+- `gotcha` Gotcha — a Gate-2 false positive can stall an autonomous groom; never disable the hook to unblock — `notes/gate2-fp-blocks-autonomy.md`
+- `gotcha` Gotcha — a mature KB emits no capture terminals, so the keep-rate gate cannot calibrate on it — `notes/mature-kb-emits-no-capture-terminals.md`
+- `gotcha` Gotcha — `npx mage` in this repo runs the PUBLISHED release, not your working tree — `notes/npx-mage-runs-the-published-release.md`
+- `gotcha` Gotcha — a lock on a hook path is the wrong mechanism; mage already folds append-only JSONL — `notes/prefer-the-repos-lock-free-convention.md`
+- `gotcha` Gotcha — promote's recurrence fold has near-zero precision on a mature KB — `notes/promote-folds-mechanical-tokens.md`
 
 ## Capture
 
 When you learn something durable in this wing, capture it with `mage:learn` (insight + procedure + pointers — never a copy of the source), then run `mage index` and `mage skills`.
+
+## Governing decisions
+
+- [0001 — A memory-first product (mage) supersedes specshub](mage/decisions/0001-memory-first-product-supersedes-specshub.md)
+- [0002 — mage forks specshub (clean copy, fresh history) and reorients](mage/decisions/0002-fork-and-reorient-specshub.md)
+- [0003 — Track work units and notes; git-ignore only artifacts and scratch](mage/decisions/0003-track-work-ignore-artifacts.md)
+- [0004 — Capture insight, procedure, and pointers — not copies of sources](mage/decisions/0004-capture-insight-not-copies.md)
+- [0005 — Exactly one canonical durable memory (mage); native memories are feeders, not rivals](mage/decisions/0005-one-canonical-memory-others-are-feeders.md)
+- [0006 — Two-layer recall: per-wing auto-loaded skills + a hierarchical factual index](mage/decisions/0006-two-layer-recall-per-wing-skills.md)
+- [0007 — Mine agentmemory's design; don't depend on it](mage/decisions/0007-mine-agentmemory-design-not-depend.md)
+- [0008 — In-repo knowledge base lives in a visible `mage/` dir (not hidden `.mage/`)](mage/decisions/0008-visible-mage-dir-for-obsidian.md)
+- [0009 — No runtime of our own; automation rides the host agent's hooks + the agent's reasoning](mage/decisions/0009-no-runtime-automation-rides-host-hooks.md)
+- [0010 — mage is durable memory, not a multi-agent coordination layer](mage/decisions/0010-durable-memory-not-coordination-layer.md)
+- [0011 — A hub is one vault; the scanner recurses; projects are wings](mage/decisions/0011-recursive-scan-hub-projects.md)
+- [0012 — A wing is an optional convention; hubs are standalone-first](mage/decisions/0012-wings-optional-convention-standalone-hubs.md)
+- [0013 — Procedure skills and the self-grooming loop](mage/decisions/0013-procedure-skills-self-grooming-loop.md)
+- [0014 — Two-gate redaction (strip secrets before write, not before display)](mage/decisions/0014-two-gate-redaction.md)
+- [0015 — `mage observe`: the capture schema (the keystone `.jsonl`)](mage/decisions/0015-mage-observe-capture-schema.md)
+- [0016 — Context-match, the confidence ladder, and the single applier](mage/decisions/0016-context-match-confidence-ladder-applier.md)
+- [0017 — `mage connect`: the host hook adapter (capture is opt-in)](mage/decisions/0017-mage-connect-host-hook-adapter.md)
+- [0018 — `mage distill`: the observed-scratch reader (capture, on first sight)](mage/decisions/0018-mage-distill-observed-scratch-reader.md)
+- [0019 — `mage promote`: self-grooming (recurrence, graduation, merge/split)](mage/decisions/0019-mage-promote-self-grooming.md)
+- [0020 — the dashboard: a per-KB, no-server generated view (Option D)](mage/decisions/0020-no-server-tiered-dashboards.md)
+- [0021 — mage stays offline: no phone-home telemetry; signal is local + voluntarily shared](mage/decisions/0021-offline-no-telemetry-local-signal.md)
+- [0022 — Remove the spec-kit-derived SDD skills](mage/decisions/0022-remove-sdd-skills.md)
+- [0023 — A hub keeps its own notes AND flat per-project subdirs (ratification)](mage/decisions/0023-hub-own-notes-and-flat-projects.md)
+- [0024 — Organic grooming loop: the lesson path (inline-primary + boundary nudge)](mage/decisions/0024-organic-grooming-loop.md)
+- [0025 — One transient-state home (`.mage/`) + redact config in `metadata.json`](mage/decisions/0025-one-transient-state-home.md)
+- [0026 — A hosted documentation website, generated from code](mage/decisions/0026-hosted-docs-website.md)
+- [0029 — Digest-to-agent capture: deterministic narrowing, agent judgment (supersedes prose-keyed)](mage/decisions/0029-digest-to-agent-capture.md)
+- [0030 — Opt-in agent autonomy ladder for the grooming loop (Operator / Approver / Overseer)](mage/decisions/0030-agent-autonomy-ladder.md)
+- [0031 — Programmatic provenance stamping + the autonomy reject-ledger (Phase 1: stamp at creation)](mage/decisions/0031-programmatic-provenance-stamp.md)
+- [0032 — Capture-redirect: co-opt the host's native-memory write into mage's git-durable pipeline (relocation where the host allows it, coexist nudge as the floor)](mage/decisions/0032-capture-redirect-native-memory.md)
+- [0033 — Recall: `@import` the bounded root index into the host's auto-loaded context (the capture companion to ADR-0032)](mage/decisions/0033-recall-import-bounded-index.md)
+- [0034 — Adopt: a dispatcher for onboarding pre-existing knowledge](mage/decisions/0034-adopt-preexisting-knowledge.md)
+- [0035 — Notes are memories: one unified store; embrace the harness format at rest, normalize at the durable boundary](mage/decisions/0035-decouple-harness-memory-from-notes.md)
+- [0036 — Defer the `HarnessAdapter` seam until a second harness exists; consolidate CC note-shape into one named module now](mage/decisions/0036-defer-harness-adapter-seam.md)
+- [0037 — doctor's remit extends to recall + skills readiness, on a bounded auto-fix line](mage/decisions/0037-readiness-doctor-remit-and-autofix-line.md)
+- [0038 — promote's note-proposal rung is deleted; graduate repoints to note-read usage; recurrence becomes a digest annotation](mage/decisions/0038-promote-note-rung-deleted-graduate-on-usage.md)
+- [0039 — measure the context footprint; bound the generated launch surface](mage/decisions/0039-context-footprint-measure-and-bound.md)
+- [0040 — version numbers are mechanical; the announcement is a named release backed by evidence](mage/decisions/0040-versions-are-mechanical-announcement-is-named.md)
