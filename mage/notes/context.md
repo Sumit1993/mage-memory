@@ -1,5 +1,5 @@
 ---
-type: pointer
+type: doc
 tags:
   - mage/design
 created: "2026-05-29"
@@ -156,7 +156,7 @@ _Avoid_: install/uninstall (as the product noun)
 
 ### Capture, recall & autonomy (the autonomy track, 0029–0036)
 
-> The run to 0.1.0 — 0.1.0 is the **autonomy milestone** ([roadmap](roadmap.md) · [release sequence](plan-release-sequence.md)). ADRs 0029–0036 are `accepted` (ratified 2026-07-01); implementation rides `main`.
+> The run to 0.1.0 — 0.1.0 is the **autonomy milestone** ([roadmap](../work/roadmap.md) · [release sequence](../work/plan-release-sequence.md)). ADRs 0029–0036 are `accepted` (ratified 2026-07-01); implementation rides `main`.
 
 **Boundary nudge → digest → agent**: the capture pivot ([ADR-0029](../decisions/0029-digest-to-agent-capture.md)). At a session boundary (`SessionStart(source=compact)`) mage emits a read-only **nudge** in two channels — a **user-visible** terse backlog notice (`mage: N staged · M unmined · K graduable → mage:groom`) and a **model-only digest + mandate** the host agent acts on. mage's model-free core only **narrows + compresses** the observed scratch into the digest; the **judgment** (is this a durable lesson? write it) is the host agent's. Two replay gates killed deterministic candidate-*selection*, so mage no longer writes lesson drafts itself.
 _Avoid_: miner, classifier (for the core — it narrows, it does not decide).
@@ -189,6 +189,6 @@ _Avoid_: permission mode, autopilot.
 
 ## Relations
 
-- defines_terms_for [mage roadmap](roadmap.md)
-- defines_terms_for [mage v0.1 implementation plan](plan-v0.1.md)
+- defines_terms_for [mage roadmap](../work/roadmap.md)
+- defines_terms_for [mage v0.1 implementation plan](../work/plan-v0.1.md)
 - see_also [ADR-0004 — capture insight, not copies](../decisions/0004-capture-insight-not-copies.md)

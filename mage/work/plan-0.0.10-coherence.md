@@ -4,7 +4,7 @@ tags: [mage/cli, mage/coherence]
 created: "2026-06-10"
 updated: "2026-06-13"
 last_reviewed: "2026-06-13"
-status: active
+status: completed
 provenance:
   repo: mage-memory
   work: 0.0.10-coherence-planning
@@ -26,7 +26,7 @@ keywords: [consolidation, commands, coherence, friction, external-kb, hub, link,
 Wiring the 0.0.9 soak into two pre-existing hub KBs (prismalens-docs-hub,
 sreforge-memory) surfaced a cluster of friction. The capture-routing bug
 ([resolveDocsRoot follows hub_path](plan-release-sequence.md), shipped in 0.0.9)
-and the [connect-doesnt-ensure-ignores](connect-doesnt-ensure-ignores.md) gotcha
+and the [connect-doesnt-ensure-ignores](../notes/connect-doesnt-ensure-ignores.md) gotcha
 are fixed; what remains is **coherence** — fewer commands, fewer silent traps.
 This note is the 0.0.10 scope; it stacks on the already-decided 0.0.10 items
 (remove the SDD skills; grill hub flat-vs-nested → ADR; the "every flavor is a
@@ -261,6 +261,6 @@ mattering.
 ## Relations
 
 - found_during [release sequence — 0.0.9](plan-release-sequence.md)
-- see_also [Gotcha — connect does not ensure sink ignores](connect-doesnt-ensure-ignores.md)
+- see_also [Gotcha — connect does not ensure sink ignores](../notes/connect-doesnt-ensure-ignores.md)
 - refines [roadmap](roadmap.md)
 - governed_by [ADR-0017 — mage connect: the host hook adapter](../decisions/0017-mage-connect-host-hook-adapter.md)

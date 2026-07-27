@@ -6,7 +6,7 @@ tags:
 created: "2026-06-14"
 updated: 2026-07-01
 last_reviewed: 2026-07-01
-status: stale-suspect
+status: completed
 provenance:
   repo: mage-memory
   work: 0.0.12-organic-grooming-loop
@@ -54,7 +54,7 @@ keywords:
 > reworked capture (redirect the host's native-memory write into git) and recall (launch-load the
 > bounded index). The live map is the
 > [autonomy track](plan-release-sequence.md#the-autonomy-track--what-010-now-delivers-adr-00290036)
-> + the [glossary](context.md#capture-recall--autonomy-the-autonomy-track-00290036); the durable
+> + the [glossary](../notes/context.md#capture-recall--autonomy-the-autonomy-track-00290036); the durable
 > `mage:groom`/`mage:learn` mechanics + `.mage/` layout below still hold.
 
 **Status: GRILLED 2026-06-15 — decisions locked; BUILT 2026-06-16.** Recorded as

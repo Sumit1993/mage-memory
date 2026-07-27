@@ -1,5 +1,5 @@
 ---
-type: pointer
+type: doc
 tags:
   - mage/grooming
 created: "2026-07-10"

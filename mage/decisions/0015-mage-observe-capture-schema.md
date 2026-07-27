@@ -166,4 +166,4 @@ is [ADR-0016](0016-context-match-confidence-ladder-applier.md).
 - refines [ADR-0014 — two-gate redaction](0014-two-gate-redaction.md) — Gate distinction is behaviour, not strength
 - read_by [ADR-0016 — context-match, the confidence ladder, and the single applier](0016-context-match-confidence-ladder-applier.md)
 - mines ECC `continuous-learning-v2` (`observations.jsonl`), mem0, Microsoft SkillOpt, Claude Code hook stdin
-- sequenced_by [release sequence](../notes/plan-release-sequence.md)
+- sequenced_by [release sequence](../work/plan-release-sequence.md)

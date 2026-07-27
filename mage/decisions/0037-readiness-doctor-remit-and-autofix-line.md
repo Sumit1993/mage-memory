@@ -34,7 +34,7 @@ keywords:
 # 0037 — doctor's remit extends to recall + skills readiness, on a bounded auto-fix line
 
 > **Status: accepted (ratified 2026-07-02).** Output of a 2026-07-02 light grill of
-> [plan-readiness-doctor](../notes/plan-readiness-doctor.md), promoted after the first slice
+> [plan-readiness-doctor](../work/plan-readiness-doctor.md), promoted after the first slice
 > shipped (PR #54). Resolves that plan's three open questions.
 
 ## Context
@@ -94,7 +94,7 @@ in a follow-up.
 - **Skills stays advisory** — never fails CI or `passed`, matching "detect-and-instruct."
 
 ## Relations
-- realizes [plan — the readiness doctor](../notes/plan-readiness-doctor.md)
+- realizes [plan — the readiness doctor](../work/plan-readiness-doctor.md)
 - extends [ADR-0009 — no runtime; automation rides host hooks](0009-no-runtime-automation-rides-host-hooks.md)
 - ethos_from [ADR-0030 — opt-in agent autonomy ladder](0030-agent-autonomy-ladder.md)
 - verifies_wiring_of [ADR-0032 — capture-redirect native memory](0032-capture-redirect-native-memory.md)

@@ -26,7 +26,7 @@
 
 ### cli
 
-- `plan` [Plan — 0.0.10 "coherence": shrink the command surface, close the external-KB friction](notes/plan-0.0.10-coherence.md) — consolidation, commands, hub, link, connect, distill, promote, dream, doctor
+- `plan` [Plan — 0.0.10 "coherence": shrink the command surface, close the external-KB friction](work/plan-0.0.10-coherence.md) — consolidation, commands, hub, link, connect, distill, promote, dream, doctor
 
 ### decisions
 
@@ -73,23 +73,23 @@
 
 ### design
 
-- `pointer` [mage — context & glossary](notes/context.md) — knowledge-base, note, wing, room, index, tag, moc, skill, work-unit, artifact, note-types
+- `doc` [mage — context & glossary](notes/context.md) — knowledge-base, note, wing, room, index, tag, moc, skill, work-unit, artifact, note-types
 - `principle` [mage is one durable memory — of hard-earned knowledge](notes/mage-is-durable-memory.md) — charter, identity, unified-memory, portable, notes-are-memories, insight, procedure, gotcha, pointer
 
 ### grooming
 
-- `pointer` [The boundary nudge — internals + where each piece lives](notes/boundary-nudge-internals.md) — digest, startup, session-start, watermark, once-per-chapter, teaser, two-channel, systemMessage, additionalContext, offer-first
+- `doc` [The boundary nudge — internals + where each piece lives](notes/boundary-nudge-internals.md) — digest, startup, session-start, watermark, once-per-chapter, teaser, two-channel, systemMessage, additionalContext, offer-first
 - `gotcha` [Gotcha — a mature KB emits no capture terminals, so the keep-rate gate cannot calibrate on it](notes/mature-kb-emits-no-capture-terminals.md) — crown-threshold, a1-bake, calibration, soak, prismalens, 0.1.0, autonomy
-- `plan` [0.0.11 — "signal quality + autonomous capture"](notes/plan-0.0.11-signal-and-capture.md) — candidate, blocker, count, compact, chapters, session, ids, serves
-- `plan` [Organic grooming loop (0.0.12) — the lesson path](notes/plan-0.0.12-organic-grooming-loop.md) — first-sight, distill, staging, nudge, inline, claude-code-memory, redact _(stale-suspect)_
-- `plan` [Faultline — friction/derivation capture trigger (Phase 1 plan)](notes/plan-faultline.md) — one, change, detector, src, distill
 - `gotcha` [Gotcha — promote's recurrence fold has near-zero precision on a mature KB](notes/promote-folds-mechanical-tokens.md) — denoise, signature, keyword-fold, watermark, rejected-buffer, soak
-- `reference` [Replay-gate methodology — does a capture mechanism produce USEFUL knowledge?](notes/replay-gate-methodology.md) — end, calibration, lessons, meta
+- `reference` [Replay-gate methodology — does a capture mechanism produce USEFUL knowledge?](notes/replay-gate-methodology.md) — calibration, lessons, paid, three
+- `plan` [0.0.11 — "signal quality + autonomous capture"](work/plan-0.0.11-signal-and-capture.md) — candidate, blocker, count, compact, chapters, session, ids, serves
+- `plan` [Organic grooming loop (0.0.12) — the lesson path](work/plan-0.0.12-organic-grooming-loop.md) — first-sight, distill, staging, nudge, inline, claude-code-memory, redact
+- `plan` [Faultline — friction/derivation capture trigger (Phase 1 plan)](work/plan-faultline.md) — one, change, detector, src, distill _(superseded)_
 
 ### plan
 
-- `principle` [mage v0.1 — finalized locks (read alongside PLAN-v0.1.md)](notes/plan-v0.1-locks.md) — naming, brand, npm, package, mage-memory, bin, authority, schema
-- `plan` [mage v0.1 — detailed implementation plan](notes/plan-v0.1.md) — milestones, fork, vault, note-model, index, skills, build _(archived)_
+- `doc` [mage v0.1 — finalized locks (read alongside PLAN-v0.1.md)](notes/plan-v0.1-locks.md) — naming, brand, npm, package, mage-memory, bin, authority, schema
+- `plan` [mage v0.1 — detailed implementation plan](work/plan-v0.1.md) — milestones, fork, vault, note-model, index, skills, build _(archived)_
 
 ### redaction
 
@@ -105,13 +105,13 @@
 
 ### roadmap
 
-- `reference` [Mining agentmemory's design into mage — files-native translation map](notes/agentmemory-mining-map.md) — iii, server-inverse, obsidian-ui, import-harvest, consolidation, auto-capture, dream, feeder, connect, roadmap
-- `plan` [mage — future thoughts (the standing idea inbox)](notes/future-thoughts.md) — backlog, ideas, taxonomy, hierarchy, wings, dashboard, graph, leiden, graphify, ingest
-- `reference` [Field notes — first external migrations (v0.1 dogfood)](notes/migration-field-notes.md) — field-test, hub-indexing, link-awareness, bulk-import, dream, onboarding, v0.2
+- `reference` [Mining agentmemory's design into mage — conclusions](notes/agentmemory-mining-map.md) — iii, server-inverse, obsidian-ui, roadmap
+- `reference` [Field notes — first external migrations (v0.1 dogfood)](notes/migration-field-notes.md) — field-test, bulk-import, byte-safe, onboarding, v0.2
 - `note` [0.1.0's last build gate: ADR-0031 Phase 2 — the reject-ledger reconciler (built; bake pending)](notes/phase2-reject-ledger-0.1.0-gate.md) — keep-rate, provenance-source, capture-vs-adopt, a1-bake, autonomy, crown-threshold
-- `plan` [mage — hosted documentation website (GRILLED, ready to build)](notes/plan-docs-site.md) — astro, starlight, generated-docs, drift, github-pages, onboarding, reference, buildProgram
-- `plan` [Footprint soak (0.0.14) — what held, and two shape assumptions that did not](notes/plan-footprint-soak-findings.md) — hub, multi-wing, wing-index, unbounded, pointer-leverage, inert-metric, line-cap, crossover, handoff
-- `plan` [mage — the readiness doctor: catch recall/skills drift, not just plumbing](notes/plan-readiness-doctor.md) — wiring, capture, plugin-install, agents-md-staleness, index-freshness, version-stamp, auto-fix
-- `plan` [mage — release sequence (0.0.x → 0.1.0)](notes/plan-release-sequence.md) — backlog, self-grooming, procedure-skill, redaction, skillopt, observe, optimize, promotion, autonomy
-- `plan` [mage — roadmap](notes/roadmap.md) — v0.1, v0.2, dream, scope, deferred, release, mcp, hub, autonomy, operator, approver
 - `pointer` [mage soak — the external dogfood targets + the read-only monitor](notes/soak-targets.md) — prismalens, sreforge, lesson-path, digest
+- `plan` [mage — future thoughts (the standing idea inbox)](work/future-thoughts.md) — backlog, ideas, taxonomy, hierarchy, wings, dashboard, graph, leiden, graphify, ingest
+- `plan` [mage — hosted documentation website (GRILLED, ready to build)](work/plan-docs-site.md) — astro, starlight, generated-docs, drift, github-pages, onboarding, reference, buildProgram
+- `plan` [Footprint soak (0.0.14) — what held, and two shape assumptions that did not](work/plan-footprint-soak-findings.md) — hub, multi-wing, wing-index, unbounded, pointer-leverage, inert-metric, line-cap, crossover, handoff
+- `plan` [mage — the readiness doctor: catch recall/skills drift, not just plumbing](work/plan-readiness-doctor.md) — wiring, capture, plugin-install, agents-md-staleness, index-freshness, version-stamp, auto-fix
+- `plan` [mage — release sequence (0.0.x → 0.1.0)](work/plan-release-sequence.md) — backlog, self-grooming, procedure-skill, redaction, skillopt, observe, optimize, promotion, autonomy
+- `plan` [mage — roadmap](work/roadmap.md) — v0.1, v0.2, dream, scope, deferred, release, mcp, hub, autonomy, operator, approver

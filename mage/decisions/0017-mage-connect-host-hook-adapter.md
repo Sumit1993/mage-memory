@@ -163,4 +163,4 @@ wiring, the `PostToolUse` capture-nudge), so it is the trigger to make the adapt
 - fires [ADR-0015 — mage observe capture schema](0015-mage-observe-capture-schema.md)
 - surfaces [ADR-0016 — context-match, the confidence ladder, and the single applier](0016-context-match-confidence-ladder-applier.md) — read-only metrics + the rollup fold
 - feeders_from [ADR-0005 — one canonical memory; others are feeders](0005-one-canonical-memory-others-are-feeders.md) — ECC consolidates via ingest, not disable
-- sequenced_by [release sequence](../notes/plan-release-sequence.md)
+- sequenced_by [release sequence](../work/plan-release-sequence.md)

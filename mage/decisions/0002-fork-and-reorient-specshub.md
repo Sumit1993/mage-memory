@@ -27,4 +27,4 @@ mage reuses specshub's already-memory-shaped machinery — in-repo/external/hybr
 ## Relations
 
 - depends_on [ADR-0001 — memory-first product supersedes specshub](0001-memory-first-product-supersedes-specshub.md)
-- see_also [mage v0.1 implementation plan](../notes/plan-v0.1.md)
+- see_also [mage v0.1 implementation plan](../work/plan-v0.1.md)

@@ -37,7 +37,7 @@ modified: 2026-07-19T18:06:46.460Z
 
 **Handoff.** `mage footprint` (ADR-0039) shipped in 0.0.14 having only ever run against
 `mage-memory` itself. The first external soak — the two targets in
-[soak-targets](soak-targets.md) — validated the headline design and found **two gaps, both
+[soak-targets](../notes/soak-targets.md) — validated the headline design and found **two gaps, both
 caused by assumptions that hold for a single-wing, file-citing KB and not for the others.**
 
 Nothing here is a regression: the instrument reports *truthfully* in every case. On hubs it
@@ -149,7 +149,7 @@ out-of-scope. Small, self-contained fix in `src/metrics/footprint.ts`.
 ## Relations
 
 - follows [ADR-0039 — measure the context footprint](../decisions/0039-context-footprint-measure-and-bound.md)
-- soak layout and targets in [soak-targets](soak-targets.md)
+- soak layout and targets in [soak-targets](../notes/soak-targets.md)
 - hub shape per [ADR-0011](../decisions/0011-recursive-scan-hub-projects.md) /
   [ADR-0012](../decisions/0012-wings-optional-convention-standalone-hubs.md)
 - pointer leverage rests on [ADR-0004 — capture insight, not copies](../decisions/0004-capture-insight-not-copies.md)

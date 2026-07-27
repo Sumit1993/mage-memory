@@ -32,7 +32,7 @@ keywords:
 
 **ADR-0031 Phase 2 was the last *build* gate before the 0.1.0 cut — and it is now built** (the
 reject-ledger reconciler + `provenance.source` + keep-rate surfaces). Everything else on the
-[release path](plan-release-sequence.md#the-autonomy-track--what-010-now-delivers-adr-00290036)
+[release path](../work/plan-release-sequence.md#the-autonomy-track--what-010-now-delivers-adr-00290036)
 is done or non-gating: the four autonomy ADRs are ratified, 0.0.12 **and** 0.0.13 shipped (npm),
 the docs site landed. With Phase 2 built, the only thing between here and the cut is the **bake** —
 letting the soak run and reading a real keep-rate. This was the load-bearing piece because it is
@@ -70,7 +70,7 @@ None of it blocks on design:
 
 ## Relations
 
-- gates [release sequence — the autonomy track](plan-release-sequence.md)
+- gates [release sequence — the autonomy track](../work/plan-release-sequence.md)
 - realizes_phase_2_of [ADR-0031 — programmatic provenance + the reject-ledger](../decisions/0031-programmatic-provenance-stamp.md)
 - measures [ADR-0030 — the autonomy ladder's crown signal](../decisions/0030-agent-autonomy-ladder.md)
 - observed_by [soak targets — the read-only monitor](soak-targets.md)

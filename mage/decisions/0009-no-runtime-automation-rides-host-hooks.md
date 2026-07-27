@@ -59,4 +59,4 @@ Tier 3  auto-capture hooks           mage connect <agent>, per host (the bespoke
 - builds_on [ADR-0005 — one canonical memory; feeders + promotion ladder](0005-one-canonical-memory-others-are-feeders.md)
 - see_also [ADR-0010 — durable memory, not a coordination layer](0010-durable-memory-not-coordination-layer.md)
 - detailed_by [agentmemory mining map](../notes/agentmemory-mining-map.md)
-- informs [mage roadmap](../notes/roadmap.md)
+- informs [mage roadmap](../work/roadmap.md)

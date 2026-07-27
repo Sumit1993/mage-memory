@@ -26,4 +26,4 @@ mage commits the durable knowledge — `notes/`, `decisions/`, `INDEX.md`, `meta
 ## Relations
 
 - see_also [ADR-0004 — capture insight, not copies](0004-capture-insight-not-copies.md)
-- see_also [mage roadmap](../notes/roadmap.md)
+- see_also [mage roadmap](../work/roadmap.md)

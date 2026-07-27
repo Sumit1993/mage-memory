@@ -6,4 +6,4 @@
 
 ## Wings
 
-- **mage** (80 notes · decision, feedback, gotcha, note, plan, pointer, principle, reference) → [_index.mage.md](_index.mage.md)
+- **mage** (80 notes · decision, doc, feedback, gotcha, note, plan, pointer, principle, reference) → [_index.mage.md](_index.mage.md)

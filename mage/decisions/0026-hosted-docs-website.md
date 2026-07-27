@@ -22,7 +22,7 @@ sources:
 
 **Status: accepted (drafted + GRILLED 2026-06-18). The locked decisions — audience, slotting, stack,
 IA, generation reach, README, hosting, sequencing, diagrams — live in
-[plan-docs-site](../notes/plan-docs-site.md).**
+[plan-docs-site](../work/plan-docs-site.md).**
 
 ## Context — the model isn't answerable from the docs
 
@@ -104,7 +104,7 @@ guarded by a drift test** — so the reference cannot silently diverge from the 
 
 ## Relations
 
-- **detailed_by** [plan-docs-site](../notes/plan-docs-site.md) — the 9 locked grill decisions (audience,
+- **detailed_by** [plan-docs-site](../work/plan-docs-site.md) — the 9 locked grill decisions (audience,
   slotting, stack, IA, generation reach, README, hosting, sequencing, diagrams) + the 4-PR build sequence.
 - **hosts_like** [ADR-0020](0020-no-server-tiered-dashboards.md) — no-server, generated static artifact
   rendered for humans.
