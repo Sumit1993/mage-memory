@@ -3,6 +3,7 @@ import {
   hasCommandeerHooks,
   isAutoMemoryEnabled,
   readClaudeSettings,
+  reconcileReachGrants,
   resolveSettingsTarget,
   upsertMageHooks,
   writeClaudeSettings,
@@ -18,9 +19,12 @@ import {
   type ResolvedDocsRoot,
   absolutePath,
   exists,
+  findCodeRepoRoot,
   looksLikeHub,
+  outOfRepoKbRoots,
   ownedDocsRoots,
   readHubMetadata,
+  readMetadata,
   resolveDocsRoot,
 } from "../paths.js";
 
@@ -49,6 +53,12 @@ export interface ConnectResult {
   backedUp: boolean;
   /** True iff the ADR-0032 commandeer tier was wired (auto-memory on + a local KB root). */
   commandeer: boolean;
+  /**
+   * The out-of-repo KB roots granted via `permissions.additionalDirectories` (ADR-0042,
+   * the reach tier). Empty for in-repo KBs (nothing sits outside the project root), for
+   * `--user` scope, and for a hub that is not present on this machine.
+   */
+  reach: string[];
   /** Outcome of the pre-commit redaction hook install (omitted when not attempted). */
   hook?: { installed: boolean; reason?: string };
 }
@@ -84,7 +94,14 @@ export async function connect(opts: ConnectOptions): Promise<ConnectResult> {
 
   if (!proceed) {
     logger.info("Aborted — no changes made.");
-    return { path: target.path, scope: target.scope, wired: 0, backedUp: false, commandeer: false };
+    return {
+      path: target.path,
+      scope: target.scope,
+      wired: 0,
+      backedUp: false,
+      commandeer: false,
+      reach: [],
+    };
   }
 
   // Commandeer tier (ADR-0032): redirect + scrub native-memory writes via a PreToolUse
@@ -134,7 +151,40 @@ export async function connect(opts: ConnectOptions): Promise<ConnectResult> {
     delete merged.mageStashedAutoMemoryDirectory;
     logger.detail("Released the CC auto-memory relocation (commandeer tier off).");
   }
-  const { backedUp } = await writeClaudeSettings(target.path, merged);
+
+  // Reach tier (ADR-0042): grant the harness filesystem access to any KB root that
+  // lives OUTSIDE this code repo, or the agent cannot read its own knowledge base.
+  // Gated on LOCAL scope only — these are machine-specific absolute paths, the same
+  // reason autoMemoryDirectory is local-only. Deliberately NOT gated on the commandeer
+  // tier: reading the KB and redirecting memory writes are separate concerns, so
+  // disabling CC auto-memory must never sever reach. Always reconciled in local scope
+  // (even to an empty grant set) so an in-repo/unlinked repo sheds a stale grant.
+  const reach: string[] = [];
+  let settingsToWrite = merged;
+  if (target.scope === "local") {
+    const codeRepo = await findCodeRepoRoot(opts.cwd ?? process.cwd());
+    const meta = codeRepo ? await readMetadata(codeRepo).catch(() => null) : null;
+    for (const dir of meta && codeRepo ? outOfRepoKbRoots(meta, codeRepo) : []) {
+      // Grant ONLY a real hub root. `hub_path` is untrusted input: `mage/metadata.json`
+      // is git-tracked, so anyone who can land a commit can point it anywhere, and mere
+      // existence would then widen harness access to an arbitrary directory (~/.ssh, /).
+      // looksLikeHub requires `projects/` + a hub `metadata.json`, which every legitimate
+      // grant target has. Doubles as the absent-hub gate (ADR-0042 §7): no grant, and
+      // never an ownership record for a path we did not grant.
+      if (await looksLikeHub(dir)) {
+        reach.push(dir);
+        continue;
+      }
+      logger.warn(
+        (await exists(dir))
+          ? `${dir} is not a mage hub (no projects/ + metadata.json) — skipping its access grant; check hub_path in mage/metadata.json.`
+          : `Hub not found at ${dir} — skipping its access grant. Clone it there, then re-run \`mage connect\`.`,
+      );
+    }
+    settingsToWrite = reconcileReachGrants(merged, reach);
+  }
+
+  const { backedUp } = await writeClaudeSettings(target.path, settingsToWrite);
 
   const wired = MAGE_HOOKS.filter((h) => h.commandeer !== true || commandeer).length;
   // settings.local.json is itself personal + gitignored by Claude Code; the capture
@@ -142,6 +192,9 @@ export async function connect(opts: ConnectOptions): Promise<ConnectResult> {
   logger.success(`Wired ${wired} events into ${target.path} (personal settings file).`);
   if (commandeer && kb) {
     logger.detail(`Commandeered CC auto-memory → ${kb.root} (writes redirect + scrub into mage; MEMORY.md mage-owned).`);
+  }
+  for (const dir of reach) {
+    logger.detail(`Granted read access to ${dir} (the KB lives outside this repo).`);
   }
   logger.detail("Run `mage disconnect` to remove.");
 
@@ -168,7 +221,7 @@ export async function connect(opts: ConnectOptions): Promise<ConnectResult> {
     await offerCommandeerCoverage(kb, { cwd: opts.cwd, yes: opts.yes, home: opts.home });
   }
 
-  return { path: target.path, scope: target.scope, wired, backedUp, commandeer, hook };
+  return { path: target.path, scope: target.scope, wired, backedUp, commandeer, reach, hook };
 }
 
 /**
@@ -244,6 +297,19 @@ async function ensureSinkIgnores(startDir: string): Promise<void> {
     kb.kind === "repo"
       ? { root: kb.repo, patterns: ["mage/.mage/"] }
       : { root: kb.root, patterns: [".mage/", "**/.mage/"] };
+
+  // The docs root can be ABSENT on this machine: mode=external resolves through the
+  // committed, machine-specific `hub_path`, so a repo cloned where the hub was never
+  // cloned points at nothing. That is a supported state (ADR-0042 §7 — connect skips
+  // the grant and doctor reports it), so it must not abort connect the way an ENOENT
+  // from ensureGitignored used to. Fail-open: nudge, wire everything else, move on.
+  if (!(await exists(root))) {
+    logger.warn(
+      `KB root not found at ${root} — skipping capture-sink ignores. ` +
+        "Clone the hub there, then re-run `mage connect`.",
+    );
+    return;
+  }
 
   const added = await ensureGitignored(root, patterns);
   if (added.length > 0) {

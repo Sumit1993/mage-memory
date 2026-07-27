@@ -2,6 +2,7 @@ import {
   hasCommandeerHooks,
   readClaudeSettings,
   removeMageHooks,
+  removeReachGrants,
   resolveSettingsTarget,
   writeClaudeSettings,
 } from "../adapters/claude-code/settings.js";
@@ -31,6 +32,11 @@ export interface DisconnectResult {
   backedUp: boolean;
   /** True iff the commandeer tier's `autoMemoryDirectory` key was present and removed. */
   autoMemoryUnset: boolean;
+  /**
+   * How many mage-owned `permissions.additionalDirectories` entries were dropped
+   * (ADR-0042, the reach tier). A user's own entries are never counted or removed.
+   */
+  reachRemoved: number;
   /** Outcome of the pre-commit redaction hook removal (omitted when not attempted). */
   hook?: { removed: boolean };
 }
@@ -56,6 +62,7 @@ export async function disconnect(opts: DisconnectOptions): Promise<DisconnectRes
       removed: 0,
       backedUp: false,
       autoMemoryUnset: false,
+      reachRemoved: 0,
       hook,
     };
   }
@@ -87,15 +94,26 @@ export async function disconnect(opts: DisconnectOptions): Promise<DisconnectRes
     autoMemoryUnset = true;
   }
 
+  // Reach tier (ADR-0042): drop only the additionalDirectories entries mage inserted,
+  // per the mageOwnedAdditionalDirectories record. A path the USER listed — even one
+  // equal to a former grant — is preserved. Unconditional on the commandeer tier: the
+  // ownership record is the sole authority, so an independently-gated grant is still
+  // reversed here. Returns a new object, so this must feed the write below.
+  const { settings: finalSettings, removed: reachRemoved } = removeReachGrants(settings);
+
   let backedUp = false;
-  if (removed > 0 || autoMemoryUnset) {
-    ({ backedUp } = await writeClaudeSettings(target.path, settings));
+  if (removed > 0 || autoMemoryUnset || reachRemoved > 0) {
+    ({ backedUp } = await writeClaudeSettings(target.path, finalSettings));
     const dirBit = autoMemoryUnset
       ? restored
         ? `autoMemoryDirectory (restored ${restored})`
         : "autoMemoryDirectory"
       : null;
-    const bits = [removed > 0 ? `${removed} mage hook(s)` : null, dirBit].filter(Boolean);
+    const bits = [
+      removed > 0 ? `${removed} mage hook(s)` : null,
+      dirBit,
+      reachRemoved > 0 ? `${reachRemoved} access grant(s)` : null,
+    ].filter(Boolean);
     logger.success(`Unwired ${bits.join(" + ")} from ${target.path}.`);
   } else {
     logger.info(`No mage hooks found in ${target.path} — nothing removed.`);
@@ -103,7 +121,15 @@ export async function disconnect(opts: DisconnectOptions): Promise<DisconnectRes
 
   const hook = await removeHook(opts);
 
-  return { path: target.path, scope: target.scope, removed, backedUp, autoMemoryUnset, hook };
+  return {
+    path: target.path,
+    scope: target.scope,
+    removed,
+    backedUp,
+    autoMemoryUnset,
+    reachRemoved,
+    hook,
+  };
 }
 
 /**

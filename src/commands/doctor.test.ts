@@ -1114,3 +1114,140 @@ describe("doctor — recall + skills readiness", () => {
     }
   });
 });
+
+describe("doctor — KB access grant, the reach tier (ADR-0042)", () => {
+  // Isolate HOME: the check unions LOCAL + USER scope (CC concatenates array settings
+  // across scopes), so a real ~/.claude grant would mask a missing local one.
+  let home: string;
+  let origHome: string | undefined;
+
+  beforeEach(async () => {
+    home = await freshDir("mage-reachhome-");
+    origHome = process.env.HOME;
+    process.env.HOME = home;
+  });
+  afterEach(() => {
+    if (origHome === undefined) delete process.env.HOME;
+    else process.env.HOME = origHome;
+  });
+
+  async function externalRepo(opts: { hubExists: boolean }): Promise<{
+    code: string;
+    hub: string;
+  }> {
+    const hub = await freshDir("mage-reachdr-hub-");
+    const code = await freshDir("mage-reachdr-code-");
+    const hubPath = opts.hubExists ? hub : join(hub, "gone");
+    if (opts.hubExists) {
+      await mkdir(join(hub, "projects", "engine", "notes"), { recursive: true });
+      await writeFile(
+        join(hub, "metadata.json"),
+        JSON.stringify({ schema: METADATA_SCHEMA, name: "h", created_at: "", projects: [] }),
+      );
+    }
+    await mkdir(join(code, "mage"), { recursive: true });
+    await writeFile(
+      join(code, "mage", "metadata.json"),
+      JSON.stringify({
+        schema: METADATA_SCHEMA,
+        mode: "external",
+        project: "engine",
+        hub_path: hubPath,
+        hub_repo: null,
+        hub_refs: [],
+        linked_at: "",
+      }),
+    );
+    return { code, hub: hubPath };
+  }
+
+  async function writeLocalGrant(code: string, dirs: string[]): Promise<void> {
+    await mkdir(join(code, ".claude"), { recursive: true });
+    await writeFile(
+      join(code, ".claude", "settings.local.json"),
+      `${JSON.stringify({ permissions: { additionalDirectories: dirs } }, null, 2)}\n`,
+    );
+  }
+
+  it("hub present but no grant → FAILS, naming `mage connect`", async () => {
+    const { code, hub } = await externalRepo({ hubExists: true });
+    const r = await doctor({ cwd: code });
+    const c = check(r.checks, "KB access grant");
+    expect(c?.ok).toBe(false);
+    expect(c?.optional).toBeFalsy(); // a required RECALL check, not advisory
+    expect(c?.detail).toContain(hub);
+    expect(c?.detail).toMatch(/mage connect/);
+    expect(r.passed).toBe(false);
+  });
+
+  it("grant present → passes", async () => {
+    const { code, hub } = await externalRepo({ hubExists: true });
+    await writeLocalGrant(code, [hub]);
+    const c = check((await doctor({ cwd: code })).checks, "KB access grant");
+    expect(c?.ok).toBe(true);
+    expect(c?.detail).toContain(hub);
+  });
+
+  it("hub absent on this machine → SKIP state: optional pass, never a CI failure", async () => {
+    const { code } = await externalRepo({ hubExists: false });
+    const c = check((await doctor({ cwd: code })).checks, "KB access grant");
+    expect(c?.ok).toBe(true);
+    expect(c?.optional).toBe(true);
+    expect(c?.detail).toMatch(/no mage hub present on this machine/);
+  });
+
+  it("a hub_path pointing at a NON-hub is a skip, not a missing-grant failure", async () => {
+    // connect refuses to grant a non-hub (hub_path is untrusted git-tracked input), so
+    // doctor must mirror that gate — nagging `mage connect` here would demand a fix
+    // connect will never make.
+    const victim = await freshDir("mage-reachdr-notahub-");
+    await writeFile(join(victim, "id_rsa"), "PRIVATE");
+    const code = await freshDir("mage-reachdr-evil-");
+    await mkdir(join(code, "mage"), { recursive: true });
+    await writeFile(
+      join(code, "mage", "metadata.json"),
+      JSON.stringify({
+        schema: METADATA_SCHEMA,
+        mode: "external",
+        project: "engine",
+        hub_path: victim,
+        hub_repo: null,
+        hub_refs: [],
+        linked_at: "",
+      }),
+    );
+
+    const c = check((await doctor({ cwd: code })).checks, "KB access grant");
+    expect(c?.ok).toBe(true);
+    expect(c?.optional).toBe(true);
+  });
+
+  it("a grant in USER scope satisfies the check (CC merges arrays across scopes)", async () => {
+    const { code, hub } = await externalRepo({ hubExists: true });
+    await mkdir(join(home, ".claude"), { recursive: true });
+    await writeFile(
+      join(home, ".claude", "settings.json"),
+      `${JSON.stringify({ permissions: { additionalDirectories: [hub] } }, null, 2)}\n`,
+    );
+    const c = check((await doctor({ cwd: code })).checks, "KB access grant");
+    expect(c?.ok).toBe(true);
+  });
+
+  it("an in-repo KB pushes no check at all — nothing lives outside the project root", async () => {
+    const dir = await freshDir();
+    await mkdir(join(dir, "mage", "notes"), { recursive: true });
+    await writeFile(
+      join(dir, "mage", "metadata.json"),
+      JSON.stringify({
+        schema: METADATA_SCHEMA,
+        mode: "in-repo",
+        project: "p",
+        hub_path: null,
+        hub_repo: null,
+        hub_refs: [],
+        linked_at: "",
+      }),
+    );
+    expect(check((await doctor({ cwd: dir })).checks, "KB access grant")).toBeUndefined();
+  });
+});
