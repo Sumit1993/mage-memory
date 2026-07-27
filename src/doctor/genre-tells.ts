@@ -12,6 +12,8 @@ import { BASE_THRESHOLDS } from "../grooming/thresholds.js";
 import { isGeneratedArtifact, listNotePaths, toPosix } from "../scan.js";
 import { logger } from "../logger.js";
 import type { resolveDocsRoot } from "../paths.js";
+import { parseNote } from "../note.js";
+import { genreOf } from "../scanner/genre-map.js";
 
 type Kb = NonNullable<Awaited<ReturnType<typeof resolveDocsRoot>>>;
 
@@ -35,18 +37,19 @@ export interface GenreTellsReport {
 /**
  * Pure compute: check a note's text against genre-tell thresholds.
  * Thresholds:
- *  - size: byte size > noteSizeCap (imported from thresholds.ts)
+ *  - size: body byte size > noteSizeCap for memory-genre notes (imported from thresholds.ts & scanner/genre-map.ts)
  *  - done-state vocabulary: count of \b(shipped|deferred|build order|critical path)\b (case-insensitive)
  *    plus PR #\d+ occurrences >= 5
  *  - issue-ref density: count of #\d+ references >= 10
- *  - checkboxes: any `- [ ]` / `- [x]` / `- [X]` line (>= 1)
+ *  - checkboxes: any `- [ ]` / `* [ ]` / `+ [ ]` line (>= 1)
  */
 export function checkNoteGenreTells(
   rawText: string,
   noteSizeCap: number = BASE_THRESHOLDS.noteSizeCap,
 ): GenreTellCounts | null {
-  const byteSize = Buffer.byteLength(rawText, "utf8");
-  const sizeFired = byteSize > noteSizeCap;
+  const { frontmatter, body } = parseNote(rawText);
+  const byteSize = Buffer.byteLength(body, "utf8");
+  const sizeFired = genreOf(frontmatter.type) === "memory" && byteSize > noteSizeCap;
 
   const vocabMatches = rawText.match(/\b(shipped|deferred|build order|critical path)\b/gi)?.length ?? 0;
   const prMatches = rawText.match(/\bPR\s*#\d+\b/gi)?.length ?? 0;
@@ -56,7 +59,7 @@ export function checkNoteGenreTells(
   const issueRefMatches = rawText.match(/#\d+\b/g)?.length ?? 0;
   const issueRefFired = issueRefMatches >= 10;
 
-  const checkboxMatches = rawText.match(/^\s*-\s*\[[ xX]\]/gm)?.length ?? 0;
+  const checkboxMatches = rawText.match(/^[ \t]*[-*+][ \t]+\[[ xX]\]/gm)?.length ?? 0;
   const checkboxesFired = checkboxMatches >= 1;
 
   if (!sizeFired && !doneVocabFired && !issueRefFired && !checkboxesFired) {
@@ -129,18 +132,30 @@ export function formatFlaggedNoteLine(f: FlaggedNote): string {
 }
 
 /**
+ * Format the summary message for genre tells.
+ */
+export function formatGenreTellsSummary(flaggedCount: number, scannedCount: number): string {
+  return `${flaggedCount} note${flaggedCount === 1 ? "" : "s"} flagged of ${scannedCount} scanned`;
+}
+
+/**
  * Render genre tells section to stdout via logger.
  */
 export function renderGenreTells(report: GenreTellsReport): void {
   logger.blank();
   logger.info("=== Genre tells (info) ===");
   if (report.flagged.length === 0) {
-    logger.detail(`0 notes flagged of ${report.scannedCount} scanned`);
+    logger.detail(formatGenreTellsSummary(0, report.scannedCount));
     return;
   }
-  for (const f of report.flagged) {
+  const MAX_SHOWN = 10;
+  const shown = report.flagged.slice(0, MAX_SHOWN);
+  for (const f of shown) {
     logger.detail(formatFlaggedNoteLine(f));
   }
-  const n = report.flagged.length;
-  logger.detail(`${n} note${n === 1 ? "" : "s"} flagged of ${report.scannedCount} scanned`);
+  if (report.flagged.length > MAX_SHOWN) {
+    const remaining = report.flagged.length - MAX_SHOWN;
+    logger.detail(`…and ${remaining} more`);
+  }
+  logger.detail(formatGenreTellsSummary(report.flagged.length, report.scannedCount));
 }

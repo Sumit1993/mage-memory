@@ -38,7 +38,7 @@ import { run } from "../shell.js";
 import { scanNotes } from "../scan.js";
 import { index } from "../commands/index-cmd.js";
 import { measureFootprint } from "../metrics/footprint.js";
-import type { GenreTellsReport } from "./genre-tells.js";
+import { formatGenreTellsSummary, type GenreTellsReport } from "./genre-tells.js";
 
 type ResolvedKb = Awaited<ReturnType<typeof resolveDocsRoot>>;
 type Kb = NonNullable<ResolvedKb>;
@@ -86,7 +86,7 @@ export async function pushKbChecks(
       name: "genre tells",
       ok: true,
       optional: true,
-      detail: `${genreTellsReport.flagged.length} note(s) flagged of ${genreTellsReport.scannedCount} scanned`,
+      detail: formatGenreTellsSummary(genreTellsReport.flagged.length, genreTellsReport.scannedCount),
     });
   }
   // Hub-aware: a per-project liveness rollup when run AT a hub (Decision 11B).
