@@ -4,7 +4,7 @@ tags: [mage/grooming, mage/faultline, mage/capture]
 created: "2026-06-20"
 updated: "2026-06-20"
 last_reviewed: "2026-06-20"
-status: active
+status: superseded
 provenance:
   repo: mage-memory
   work: faultline-friction-trigger

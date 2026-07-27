@@ -34,7 +34,7 @@ keywords:
 
 # mage — roadmap
 
-> Scope line set 2026-05-29 (grill-with-docs session). Decisions: [ADR-0001](../decisions/0001-memory-first-product-supersedes-specshub.md)–0036 — the run to 0.1.0 is now the **autonomy track** ([0029](../decisions/0029-digest-to-agent-capture.md)–[0036](../decisions/0036-defer-harness-adapter-seam.md)), sequenced in the [release note](plan-release-sequence.md#the-autonomy-track--what-010-now-delivers-adr-00290036). What to mine from agentmemory: [mining map](agentmemory-mining-map.md). Language: [context & glossary](context.md). Founding design research was distilled into these notes; the raw research is author-local and not version-controlled here.
+> Scope line set 2026-05-29 (grill-with-docs session). Decisions: [ADR-0001](../decisions/0001-memory-first-product-supersedes-specshub.md)–0036 — the run to 0.1.0 is now the **autonomy track** ([0029](../decisions/0029-digest-to-agent-capture.md)–[0036](../decisions/0036-defer-harness-adapter-seam.md)), sequenced in the [release note](plan-release-sequence.md#the-autonomy-track--what-010-now-delivers-adr-00290036). What to mine from agentmemory: [mining map](../notes/agentmemory-mining-map.md). Language: [context & glossary](../notes/context.md). Founding design research was distilled into these notes; the raw research is author-local and not version-controlled here.
 
 ## v0.1 — the durable, portable, navigable knowledge base (the founding value)
 - **Fork specshub → mage**: rename `.specshub/`→`mage/`, schema, CLI/package/awareness skill; **carry** modes (in-repo/external/hybrid), metadata, hub registry, commit hygiene, SDD skills (specs = a work type) [ADR-0002].
@@ -118,10 +118,10 @@ grooming ladder while mage's engine stays model-free. Full sequencing + per-ADR 
 - v0.2_informed_by [ADR-0007 — mine agentmemory's design](../decisions/0007-mine-agentmemory-design-not-depend.md)
 - v0.2_informed_by [ADR-0009 — no runtime; automation rides host hooks](../decisions/0009-no-runtime-automation-rides-host-hooks.md)
 - bounded_by [ADR-0010 — durable memory, not a coordination layer](../decisions/0010-durable-memory-not-coordination-layer.md)
-- mining_map [agentmemory mining map](agentmemory-mining-map.md)
+- mining_map [agentmemory mining map](../notes/agentmemory-mining-map.md)
 - detailed_by [mage v0.1 implementation plan](plan-v0.1.md)
 - sequenced_by [release sequence (post-v0.1 → 1.0)](plan-release-sequence.md)
-- field_tested_by [migration field notes](migration-field-notes.md)
+- field_tested_by [migration field notes](../notes/migration-field-notes.md)
 - decided_by [ADR-0011 — recursive scan; hub projects are wings](../decisions/0011-recursive-scan-hub-projects.md)
 - decided_by [ADR-0013 — procedure skills + the self-grooming loop](../decisions/0013-procedure-skills-self-grooming-loop.md)
 - gated_by [ADR-0014 — two-gate redaction](../decisions/0014-two-gate-redaction.md)

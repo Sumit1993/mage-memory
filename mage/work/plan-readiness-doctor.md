@@ -5,7 +5,7 @@ tags:
 created: "2026-07-02"
 updated: 2026-07-02
 last_reviewed: 2026-07-02
-status: active
+status: completed
 provenance:
   repo: mage-memory
   commit: cacb49c
@@ -132,7 +132,7 @@ kept here as the record of what was pressure-tested.
 
 Fixed live: installed `mage@mage` (user scope, 5 skills); regenerated hub indexes
 (prismalens 90 notes / 3 wings, sreforge 46); re-linked prismalens (`/mage-learn` →
-`mage:learn`). See [soak targets](soak-targets.md). All three drifts were invisible to the
+`mage:learn`). See [soak targets](../notes/soak-targets.md). All three drifts were invisible to the
 then-current `mage doctor`.
 
 ## Relations
@@ -140,7 +140,7 @@ then-current `mage doctor`.
 - verifies [ADR-0033 — recall: import the bounded index](../decisions/0033-recall-import-bounded-index.md)
 - bounded_by [ADR-0009 — no runtime; automation rides host hooks](../decisions/0009-no-runtime-automation-rides-host-hooks.md)
 - ethos_from [ADR-0030 — opt-in agent autonomy ladder](../decisions/0030-agent-autonomy-ladder.md)
-- precedent [Gotcha — connect doesn't ensure the sink is gitignored](connect-doesnt-ensure-ignores.md)
-- surfaced_by [mage soak — the dogfood targets + monitor](soak-targets.md)
+- precedent [Gotcha — connect doesn't ensure the sink is gitignored](../notes/connect-doesnt-ensure-ignores.md)
+- surfaced_by [mage soak — the dogfood targets + monitor](../notes/soak-targets.md)
 - promoted_to [ADR-0037 — doctor's remit + the auto-fix line](../decisions/0037-readiness-doctor-remit-and-autofix-line.md)
 - sequenced_in [release sequence](plan-release-sequence.md)

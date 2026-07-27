@@ -34,4 +34,4 @@ sources:
 
 - depends_on [ADR-0005 — one canonical memory](0005-one-canonical-memory-others-are-feeders.md)
 - depends_on [ADR-0006 — two-layer recall](0006-two-layer-recall-per-wing-skills.md)
-- informs [mage roadmap — v0.2 /dream](../notes/roadmap.md)
+- informs [mage roadmap — v0.2 /dream](../work/roadmap.md)

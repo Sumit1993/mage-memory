@@ -65,4 +65,4 @@ already computes the richest signal locally.
 - guarded_by [ADR-0014 — two-gate redaction](0014-two-gate-redaction.md)
 - reads [ADR-0019 — mage promote: self-grooming](0019-mage-promote-self-grooming.md)
 - offline_with [ADR-0020 — the dashboard: per-KB, no-server](0020-no-server-tiered-dashboards.md)
-- sequenced_in [release sequence — 0.0.9](../notes/plan-release-sequence.md)
+- sequenced_in [release sequence — 0.0.9](../work/plan-release-sequence.md)

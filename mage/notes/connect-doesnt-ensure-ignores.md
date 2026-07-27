@@ -66,6 +66,6 @@ it — especially when the writes are sensitive and the repo may be public.
 ## Relations
 
 - guards [ADR-0014 — two-gate redaction](../decisions/0014-two-gate-redaction.md)
-- found_during [release sequence — 0.0.9](plan-release-sequence.md)
+- found_during [release sequence — 0.0.9](../work/plan-release-sequence.md)
 - adapter [ADR-0017 — mage connect: the host hook adapter](../decisions/0017-mage-connect-host-hook-adapter.md)
 - see_also [Gotcha — scope Gate-2 to the knowledge base](gate2-blocks-own-redaction-fixtures.md)

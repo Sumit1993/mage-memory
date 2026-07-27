@@ -95,4 +95,4 @@ plugins later, not mage-generated markdown") — generated **HTML** is the bette
 - surfaces [ADR-0019 — mage promote: self-grooming](0019-mage-promote-self-grooming.md)
 - offline_with [ADR-0021 — mage stays offline; no telemetry](0021-offline-no-telemetry-local-signal.md)
 - supersedes_line [agentmemory mining map](../notes/agentmemory-mining-map.md)
-- sequenced_in [release sequence — 0.0.9](../notes/plan-release-sequence.md)
+- sequenced_in [release sequence — 0.0.9](../work/plan-release-sequence.md)

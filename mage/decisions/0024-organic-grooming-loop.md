@@ -32,7 +32,7 @@ mage captures durable **lessons** the way Claude Code's own memory does — a sh
 the *first* time something is worth remembering — and routes them through a judged inbox before
 they become committed knowledge. This ADR records the locked 0.0.12 design. The full grill
 rationale (and the rejected alternatives) lives in
-[plan-0.0.12-organic-grooming-loop](../notes/plan-0.0.12-organic-grooming-loop.md); this is the
+[plan-0.0.12-organic-grooming-loop](../work/plan-0.0.12-organic-grooming-loop.md); this is the
 decision of record.
 
 ## Context

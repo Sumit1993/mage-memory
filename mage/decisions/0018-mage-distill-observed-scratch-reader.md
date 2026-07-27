@@ -206,4 +206,4 @@ chunks and dedups, where redaction blocks, and what it deliberately leaves out. 
 - amends [ADR-0013 §5](0013-procedure-skills-self-grooming-loop.md) — ECC/native feeder half removed
 - strengthens [ADR-0017 — mage connect](0017-mage-connect-host-hook-adapter.md) §5 — fully ignore foreign observers
 - mines ECC `continuous-learning-v2` (observer daemon, the four pattern lenses)
-- sequenced_by [release sequence](../notes/plan-release-sequence.md)
+- sequenced_by [release sequence](../work/plan-release-sequence.md)
