@@ -33,18 +33,30 @@ to avoid), and **pointers** to canonical sources — never a copy of the source
    `<hub_path>/projects/<project>/` (external). If none, tell the user to
    run `mage init` first.
 
-2. **Classify the finding.** Pick a `type` (open vocab — see `CONVENTIONS.md`):
-   `interface`, `tooling`, `topology`, `relationship`, `playbook`, `gotcha`,
-   `pointer`, `trail`, `decision`, `principle`. Pick the **wing** (project /
-   repo / service / person) and **room** (topic) → tag `#<wing>/<room>`.
+2. **Walk the better home ladder (ADR-0041).** Ask: *"Would an agent, mid-task and not looking for it, be better off if this arrived unbidden?"* Check the ladder rows in order before authoring a note:
+   - **Code comment:** file/function-scoped detail that rots with the code.
+   - **Ticket or `work/`:** work not yet done, forward plans, task lists (`mage/work/`).
+   - **Doc beside code:** current-truth spec describing what the system IS.
+   - **Artifact + pointer:** point-in-time investigation or raw trace.
+   - **Skill / prompt:** instruction addressed to the agent as "you".
+   - **Decision record:** settled choice and rationale (`mage/decisions/`).
+   - **Memory:** non-completing, recallable gotcha, procedure, insight, or pointer.
 
-3. **Overlap-check (on-write, ADR-0004).** Read `mage/INDEX.md` (and the
+   If a better home wins, route the content there (`mage/work/` for plans/specs/tasks, `mage/decisions/` for decisions, a repo doc for current truth, a skill for instructions) instead of authoring a note. This is **guidance, not a gate** — never phrase it as a hard block (ADR-0035 §4 forbids write-time tollbooths; if the user still requests a note, author it).
+
+3. **Classify the finding.** Pick a `type` (see `CONVENTIONS.md`). Memory genre —
+   recall-bearing: `gotcha`, `procedure`, `pointer`, `principle`, `feedback`,
+   `reference`, `note`. Non-memory genres: `decision`, `plan`, `tasks`, `spec`.
+   Any other string is legal but lands **unclassified** (rung 3). Pick the **wing**
+   (project / repo / service / person) and **room** (topic) → tag `#<wing>/<room>`.
+
+4. **Overlap-check (on-write, ADR-0004).** Read `mage/INDEX.md` (and the
    per-wing `_index.<wing>.md` if present) for notes on the same topic or
    keywords. Decide **UPDATE** an existing note vs **NEW** note. If a new claim
    contradicts an existing note, prefer **supersede**: mark the old note
    `status: superseded`, link to the new one — never silently overwrite.
 
-4. **Draft the note** (do not write yet). Frontmatter (all optional, but fill
+5. **Draft the note** (do not write yet). Frontmatter (all optional, but fill
    what you know):
    ```yaml
    ---
@@ -63,29 +75,29 @@ to avoid), and **pointers** to canonical sources — never a copy of the source
    section with typed portable links (`- depends_on [x](x.md)`). Use standard
    markdown links `[text](relative/path.md)` — never `[[wikilinks]]`.
 
-5. **Capture by pointer, not copy.** Reference the canonical source in
+6. **Capture by pointer, not copy.** Reference the canonical source in
    `sources:`; quote only the reusable distilled insight. Snapshot a source
    into `work/<slug>/artifacts/` ONLY if it's fragile/ephemeral.
 
-6. **Confirm with the user.** Show the draft + the chosen path
+7. **Confirm with the user.** Show the draft + the chosen path
    (`mage/notes/<wing>/<slug>.md`) and whether it's UPDATE or NEW. Wait for a
    yes. (Human-confirm is the default for v0.1.)
 
-7. **Redaction gate (ADR-0014 Gate 2, BEFORE write).** Run
+8. **Redaction gate (ADR-0014 Gate 2, BEFORE write).** Run
    `mage redact <draft-file>` on the draft. If it reports a **LIVE** secret
    (non-zero exit), **STOP** — strip it (`mage redact --strip <draft-file>`) or
    remove it by hand — never write a secret into a tracked note/skill. A note is
    tracked and shared, so this is the seam where a missed secret becomes public.
 
-8. **Write** the note under `mage/notes/` after confirmation and a clean
+9. **Write** the note under `mage/notes/` after confirmation and a clean
    redaction gate.
 
-9. **Suggest follow-ups (never auto-run):**
-   ```bash
-   mage index          # refresh INDEX.md
-   mage skills         # refresh per-wing skills (if a new wing appeared)
-   git -C <repo> add mage && git -C <repo> commit -m "note: <title> (#<wing>)"
-   ```
+10. **Suggest follow-ups (never auto-run):**
+    ```bash
+    mage index          # refresh INDEX.md
+    mage skills         # refresh per-wing skills (if a new wing appeared)
+    git -C <repo> add mage && git -C <repo> commit -m "note: <title> (#<wing>)"
+    ```
 
 ## Bulk import — mage:learn --from <dir>
 
