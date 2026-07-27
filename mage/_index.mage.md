@@ -2,7 +2,7 @@
 
 # mage
 
-> 79 notes. Part of the [index](INDEX.md).
+> 80 notes. Part of the [index](INDEX.md).
 
 ## build
 
@@ -108,6 +108,7 @@
 - `reference` [Field notes — first external migrations (v0.1 dogfood)](notes/migration-field-notes.md) — field-test, hub-indexing, link-awareness, bulk-import, dream, onboarding, v0.2
 - `note` [0.1.0's last build gate: ADR-0031 Phase 2 — the reject-ledger reconciler (built; bake pending)](notes/phase2-reject-ledger-0.1.0-gate.md) — keep-rate, provenance-source, capture-vs-adopt, a1-bake, autonomy, crown-threshold
 - `plan` [mage — hosted documentation website (GRILLED, ready to build)](notes/plan-docs-site.md) — astro, starlight, generated-docs, drift, github-pages, onboarding, reference, buildProgram
+- `plan` [Footprint soak (0.0.14) — what held, and two shape assumptions that did not](notes/plan-footprint-soak-findings.md) — hub, multi-wing, wing-index, unbounded, pointer-leverage, inert-metric, line-cap, crossover, handoff
 - `plan` [mage — the readiness doctor: catch recall/skills drift, not just plumbing](notes/plan-readiness-doctor.md) — wiring, capture, plugin-install, agents-md-staleness, index-freshness, version-stamp, auto-fix
 - `plan` [mage — release sequence (0.0.x → 0.1.0)](notes/plan-release-sequence.md) — backlog, self-grooming, procedure-skill, redaction, skillopt, observe, optimize, promotion, autonomy
 - `plan` [mage — roadmap](notes/roadmap.md) — v0.1, v0.2, dream, scope, deferred, release, mcp, hub, autonomy, operator, approver
