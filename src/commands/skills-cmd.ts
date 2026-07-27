@@ -13,14 +13,28 @@ import {
   writeRollup,
 } from "../metrics/rollup.js";
 import { readNote } from "../note.js";
-import { absolutePath, learningsPath, resolveDocsRoot } from "../paths.js";
+import {
+  absolutePath,
+  learningsPath,
+  readGenreOverrides,
+  resolveDocsRoot,
+} from "../paths.js";
 import { type ScannedNote, scanNotes } from "../scan.js";
-import { genreOf } from "../scanner/genre-map.js";
+import { type Genre, genreOf } from "../scanner/genre-map.js";
 import {
   GEN_MARKER,
   TARGET_AGENT_DIRS,
   WING_PREFIX,
 } from "../skills-shared.js";
+
+/**
+ * Section cap for the generated "Governing decisions" list (ADR-0041 §4).
+ * The auto-memory ceiling (lines/bytes) is a whole-file backstop that cannot
+ * engage until ~164 entries, which is far past the point where a wall of ADR
+ * links stops being contextual recall. The 12 MOST RECENT (highest-numbered)
+ * are kept; the rest fold into one "…and N more in decisions/" pointer.
+ */
+const MAX_GOVERNING_LINES = 12;
 
 /** Note types worth surfacing as the auto-loaded "nudge" for a wing. */
 const NUDGE_TYPES = new Set([
@@ -76,6 +90,7 @@ export async function skills(opts: SkillsOptions = {}): Promise<SkillsResult> {
   }
   const { root, repo } = resolved;
   const docsRel = toRel(relative(repo, root));
+  const genreOverrides = await readGenreOverrides(resolved);
 
   const notes = await scanNotes(root);
   const noteMap = new Map<string, ScannedNote>();
@@ -104,6 +119,7 @@ export async function skills(opts: SkillsOptions = {}): Promise<SkillsResult> {
         noteMap,
         wikiResolver,
         docsRel,
+        genreOverrides,
       );
       await writeFile(
         join(dir, "SKILL.md"),
@@ -240,16 +256,33 @@ function makeWikiResolver(
   };
 }
 
+/**
+ * Harvest the wing's governing ADRs from the link graph (ADR-0041 §4).
+ *
+ * SOURCES are memory-genre notes ONLY: per ADR-0041 §4, per-ADR recall rides
+ * *linking memories* — the small note that carries the recallable one-liner and
+ * links to its ADR. Decision, work, and doc notes are never harvest sources;
+ * harvesting from them would re-derive the whole ADR corpus (every ADR's own
+ * `## Relations` section links its neighbours), which is exactly the always-on
+ * dump this ADR set out to delete.
+ *
+ * TARGET classification rides frontmatter `type:` only (ADR-0011 — folders are
+ * conventions), with the per-KB `genres` overrides threaded through so a custom
+ * type mapped onto the decision genre is recognized.
+ */
 async function collectGoverningDecisions(
   root: string,
   wingNotes: ScannedNote[],
   noteMap: Map<string, ScannedNote>,
   wikiResolver: (target: string) => string | null,
   docsRel: string,
+  overrides: Record<string, Genre> = {},
 ): Promise<GoverningAdr[]> {
   const adrMap = new Map<string, GoverningAdr>();
 
   for (const note of wingNotes) {
+    if (genreOf(note.type, overrides) !== "memory") continue;
+
     let body: string;
     try {
       const parsed = await readNote(join(root, note.relPath));
@@ -284,13 +317,10 @@ async function collectGoverningDecisions(
       const targetNote = noteMap.get(targetRelPath);
       if (!targetNote) continue;
 
-      if (genreOf(targetNote.type) !== "decision") continue;
-      if (
-        !targetNote.relPath.startsWith("decisions/") &&
-        !targetNote.relPath.includes("/decisions/")
-      )
+      // Genre rides frontmatter `type:` only — never the folder (ADR-0011).
+      if (genreOf(targetNote.type, overrides) !== "decision") continue;
+      if (targetNote.status !== "accepted" && targetNote.status !== "active")
         continue;
-      if (targetNote.status !== "accepted" && targetNote.status !== "active") continue;
 
       if (!adrMap.has(targetRelPath)) {
         const base = posix.basename(targetRelPath);
@@ -395,7 +425,14 @@ function renderWingSkill(
     return `${joined.slice(0, end)}\n`;
   };
 
-  let content = buildContent(governing, 0);
+  // Section cap FIRST (ADR-0041 §4): keep the MAX_GOVERNING_LINES most recent
+  // (highest-numbered) decisions. The auto-memory ceiling below stays as the
+  // whole-file backstop, but it cannot engage until ~164 entries.
+  const capped =
+    governing.length > MAX_GOVERNING_LINES
+      ? governing.slice(governing.length - MAX_GOVERNING_LINES)
+      : governing;
+  let content = buildContent(capped, governing.length - capped.length);
 
   const checkBreach = (text: string) => {
     const lines = text.split("\n").length;
@@ -403,11 +440,13 @@ function renderWingSkill(
     return lines > AUTO_MEMORY_MAX_LINES || bytes > AUTO_MEMORY_MAX_BYTES;
   };
 
-  if (checkBreach(content) && governing.length > 0) {
-    for (let k = governing.length - 1; k >= 0; k--) {
-      const truncatedCount = governing.length - k;
+  if (checkBreach(content) && capped.length > 0) {
+    for (let k = capped.length - 1; k >= 0; k--) {
       // Keep the k MOST RECENT (highest-numbered) decisions; drop the oldest first.
-      const candidate = buildContent(governing.slice(governing.length - k), truncatedCount);
+      const candidate = buildContent(
+        capped.slice(capped.length - k),
+        governing.length - k,
+      );
       if (!checkBreach(candidate) || k === 0) {
         content = candidate;
         break;

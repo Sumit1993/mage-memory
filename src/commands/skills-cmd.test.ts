@@ -209,6 +209,172 @@ describe("mage skills", () => {
     const betaSkill = await readFile(skillFile(dir, "beta"), "utf8");
     expect(betaSkill).not.toContain("Governing decisions");
   });
+
+  it("harvests from memory-genre sources ONLY — ADR-to-ADR Relations links do not govern", async () => {
+    const dir = await vault();
+    await decision(
+      dir,
+      "0001-linked-by-memory.md",
+      "---\ntype: decision\nstatus: accepted\ntags: [alpha/x]\n---\n# 0001 — Linked By Memory\n",
+    );
+    // An accepted ADR reachable ONLY from another decision note's Relations list.
+    await decision(
+      dir,
+      "0002-linked-by-adr-only.md",
+      "---\ntype: decision\nstatus: accepted\ntags: [alpha/x]\n---\n# 0002 — Linked By ADR Only\n",
+    );
+    // The decision note that links it — a wing-tagged note, but NOT a harvest source.
+    await decision(
+      dir,
+      "0003-relations-hub.md",
+      "---\ntype: decision\nstatus: accepted\ntags: [alpha/x]\n---\n# 0003 — Relations Hub\n\n## Relations\n\n- builds_on [ADR 0002](0002-linked-by-adr-only.md)\n",
+    );
+    // Work- and doc-genre notes are not harvest sources either.
+    await note(
+      dir,
+      "plan.md",
+      "---\ntype: plan\ntags: [alpha/x]\n---\n# Plan\nLink to [ADR 0002](../decisions/0002-linked-by-adr-only.md).",
+    );
+    await note(
+      dir,
+      "spec.md",
+      "---\ntype: spec\ntags: [alpha/x]\n---\n# Spec\nLink to [ADR 0002](../decisions/0002-linked-by-adr-only.md).",
+    );
+    // The one memory-genre note — the only legitimate harvest source.
+    await note(
+      dir,
+      "mem.md",
+      "---\ntype: gotcha\ntags: [alpha/x]\n---\n# Memory\nLink to [ADR 0001](../decisions/0001-linked-by-memory.md).",
+    );
+
+    await skills({ dir });
+    const alpha = await readFile(skillFile(dir, "alpha"), "utf8");
+
+    expect(alpha).toContain("0001 — Linked By Memory");
+    expect(alpha).not.toContain("0002 — Linked By ADR Only");
+    expect(alpha).not.toContain("0003 — Relations Hub");
+  });
+
+  it("a fully cross-linked ADR corpus does not become the wing's governing list", async () => {
+    // Reproduces the shipped regression at scale: 38 wing-tagged ADRs, each
+    // linking its neighbours from `## Relations`. Only the ADRs a MEMORY note
+    // links may govern — here, three.
+    const dir = await vault();
+    for (let i = 1; i <= 38; i++) {
+      const num = String(i).padStart(4, "0");
+      const prev = String(Math.max(1, i - 1)).padStart(4, "0");
+      const next = String(Math.min(38, i + 1)).padStart(4, "0");
+      await decision(
+        dir,
+        `${num}-adr.md`,
+        `---\ntype: decision\nstatus: accepted\ntags: [alpha/x]\n---\n# ${num} — Decision ${i}\n\n## Relations\n\n- builds_on [prev](${prev}-adr.md)\n- companion [next](${next}-adr.md)\n`,
+      );
+    }
+    await note(
+      dir,
+      "mem.md",
+      "---\ntype: gotcha\ntags: [alpha/x]\n---\n# Memory\nSee [a](../decisions/0005-adr.md), [b](../decisions/0011-adr.md), [c](../decisions/0030-adr.md).",
+    );
+
+    await skills({ dir });
+    const alpha = await readFile(skillFile(dir, "alpha"), "utf8");
+
+    const govLines = alpha
+      .split("\n")
+      .filter((l) => /^- \[\d{4} — Decision \d+\]\(/.test(l));
+    expect(govLines.length).toBe(3);
+    expect(alpha).not.toContain("more in decisions/");
+    expect(alpha).toContain("0005 — Decision 5]");
+    expect(alpha).toContain("0011 — Decision 11]");
+    expect(alpha).toContain("0030 — Decision 30]");
+  });
+
+  it("classifies targets by frontmatter type, not folder (ADR-0011)", async () => {
+    const dir = await vault();
+    // A decision-genre note living OUTSIDE decisions/ — must still be harvested.
+    await note(
+      dir,
+      "0007-stray-decision.md",
+      "---\ntype: decision\nstatus: accepted\n---\n# 0007 — Stray Decision\n",
+    );
+    // A memory-genre note living INSIDE decisions/ — must NOT be harvested.
+    await decision(
+      dir,
+      "0008-not-a-decision.md",
+      "---\ntype: gotcha\nstatus: accepted\n---\n# 0008 — Not A Decision\n",
+    );
+    await note(
+      dir,
+      "mem.md",
+      "---\ntype: gotcha\ntags: [alpha/x]\n---\n# Memory\nSee [stray](0007-stray-decision.md) and [gotcha](../decisions/0008-not-a-decision.md).",
+    );
+
+    await skills({ dir });
+    const alpha = await readFile(skillFile(dir, "alpha"), "utf8");
+
+    expect(alpha).toContain("- [0007 — Stray Decision](mage/notes/0007-stray-decision.md)");
+    expect(alpha).not.toContain("0008 — Not A Decision");
+  });
+
+  it("threads metadata.json genres overrides through target classification", async () => {
+    const dir = await vault();
+    const metaPath = join(dir, "mage", "metadata.json");
+    const meta = JSON.parse(await readFile(metaPath, "utf8")) as Record<
+      string,
+      unknown
+    >;
+    meta.genres = { ruling: "decision" };
+    await writeFile(metaPath, `${JSON.stringify(meta, null, 2)}\n`);
+
+    await decision(
+      dir,
+      "0009-custom-type.md",
+      "---\ntype: ruling\nstatus: accepted\n---\n# 0009 — Custom Type Decision\n",
+    );
+    await note(
+      dir,
+      "mem.md",
+      "---\ntype: gotcha\ntags: [alpha/x]\n---\n# Memory\nSee [ruling](../decisions/0009-custom-type.md).",
+    );
+
+    await skills({ dir });
+    const alpha = await readFile(skillFile(dir, "alpha"), "utf8");
+
+    expect(alpha).toContain("0009 — Custom Type Decision");
+  });
+
+  it("caps the Governing decisions section at 12, keeping the most recent", async () => {
+    const dir = await vault();
+    const links: string[] = [];
+    for (let i = 1; i <= 15; i++) {
+      const num = String(i).padStart(4, "0");
+      await decision(
+        dir,
+        `${num}-adr.md`,
+        `---\ntype: decision\nstatus: accepted\n---\n# ${num} — Decision ${i}\n`,
+      );
+      links.push(`[ADR ${num}](../decisions/${num}-adr.md)`);
+    }
+    await note(
+      dir,
+      "mem.md",
+      `---\ntype: gotcha\ntags: [alpha/x]\n---\n# Memory\nLinks: ${links.join(", ")}.`,
+    );
+
+    await skills({ dir });
+    const alpha = await readFile(skillFile(dir, "alpha"), "utf8");
+
+    const govLines = alpha
+      .split("\n")
+      .filter((l) => /^- \[\d{4} — Decision \d+\]\(/.test(l));
+    expect(govLines.length).toBe(12);
+    // Oldest three dropped, newest kept.
+    expect(alpha).not.toContain("0001 — Decision 1]");
+    expect(alpha).not.toContain("0003 — Decision 3]");
+    expect(alpha).toContain("0004 — Decision 4]");
+    expect(alpha).toContain("0015 — Decision 15]");
+    expect(alpha).toContain("- …and 3 more in decisions/");
+  });
 });
 
 describe("mage skills --metrics (read-only)", () => {
