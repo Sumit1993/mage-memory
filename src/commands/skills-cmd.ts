@@ -389,7 +389,10 @@ function renderWingSkill(
       out.push("");
     }
 
-    return `${out.join("\n").replace(/\n+$/, "")}\n`;
+    const joined = out.join("\n");
+    let end = joined.length;
+    while (end > 0 && joined[end - 1] === "\n") end--;
+    return `${joined.slice(0, end)}\n`;
   };
 
   let content = buildContent(governing, 0);
