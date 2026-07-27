@@ -9,9 +9,12 @@ import {
   METADATA_SCHEMA_V1,
   type MageMetadata,
   hubMetadataPath,
+  findCodeRepoRoot,
   hubProjectDocsRoot,
   hubProjectPath,
+  isUnder,
   looksLikeHub,
+  outOfRepoKbRoots,
   metadataPath,
   normalizeHubMetadata,
   normalizeMetadata,
@@ -323,5 +326,121 @@ describe("paths — schema migration (Dec 9 / v1 → v2)", () => {
       const dir = await tmpDir("mage-ownmissing-");
       expect(await ownedDocsRoots({ root: dir, kind: "hub", repo: dir })).toEqual([dir]);
     });
+  });
+});
+
+describe("isUnder", () => {
+  it("a dir is under itself", () => {
+    expect(isUnder("/a/b", "/a/b")).toBe(true);
+  });
+
+  it("a descendant is under", () => {
+    expect(isUnder("/a/b", "/a/b/c/d")).toBe(true);
+  });
+
+  it("a sibling is not under", () => {
+    expect(isUnder("/a/b", "/a/c")).toBe(false);
+  });
+
+  it("a parent is not under its child", () => {
+    expect(isUnder("/a/b/c", "/a/b")).toBe(false);
+  });
+
+  it("a prefix-sharing sibling is not under (no substring false positive)", () => {
+    expect(isUnder("/a/repo", "/a/repo-other")).toBe(false);
+  });
+});
+
+describe("outOfRepoKbRoots (ADR-0042)", () => {
+  const REPO = "/home/u/org/code";
+  const HUB = "/home/u/org/docs-hub";
+  const base = (over: Partial<MageMetadata> = {}): MageMetadata => ({
+    schema: METADATA_SCHEMA,
+    mode: "in-repo",
+    project: "p",
+    hub_path: null,
+    hub_repo: null,
+    hub_refs: [],
+    linked_at: "2026-01-01T00:00:00Z",
+    ...over,
+  });
+
+  it("in-repo grants nothing — the docs already sit under the project root", () => {
+    expect(outOfRepoKbRoots(base(), REPO)).toEqual([]);
+  });
+
+  it("external grants the HUB REPO root, not the project docs root beneath it", () => {
+    const meta = base({ mode: "external", hub_path: HUB, hub_repo: "git@x:y.git" });
+    expect(outOfRepoKbRoots(meta, REPO)).toEqual([HUB]);
+  });
+
+  it("external with no hub_path grants nothing (degraded metadata)", () => {
+    expect(outOfRepoKbRoots(base({ mode: "external" }), REPO)).toEqual([]);
+  });
+
+  it("hybrid grants every registered hub_ref", () => {
+    const meta = base({
+      hub_refs: [
+        { hub_path: HUB, hub_repo: "git@x:a.git", project: "p" },
+        { hub_path: "/home/u/org/hub2", hub_repo: "git@x:b.git", project: "p" },
+      ],
+    });
+    // v1-shaped (mode "in-repo" + refs) normalizes to hybrid in memory.
+    expect(outOfRepoKbRoots(meta, REPO)).toEqual([HUB, "/home/u/org/hub2"]);
+  });
+
+  it("drops a hub that sits INSIDE the project root (self-referential)", () => {
+    const inside = join(REPO, "docs-hub");
+    const meta = base({ mode: "external", hub_path: inside, hub_repo: null });
+    expect(outOfRepoKbRoots(meta, REPO)).toEqual([]);
+  });
+
+  it("drops a hub equal to the project root", () => {
+    const meta = base({ mode: "external", hub_path: REPO, hub_repo: null });
+    expect(outOfRepoKbRoots(meta, REPO)).toEqual([]);
+  });
+
+  it("de-duplicates repeated hub_refs", () => {
+    const meta = base({
+      hub_refs: [
+        { hub_path: HUB, hub_repo: "git@x:a.git", project: "p" },
+        { hub_path: HUB, hub_repo: "git@x:a.git", project: "q" },
+      ],
+    });
+    expect(outOfRepoKbRoots(meta, REPO)).toEqual([HUB]);
+  });
+
+  it("is pure — no filesystem access, so a non-existent hub is still returned", () => {
+    const meta = base({ mode: "external", hub_path: "/nope/not/here", hub_repo: null });
+    expect(outOfRepoKbRoots(meta, REPO)).toEqual(["/nope/not/here"]);
+  });
+});
+
+describe("findCodeRepoRoot", () => {
+  it("finds the repo root from a nested subdir", async () => {
+    const dir = await tmpDir("mage-findrepo-");
+    await mkdir(join(dir, META_DIR), { recursive: true });
+    await writeFile(
+      join(dir, META_DIR, "metadata.json"),
+      JSON.stringify({ schema: METADATA_SCHEMA, mode: "in-repo", project: "p" }),
+    );
+    const nested = join(dir, "src", "deep");
+    await mkdir(nested, { recursive: true });
+    expect(await findCodeRepoRoot(nested)).toBe(dir);
+  });
+
+  it("returns the dir itself when it carries the metadata", async () => {
+    const dir = await tmpDir("mage-findrepo-");
+    await mkdir(join(dir, META_DIR), { recursive: true });
+    await writeFile(
+      join(dir, META_DIR, "metadata.json"),
+      JSON.stringify({ schema: METADATA_SCHEMA, mode: "in-repo", project: "p" }),
+    );
+    expect(await findCodeRepoRoot(dir)).toBe(dir);
+  });
+
+  it("returns null when no code-repo KB exists above the start dir", async () => {
+    const dir = await tmpDir("mage-findrepo-");
+    expect(await findCodeRepoRoot(dir)).toBeNull();
   });
 });

@@ -27,8 +27,10 @@ import {
   METADATA_SCHEMA,
   STATE_DIR,
   exists,
+  findCodeRepoRoot,
   learningsPath,
   looksLikeHub,
+  outOfRepoKbRoots,
   ownedDocsRoots,
   readGenreOverrides,
   readHubMetadata,
@@ -75,6 +77,10 @@ export async function pushKbChecks(
   // disconnected" (a regression) using the sink's capture history.
   const hadCapture = await learningsHasHistory(kb.root);
   await pushConnectionCheck(checks, conn, hadCapture, opts);
+  // Recall readiness (ADR-0042): when the KB lives OUTSIDE this code repo, the harness
+  // needs a filesystem grant or the agent cannot read what it knows. Detect-and-instruct
+  // only — doctor never writes host config (ADR-0037 §2); `mage connect` is the writer.
+  await pushReachGrantCheck(checks, opts);
   // Gate-2 redaction pre-commit hook (detect+nudge; never installed by --fix) and
   // metadata schema drift (advisory; --fix migrates in place). Both fail-open.
   await pushRedactHookCheck(checks, kb, conn.diff.connected);
@@ -564,6 +570,81 @@ async function refreshHookBlock(conn: Connection): Promise<MageDiff | null> {
   } catch {
     return null;
   }
+}
+
+/**
+ * The reach tier's readiness check (ADR-0042): when this code repo's KB lives OUTSIDE
+ * the project root (mode external or hybrid), the harness must be granted filesystem
+ * access to it or the agent cannot read its own knowledge base — every note read
+ * becomes a permission prompt mid-task.
+ *
+ * A RECALL failure, not an advisory one: this is the same class as a stale index or a
+ * missing MEMORY twin, and strictly worse in practice. Three states, so a machine that
+ * simply lacks a clone is never mistaken for a misconfiguration:
+ *   - grant present            → pass
+ *   - hub absent on this machine → pass, optional, with a note (nothing to grant yet;
+ *                                  `connect` deliberately skips it, so this must not fail
+ *                                  a CI runner that never clones the hub)
+ *   - hub present, grant missing → FAIL, with `mage connect` as the fix
+ *
+ * Detect-and-instruct only. ADR-0037 §2 holds doctor to read-only over host config, so
+ * even though this repair passes §3's auto-fix test (idempotent ∧ mage-owned ∧ local ∧
+ * reversible), `connect` stays the single writer. Reads BOTH scopes because Claude Code
+ * concatenates array-valued settings across them — a grant a user placed in
+ * `~/.claude/settings.json` is genuinely effective and must not be reported as missing.
+ * Fail-open throughout: an unreadable metadata or settings file pushes no check at all.
+ */
+async function pushReachGrantCheck(checks: DoctorCheck[], opts: DoctorOptions): Promise<void> {
+  const cwd = opts.cwd ?? process.cwd();
+  let wanted: string[] = [];
+  try {
+    const codeRepo = await findCodeRepoRoot(cwd);
+    const meta = codeRepo ? await readMetadata(codeRepo) : null;
+    wanted = meta && codeRepo ? outOfRepoKbRoots(meta, codeRepo) : [];
+  } catch {
+    return; // unreadable/foreign metadata — schema drift check owns that story
+  }
+  if (wanted.length === 0) return; // in-repo KB: nothing lives outside the project root
+
+  const granted = new Set<string>();
+  for (const t of [resolveSettingsTarget({ cwd }), resolveSettingsTarget({ user: true })]) {
+    const r = await readClaudeSettings(t.path).catch(() => null);
+    const dirs = r?.settings?.permissions?.additionalDirectories;
+    if (Array.isArray(dirs)) for (const d of dirs) if (typeof d === "string") granted.add(d);
+  }
+
+  const missing: string[] = [];
+  const absent: string[] = [];
+  for (const dir of wanted) {
+    if (granted.has(dir)) continue;
+    if (await exists(dir)) missing.push(dir);
+    else absent.push(dir);
+  }
+
+  if (missing.length > 0) {
+    checks.push({
+      name: "KB access grant",
+      ok: false,
+      detail:
+        `the KB lives outside this repo but the harness has no grant for ` +
+        `${missing.join(", ")} — the agent cannot read it; run \`mage connect\``,
+    });
+    return;
+  }
+  if (absent.length > 0) {
+    checks.push({
+      name: "KB access grant",
+      ok: true,
+      optional: true,
+      detail: `hub not present on this machine (${absent.join(", ")}) — nothing to grant yet`,
+    });
+    return;
+  }
+  checks.push({
+    name: "KB access grant",
+    ok: true,
+    detail: `granted: ${wanted.join(", ")}`,
+  });
 }
 
 /**

@@ -96,6 +96,29 @@ Capture is strictly opt-in — it is not bundled with the skills plugin. For wha
 the hooks actually capture, see [Capture](../loop/capture.md) and the
 [Hooks reference](./hooks.mdx).
 
+### Reaching a knowledge base outside the repo
+
+When your KB lives in a hub (`external` or `hybrid` mode), it sits outside the
+repo your agent was launched in — and agent harnesses confine file access to the
+project root. `mage connect` therefore also grants access to the hub, by adding it
+to `permissions.additionalDirectories` in the same local settings file. Without
+that grant the agent is pointed at a knowledge base it cannot read, and every note
+read becomes a permission prompt.
+
+This is independent of everything else `connect` wires: turning off your harness's
+own auto-memory does not revoke it. mage records exactly which entries it added, so
+`mage disconnect` removes those and leaves any you added yourself untouched.
+
+Two cases worth knowing:
+
+- **The hub isn't on this machine.** No grant is written (there is nothing to grant
+  yet). Clone the hub, then re-run `mage connect`.
+- **A new worktree.** Local settings are gitignored, so a fresh worktree starts
+  without them. Run `mage connect` in it.
+
+`mage doctor` reports the grant under **KB access grant** — a failing check when the
+hub is present but ungranted, and a skip when the hub simply isn't cloned here.
+
 ## Regenerating the index and skills
 
 Two generated artifacts keep agents oriented. `mage index` rebuilds

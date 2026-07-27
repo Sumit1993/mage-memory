@@ -46,6 +46,9 @@ const READINESS_CHECKS = new Set([
   "INDEX.md",
   "index freshness",
   "AGENTS.md awareness",
+  // ADR-0042: an external/hybrid KB the harness cannot reach is a recall failure the
+  // setup footer must surface at connect/link time, not weeks later.
+  "KB access grant",
 ]);
 
 /**

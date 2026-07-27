@@ -435,6 +435,22 @@ export interface ResolvedDocsRoot {
 }
 
 /**
+ * The nearest ancestor of `startDir` (inclusive) carrying `mage/metadata.json` — the
+ * CODE REPO root, which for mode=external is NOT the docs root (that lives in the hub).
+ * Callers needing the metadata itself pair this with {@link readMetadata}. Returns null
+ * when no code-repo KB is found walking up to the filesystem root.
+ */
+export async function findCodeRepoRoot(startDir: string): Promise<string | null> {
+  let dir = absolutePath(startDir);
+  for (;;) {
+    if (await exists(join(dir, META_DIR, META_FILE))) return dir;
+    const parent = dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+}
+
+/**
  * Resolve the mage docs root to operate on, starting from `startDir` (default cwd):
  *  - repo KB:  the nearest ancestor with `mage/metadata.json` (mode=in-repo or
  *              mode=hybrid) → that repo's `mage/`. Reported as kind "repo".
@@ -454,18 +470,13 @@ export async function resolveDocsRoot(
   const abs = absolutePath(startDir);
 
   // Walk up looking for a code-repo `mage/metadata.json` (in-repo/hybrid/external).
-  let dir = abs;
-  for (;;) {
-    if (await exists(join(dir, META_DIR, META_FILE))) {
-      // Honor mode=external by following hub_path; a bad read degrades to repo KB.
-      const external = await externalDocsRoot(dir).catch(() => null);
-      return (
-        external ?? { root: codeRepoDocsRoot(dir), kind: "repo", repo: dir }
-      );
-    }
-    const parent = dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
+  const codeRepo = await findCodeRepoRoot(abs);
+  if (codeRepo) {
+    // Honor mode=external by following hub_path; a bad read degrades to repo KB.
+    const external = await externalDocsRoot(codeRepo).catch(() => null);
+    return (
+      external ?? { root: codeRepoDocsRoot(codeRepo), kind: "repo", repo: codeRepo }
+    );
   }
 
   // Otherwise, walk up looking for a hub root. `startDir` may BE the hub, or sit
@@ -474,7 +485,7 @@ export async function resolveDocsRoot(
   // metadata.json of its own. Resolving it is what lets `mage <engine> --dir
   // <hub>/projects/<name>/` (the Decision 1 groom fan-out) reach the project's
   // own `.learnings/` even when its member code repo is absent on this machine.
-  dir = abs;
+  let dir = abs;
   for (;;) {
     if (await looksLikeHub(dir)) return hubDocsRoot(dir, abs);
     const parent = dirname(dir);
@@ -560,6 +571,63 @@ export async function ownedDocsRoots(kb: ResolvedDocsRoot): Promise<string[]> {
     }
   }
   return roots;
+}
+
+/**
+ * True when `child` is `parent` itself or nested inside it (no `../` escape).
+ * The one canonical containment rule — it was written five times across the
+ * codebase before this; adapters and `dream` import it rather than re-deriving it.
+ */
+export function isUnder(parent: string, child: string): boolean {
+  const rel = relative(parent, child);
+  return rel === "" || (!rel.startsWith(`..${sep}`) && rel !== ".." && !isAbsolute(rel));
+}
+
+/**
+ * The KB directories that live OUTSIDE a code repo's project root — what a harness
+ * must be granted access to before the agent can read its own knowledge base
+ * (ADR-0042, the reach tier).
+ *
+ *   - in-repo  → `[]`  (docs sit at `<repo>/mage/`, already under the project root)
+ *   - external → `[hub_path]` — the hub REPO root, not the project docs root beneath
+ *                it. The hub top carries its own `INDEX.md`/`decisions/`/`notes/` plus
+ *                the cross-project `_index.*` files, so one grant covers both levels
+ *                and following a hub-root link never trips a permission prompt.
+ *   - hybrid   → every `hub_refs[].hub_path` (docs are local, but the registered hubs
+ *                are not).
+ *
+ * Harness-NEUTRAL by design (ADR-0036): this returns paths, never policy. The adapter
+ * decides how a given harness expresses the grant — for Claude Code that is
+ * `permissions.additionalDirectories`. When a second harness lands, it consumes this
+ * same list; that is the seam ADR-0036 defers, not a reason to build it now.
+ *
+ * Paths at or under `projectRoot` are dropped (self-referential when cwd is inside the
+ * hub itself). Order-stable, de-duplicated, and pure — no filesystem access, so an
+ * absent hub is the CALLER's business to detect (connect skips it; doctor reports it).
+ */
+export function outOfRepoKbRoots(meta: MageMetadata, projectRoot: string): string[] {
+  const normalized = normalizeMetadata(meta);
+  const candidates =
+    normalized.mode === "external"
+      ? normalized.hub_path
+        ? [normalized.hub_path]
+        : []
+      : normalized.mode === "hybrid"
+        ? normalized.hub_refs.map((r) => r.hub_path)
+        : [];
+
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of candidates) {
+    if (!raw) continue;
+    const abs = absolutePath(raw);
+    if (seen.has(abs)) continue;
+    seen.add(abs);
+    // Self-referential: cwd is inside the hub, so the hub is already reachable.
+    if (isUnder(projectRoot, abs)) continue;
+    out.push(abs);
+  }
+  return out;
 }
 
 /** Resolve a path (relative → absolute relative to cwd). */

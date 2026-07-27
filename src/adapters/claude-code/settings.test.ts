@@ -8,7 +8,9 @@ import {
   MAGE_ID_PREFIX,
   isAutoMemoryEnabled,
   readClaudeSettings,
+  reconcileReachGrants,
   removeMageHooks,
+  removeReachGrants,
   resolveSettingsTarget,
   upsertMageHooks,
   writeClaudeSettings,
@@ -380,5 +382,124 @@ describe("integration: wire then unwire a real-shaped file", () => {
 
     const { settings: reverted } = removeMageHooks(after.settings);
     expect(reverted).toEqual(live);
+  });
+});
+
+describe("reach tier — reconcileReachGrants (ADR-0042)", () => {
+  const HUB = "/home/u/org/docs-hub";
+  const HUB2 = "/home/u/org/other-hub";
+
+  it("grants a hub into an empty file and records ownership", () => {
+    const out = reconcileReachGrants(null, [HUB]);
+    expect(out.permissions?.additionalDirectories).toEqual([HUB]);
+    expect(out.mageOwnedAdditionalDirectories).toEqual([HUB]);
+  });
+
+  it("is idempotent — re-running neither duplicates the entry nor the record", () => {
+    const once = reconcileReachGrants(null, [HUB]);
+    const twice = reconcileReachGrants(once, [HUB]);
+    expect(twice).toEqual(once);
+  });
+
+  it("grants multiple hubs (hybrid: one per hub_ref)", () => {
+    const out = reconcileReachGrants(null, [HUB, HUB2]);
+    expect(out.permissions?.additionalDirectories).toEqual([HUB, HUB2]);
+    expect(out.mageOwnedAdditionalDirectories).toEqual([HUB, HUB2]);
+  });
+
+  it("never CLAIMS a path the user already listed", () => {
+    const live: ClaudeSettings = { permissions: { additionalDirectories: [HUB] } };
+    const out = reconcileReachGrants(live, [HUB]);
+    // Present (so the grant is satisfied) but unowned — disconnect must leave it.
+    expect(out.permissions?.additionalDirectories).toEqual([HUB]);
+    expect(out.mageOwnedAdditionalDirectories).toBeUndefined();
+  });
+
+  it("preserves unrelated entries and other permissions keys", () => {
+    const live: ClaudeSettings = {
+      permissions: { allow: ["Bash(ls:*)"], additionalDirectories: ["/home/u/scratch"] },
+    };
+    const out = reconcileReachGrants(live, [HUB]);
+    expect(out.permissions?.additionalDirectories).toEqual(["/home/u/scratch", HUB]);
+    expect(out.permissions?.allow).toEqual(["Bash(ls:*)"]);
+  });
+
+  it("reconciles DOWNWARD — a moved hub sheds the stale grant", () => {
+    const before = reconcileReachGrants(null, [HUB]);
+    const after = reconcileReachGrants(before, [HUB2]);
+    expect(after.permissions?.additionalDirectories).toEqual([HUB2]);
+    expect(after.mageOwnedAdditionalDirectories).toEqual([HUB2]);
+  });
+
+  it("an empty grant set (in-repo / unlinked) prunes mage's entries and both keys", () => {
+    const before = reconcileReachGrants(null, [HUB]);
+    const after = reconcileReachGrants(before, []);
+    expect(after.permissions).toBeUndefined();
+    expect(after.mageOwnedAdditionalDirectories).toBeUndefined();
+  });
+
+  it("an empty grant set leaves a USER entry and their other permissions alone", () => {
+    const live: ClaudeSettings = {
+      permissions: { allow: ["Bash(ls:*)"], additionalDirectories: [HUB] },
+    };
+    const after = reconcileReachGrants(live, []);
+    expect(after.permissions?.additionalDirectories).toEqual([HUB]);
+    expect(after.permissions?.allow).toEqual(["Bash(ls:*)"]);
+  });
+
+  it("does not mutate its input", () => {
+    const live: ClaudeSettings = { permissions: { additionalDirectories: [] } };
+    reconcileReachGrants(live, [HUB]);
+    expect(live.permissions?.additionalDirectories).toEqual([]);
+  });
+
+  it("tolerates a hand-edited file whose keys are the wrong shape", () => {
+    const live = {
+      permissions: { additionalDirectories: [HUB, 42, null] },
+      mageOwnedAdditionalDirectories: "nope",
+    } as unknown as ClaudeSettings;
+    const out = reconcileReachGrants(live, [HUB]);
+    expect(out.permissions?.additionalDirectories).toEqual([HUB]);
+  });
+});
+
+describe("reach tier — removeReachGrants (ADR-0042)", () => {
+  const HUB = "/home/u/org/docs-hub";
+
+  it("round-trips: grant then remove restores the original object exactly", () => {
+    const live: ClaudeSettings = { permissions: { allow: ["Bash(ls:*)"] } };
+    const granted = reconcileReachGrants(live, [HUB]);
+    const { settings: reverted, removed } = removeReachGrants(granted);
+    expect(removed).toBe(1);
+    expect(reverted).toEqual(live);
+  });
+
+  it("round-trips to a bare object when nothing else was in the file", () => {
+    const granted = reconcileReachGrants(null, [HUB]);
+    const { settings: reverted } = removeReachGrants(granted);
+    expect(reverted).toEqual({});
+  });
+
+  it("leaves a user's own identical entry in place", () => {
+    const live: ClaudeSettings = { permissions: { additionalDirectories: [HUB] } };
+    const granted = reconcileReachGrants(live, [HUB]);
+    const { settings: reverted, removed } = removeReachGrants(granted);
+    expect(removed).toBe(0);
+    expect(reverted.permissions?.additionalDirectories).toEqual([HUB]);
+  });
+
+  it("is a no-op with no ownership record", () => {
+    const live: ClaudeSettings = { permissions: { additionalDirectories: ["/x"] } };
+    const { settings, removed } = removeReachGrants(live);
+    expect(removed).toBe(0);
+    expect(settings).toEqual(live);
+  });
+
+  it("removes mage's entry while keeping the user's unrelated one", () => {
+    const live: ClaudeSettings = { permissions: { additionalDirectories: ["/home/u/scratch"] } };
+    const granted = reconcileReachGrants(live, [HUB]);
+    const { settings: reverted, removed } = removeReachGrants(granted);
+    expect(removed).toBe(1);
+    expect(reverted.permissions?.additionalDirectories).toEqual(["/home/u/scratch"]);
   });
 });
