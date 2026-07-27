@@ -187,7 +187,7 @@ archive of what you read, it doesn't belong.
 
 ## 6. Note-type vocabulary, genres, and recall rungs
 
-`type` is an open vocabulary, but every note type maps onto a **genre** that decides its recall rung ([ADR-0041](mage/decisions/0041-genre-decides-the-recall-rung.md)). Only **memory** genre notes will populate the always-loaded recall index (`INDEX.md`/`MEMORY.md`) once the scanner genre filter ships (ADR-0041 — not yet implemented; today's index carries every genre). Non-memory types (`plan`, `spec`, `tasks`, `decision`) remain legal types for storage and linking, but are non-memory genres (`work`, `doc`, `decision` per ADR-0041) that will be excluded from always-loaded recall — authored deliberately, never the default destination for captured knowledge.
+`type` is an open vocabulary, but every note type maps onto a **genre** that decides its recall rung ([ADR-0041](mage/decisions/0041-genre-decides-the-recall-rung.md)). Only **memory** genre notes populate the always-loaded recall index (`INDEX.md`/`MEMORY.md`) (ADR-0041). Non-memory types (`plan`, `spec`, `tasks`, `decision`) remain legal types for storage and linking, but are non-memory genres (`work`, `doc`, `decision` per ADR-0041) that are excluded from always-loaded recall — authored deliberately, never the default destination for captured knowledge.
 
 | `type:` | Genre | Recall Rung | Purpose & Lifecycle |
 |---|---|---|---|

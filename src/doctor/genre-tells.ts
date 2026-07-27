@@ -9,11 +9,11 @@
 import { readFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { BASE_THRESHOLDS } from "../grooming/thresholds.js";
-import { isGeneratedArtifact, listNotePaths, toPosix } from "../scan.js";
 import { logger } from "../logger.js";
-import type { resolveDocsRoot } from "../paths.js";
 import { parseNote } from "../note.js";
-import { genreOf } from "../scanner/genre-map.js";
+import { readGenreOverrides, type resolveDocsRoot } from "../paths.js";
+import { isGeneratedArtifact, listNotePaths, toPosix } from "../scan.js";
+import { type Genre, genreOf } from "../scanner/genre-map.js";
 
 type Kb = NonNullable<Awaited<ReturnType<typeof resolveDocsRoot>>>;
 
@@ -46,12 +46,16 @@ export interface GenreTellsReport {
 export function checkNoteGenreTells(
   rawText: string,
   noteSizeCap: number = BASE_THRESHOLDS.noteSizeCap,
+  overrides?: Record<string, Genre>,
 ): GenreTellCounts | null {
   const { frontmatter, body } = parseNote(rawText);
   const byteSize = Buffer.byteLength(body, "utf8");
-  const sizeFired = genreOf(frontmatter.type) === "memory" && byteSize > noteSizeCap;
+  const sizeFired =
+    genreOf(frontmatter.type, overrides) === "memory" && byteSize > noteSizeCap;
 
-  const vocabMatches = rawText.match(/\b(shipped|deferred|build order|critical path)\b/gi)?.length ?? 0;
+  const vocabMatches =
+    rawText.match(/\b(shipped|deferred|build order|critical path)\b/gi)
+      ?.length ?? 0;
   const prMatches = rawText.match(/\bPR\s*#\d+\b/gi)?.length ?? 0;
   const doneVocabCount = vocabMatches + prMatches;
   const doneVocabFired = doneVocabCount >= 5;
@@ -59,7 +63,8 @@ export function checkNoteGenreTells(
   const issueRefMatches = rawText.match(/#\d+\b/g)?.length ?? 0;
   const issueRefFired = issueRefMatches >= 10;
 
-  const checkboxMatches = rawText.match(/^[ \t]*[-*+][ \t]+\[[ xX]\]/gm)?.length ?? 0;
+  const checkboxMatches =
+    rawText.match(/^[ \t]*[-*+][ \t]+\[[ xX]\]/gm)?.length ?? 0;
   const checkboxesFired = checkboxMatches >= 1;
 
   if (!sizeFired && !doneVocabFired && !issueRefFired && !checkboxesFired) {
@@ -86,6 +91,7 @@ export async function evaluateGenreTells(
   try {
     const rawPaths = await listNotePaths(kb.root);
     const paths = rawPaths.filter((p) => !isGeneratedArtifact(p));
+    const overrides = await readGenreOverrides(kb);
     const flagged: FlaggedNote[] = [];
 
     for (const rel of paths) {
@@ -97,7 +103,7 @@ export async function evaluateGenreTells(
         continue; // fail-open on unreadable file
       }
 
-      const tells = checkNoteGenreTells(rawText, noteSizeCap);
+      const tells = checkNoteGenreTells(rawText, noteSizeCap, overrides);
       if (tells) {
         // POSIX path relative to kb.repo (so for a repo KB with root=mage, returns mage/notes/foo.md)
         const relToRepo = toPosix(relative(kb.repo, absPath));
@@ -134,7 +140,10 @@ export function formatFlaggedNoteLine(f: FlaggedNote): string {
 /**
  * Format the summary message for genre tells.
  */
-export function formatGenreTellsSummary(flaggedCount: number, scannedCount: number): string {
+export function formatGenreTellsSummary(
+  flaggedCount: number,
+  scannedCount: number,
+): string {
   return `${flaggedCount} note${flaggedCount === 1 ? "" : "s"} flagged of ${scannedCount} scanned`;
 }
 
@@ -157,5 +166,7 @@ export function renderGenreTells(report: GenreTellsReport): void {
     const remaining = report.flagged.length - MAX_SHOWN;
     logger.detail(`…and ${remaining} more`);
   }
-  logger.detail(formatGenreTellsSummary(report.flagged.length, report.scannedCount));
+  logger.detail(
+    formatGenreTellsSummary(report.flagged.length, report.scannedCount),
+  );
 }

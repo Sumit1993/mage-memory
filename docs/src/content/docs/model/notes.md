@@ -25,14 +25,14 @@ For example, instead of pasting a service's entire API reference into a note, yo
 
 ## Note types and genres
 
-A note carries an optional `type` in its frontmatter. Per ADR-0041, `type` maps to a **genre** that decides its recall rung. Only memory-genre notes will populate the always-loaded recall index (`INDEX.md`) once the scanner genre filter ships (ADR-0041 — not yet implemented; today's index carries every genre):
+A note carries an optional `type` in its frontmatter. Per ADR-0041, `type` maps to a **genre** that decides its recall rung. Only memory-genre notes populate the always-loaded recall index (`INDEX.md`) (ADR-0041):
 
 - **gotcha** / **procedure** — traps and reusable procedures (procedural notes that can graduate into skills).
 - **pointer** / **reference** / **principle** / **feedback** / **note** — wayfinding, durable rules, and insight.
 
-Any string is legal; unrecognized types are unclassified and sit at rung 3 (on-demand only). Legacy strings (`playbook`, `interface`, `tooling`, `topology`, `relationship`, `trail`) remain legal but map to **unclassified** (rung 3).
+Any string is legal; unrecognized types are unclassified and sit at rung 3 (on-demand only). Custom types can be mapped to one of the four standard genres (`memory`, `decision`, `work`, `doc`) via the optional `genres` map in `metadata.json` (e.g. `"genres": { "runbook": "memory" }`). Legacy strings (`playbook`, `interface`, `tooling`, `topology`, `relationship`, `trail`) remain legal but map to **unclassified** (rung 3).
 
-Non-memory types (`plan`, `spec`, `tasks`, `decision`) remain legal note types for storage and linking, but are non-memory genres (`work`, `doc`, `decision` per ADR-0041) that will be excluded from always-loaded recall — authored deliberately rather than as default destinations for captured knowledge:
+Non-memory types (`plan`, `spec`, `tasks`, `decision`) remain legal note types for storage and linking, but are non-memory genres (`work`, `doc`, `decision` per ADR-0041) that are excluded from always-loaded recall — authored deliberately rather than as default destinations for captured knowledge:
 - **decision** — an ADR: a choice, the reasoning, and what it rules out (stored in `mage/decisions/`).
 - **spec** / **plan** / **tasks** — specifications, forward work plans, and checklists (stored in `mage/work/` or repo docs).
 
