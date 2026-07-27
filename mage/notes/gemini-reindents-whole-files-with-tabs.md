@@ -18,7 +18,7 @@ keywords:
   - indentation
   - diff-churn
   - delegation
-modified: 2026-07-27T09:10:50.989Z
+modified: 2026-07-27T09:45:30.639Z
 ---
 
 # Gotcha — Gemini re-indents entire files with tabs; diff-stat inflation is the tell
@@ -28,7 +28,9 @@ indentation to tabs, turning ~200-line functional changes into 700-1800-line dif
 (`skills-cmd.ts` +553 churned; `paths.ts` 478 lines churned for a 5-line real delta).
 
 **Tells:** a diff-stat far larger than the spec's scope; `grep -c "$(printf '\t')" file` on
-touched files. **Fix:** `sed -i 's/\t/  /g'` on touched `.ts` files, re-verify, amend — real
+touched files. **Fix (indentation-only — a global `s/\t/  /g` would also rewrite tabs inside
+string literals):** `sed -i -e ':a' -e 's/^\(\t*\)\t/\1  /;ta' <files>` converts leading tab
+runs to 2-space steps and leaves in-line tabs alone; re-verify (typecheck + tests), amend — real
 changes survive because they were authored on the tab-indented text. **Prevention:** put
 "2-space indent, NEVER tabs" in every agy spec's constraints (added to the Wave-B fix-round
 prompts; both came back clean).
