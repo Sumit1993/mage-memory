@@ -1,5 +1,20 @@
 reviews:
   profile: chill
+  # Rate-limit discipline. This repo is on CodeRabbit's OSS tier: 1-10 PR reviews per
+  # developer per hour, scaling with project popularity — a young repo sits near the
+  # bottom. EVERY review run spends one, including the automatic incremental review
+  # after each push, so a fix-push loop drains the whole budget on a single PR.
+  # Pausing after 1 reviewed commit means one review per PR; push your fixes as a batch,
+  # then re-request explicitly with an `@coderabbitai review` comment.
+  auto_review:
+    auto_pause_after_reviewed_commits: 1
+    ignore_title_keywords:
+      - "WIP"
+  # Not a rate-limit lever (the limit counts reviews, not files) — this keeps PRs under
+  # the OSS files-per-review cap of 50-150. docs/src/generated/mage-data.json is
+  # deliberately NOT excluded: path_instructions require it to be regenerated in-PR.
+  path_filters:
+    - "!pnpm-lock.yaml"
   path_instructions:
     - path: "src/**"
       instructions: |
