@@ -14,8 +14,8 @@ sources:
   - decisions/0033-recall-import-bounded-index.md
   - decisions/0038-promote-note-rung-deleted-graduate-on-usage.md
   - decisions/0039-context-footprint-measure-and-bound.md
-  - ~/ai-context/research-memory-vs-artifacts-2026-07-27/ (external-survey, pocock-layering, internal-audit, OPTIONS)
-  - ~/ai-context/mage-memory-vs-other-artifacts-handoff-2026-07-27.md
+  - research sweep 2026-07-27 — external survey of 14 memory systems, Pocock skills layering, internal genre audit (local artifacts; every load-bearing number is inlined under Context)
+  - prismalens-docs-hub genre audit handoff 2026-07-27 (local artifact; its better-home ladder is reproduced in CONVENTIONS.md by the Wave-1 PR)
   - cc-session:ee0349da-df7e-4672-b8be-dc8cb25cb2c5
 keywords:
   - genre
@@ -28,7 +28,7 @@ keywords:
   - lifecycle-verbs
   - annotate-never-sort
   - migration-manifest
-modified: 2026-07-27T07:31:47.570Z
+modified: 2026-07-27T07:39:36.616Z
 ---
 
 # 0041 — Genre decides the recall rung: one store, three recall paths (amends ADR-0035)
@@ -107,8 +107,10 @@ displaced bodies must stay committed notes).
      recallable one-liner and links to its ADR (the pointer-leverage pattern,
      [ADR-0039](0039-context-footprint-measure-and-bound.md)).
    - **Wing skills gain a generated "Governing decisions" section** — one line per
-     ADR the wing's notes link to, harvested from the link graph at `mage skills`
-     generation time. Contextual ADR recall at zero always-on cost.
+     **accepted, non-superseded** ADR the wing's notes link to (proposed, rejected,
+     and superseded decisions are excluded — they do not govern), harvested from the
+     link graph at `mage skills` generation time. Contextual ADR recall at zero
+     always-on cost.
 
 5. **Lifecycle is declared semantics + read-only annotation — no event machinery.**
    The verbs in the table are convention; `mage doctor` annotates violations on its
@@ -160,8 +162,8 @@ displaced bodies must stay committed notes).
 - `INDEX.md`/`MEMORY.md` generation filters to memory genre + governance line.
 - `mage skills` generation adds the Governing-decisions section.
 - `mage doctor` gains the genre-tell annotations (size, done-state vocabulary,
-  issue-ref density, lifecycle violations); `noteSizeCap` gains its first importer
-  or is deleted.
+  issue-ref density, lifecycle violations); `noteSizeCap` becomes doctor's imported
+  size threshold — its first real consumer (matching Decision §5).
 - Three KBs migrate via approved manifests (home first, soaks after the A-window).
 - Deferred to [future-thoughts](../notes/future-thoughts.md): falsify-on-commit,
   path-collision nudge, template wings (FT-04) as the delivery vehicle for
