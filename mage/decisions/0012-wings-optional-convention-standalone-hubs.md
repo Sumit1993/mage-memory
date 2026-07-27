@@ -62,4 +62,4 @@ mage was framed "for software systems," and its hub mechanics encode that: a "pr
 - refines [ADR-0006 — two-layer recall](0006-two-layer-recall-per-wing-skills.md)
 - see_also [ADR-0009 — no runtime; automation rides host hooks](0009-no-runtime-automation-rides-host-hooks.md)
 - realizes [migration field notes](../notes/migration-field-notes.md)
-- informs [mage roadmap](../notes/roadmap.md)
+- informs [mage roadmap](../work/roadmap.md)

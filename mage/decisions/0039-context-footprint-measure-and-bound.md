@@ -43,7 +43,7 @@ keywords:
 # 0039 — measure the context footprint; bound the generated launch surface
 
 > **Status: accepted (ratified 2026-07-19).** Output of a 2026-07-19 grill. Implements
-> **FT-18** ([future-thoughts](../notes/future-thoughts.md)). Resolves the size-cap policy that
+> **FT-18** ([future-thoughts](../work/future-thoughts.md)). Resolves the size-cap policy that
 > [ADR-0033](0033-recall-import-bounded-index.md) §Open-questions deferred, and corrects that
 > ADR's "~4KB bounded import" estimate, which measurement showed to be wrong by ~5×.
 > ADR-0033's core decision — import the bounded root — stands and is **not** superseded.
@@ -323,7 +323,7 @@ call with a real downside, not the mechanical repair `--fix` is scoped to. Docto
 ### 9. `mage footprint` is a visible human verb.
 
 "What is mage costing me?" is a user question, not plumbing, so
-[plan-0.0.10-coherence](../notes/plan-0.0.10-coherence.md)'s objection (plumbing mixed with
+[plan-0.0.10-coherence](../work/plan-0.0.10-coherence.md)'s objection (plumbing mixed with
 user verbs) does not apply. To avoid that plan's *second* problem — one job spread across
 several verbs — the boundary is fixed here:
 
@@ -378,7 +378,7 @@ ADR-0033's *judgment* was sound and only its estimate was wrong.
 
 ## Relations
 
-- implements **FT-18** — [future-thoughts](../notes/future-thoughts.md)
+- implements **FT-18** — [future-thoughts](../work/future-thoughts.md)
 - resolves the deferred size-cap question in
   [ADR-0033 — recall: `@import` the bounded root index](0033-recall-import-bounded-index.md)
 - constrained by [ADR-0021 — offline, no telemetry; local signal](0021-offline-no-telemetry-local-signal.md)
@@ -389,4 +389,4 @@ ADR-0033's *judgment* was sound and only its estimate was wrong.
 - pointer leverage rests on [ADR-0004 — capture insight, not copies](0004-capture-insight-not-copies.md)
 - shares the mechanical-token failure mode with
   [promote-folds-mechanical-tokens](../notes/promote-folds-mechanical-tokens.md)
-- command placement follows [plan-0.0.10-coherence](../notes/plan-0.0.10-coherence.md)
+- command placement follows [plan-0.0.10-coherence](../work/plan-0.0.10-coherence.md)

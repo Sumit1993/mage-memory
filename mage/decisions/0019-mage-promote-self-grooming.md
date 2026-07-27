@@ -196,4 +196,4 @@ their seam/dial, what graduates, merge vs split, and where the counters live.
 - gated_by [ADR-0014 — two-gate redaction](0014-two-gate-redaction.md) — the Gate-2 block the applier honours
 - rides [ADR-0009 — no runtime; automation rides host hooks](0009-no-runtime-automation-rides-host-hooks.md) — Rung A now; auto-tuner a deferred opt-in
 - mines ECC `continuous-learning-v2` (recurrence model) + Microsoft SkillOpt (rejected-edit buffer, bounded edits, held-out gate)
-- sequenced_by [release sequence](../notes/plan-release-sequence.md)
+- sequenced_by [release sequence](../work/plan-release-sequence.md)

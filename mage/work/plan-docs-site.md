@@ -4,7 +4,7 @@ tags: [mage/roadmap]
 created: "2026-06-18"
 updated: "2026-06-18"
 last_reviewed: "2026-06-18"
-status: active
+status: completed
 provenance:
   repo: mage-memory
   work: docs-site

@@ -52,4 +52,4 @@ Consistency is free: `index`, `skills`, and `dream` already share `scanNotes` (`
 - depends_on [ADR-0008 — visible mage/ dir](0008-visible-mage-dir-for-obsidian.md)
 - bounded_by [ADR-0004 — capture insight, not copies](0004-capture-insight-not-copies.md)
 - realizes [migration field notes](../notes/migration-field-notes.md)
-- informs [mage roadmap](../notes/roadmap.md)
+- informs [mage roadmap](../work/roadmap.md)

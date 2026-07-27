@@ -152,5 +152,5 @@ load-bearing invariants — *no runtime of our own* ([ADR-0009](0009-no-runtime-
 - realizes [ADR-0004 — capture insight, not copies](0004-capture-insight-not-copies.md)
 - gated_by [ADR-0014 — two-gate redaction](0014-two-gate-redaction.md)
 - mines microsoft/SkillOpt (text-space skill optimizer) + ECC `continuous-learning-v2`
-- sequenced_by [release sequence](../notes/plan-release-sequence.md)
-- informs [mage roadmap](../notes/roadmap.md)
+- sequenced_by [release sequence](../work/plan-release-sequence.md)
+- informs [mage roadmap](../work/roadmap.md)

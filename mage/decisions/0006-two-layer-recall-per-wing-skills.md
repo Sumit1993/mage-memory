@@ -30,4 +30,4 @@ Recall uses two complementary layers:
 ## Relations
 
 - see_also [ADR-0005 — one canonical memory](0005-one-canonical-memory-others-are-feeders.md)
-- realized_by [mage v0.1 implementation plan](../notes/plan-v0.1.md)
+- realized_by [mage v0.1 implementation plan](../work/plan-v0.1.md)

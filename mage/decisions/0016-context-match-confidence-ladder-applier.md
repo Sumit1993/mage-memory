@@ -122,4 +122,4 @@ promote/optimize ──proposal──▶ [ladder: human-confirm OR auto-approve]
 - rides [ADR-0009 — no runtime; automation rides host hooks](0009-no-runtime-automation-rides-host-hooks.md)
 - gated_by [ADR-0014 — two-gate redaction](0014-two-gate-redaction.md) — the Gate-2 block the applier honours
 - mines ECC `continuous-learning-v2` (confidence model) + Microsoft SkillOpt (held-out gate, rejected-edit buffer)
-- sequenced_by [release sequence](../notes/plan-release-sequence.md)
+- sequenced_by [release sequence](../work/plan-release-sequence.md)

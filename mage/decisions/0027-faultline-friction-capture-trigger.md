@@ -29,7 +29,7 @@ sources:
 > This ADR is kept as the honest record of a design that was pre-registered, gated, and falsified;
 > the prose-keyed pivot the gate's diagnosis pointed to is ADR-0028. The build lives on the
 > documented dead-end branch `feat/faultline-detector` (not wired). Plan:
-> [plan-faultline](../notes/plan-faultline.md).
+> [plan-faultline](../work/plan-faultline.md).
 
 ## Context
 
