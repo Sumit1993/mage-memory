@@ -31,7 +31,7 @@ keywords:
   - worktree
   - portability
   - t3code
-modified: 2026-07-27T16:49:34.464Z
+modified: 2026-07-27T17:20:22.726Z
 ---
 
 # 0042 — the reach tier: mage grants the harness access to an out-of-repo knowledge base
@@ -110,9 +110,16 @@ changes and metadata may already be unlinked, orphaning the grant with nothing r
 **6. `unlink` leaves orphans**; `doctor` detects and the next `connect` reconciles. Keeps
 `unlink` narrow and non-surprising; a stale entry granting read access to a directory is inert.
 
-**7. A hub absent on this machine gets no grant** — warn, record nothing. `metadata.json`
-is git-tracked and carries an absolute `hub_path`, so a clone on another machine routinely
-points at nothing. This is a supported state, not an error.
+**7. Only a real hub root is granted — `hub_path` is untrusted input.** `metadata.json` is
+git-tracked, so anyone who can land a commit controls `hub_path`. Existence alone is not a
+sufficient gate: pointed at `~/.ssh` or `/`, it would widen harness access to an arbitrary
+directory on the next `mage connect`. The writer requires `looksLikeHub` (a `projects/` dir
+plus a hub `metadata.json`), which every legitimate grant target has. This subsumes the
+absent-hub case — a hub not cloned on this machine and a path that is not a hub are both
+simply "no hub here": warn, grant nothing, record nothing. Routine on a fresh clone
+(`hub_path` is absolute and machine-specific), so it is a supported state, not an error.
+`doctor` mirrors the same gate rather than `exists`, or it would nag for a fix `connect`
+will never make.
 
 **8. doctor reports it as a failing RECALL check, three-state.** Grant missing while the
 hub exists → **fail** (the agent cannot read its own KB — the same class as a stale index,
@@ -155,6 +162,10 @@ and WSL behaviour).
   permits Write/Edit and the scrub hook is commandeer-gated. **Gate-2 remains the durable
   boundary** — `mage connect` installs `mage:redact-precommit` in the hub repo, so a staged
   secret is caught at commit. Accepted deliberately, not overlooked.
+- **Grant widening is bounded by hub-shape, not by trust in the repo.** A hostile or
+  mistaken `hub_path` cannot widen access beyond a directory that is already a mage hub.
+  The residual exposure is a *legitimate* hub whose contents an attacker controls — which
+  is the same trust boundary as the notes themselves, not a new one.
 - **A pre-existing crash was fixed as a prerequisite.** `ensureSinkIgnores` threw ENOENT
   when `mode: external` resolved through a `hub_path` absent on this machine, aborting
   `connect` entirely — which made §7's "skip and warn" unreachable. Now fail-open.

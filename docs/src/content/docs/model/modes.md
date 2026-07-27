@@ -131,6 +131,7 @@ Two consequences worth knowing:
 
 - **`mage connect` is not optional for hub modes.** Without the grant the agent resolves the KB correctly and then cannot open it.
 - **`hub_path` is machine-specific.** It is an absolute path in a git-tracked file, so a clone on another machine may point at a hub that isn't there. mage skips the grant in that case rather than recording one for a path that doesn't exist; clone the hub and re-run `mage connect`. `mage doctor` reports the state either way.
+- **Only a real hub is ever granted.** Because `hub_path` lives in a tracked file, it is untrusted input — a bad value could otherwise point the grant at any directory. mage grants a path only when it actually looks like a hub (a `projects/` directory and a hub `metadata.json`), and skips it otherwise.
 
 An `in-repo` KB needs none of this — its docs already live under the project root.
 

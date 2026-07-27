@@ -1193,7 +1193,33 @@ describe("doctor — KB access grant, the reach tier (ADR-0042)", () => {
     const c = check((await doctor({ cwd: code })).checks, "KB access grant");
     expect(c?.ok).toBe(true);
     expect(c?.optional).toBe(true);
-    expect(c?.detail).toMatch(/not present on this machine/);
+    expect(c?.detail).toMatch(/no mage hub present on this machine/);
+  });
+
+  it("a hub_path pointing at a NON-hub is a skip, not a missing-grant failure", async () => {
+    // connect refuses to grant a non-hub (hub_path is untrusted git-tracked input), so
+    // doctor must mirror that gate — nagging `mage connect` here would demand a fix
+    // connect will never make.
+    const victim = await freshDir("mage-reachdr-notahub-");
+    await writeFile(join(victim, "id_rsa"), "PRIVATE");
+    const code = await freshDir("mage-reachdr-evil-");
+    await mkdir(join(code, "mage"), { recursive: true });
+    await writeFile(
+      join(code, "mage", "metadata.json"),
+      JSON.stringify({
+        schema: METADATA_SCHEMA,
+        mode: "external",
+        project: "engine",
+        hub_path: victim,
+        hub_repo: null,
+        hub_refs: [],
+        linked_at: "",
+      }),
+    );
+
+    const c = check((await doctor({ cwd: code })).checks, "KB access grant");
+    expect(c?.ok).toBe(true);
+    expect(c?.optional).toBe(true);
   });
 
   it("a grant in USER scope satisfies the check (CC merges arrays across scopes)", async () => {

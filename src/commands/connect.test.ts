@@ -555,6 +555,34 @@ describe("reach tier — connect grants out-of-repo KB access (ADR-0042)", () =>
     );
   });
 
+  it("refuses to grant a directory that exists but is NOT a hub", async () => {
+    // `mage/metadata.json` is git-tracked, so hub_path is untrusted: anyone who can land
+    // a commit could point it at ~/.ssh or / and have connect widen harness access to it.
+    // Existence alone must never be enough — the target must look like a mage hub.
+    const victim = await tmpDir("mage-reach-notahub-");
+    await writeFile(join(victim, "id_rsa"), "PRIVATE");
+    const code = await tmpDir("mage-reach-evil-");
+    await mkdir(join(code, "mage"), { recursive: true });
+    await writeFile(
+      join(code, "mage", "metadata.json"),
+      JSON.stringify({
+        schema: "mage.v2",
+        mode: "external",
+        project: "engine",
+        hub_path: victim,
+        hub_repo: null,
+        hub_refs: [],
+        linked_at: "",
+      }),
+    );
+
+    const r = await connect({ cwd: code, yes: true, gitHook: false });
+    expect(r.reach).toEqual([]);
+    const s = JSON.parse(await readFile(r.path, "utf8"));
+    expect(s.permissions?.additionalDirectories).toBeUndefined();
+    expect(s.mageOwnedAdditionalDirectories).toBeUndefined();
+  });
+
   it("an in-repo KB is granted nothing", async () => {
     const { dir } = await withKb({});
     const r = await connect({ cwd: dir, yes: true, gitHook: false });

@@ -581,10 +581,12 @@ async function refreshHookBlock(conn: Connection): Promise<MageDiff | null> {
  * A RECALL failure, not an advisory one: this is the same class as a stale index or a
  * missing MEMORY twin, and strictly worse in practice. Three states, so a machine that
  * simply lacks a clone is never mistaken for a misconfiguration:
- *   - grant present            → pass
- *   - hub absent on this machine → pass, optional, with a note (nothing to grant yet;
- *                                  `connect` deliberately skips it, so this must not fail
- *                                  a CI runner that never clones the hub)
+ *   - grant present             → pass
+ *   - no hub at the path        → pass, optional, with a note. Covers BOTH a hub absent
+ *                                 on this machine and a `hub_path` that resolves to
+ *                                 something which is not a hub — `connect` grants neither,
+ *                                 so neither must fail a CI runner or nag for a fix that
+ *                                 will never be made.
  *   - hub present, grant missing → FAIL, with `mage connect` as the fix
  *
  * Detect-and-instruct only. ADR-0037 §2 holds doctor to read-only over host config, so
@@ -617,7 +619,10 @@ async function pushReachGrantCheck(checks: DoctorCheck[], opts: DoctorOptions): 
   const absent: string[] = [];
   for (const dir of wanted) {
     if (granted.has(dir)) continue;
-    if (await exists(dir)) missing.push(dir);
+    // Mirror connect's gate exactly (looksLikeHub, NOT exists): `hub_path` is untrusted
+    // git-tracked input, so connect refuses to grant a non-hub. Reporting such a path as
+    // a missing grant would nag for a fix connect will never make.
+    if (await looksLikeHub(dir)) missing.push(dir);
     else absent.push(dir);
   }
 
@@ -636,7 +641,7 @@ async function pushReachGrantCheck(checks: DoctorCheck[], opts: DoctorOptions): 
       name: "KB access grant",
       ok: true,
       optional: true,
-      detail: `hub not present on this machine (${absent.join(", ")}) — nothing to grant yet`,
+      detail: `no mage hub present on this machine (${absent.join(", ")}) — nothing to grant yet`,
     });
     return;
   }

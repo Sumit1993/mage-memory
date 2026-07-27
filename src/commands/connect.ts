@@ -165,13 +165,21 @@ export async function connect(opts: ConnectOptions): Promise<ConnectResult> {
     const codeRepo = await findCodeRepoRoot(opts.cwd ?? process.cwd());
     const meta = codeRepo ? await readMetadata(codeRepo).catch(() => null) : null;
     for (const dir of meta && codeRepo ? outOfRepoKbRoots(meta, codeRepo) : []) {
-      // A hub absent on THIS machine gets no grant — never record ownership of a path
-      // that isn't there. Clone it and re-run connect; `mage doctor` reports it meanwhile.
-      if (await exists(dir)) reach.push(dir);
-      else
-        logger.warn(
-          `Hub not found at ${dir} — skipping its access grant. Clone it there, then re-run \`mage connect\`.`,
-        );
+      // Grant ONLY a real hub root. `hub_path` is untrusted input: `mage/metadata.json`
+      // is git-tracked, so anyone who can land a commit can point it anywhere, and mere
+      // existence would then widen harness access to an arbitrary directory (~/.ssh, /).
+      // looksLikeHub requires `projects/` + a hub `metadata.json`, which every legitimate
+      // grant target has. Doubles as the absent-hub gate (ADR-0042 §7): no grant, and
+      // never an ownership record for a path we did not grant.
+      if (await looksLikeHub(dir)) {
+        reach.push(dir);
+        continue;
+      }
+      logger.warn(
+        (await exists(dir))
+          ? `${dir} is not a mage hub (no projects/ + metadata.json) — skipping its access grant; check hub_path in mage/metadata.json.`
+          : `Hub not found at ${dir} — skipping its access grant. Clone it there, then re-run \`mage connect\`.`,
+      );
     }
     settingsToWrite = reconcileReachGrants(merged, reach);
   }
