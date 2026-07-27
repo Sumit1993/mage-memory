@@ -102,7 +102,7 @@ Two generated artifacts keep agents oriented. `mage index` rebuilds
 `mage/INDEX.md`, the always-loaded map of every note (deterministic and
 idempotent — never hand-edit the output). `mage skills` regenerates one
 auto-loaded skill per wing into `.claude/skills/` and `.agents/skills/` so agents
-discover your knowledge base. Each generated wing skill includes a "Governing decisions" section listing all accepted, non-superseded decision records (ADRs) linked from that wing's notes.
+discover your knowledge base. Each generated wing skill includes a "Governing decisions" section listing all accepted, non-superseded decision records (ADRs) linked from that wing's notes. If the list would breach the recall/footprint ceilings, it is truncated keeping the most recent decisions (use `mage footprint`/`mage doctor` to diagnose breaches).
 
 ```bash
 # Rebuild the always-loaded index after adding or editing notes

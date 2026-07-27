@@ -406,7 +406,8 @@ function renderWingSkill(
   if (checkBreach(content) && governing.length > 0) {
     for (let k = governing.length - 1; k >= 0; k--) {
       const truncatedCount = governing.length - k;
-      const candidate = buildContent(governing.slice(0, k), truncatedCount);
+      // Keep the k MOST RECENT (highest-numbered) decisions; drop the oldest first.
+      const candidate = buildContent(governing.slice(governing.length - k), truncatedCount);
       if (!checkBreach(candidate) || k === 0) {
         content = candidate;
         break;
