@@ -77,6 +77,8 @@ After scaffolding an in-repo knowledge base, `mage init` auto-connects capture â
 mage connect
 ```
 
+(After connecting, mage prints a quick **readiness footer** to confirm your environment is healthy and ready to capture.)
+
 If a pre-commit hook already exists, mage will not overwrite it â€” it tells you to add `mage redact --check --staged` to your own hook. Skip the git hook with `mage connect --no-git-hook`.
 
 ## If setup looks wrong

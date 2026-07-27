@@ -4,12 +4,12 @@ description: |
   Groom mage's own observed scratch (`.mage/learnings/*.jsonl`) into durable notes —
   the judgment tier of the self-grooming loop. Runs the two deterministic engines
   in sequence: `mage distill` (FIRST SIGHT — a striking insight earns a note the
-  first time it is seen) then `mage promote` (RECURRENCE — a pattern that kept
-  coming up across distinct sessions but was never striking enough to capture
-  once). Fires at session boundaries, after a PreCompact, or when the user says
-  "groom", "distill", "promote", "mine the learnings", "what did we learn", or
-  "what keeps coming up". Judges candidates through the shared capture pipeline,
-  routes proven notes to `mage:graduate`. Nudge-invoked, not user-only.
+  first time it is seen) then `mage promote` (GRADUATION — fold note-read usage
+  into proposals for proven notes to become auto-loadable skills).
+  Fires at session boundaries, after a PreCompact, or when the user says
+  "groom", "distill", "promote", "mine the learnings", or "what did we learn".
+  Judges candidates through the shared capture pipeline, routes proven notes to
+  `mage:graduate`. Nudge-invoked, not user-only.
 allowed-tools: Read, Grep, Glob, Write, Edit, Bash
 ---
 

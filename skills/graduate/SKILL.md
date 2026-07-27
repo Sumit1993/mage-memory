@@ -3,10 +3,10 @@ name: graduate
 description: |
   Push a proven procedural note up into its own auto-loadable Procedure skill.
   Fires when the user says "graduate", "make this a skill", or when
-  `mage:groom` surfaces a proven note that recurred across enough sessions.
-  Reads the deterministic recurrence reader (`mage promote --json`) for
+  `mage:groom` surfaces a proven note that saw continued usage (was read across enough distinct chapters).
+  Reads the deterministic graduation reader (`mage promote --json`) for
   `action: "graduate"` proposals, shows the human the backing note plus the
-  recurrence evidence, and on confirm pipes the graduate Proposal JSON to
+  note-read usage evidence, and on confirm pipes the graduate Proposal JSON to
   `mage dream --apply` — the single writer that mints `mage-skill-<slug>`,
   points the note at it, and honors the ceilings. Nudge-invoked, not user-only.
 allowed-tools: Read, Grep, Glob, Bash
@@ -14,21 +14,21 @@ allowed-tools: Read, Grep, Glob, Bash
 
 # mage:graduate — note → Procedure skill
 
-A **proven procedural note** — a playbook or gotcha that recurred across **≥ M
-distinct sessions** — earns its own loadable **Procedure skill**
+A **proven procedural note** — a playbook or gotcha that was read across **≥ M
+distinct chapters** — earns its own loadable **Procedure skill**
 (`mage-skill-<slug>`). The note stays the substrate; the skill is its *pushed
 form* (ADR-0013 §1). A skill is **auto-loaded** into context, so it must be an
 actionable, proven **procedure** — you auto-load a *procedure*, not a *fact*. That
 is why **only playbook/gotcha notes graduate**: principle / reference / interface
 notes carry knowledge, not a method to run, so they stay notes (ADR-0019 §5).
 
-Recurrence — not context-match — gates graduation: a not-yet-graduated note emits
+Note-read usage — not context-match — gates graduation: a not-yet-graduated note emits
 no `skill_load`, so there is no context-match data to gate on. Context-match only
 exists *after* graduation, where it governs **reword / demote** (driven by
 `mage:optimize`). The reverse of graduation — a skill that stops earning its keep
 — is **demote** (skill → note; the skill is archived, the note kept).
 
-This skill is judgment over a deterministic fold: the reader counts recurrence and
+This skill is judgment over a deterministic fold: the reader counts note-reads and
 proposes; you confirm against the actual note; `mage dream --apply` does every
 write through the single applier.
 
@@ -39,7 +39,7 @@ write through the single applier.
    `<hub_path>/projects/<project>/` (external). If none, tell the user to run
    `mage init` first — there is nothing to graduate.
 
-2. **Run the deterministic recurrence reader.**
+2. **Run the deterministic graduation reader.**
    ```bash
    mage promote --json
    ```
@@ -50,17 +50,17 @@ write through the single applier.
      "action": "graduate",
      "target": "notes/<file>.md",            // the backing note's relPath
      "payload": { "note": "…", "wing": "…", "type": "playbook"|"gotcha" },
-     "evidence": "recurred in N sessions"
+     "evidence": "note read in N distinct chapter(s) — a proven playbook, ready to graduate to a skill"
    }
    ```
-   If there are no `graduate` proposals, say so and stop — nothing has recurred
+   If there are no `graduate` proposals, say so and stop — nothing has been read
    enough to graduate yet.
 
-3. **Show the human the backing note + the recurrence evidence.** For each
+3. **Show the human the backing note + the note-read usage evidence.** For each
    `graduate` proposal, read the note at `target` and present:
    - the note's title, `type`, and wing (confirm it really is a playbook/gotcha —
      a non-procedural note is a reader/judgment mismatch; do **not** graduate it);
-   - the recurrence `evidence` (how many distinct sessions corroborated it);
+   - the note-read `evidence` (how many distinct chapters it was read in);
    - what graduation will produce: a `mage-skill-<slug>` SKILL.md written into both
      `.claude/skills/` and `.agents/skills/`, carrying `GEN_MARKER` + a `wing:`
      line + a `Load when…` trigger, with the note re-written to point at it
@@ -73,7 +73,7 @@ write through the single applier.
    exact proposal JSON to `mage dream --apply` on **stdin** (the graduate payload
    is `{}` — the applier reads the note at `target` and derives its wing):
    ```bash
-   printf '%s' '{"action":"graduate","target":"notes/<file>.md","payload":{},"evidence":"recurred in N sessions"}' | mage dream --apply
+   printf '%s' '{"action":"graduate","target":"notes/<file>.md","payload":{},"evidence":"note read in N distinct chapter(s) — a proven playbook, ready to graduate to a skill"}' | mage dream --apply
    ```
    The applier (the single serialized writer):
    - renders the SKILL.md from the note's body and writes it into **both**
@@ -110,7 +110,7 @@ write through the single applier.
       "action": "graduate",
       "target": "notes/svc-api/migration-lock.md",
       "payload": { "note": "notes/svc-api/migration-lock.md", "wing": "svc-api", "type": "gotcha" },
-      "evidence": "recurred in 5 sessions (failure×4, correction×1)"
+      "evidence": "note read in 5 distinct chapter(s) — a proven gotcha, ready to graduate to a skill"
     }
   ],
   "cursors": { "…": 0 },
@@ -121,7 +121,7 @@ write through the single applier.
 Read `notes/svc-api/migration-lock.md` — a `gotcha` titled **Migration lock** that
 documents the "release the advisory lock before re-running the migration"
 procedure, and it has burned five separate sessions. Show the human the note body
-and the `failure×4, correction×1` evidence, confirm it is procedural, and on a yes:
+and the usage evidence, confirm it is procedural, and on a yes:
 
 > The skill **slug is derived from the note's title** (`procedureSkillSlug`), not
 > its filename: a short title like *Migration lock* mints `mage-skill-migration-lock`,
@@ -129,7 +129,7 @@ and the `failure×4, correction×1` evidence, confirm it is procedural, and on a
 > paths to see the actual name.
 
 ```bash
-printf '%s' '{"action":"graduate","target":"notes/svc-api/migration-lock.md","payload":{},"evidence":"recurred in 5 sessions (failure×4, correction×1)"}' | mage dream --apply
+printf '%s' '{"action":"graduate","target":"notes/svc-api/migration-lock.md","payload":{},"evidence":"note read in 5 distinct chapter(s) — a proven gotcha, ready to graduate to a skill"}' | mage dream --apply
 ```
 
 The applier writes `mage-skill-migration-lock/SKILL.md` into both
@@ -148,8 +148,8 @@ stay a note.
 
 ## Quality bar
 
-- Only **proven** procedures graduate — a playbook/gotcha that recurred ≥ M
-  distinct sessions, confirmed against the actual note body before applying.
+- Only **proven** procedures graduate — a playbook/gotcha that was read in ≥ M
+  distinct chapters, confirmed against the actual note body before applying.
 - The **note persists** — graduation pushes a copy up into a skill and points the
   note at it; it never deletes or replaces the note.
 - Every write goes through `mage dream --apply` (the single writer); the skill
@@ -170,4 +170,7 @@ stay a note.
   a skill is a graduated note; the note is the substrate, the skill its pushed
   form; dream is the single applier.
 - **ADR-0019** (`mage/decisions/0019-mage-promote-self-grooming.md`) §5 — only
-  procedural notes graduate; recurrence (not context-match) gates graduation.
+  procedural notes graduate.
+- **ADR-0038** (`mage/decisions/0038-promote-note-rung-deleted-graduate-on-usage.md`) —
+  note-read usage across distinct chapters (not recurrence, not context-match)
+  gates graduation.

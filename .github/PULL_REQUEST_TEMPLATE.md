@@ -21,7 +21,11 @@ pull request with green CI. Keep PRs focused and small where you can.
 - [ ] Tests added or updated for the change
 - [ ] No secrets, tokens, or private content committed (see redaction gates)
 - [ ] Commits follow Conventional Commits (`feat:`, `fix:`, `docs:`, ...)
-- [ ] Docs / README / mage notes updated if behavior changed
+
+## Docs
+
+- [ ] every changed operator/agent-facing surface has its doc updated — list them (e.g. commands.mdx, loop/ pages, CONVENTIONS.md, README, SKILL.md descriptions, package.json description)
+- [ ] no doc surface affected — explain why
 
 ## Related issues
 

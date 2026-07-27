@@ -1,22 +1,48 @@
+# Dependabot config. npm (root pnpm-lock.yaml) + github-actions, weekly.
+# Grouping mirrors the auto-merge policy: low-risk minor/patch bumps are grouped
+# so they can be merged in bulk, while majors open as individual PRs for review.
 version: 2
 updates:
   - package-ecosystem: npm
     directory: "/"
     schedule:
       interval: weekly
+    # This repo pins pnpm 11 (see packageManager), which verifies the lockfile
+    # against a supply-chain minimum-release-age policy. A bump proposed the
+    # moment a version lands cannot install
+    # (ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION) and the PR sits red until the
+    # package ages out -- this is what put #84/#85/#88 red simultaneously.
+    # Dependabot already applies a 3-day cooldown by default; 7 gives margin.
+    # Cooldown covers VERSION updates only -- security updates are never delayed.
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 5
     commit-message:
       prefix: chore
       include: scope
     groups:
-      dev-dependencies:
+      dev-minor-patch:
         dependency-type: development
-      production-dependencies:
+        update-types:
+          - minor
+          - patch
+      prod-minor-patch:
         dependency-type: production
+        update-types:
+          - minor
+          - patch
 
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
       interval: weekly
+    open-pull-requests-limit: 5
     commit-message:
       prefix: ci
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch

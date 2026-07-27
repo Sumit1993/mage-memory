@@ -108,7 +108,7 @@ Never put a real key or token in a note, an example, or the `redact` allowlist �
 
 The engine ships deterministic detectors for the common credential shapes, including: private-key blocks, URL credentials (`scheme://user:password@host`), AWS access/secret keys, GitHub and GitLab tokens, Anthropic and OpenAI keys, Slack, Stripe, Google, and npm tokens, JWTs, `Authorization: Bearer` headers, generic `key=value` / `"key": "value"` assignments, `SCREAMING_SNAKE` env secrets, and standalone high-entropy blobs. Email addresses are detected as advisory PII (warn, never block).
 
-It is intentionally conservative to limit false positives — for example, `${ENV}` interpolation placeholders and already-redacted markers are recognized and left alone, and common hash digests are not mistaken for secrets. The detector table is single-sourced in `src/redact.ts`; treat that file as the authority on exactly which patterns fire.
+It is intentionally conservative to limit false positives — for example, `${ENV}` interpolation placeholders, `<...>` documentation placeholders (like `<your-token>`), and already-redacted markers are recognized and left alone, and common hash digests are not mistaken for secrets. The detector table is single-sourced in `src/redact.ts`; treat that file as the authority on exactly which patterns fire.
 
 ## Where to next
 
