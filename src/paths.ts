@@ -1,6 +1,8 @@
 import { access, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
+import { type Genre, resolveGenreOverrides } from "./scanner/genre-map.js";
+
 // ─── path constants ──────────────────────────────────────────────────────
 /** The knowledge-base (KB) dir nested in a code repo (in-repo and hybrid modes). */
 export const META_DIR = "mage";
@@ -130,6 +132,8 @@ export interface MageMetadata {
   grooming?: GroomingConfig;
   /** Gate-2 false-positive allowlist (ADR-0025); absent ⇒ no allowances. */
   redact?: RedactConfig;
+  /** Custom type-to-genre overrides (ADR-0041 §3). */
+  genres?: Record<string, string>;
 }
 
 /**
@@ -157,6 +161,8 @@ export interface HubMetadata {
   grooming?: GroomingConfig;
   /** Gate-2 false-positive allowlist (ADR-0025); absent ⇒ no allowances. */
   redact?: RedactConfig;
+  /** Custom type-to-genre overrides (ADR-0041 §3). */
+  genres?: Record<string, string>;
 }
 
 export interface HubProject {
@@ -544,5 +550,21 @@ export async function exists(path: string): Promise<boolean> {
     return true;
   } catch {
     return false;
+  }
+}
+
+/** Read genre overrides from metadata.json (ADR-0041 §3). */
+export async function readGenreOverrides(
+  resolved: ResolvedDocsRoot,
+  logWarn = false,
+): Promise<Record<string, Genre>> {
+  try {
+    const meta =
+      resolved.kind === "hub"
+        ? await readHubMetadata(resolved.repo)
+        : await readMetadata(resolved.repo);
+    return resolveGenreOverrides(meta?.genres, logWarn);
+  } catch {
+    return {};
   }
 }
