@@ -3,7 +3,7 @@ type: plan
 tags: [mage/grooming, mage/0.0.11]
 created: "2026-06-14"
 last_reviewed: "2026-06-14"
-status: active
+status: completed
 provenance:
   repo: mage-memory
   work: 0.0.11-signal-and-capture
@@ -155,7 +155,7 @@ transcript on a real autonomous run.
 ## Relations
 
 - informs [plan-release-sequence](plan-release-sequence.md) — inserts 0.0.11 before the 0.1.0 beta announcement
-- relates_to [plan-v0.1-locks](plan-v0.1-locks.md)
+- relates_to [plan-v0.1-locks](../notes/plan-v0.1-locks.md)
 - depends_on [ADR-0013](../decisions/0013-procedure-skills-self-grooming-loop.md) — the scratch→note→skill ladder + thresholds
 - depends_on [ADR-0015](../decisions/0015-mage-observe-capture-schema.md) — the compact terminator + capture schema (where a SubagentStop event slots in)
 - depends_on [ADR-0016](../decisions/0016-context-match-confidence-ladder-applier.md) — signatures as the load-bearing predicate

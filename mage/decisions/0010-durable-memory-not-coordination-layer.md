@@ -32,4 +32,4 @@ agentmemory ships multi-agent **coordination** primitives — exclusive action l
 - depends_on [ADR-0001 — memory-first product](0001-memory-first-product-supersedes-specshub.md)
 - see_also [ADR-0009 — no runtime; automation rides host hooks](0009-no-runtime-automation-rides-host-hooks.md)
 - see_also [agentmemory mining map](../notes/agentmemory-mining-map.md)
-- informs [mage roadmap](../notes/roadmap.md)
+- informs [mage roadmap](../work/roadmap.md)

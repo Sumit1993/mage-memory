@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { homedir, platform } from "node:os";
 import { join } from "node:path";
 import { buildReport, renderReport } from "../doctor/report.js";
+import { evaluateGenreTells, renderGenreTells } from "../doctor/genre-tells.js";
 import { pushKbChecks } from "../doctor/kb-checks.js";
 import { pushLinkChecks } from "../doctor/link-checks.js";
 import { hasGh, hasGit } from "../git.js";
@@ -50,7 +51,7 @@ const READINESS_CHECKS = new Set([
 /**
  * Diagnostic checks. Reports environment, tool availability, network reach, and —
  * when run inside a mage KB — KB structure, capture-sink gitignore coverage (THE
- * leak guard), and connection/hook-drift health (ADR-0021; setup-integrity gotcha).
+ * leak guard), connection/hook-drift health, and genre tells (ADR-0021; ADR-0041).
  *
  * Notes:
  *  - No symlinks anywhere → platform check just reports OS; junctions/symlinks irrelevant
@@ -63,7 +64,8 @@ export async function doctor(opts: DoctorOptions = {}): Promise<DoctorResult> {
 
   await pushEnvChecks(checks, opts);
   const kb = await resolveDocsRoot(opts.cwd ?? process.cwd());
-  await pushKbChecks(checks, kb, opts);
+  const genreTellsReport = kb ? await evaluateGenreTells(kb) : null;
+  await pushKbChecks(checks, kb, opts, genreTellsReport);
   // Link integrity (two-way code-repo<->hub references; `--fix` heals a stale
   // back-reference after a move). Only meaningful inside a KB.
   if (kb) await pushLinkChecks(checks, opts);
@@ -82,6 +84,9 @@ export async function doctor(opts: DoctorOptions = {}): Promise<DoctorResult> {
 
   if (!opts.quiet) {
     renderChecks(checks, passed);
+    if (genreTellsReport) {
+      renderGenreTells(genreTellsReport);
+    }
     const me = await which("mage");
     if (me) logger.detail("(mage itself is on PATH)");
   }

@@ -67,4 +67,4 @@ By 0.0.10 the SDD skills had become dead weight and an active drag on coherence:
 ## Relations
 
 - completes [ADR-0001](0001-memory-first-product-supersedes-specshub.md) / [ADR-0002](0002-fork-and-reorient-specshub.md) (the deferred prune)
-- part_of [0.0.10 coherence plan](../notes/plan-0.0.10-coherence.md) (Decision 10)
+- part_of [0.0.10 coherence plan](../work/plan-0.0.10-coherence.md) (Decision 10)

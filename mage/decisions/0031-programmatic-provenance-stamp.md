@@ -24,7 +24,7 @@ sources:
 > (the reject-ledger reconciler) is **sketched here, not built**. Extends
 > [ADR-0030](0030-agent-autonomy-ladder.md) by making its crown signal — the keep-vs-`git
 > revert` ratio on autonomously-written notes — *measurable*, and is the first increment of
-> the central frontmatter-builder that [FT-12](../notes/future-thoughts.md) names.
+> the central frontmatter-builder that [FT-12](../work/future-thoughts.md) names.
 
 ## Context
 
@@ -46,7 +46,7 @@ notes and ADRs. So the staleness heuristic (`mage dream`/dashboard read `provena
 was blind to every auto-written note. Stamping provenance programmatically both fixes that
 dormant gap and gives the reject-ledger its attribution.
 
-This realizes the distinction grilled into [FT-12](../notes/future-thoughts.md): the
+This realizes the distinction grilled into [FT-12](../work/future-thoughts.md): the
 **automated** write path has a code chokepoint, so conventions belong in code (this ADR); the
 **manual** hand-authoring path has no chokepoint, so a skill is its only lever (FT-12, separate).
 
@@ -126,7 +126,7 @@ This realizes the distinction grilled into [FT-12](../notes/future-thoughts.md):
 
 - **extends** [ADR-0030](0030-agent-autonomy-ladder.md) — makes its crown signal measurable; the
   stamp is the authorship mark the reject-ledger reads.
-- **realizes** [FT-12](../notes/future-thoughts.md) — the automated-path twin of the central
+- **realizes** [FT-12](../work/future-thoughts.md) — the automated-path twin of the central
   frontmatter-builder; v1 is its first increment.
 - **rides** [ADR-0009](0009-no-runtime-automation-rides-host-hooks.md) (no model — reads a config
   field + git), [ADR-0013](0013-procedure-skills-self-grooming-loop.md) (the commit is the

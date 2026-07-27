@@ -238,6 +238,6 @@ function toScanned(fm: NoteFrontmatter, body: string, abs: string, relPath: stri
   };
 }
 
-function toPosix(p: string): string {
+export function toPosix(p: string): string {
   return p.split(sep).join("/");
 }

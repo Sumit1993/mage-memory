@@ -15,9 +15,9 @@ keywords: [plan, milestones, fork, vault, note-model, index, skills, v0.1, build
 
 # mage v0.1 — detailed implementation plan
 
-_v0.1 shipped at commit `1ec8225` — all eight milestones (A–H) are done. This plan is kept as the historical build record; the naming authority is [plan-v0.1-locks](plan-v0.1-locks.md)._
+_v0.1 shipped at commit `1ec8225` — all eight milestones (A–H) are done. This plan is kept as the historical build record; the naming authority is [plan-v0.1-locks](../notes/plan-v0.1-locks.md)._
 
-> Scope: [roadmap](roadmap.md) (v0.1). Decisions: [ADR-0001](../decisions/0001-memory-first-product-supersedes-specshub.md)–[0006](../decisions/0006-two-layer-recall-per-wing-skills.md). Language: [context & glossary](context.md). Forks specshub (`https://github.com/Sumit1993/specshub`) per [ADR-0002](../decisions/0002-fork-and-reorient-specshub.md).
+> Scope: [roadmap](roadmap.md) (v0.1). Decisions: [ADR-0001](../decisions/0001-memory-first-product-supersedes-specshub.md)–[0006](../decisions/0006-two-layer-recall-per-wing-skills.md). Language: [context & glossary](../notes/context.md). Forks specshub (`https://github.com/Sumit1993/specshub`) per [ADR-0002](../decisions/0002-fork-and-reorient-specshub.md).
 > Source facts confirmed against specshub: `src/{paths,init,gitignore,git,shell,logger,index}.ts`, `src/commands/{verify,doctor,list,status,link,unlink}.ts`, `plugin/`.
 
 ## 0. Principles & what carries unchanged
@@ -150,5 +150,5 @@ Full `/dream` sweep (only cheap read-time staleness + on-write overlap ship) · 
 
 ## Relations
 - implements [mage roadmap](roadmap.md)
-- governed_by [mage v0.1 locks (naming authority)](plan-v0.1-locks.md)
+- governed_by [mage v0.1 locks (naming authority)](../notes/plan-v0.1-locks.md)
 - forks_per [ADR-0002 — fork and reorient specshub](../decisions/0002-fork-and-reorient-specshub.md)

@@ -93,7 +93,7 @@ allowed to block a release it was never gating.
 ### 4. Existing references to "0.1.0 the milestone" are historical.
 
 [ADR-0020](0020-no-server-tiered-dashboards.md), [ADR-0026](0026-hosted-docs-website.md),
-[plan-release-sequence](../notes/plan-release-sequence.md) and other notes mention 0.1.0 as an
+[plan-release-sequence](../work/plan-release-sequence.md) and other notes mention 0.1.0 as an
 announcement or credibility push. Those were written when the version and the milestone were the
 same thing. They are **not** rewritten — they are point-in-time records, and this ADR is the
 current rule. A reader hitting "0.1.0" in an older document should read it as *"the

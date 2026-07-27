@@ -109,7 +109,8 @@ const THRESHOLD_MEANING: Record<keyof typeof BASE_THRESHOLDS, { symbol: string; 
   noteSizeCap: {
     symbol: "",
     dialScaled: false,
-    meaning: "Authored-note body char cap; past it `mage groom` proposes a split. A quality floor — the dial never moves it.",
+    meaning:
+      "Authored-note body byte cap; notes exceeding it are annotated by `mage doctor` (info level; read-only, nothing blocks). A quality floor — the dial never moves it.",
   },
   rewordRate: {
     symbol: "",

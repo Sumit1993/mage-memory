@@ -88,7 +88,7 @@ storage). This ADR sets mage's redaction model.
   they must pass before they can be committed.
 - Slightly more friction at promotion (a blocked secret stops the flow) — intended.
 - Lands across two releases: **Gate 1** in the `mage observe` release, **Gate 2** in
-  the distill/graduate release (see the [release sequence](../notes/plan-release-sequence.md)).
+  the distill/graduate release (see the [release sequence](../work/plan-release-sequence.md)).
 
 ## Relations
 
@@ -96,4 +96,4 @@ storage). This ADR sets mage's redaction model.
 - realizes [ADR-0004 — capture insight, not copies](0004-capture-insight-not-copies.md)
 - rides [ADR-0009 — no runtime; automation rides host hooks](0009-no-runtime-automation-rides-host-hooks.md)
 - mines ECC `continuous-learning-v2` (`observe.sh` capture-time scrub)
-- informs [mage roadmap](../notes/roadmap.md)
+- informs [mage roadmap](../work/roadmap.md)
