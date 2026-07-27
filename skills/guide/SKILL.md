@@ -96,7 +96,7 @@ See `CONVENTIONS.md` for the full spec. Essentials:
 - **Tags:** `#<wing>/<room>` — wing = project/repo/service/person, room = topic.
 - **Relations:** a `## Relations` section with typed links
   (`- depends_on [x](x.md)`).
-- **Genre & recall rungs (ADR-0041):** Note `type` maps to a genre that determines its recall rung — see `mage/decisions/0041-genre-decides-the-recall-rung.md`. Memory-genre notes (`gotcha`, `procedure`, `pointer`, `principle`, `feedback`, `reference`, `note`) will form the recall-bearing set loaded in `INDEX.md` once the scanner genre filter ships (not yet implemented; today's index carries every genre). Non-memory genres (`decision`, `plan`, `tasks`, `spec`) are legal for storage and linking but will be excluded from always-loaded recall — `mage/work/` is the home for plans/specs/task lists, while `mage/decisions/` holds decision records.
+- **Genre & recall rungs (ADR-0041):** Note `type` maps to a genre that determines its recall rung — see `mage/decisions/0041-genre-decides-the-recall-rung.md`. Memory-genre notes (`gotcha`, `procedure`, `pointer`, `principle`, `feedback`, `reference`, `note`) form the recall-bearing set loaded in `INDEX.md` (ADR-0041). Non-memory genres (`decision`, `plan`, `tasks`, `spec`) are legal for storage and linking but are excluded from always-loaded recall — `mage/work/` is the home for plans/specs/task lists, while `mage/decisions/` holds decision records.
 
 After editing notes, run `mage index` (refresh INDEX) and, if a new wing
 appeared, `mage skills` (refresh per-wing skills). Both are deterministic.

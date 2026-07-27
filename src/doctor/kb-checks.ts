@@ -30,10 +30,12 @@ import {
   learningsPath,
   looksLikeHub,
   ownedDocsRoots,
+  readGenreOverrides,
   readHubMetadata,
   readMetadata,
   type resolveDocsRoot,
 } from "../paths.js";
+import { genreOf } from "../scanner/genre-map.js";
 import { run } from "../shell.js";
 import { scanNotes } from "../scan.js";
 import { index } from "../commands/index-cmd.js";
@@ -227,11 +229,16 @@ function pushKbStructureChecks(checks: DoctorCheck[], kb: Kb, hasIndex: boolean)
 
 /**
  * Recall readiness: the generated index must reflect the notes on disk. Compares the
- * canonical on-disk count (scanNotes) to the count INDEX.md advertises in its header
+ * on-disk MEMORY-GENRE count to the count INDEX.md advertises in its header
  * (`> N notes …`) — a mismatch means the agent reads a stale map of the KB (the soak's
  * 9-line index for 62 notes). Advisory (a just-added, not-yet-indexed note is a common,
  * benign miss) but loud. `--fix` regenerates. Skipped when INDEX.md is absent — the
  * structure check already nags that. Fail-open: any read error → no check pushed.
+ *
+ * The count MUST be computed exactly the way `mage index` renders the header: memory
+ * genre only, honoring `metadata.json` `genres` overrides (ADR-0041 §2–§4). Counting
+ * every genre here made the check permanently false-STALE on any KB holding a decision,
+ * plan, or spec — `--fix` regenerated the same filtered header and never converged.
  */
 async function pushIndexFreshnessCheck(
   checks: DoctorCheck[],
@@ -247,7 +254,10 @@ async function pushIndexFreshnessCheck(
   let onDisk: number;
   let advertised: number | null;
   try {
-    onDisk = (await scanNotes(indexRoot)).length;
+    const overrides = await readGenreOverrides(kb);
+    onDisk = (await scanNotes(indexRoot)).filter(
+      (n) => genreOf(n.type, overrides) === "memory",
+    ).length;
     advertised = parseIndexCount(await readFile(indexPath, "utf8"));
   } catch {
     return; // fail-open — doctor never throws

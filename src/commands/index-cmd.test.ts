@@ -2,11 +2,11 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { tmpDir } from "../../test/fixtures/kb.js";
+import { AUTO_MEMORY_MAX_BYTES } from "../adapters/claude-code/constants.js";
+import { BREACH_RATIO } from "../metrics/footprint.js";
 import type { HubProject } from "../paths.js";
 import { index, SCAFFOLDING_WORDS } from "./index-cmd.js";
 import { init } from "./init.js";
-import { BREACH_RATIO } from "../metrics/footprint.js";
-import { AUTO_MEMORY_MAX_BYTES } from "../adapters/claude-code/constants.js";
 
 async function vault(): Promise<string> {
   const dir = await tmpDir("mage-idx-");
@@ -25,19 +25,33 @@ async function note(dir: string, rel: string, content: string): Promise<void> {
 // so a fixture can exercise the normalization path (the `schema: "mage.v1"` file
 // written below is exactly where the legacy value is valid). withKb refuses the
 // legacy `in-repo` storage alias, so this foreign-schema writer stays local.
-type RawHubProject = Omit<HubProject, "storage"> & { storage: HubProject["storage"] | "in-repo" };
+type RawHubProject = Omit<HubProject, "storage"> & {
+  storage: HubProject["storage"] | "in-repo";
+};
 
 /** A hub root (kind=hub): projects/ dir + a top-level metadata.json registry. */
 async function hub(projects: RawHubProject[] = []): Promise<string> {
   const dir = await tmpDir("mage-hub-");
   await mkdir(join(dir, "projects"), { recursive: true });
-  const meta = { schema: "mage.v1", name: "myhub", created_at: "2026-06-03", projects };
-  await writeFile(join(dir, "metadata.json"), `${JSON.stringify(meta, null, 2)}\n`);
+  const meta = {
+    schema: "mage.v1",
+    name: "myhub",
+    created_at: "2026-06-03",
+    projects,
+  };
+  await writeFile(
+    join(dir, "metadata.json"),
+    `${JSON.stringify(meta, null, 2)}\n`,
+  );
   return dir;
 }
 
 /** Write a note at an arbitrary path under a docs root (hub-relative). */
-async function put(root: string, relUnderRoot: string, content: string): Promise<void> {
+async function put(
+  root: string,
+  relUnderRoot: string,
+  content: string,
+): Promise<void> {
   const p = join(root, relUnderRoot);
   await mkdir(join(p, ".."), { recursive: true });
   await writeFile(p, content);
@@ -47,8 +61,12 @@ const readIndex = (root: string) => readFile(join(root, "INDEX.md"), "utf8");
 describe("mage index", () => {
   it("produces a flat index grouped by wing, with a cross-cutting section", async () => {
     const dir = await vault();
-    await note(dir, "billing/pay.md", "---\ntype: interface\ntags: [billing/payments]\n---\n# Pay\n");
-    await note(dir, "overview.md", "---\ntype: topology\n---\n# Overview\n");
+    await note(
+      dir,
+      "billing/pay.md",
+      "---\ntype: procedure\ntags: [billing/payments]\n---\n# Pay\n",
+    );
+    await note(dir, "overview.md", "---\ntype: note\n---\n# Overview\n");
     const r = await index({ dir });
     expect(r.hierarchical).toBe(false);
     expect(r.wings).toEqual(["billing"]);
@@ -61,7 +79,7 @@ describe("mage index", () => {
 
   it("is idempotent (re-run = byte-identical)", async () => {
     const dir = await vault();
-    await note(dir, "a.md", "---\ntags: [x/y]\n---\n# A\n");
+    await note(dir, "a.md", "---\ntype: note\ntags: [x/y]\n---\n# A\n");
     await index({ dir });
     const first = await readFile(join(dir, "mage", "INDEX.md"), "utf8");
     await index({ dir });
@@ -73,7 +91,11 @@ describe("mage index", () => {
 
   it("emits a MEMORY.md twin alongside INDEX.md (flat single-wing KB)", async () => {
     const dir = await vault();
-    await note(dir, "billing/pay.md", "---\ntype: interface\ntags: [billing/payments]\n---\n# Pay\n");
+    await note(
+      dir,
+      "billing/pay.md",
+      "---\ntype: procedure\ntags: [billing/payments]\n---\n# Pay\n",
+    );
     const r = await index({ dir });
     expect(r.written).toContain("MEMORY.md");
     const mem = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
@@ -84,7 +106,12 @@ describe("mage index", () => {
 
   it("folds the per-note list INTO MEMORY.md for a single-wing hierarchical KB", async () => {
     const dir = await vault();
-    for (let i = 0; i < 21; i++) await note(dir, `n${i}.md`, `---\ntags: [one/r]\n---\n# n${i}\n`);
+    for (let i = 0; i < 21; i++)
+      await note(
+        dir,
+        `n${i}.md`,
+        `---\ntype: note\ntags: [one/r]\n---\n# n${i}\n`,
+      );
     const r = await index({ dir });
     expect(r.hierarchical).toBe(true);
     expect(r.wings).toEqual(["one"]);
@@ -101,7 +128,11 @@ describe("mage index", () => {
   it("keeps MEMORY.md a bounded wings-map twin for a multi-wing hierarchical KB", async () => {
     const dir = await vault();
     for (const w of ["a", "b", "c", "d", "e"]) {
-      await note(dir, `${w}.md`, `---\ntags: [${w}/r]\n---\n# ${w}\n`);
+      await note(
+        dir,
+        `${w}.md`,
+        `---\ntype: note\ntags: [${w}/r]\n---\n# ${w}\n`,
+      );
     }
     const r = await index({ dir });
     expect(r.hierarchical).toBe(true);
@@ -114,7 +145,7 @@ describe("mage index", () => {
 
   it("MEMORY.md is idempotent (re-run = byte-identical)", async () => {
     const dir = await vault();
-    await note(dir, "a.md", "---\ntags: [x/y]\n---\n# A\n");
+    await note(dir, "a.md", "---\ntype: note\ntags: [x/y]\n---\n# A\n");
     await index({ dir });
     const first = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
     await index({ dir });
@@ -124,7 +155,11 @@ describe("mage index", () => {
   it("goes hierarchical past the wing threshold and writes per-wing files", async () => {
     const dir = await vault();
     for (const w of ["a", "b", "c", "d", "e"]) {
-      await note(dir, `${w}.md`, `---\ntags: [${w}/r]\n---\n# ${w}\n`);
+      await note(
+        dir,
+        `${w}.md`,
+        `---\ntype: note\ntags: [${w}/r]\n---\n# ${w}\n`,
+      );
     }
     const r = await index({ dir });
     expect(r.hierarchical).toBe(true);
@@ -132,7 +167,9 @@ describe("mage index", () => {
     const root = await readFile(join(dir, "mage", "INDEX.md"), "utf8");
     expect(root).toContain("## Wings");
     expect(root).toContain("[_index.a.md](_index.a.md)");
-    expect(await readFile(join(dir, "mage", "_index.a.md"), "utf8")).toContain("# a");
+    expect(await readFile(join(dir, "mage", "_index.a.md"), "utf8")).toContain(
+      "# a",
+    );
   });
 
   it("keeps the heading hierarchy contiguous in BOTH index shapes (no MD001 skip)", async () => {
@@ -142,7 +179,11 @@ describe("mage index", () => {
     // file is GENERATED, the only place to fix it is the renderer.
     const dir = await vault();
     for (const w of ["a", "b", "c", "d", "e"]) {
-      await note(dir, `${w}.md`, `---\ntags: [${w}/r]\n---\n# ${w}\n`);
+      await note(
+        dir,
+        `${w}.md`,
+        `---\ntype: note\ntags: [${w}/r]\n---\n# ${w}\n`,
+      );
     }
     await index({ dir });
 
@@ -158,13 +199,20 @@ describe("mage index", () => {
   it("cleans up stale per-wing index files when dropping back to flat", async () => {
     const dir = await vault();
     for (const w of ["a", "b", "c", "d", "e"]) {
-      await note(dir, `${w}.md`, `---\ntags: [${w}/r]\n---\n# ${w}\n`);
+      await note(
+        dir,
+        `${w}.md`,
+        `---\ntype: note\ntags: [${w}/r]\n---\n# ${w}\n`,
+      );
     }
     await index({ dir });
-    for (const w of ["b", "c", "d", "e"]) await rm(join(dir, "mage", "notes", `${w}.md`));
+    for (const w of ["b", "c", "d", "e"])
+      await rm(join(dir, "mage", "notes", `${w}.md`));
     const r = await index({ dir });
     expect(r.hierarchical).toBe(false);
-    await expect(readFile(join(dir, "mage", "_index.b.md"), "utf8")).rejects.toThrow();
+    await expect(
+      readFile(join(dir, "mage", "_index.b.md"), "utf8"),
+    ).rejects.toThrow();
   });
 
   it("throws when there is no knowledge base", async () => {
@@ -175,12 +223,22 @@ describe("mage index", () => {
   it("stays flat at exactly the thresholds and flips just past them", async () => {
     const wingVault = async (wings: string[]) => {
       const d = await vault();
-      for (const w of wings) await note(d, `${w}.md`, `---\ntags: [${w}/r]\n---\n# ${w}\n`);
+      for (const w of wings)
+        await note(
+          d,
+          `${w}.md`,
+          `---\ntype: note\ntags: [${w}/r]\n---\n# ${w}\n`,
+        );
       return (await index({ dir: d })).hierarchical;
     };
     const noteVault = async (n: number) => {
       const d = await vault();
-      for (let i = 0; i < n; i++) await note(d, `n${i}.md`, `---\ntags: [one/r]\n---\n# n${i}\n`);
+      for (let i = 0; i < n; i++)
+        await note(
+          d,
+          `n${i}.md`,
+          `---\ntype: note\ntags: [one/r]\n---\n# n${i}\n`,
+        );
       return (await index({ dir: d })).hierarchical;
     };
     expect(await wingVault(["a", "b", "c", "d"])).toBe(false); // exactly 4 wings → flat
@@ -191,7 +249,11 @@ describe("mage index", () => {
 
   it("percent-encodes special characters in note link destinations", async () => {
     const dir = await vault();
-    await note(dir, "weird (v2) #1.md", "---\ntags: [x/y]\n---\n# Weird\n");
+    await note(
+      dir,
+      "weird (v2) #1.md",
+      "---\ntype: note\ntags: [x/y]\n---\n# Weird\n",
+    );
     await index({ dir });
     const idx = await readFile(join(dir, "mage", "INDEX.md"), "utf8");
     expect(idx).toContain("(notes/weird%20%28v2%29%20%231.md)");
@@ -203,8 +265,16 @@ describe("mage index", () => {
     // `_index.<wing>.md` live — so the `_index.*.md` namespace is reserved for
     // mage's own output and never indexed as a user note.
     const dir = await vault();
-    await note(dir, "_index.architecture.md", "---\ntags: [sys/arch]\n---\n# Architecture\n");
-    await note(dir, "real.md", "---\ntags: [sys/arch]\n---\n# Real\n");
+    await note(
+      dir,
+      "_index.architecture.md",
+      "---\ntype: note\ntags: [sys/arch]\n---\n# Architecture\n",
+    );
+    await note(
+      dir,
+      "real.md",
+      "---\ntype: note\ntags: [sys/arch]\n---\n# Real\n",
+    );
     const r = await index({ dir });
     expect(r.noteCount).toBe(1); // only real.md; the _index.* file is reserved
     const idx = await readFile(join(dir, "mage", "INDEX.md"), "utf8");
@@ -214,7 +284,11 @@ describe("mage index", () => {
 
   it("reclassifies an unsafe wing tag to cross-cutting (no traversal filename)", async () => {
     const dir = await vault();
-    await note(dir, "evil.md", "---\ntags: [../escape/x]\n---\n# Evil\n");
+    await note(
+      dir,
+      "evil.md",
+      "---\ntype: note\ntags: [../escape/x]\n---\n# Evil\n",
+    );
     const r = await index({ dir });
     expect(r.wings).toEqual([]); // ".." wing rejected
     expect(r.noteCount).toBe(1); // still indexed, as cross-cutting
@@ -222,7 +296,11 @@ describe("mage index", () => {
 
   it("cross-lists a multi-homed note under every tagged wing (per-wing room)", async () => {
     const dir = await vault();
-    await note(dir, "rel.md", "---\ntype: relationship\ntags: [a/x, b/y]\n---\n# My Rel\n");
+    await note(
+      dir,
+      "rel.md",
+      "---\ntype: pointer\ntags: [a/x, b/y]\n---\n# My Rel\n",
+    );
     const r = await index({ dir });
     expect(r.wings).toEqual(["a", "b"]);
     expect(r.noteCount).toBe(1); // counted once, listed twice
@@ -239,10 +317,23 @@ describe("mage index", () => {
 describe("mage index — hub projects + registry (ADR-0011/0012)", () => {
   it("indexes hub-owned project notes and excludes their archive/", async () => {
     const root = await hub([
-      { name: "engine", storage: "hub-owned", code_repo_path: "/code/engine", code_repo_url: "git@github.com:me/engine.git" },
+      {
+        name: "engine",
+        storage: "hub-owned",
+        code_repo_path: "/code/engine",
+        code_repo_url: "git@github.com:me/engine.git",
+      },
     ]);
-    await put(root, "projects/engine/notes/api.md", "---\ntags: [engine/api]\n---\n# Engine API\n");
-    await put(root, "projects/engine/archive/old.md", "---\ntags: [engine/api]\n---\n# Old\n");
+    await put(
+      root,
+      "projects/engine/notes/api.md",
+      "---\ntype: note\ntags: [engine/api]\n---\n# Engine API\n",
+    );
+    await put(
+      root,
+      "projects/engine/archive/old.md",
+      "---\ntype: note\ntags: [engine/api]\n---\n# Old\n",
+    );
     const r = await index({ dir: root });
     expect(r.wings).toContain("engine");
     expect(r.noteCount).toBe(1); // archived note excluded
@@ -253,9 +344,18 @@ describe("mage index — hub projects + registry (ADR-0011/0012)", () => {
 
   it("decorates a wing that matches a registered project with its code-repo pointer", async () => {
     const root = await hub([
-      { name: "engine", storage: "hub-owned", code_repo_path: "/code/engine", code_repo_url: "git@github.com:me/engine.git" },
+      {
+        name: "engine",
+        storage: "hub-owned",
+        code_repo_path: "/code/engine",
+        code_repo_url: "git@github.com:me/engine.git",
+      },
     ]);
-    await put(root, "projects/engine/notes/api.md", "---\ntags: [engine/api]\n---\n# Engine API\n");
+    await put(
+      root,
+      "projects/engine/notes/api.md",
+      "---\ntype: note\ntags: [engine/api]\n---\n# Engine API\n",
+    );
     const idx = await (async () => {
       await index({ dir: root });
       return readIndex(root);
@@ -265,7 +365,11 @@ describe("mage index — hub projects + registry (ADR-0011/0012)", () => {
 
   it("does not decorate when there is no registry (registry-enriched, never -dependent)", async () => {
     const dir = await vault(); // in-repo: no hub metadata
-    await note(dir, "api.md", "---\ntags: [engine/api]\n---\n# Engine API\n");
+    await note(
+      dir,
+      "api.md",
+      "---\ntype: note\ntags: [engine/api]\n---\n# Engine API\n",
+    );
     const r = await index({ dir });
     expect(r.wings).toEqual(["engine"]);
     const idx = await readFile(join(dir, "mage", "INDEX.md"), "utf8");
@@ -274,7 +378,12 @@ describe("mage index — hub projects + registry (ADR-0011/0012)", () => {
 
   it("renders an in-repo member as a visible pointer, even with zero hub-owned notes", async () => {
     const root = await hub([
-      { name: "web", storage: "in-repo", code_repo_path: "/code/web", code_repo_url: "git@github.com:me/web.git" },
+      {
+        name: "web",
+        storage: "in-repo",
+        code_repo_path: "/code/web",
+        code_repo_url: "git@github.com:me/web.git",
+      },
     ]);
     const r = await index({ dir: root });
     expect(r.noteCount).toBe(0);
@@ -287,7 +396,11 @@ describe("mage index — hub projects + registry (ADR-0011/0012)", () => {
   it("is idempotent on a hub (re-run byte-identical; no self-ingestion)", async () => {
     const root = await hub([]);
     for (const w of ["a", "b", "c", "d", "e"]) {
-      await put(root, `projects/p/notes/${w}.md`, `---\ntags: [${w}/r]\n---\n# ${w}\n`);
+      await put(
+        root,
+        `projects/p/notes/${w}.md`,
+        `---\ntype: note\ntags: [${w}/r]\n---\n# ${w}\n`,
+      );
     }
     await index({ dir: root });
     const first = await readIndex(root);
@@ -299,7 +412,11 @@ describe("mage index — hub projects + registry (ADR-0011/0012)", () => {
 
   it("flips hierarchical when one note carries >4 distinct tag-wings", async () => {
     const dir = await vault();
-    await note(dir, "wide.md", "---\ntags: [a/1, b/2, c/3, d/4, e/5]\n---\n# Wide\n");
+    await note(
+      dir,
+      "wide.md",
+      "---\ntype: note\ntags: [a/1, b/2, c/3, d/4, e/5]\n---\n# Wide\n",
+    );
     const r = await index({ dir });
     expect(r.wings.length).toBe(5);
     expect(r.hierarchical).toBe(true);
@@ -312,13 +429,13 @@ describe("mage index — dedupe generated index payload (ADR-0039 §5)", () => {
     await note(
       dir,
       "foo/bar.md",
-      "---\ntype: concept\nkeywords: [foo, bar, concept, the-foo-title]\n---\n# The Foo Title\n"
+      "---\ntype: note\nkeywords: [foo, bar, note, the-foo-title]\n---\n# The Foo Title\n",
     );
     await index({ dir });
     const idx = await readFile(join(dir, "mage", "INDEX.md"), "utf8");
-    
-    expect(idx).toContain("- `concept` [The Foo Title](notes/foo/bar.md)");
-    expect(idx).toMatch(/- `concept` \[The Foo Title\]\(notes\/foo\/bar\.md\)$/m);
+
+    expect(idx).toContain("- `note` [The Foo Title](notes/foo/bar.md)");
+    expect(idx).toMatch(/- `note` \[The Foo Title\]\(notes\/foo\/bar\.md\)$/m);
   });
 
   it("survives novel keywords and multi-part keywords where only SOME parts appear", async () => {
@@ -326,12 +443,14 @@ describe("mage index — dedupe generated index payload (ADR-0039 §5)", () => {
     await note(
       dir,
       "test.md",
-      "---\ntype: default\nkeywords: [stale-binary, the-novel]\n---\n# The Title\n"
+      "---\ntype: note\nkeywords: [stale-binary, the-novel]\n---\n# The Title\n",
     );
     await index({ dir });
     const idx = await readFile(join(dir, "mage", "INDEX.md"), "utf8");
-    
-    expect(idx).toContain("- `default` [The Title](notes/test.md) — stale-binary, the-novel");
+
+    expect(idx).toContain(
+      "- `note` [The Title](notes/test.md) — stale-binary, the-novel",
+    );
   });
 
   it("drops each scaffolding stoplist word", async () => {
@@ -339,35 +458,47 @@ describe("mage index — dedupe generated index payload (ADR-0039 §5)", () => {
     await note(
       dir,
       "scaffold.md",
-      `---\ntype: default\nkeywords: [${SCAFFOLDING_WORDS.join(", ")}]\n---\n# Scaffold\n`
+      `---\ntype: note\nkeywords: [${SCAFFOLDING_WORDS.join(", ")}]\n---\n# Scaffold\n`,
     );
     await index({ dir });
     const idx = await readFile(join(dir, "mage", "INDEX.md"), "utf8");
-    
-    expect(idx).toContain("- `default` [Scaffold](notes/scaffold.md)");
-    expect(idx).toMatch(/- `default` \[Scaffold\]\(notes\/scaffold\.md\)$/m);
+
+    expect(idx).toContain("- `note` [Scaffold](notes/scaffold.md)");
+    expect(idx).toMatch(/- `note` \[Scaffold\]\(notes\/scaffold\.md\)$/m);
   });
 
   it("renders no lifecycle suffix for 'accepted' status or when no caution status applies", async () => {
     const dir = await vault();
-    await note(dir, "a.md", "---\ntype: default\nstatus: accepted\nlastReviewed: 2026-07-01\n---\n# A\n");
-    await note(dir, "b.md", "---\ntype: default\nlastReviewed: 2026-07-02\n---\n# B\n");
+    await note(
+      dir,
+      "a.md",
+      "---\ntype: note\nstatus: accepted\nlastReviewed: 2026-07-01\n---\n# A\n",
+    );
+    await note(
+      dir,
+      "b.md",
+      "---\ntype: note\nlastReviewed: 2026-07-02\n---\n# B\n",
+    );
     await index({ dir });
     const idx = await readFile(join(dir, "mage", "INDEX.md"), "utf8");
-    
-    expect(idx).toContain("- `default` [A](notes/a.md)\n");
-    expect(idx).toContain("- `default` [B](notes/b.md)\n");
+
+    expect(idx).toContain("- `note` [A](notes/a.md)\n");
+    expect(idx).toContain("- `note` [B](notes/b.md)\n");
     expect(idx).not.toContain("_()");
     expect(idx).not.toContain("accepted");
   });
 
   it("renders suffix for 'stale-suspect' and never renders reviewed date", async () => {
     const dir = await vault();
-    await note(dir, "c.md", "---\ntype: default\nstatus: stale-suspect\nlastReviewed: 2026-07-03\n---\n# C\n");
+    await note(
+      dir,
+      "c.md",
+      "---\ntype: note\nstatus: stale-suspect\nlastReviewed: 2026-07-03\n---\n# C\n",
+    );
     await index({ dir });
     const idx = await readFile(join(dir, "mage", "INDEX.md"), "utf8");
-    
-    expect(idx).toContain("- `default` [C](notes/c.md) _(stale-suspect)_");
+
+    expect(idx).toContain("- `note` [C](notes/c.md) _(stale-suspect)_");
     expect(idx).not.toContain("2026-07-03");
   });
 });
@@ -381,12 +512,12 @@ describe("mage index — progressive degradation (ADR-0039 §7)", () => {
         dir,
         `note${i}.md`,
         `---
-type: default
+type: note
 status: stale-suspect
-keywords: [kw${i}, ${"k".repeat(20)}]
+keywords: [kw${i}, ${"k".repeat(25)}]
 ---
 # Note ${i} ${"t".repeat(120)}
-`
+`,
       );
     }
   }
@@ -404,7 +535,7 @@ keywords: [kw${i}, ${"k".repeat(20)}]
 
   it("a KB just over threshold sheds tier 1 only — keyword tails gone, suffixes still present", async () => {
     const dir = await vault();
-    await generateKb(dir, 110); 
+    await generateKb(dir, 110);
     const r = await index({ dir, quiet: true });
     expect(r.memoryTier).toBe(1);
     const mem = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
@@ -430,12 +561,12 @@ keywords: [kw${i}, ${"k".repeat(20)}]
       dir,
       "huge.md",
       `---
-type: default
+type: note
 status: stale-suspect
 keywords: [kw1, ${"k".repeat(30000)}]
 ---
 # Huge Note
-`
+`,
     );
     const r = await index({ dir, quiet: true });
     expect(r.memoryTier).toBe(1); // drops keyword tails
@@ -445,17 +576,17 @@ keywords: [kw1, ${"k".repeat(30000)}]
 
   it("a line-only breach goes straight to tier 3 and mentions line budget", async () => {
     const dir = await vault();
-    // 190 notes with short content: won't breach bytes, but will breach lines 
+    // 190 notes with short content: won't breach bytes, but will breach lines
     // threshold = 0.9 * 200 = 180 lines. 190 notes = ~190 lines + headers = >180 lines.
     for (let i = 0; i < 190; i++) {
       await note(
         dir,
         `note${i}.md`,
         `---
-type: default
+type: note
 ---
 # N${i}
-`
+`,
       );
     }
     const r = await index({ dir, quiet: true });
@@ -482,9 +613,12 @@ type: default
     await generateKb(dir, 130);
     await index({ dir, quiet: true });
     const first = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
-    
+
     await mkdir(join(dir, "mage", ".mage", "metrics"), { recursive: true });
-    await writeFile(join(dir, "mage", ".mage", "metrics", "promote.json"), JSON.stringify({ v: 4, sessions: {}, notes: {} }));
+    await writeFile(
+      join(dir, "mage", ".mage", "metrics", "promote.json"),
+      JSON.stringify({ v: 4, sessions: {}, notes: {} }),
+    );
     await index({ dir, quiet: true });
     const second = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
     expect(second).toBe(first);
@@ -499,5 +633,174 @@ type: default
     expect(mem).not.toBe(idx);
     expect(idx).toContain("Note 0"); // Unaffected by tiering
     expect(idx).toContain("_(stale-suspect)_");
+  });
+});
+
+describe("mage index — recall surface filtering & metadata genre overrides (ADR-0041 Wave B)", () => {
+  it("filters INDEX to memory-genre lines only and appends governance line (N=1)", async () => {
+    const dir = await vault();
+    await note(dir, "gotcha.md", "---\ntype: gotcha\n---\n# Gotcha Note\n");
+    await note(dir, "proc.md", "---\ntype: procedure\n---\n# Procedure Note\n");
+    await note(
+      dir,
+      "adr-accepted.md",
+      "---\ntype: decision\nstatus: accepted\n---\n# Accepted Decision\n",
+    );
+    await note(
+      dir,
+      "adr-proposed.md",
+      "---\ntype: decision\nstatus: proposed\n---\n# Proposed Decision\n",
+    );
+    await note(dir, "plan1.md", "---\ntype: plan\n---\n# Work Plan\n");
+    await note(dir, "spec1.md", "---\ntype: spec\n---\n# System Spec\n");
+
+    const r = await index({ dir });
+    expect(r.noteCount).toBe(2);
+
+    const idx = await readFile(join(dir, "mage", "INDEX.md"), "utf8");
+    expect(idx).toContain("[Gotcha Note]");
+    expect(idx).toContain("[Procedure Note]");
+    expect(idx).not.toContain("[Accepted Decision]");
+    expect(idx).not.toContain("[Proposed Decision]");
+    expect(idx).not.toContain("[Work Plan]");
+    expect(idx).not.toContain("[System Spec]");
+
+    expect(idx).toContain(
+      "> 1 accepted decision governs this repo — read `decisions/` before architectural or scope changes.",
+    );
+
+    const mem = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
+    expect(mem).toContain(
+      "> 1 accepted decision governs this repo — read `decisions/` before architectural or scope changes.",
+    );
+  });
+
+  it("omits the governance line when N=0 accepted decisions exist", async () => {
+    const dir = await vault();
+    await note(dir, "gotcha.md", "---\ntype: gotcha\n---\n# Gotcha Note\n");
+    await note(
+      dir,
+      "adr-proposed.md",
+      "---\ntype: decision\nstatus: proposed\n---\n# Proposed Decision\n",
+    );
+
+    await index({ dir });
+    const idx = await readFile(join(dir, "mage", "INDEX.md"), "utf8");
+    expect(idx).not.toContain("govern this repo");
+  });
+
+  it("respects metadata.json genres overrides and validates them", async () => {
+    const dir = await vault();
+    const meta = {
+      schema: "mage.v2",
+      mode: "in-repo",
+      project: "t",
+      hub_path: null,
+      hub_repo: null,
+      hub_refs: [],
+      linked_at: "2026-07-27T00:00:00Z",
+      genres: {
+        runbook: "memory",
+        gotcha: "doc", // built-in attempt, ignored
+        foo: "shiny", // invented genre, ignored
+      },
+    };
+    await writeFile(
+      join(dir, "mage", "metadata.json"),
+      JSON.stringify(meta, null, 2),
+    );
+
+    await note(dir, "runbook.md", "---\ntype: runbook\n---\n# Runbook Note\n");
+    await note(dir, "gotcha.md", "---\ntype: gotcha\n---\n# Gotcha Note\n");
+    await note(dir, "foo.md", "---\ntype: foo\n---\n# Foo Note\n");
+
+    const r = await index({ dir });
+    expect(r.noteCount).toBe(2); // runbook (mapped to memory) + gotcha (built-in memory, remap ignored)
+
+    const idx = await readFile(join(dir, "mage", "INDEX.md"), "utf8");
+    expect(idx).toContain("[Runbook Note]");
+    expect(idx).toContain("[Gotcha Note]");
+    expect(idx).not.toContain("[Foo Note]");
+  });
+
+  // The governance line counts BOTH terminal "in force" spellings. `active` is the
+  // spelling several external KBs use; counting only `accepted` under-reported them.
+  it("governance line counts status accepted AND active, and excludes superseded/proposed", async () => {
+    const dir = await vault();
+    await note(dir, "gotcha.md", "---\ntype: gotcha\n---\n# Gotcha Note\n");
+    await note(
+      dir,
+      "adr-accepted.md",
+      "---\ntype: decision\nstatus: accepted\n---\n# Accepted Decision\n",
+    );
+    await note(
+      dir,
+      "adr-active.md",
+      "---\ntype: decision\nstatus: active\n---\n# Active Decision\n",
+    );
+
+    await index({ dir });
+    expect(await readIndex(join(dir, "mage"))).toContain(
+      "> 2 accepted decisions govern this repo — read `decisions/` before architectural or scope changes.",
+    );
+  });
+
+  it("governance line excludes superseded and proposed decisions", async () => {
+    const dir = await vault();
+    await note(dir, "gotcha.md", "---\ntype: gotcha\n---\n# Gotcha Note\n");
+    await note(
+      dir,
+      "adr-superseded.md",
+      "---\ntype: decision\nstatus: superseded\n---\n# Superseded Decision\n",
+    );
+    await note(
+      dir,
+      "adr-proposed.md",
+      "---\ntype: decision\nstatus: proposed\n---\n# Proposed Decision\n",
+    );
+
+    await index({ dir });
+    expect(await readIndex(join(dir, "mage"))).not.toContain("govern this repo");
+  });
+
+  // `mage skills` generates a skill per ALL-notes wing and points it at
+  // `_index.<wing>.md`. Deriving the per-wing FILE set from memory wings alone
+  // deleted that target for a document-only wing, leaving the skill dangling.
+  it("keeps a per-wing index file for a document-only wing, with zero note lines", async () => {
+    const dir = await vault();
+    // Five memory wings force hierarchical mode (FLAT_MAX_WINGS = 4).
+    for (const w of ["a", "b", "c", "d", "e"]) {
+      await note(
+        dir,
+        `${w}.md`,
+        `---\ntype: gotcha\ntags: [${w}/room]\n---\n# Memory ${w}\n`,
+      );
+    }
+    await note(
+      dir,
+      "plan.md",
+      "---\ntype: plan\ntags: [paperwork/room]\n---\n# Doc Only Plan\n",
+    );
+
+    const r = await index({ dir });
+    expect(r.hierarchical).toBe(true);
+    expect(r.wings).toEqual(["a", "b", "c", "d", "e"]); // recall surface: memory wings
+    expect(r.written).toContain("_index.paperwork.md"); // file surface: all wings
+
+    const wingIdx = await readFile(
+      join(dir, "mage", "_index.paperwork.md"),
+      "utf8",
+    );
+    expect(wingIdx).toContain("# paperwork");
+    expect(wingIdx).toContain("> 0 notes. Part of the [index](INDEX.md).");
+    expect(wingIdx).not.toContain("[Doc Only Plan]");
+    expect(wingIdx).not.toMatch(/^- `/m); // zero note lines
+
+    // A memory wing still lists its notes.
+    expect(await readFile(join(dir, "mage", "_index.a.md"), "utf8")).toContain(
+      "[Memory a]",
+    );
+    // The root recall surface does not advertise the document-only wing.
+    expect(await readIndex(join(dir, "mage"))).not.toContain("**paperwork**");
   });
 });

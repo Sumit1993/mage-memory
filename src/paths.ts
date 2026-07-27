@@ -221,7 +221,10 @@ export function hubProjectPath(hubRoot: string, projectName: string): string {
  * looks like the hub it lives in, not like a code-repo `mage/`. (Identical to
  * {@link hubProjectPath}; kept as a distinct name for call-site intent.)
  */
-export function hubProjectDocsRoot(hubRoot: string, projectName: string): string {
+export function hubProjectDocsRoot(
+  hubRoot: string,
+  projectName: string,
+): string {
   return hubProjectPath(hubRoot, projectName);
 }
 
@@ -273,7 +276,9 @@ export function stagingPath(docsRoot: string): string {
  * can still report a v1 file as needing `mage migrate`. Only a genuinely foreign
  * schema throws. On the capture hot path: kept cheap and total.
  */
-export async function readMetadata(codeRepo: string): Promise<MageMetadata | null> {
+export async function readMetadata(
+  codeRepo: string,
+): Promise<MageMetadata | null> {
   const path = metadataPath(codeRepo);
   let raw: string;
   try {
@@ -322,7 +327,9 @@ export function normalizeMetadata(meta: MageMetadata): MageMetadata {
  * "in-repo" ⇒ "repo-owned"); the returned `schema` is the on-disk value. Only a
  * genuinely foreign schema throws.
  */
-export async function readHubMetadata(hubRoot: string): Promise<HubMetadata | null> {
+export async function readHubMetadata(
+  hubRoot: string,
+): Promise<HubMetadata | null> {
   const path = hubMetadataPath(hubRoot);
   let raw: string;
   try {
@@ -376,15 +383,27 @@ export function normalizeHubMetadata(hub: HubMetadata): HubMetadata {
  * read-modify-write upgrades a v1 file to v2 (lazy migration) and that no spread
  * accidentally persists a stale schema. Trailing newline for clean git diffs.
  */
-export async function writeMetadata(codeRepo: string, meta: MageMetadata): Promise<void> {
+export async function writeMetadata(
+  codeRepo: string,
+  meta: MageMetadata,
+): Promise<void> {
   const stamped: MageMetadata = { ...meta, schema: METADATA_SCHEMA };
-  await writeFile(metadataPath(codeRepo), `${JSON.stringify(stamped, null, 2)}\n`);
+  await writeFile(
+    metadataPath(codeRepo),
+    `${JSON.stringify(stamped, null, 2)}\n`,
+  );
 }
 
 /** Write a hub's top-level metadata, always stamping {@link METADATA_SCHEMA}. */
-export async function writeHubMetadata(hubRoot: string, hub: HubMetadata): Promise<void> {
+export async function writeHubMetadata(
+  hubRoot: string,
+  hub: HubMetadata,
+): Promise<void> {
   const stamped: HubMetadata = { ...hub, schema: METADATA_SCHEMA };
-  await writeFile(hubMetadataPath(hubRoot), `${JSON.stringify(stamped, null, 2)}\n`);
+  await writeFile(
+    hubMetadataPath(hubRoot),
+    `${JSON.stringify(stamped, null, 2)}\n`,
+  );
 }
 
 // ─── structural checks ──────────────────────────────────────────────────
@@ -429,7 +448,9 @@ export interface ResolvedDocsRoot {
  * Returns null if none is found. A malformed/unreadable metadata degrades to the
  * repo KB root (never throws — this is on the capture hot path).
  */
-export async function resolveDocsRoot(startDir: string): Promise<ResolvedDocsRoot | null> {
+export async function resolveDocsRoot(
+  startDir: string,
+): Promise<ResolvedDocsRoot | null> {
   const abs = absolutePath(startDir);
 
   // Walk up looking for a code-repo `mage/metadata.json` (in-repo/hybrid/external).
@@ -438,7 +459,9 @@ export async function resolveDocsRoot(startDir: string): Promise<ResolvedDocsRoo
     if (await exists(join(dir, META_DIR, META_FILE))) {
       // Honor mode=external by following hub_path; a bad read degrades to repo KB.
       const external = await externalDocsRoot(dir).catch(() => null);
-      return external ?? { root: codeRepoDocsRoot(dir), kind: "repo", repo: dir };
+      return (
+        external ?? { root: codeRepoDocsRoot(dir), kind: "repo", repo: dir }
+      );
     }
     const parent = dirname(dir);
     if (parent === dir) break;
@@ -504,7 +527,8 @@ function hubDocsRoot(hub: string, abs: string): ResolvedDocsRoot {
  */
 async function externalDocsRoot(dir: string): Promise<ResolvedDocsRoot | null> {
   const meta = await readMetadata(dir);
-  if (!meta || meta.mode !== "external" || !meta.hub_path || !meta.project) return null;
+  if (!meta || meta.mode !== "external" || !meta.hub_path || !meta.project)
+    return null;
   return {
     root: hubProjectDocsRoot(meta.hub_path, meta.project),
     kind: "hub",

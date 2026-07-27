@@ -33,7 +33,7 @@ Plus a few other generated, committed markdown files at the root depending on yo
 
 - `notes/`, `decisions/`, `work/` are content directories — the things you author (with mage's help) and review.
 - `INDEX.md` is regenerated deterministically by `mage index`; it is committed so a reader (human or agent) can see what is known without loading every note. See [Notes](../model/notes.md) and [The graph](../model/graph.md).
-- `metadata.json` is the KB's config: its identity, its mode (in-repo / hybrid / external), any hub links, the grooming sensitivity dial that scales the recurrence thresholds, and the optional `redact` allowlist for the redaction gate. See [Thresholds and the dial](./thresholds.mdx) and [Redaction (two gates)](./redaction.md).
+- `metadata.json` is the KB's config: its identity, its mode (in-repo / hybrid / external), any hub links, the grooming sensitivity dial that scales the recurrence thresholds, the optional `redact` allowlist for the redaction gate, and the optional `genres` map for custom note-type to genre overrides. See [Thresholds and the dial](./thresholds.mdx) and [Redaction (two gates)](./redaction.md).
 
 ## The gitignored machine state
 
