@@ -28,7 +28,7 @@ keywords:
   - lifecycle-verbs
   - annotate-never-sort
   - migration-manifest
-modified: 2026-07-27T07:39:36.616Z
+modified: 2026-07-27T07:41:55.456Z
 ---
 
 # 0041 — Genre decides the recall rung: one store, three recall paths (amends ADR-0035)
@@ -118,7 +118,8 @@ displaced bodies must stay committed notes).
    an edited `decision` that should have been superseded; a `work` note with no
    terminal status; a `doc` note whose `provenance.commit` trails HEAD by more than
    a threshold (`git rev-list --count` — a check, not a watcher); a memory-genre
-   note over the size threshold (`noteSizeCap`, now actually imported). Per
+   note over the size threshold (`noteSizeCap` — the doctor wire-in makes it the
+   imported threshold, its first real consumer). Per
    [ADR-0038](0038-promote-note-rung-deleted-graduate-on-usage.md): **annotate,
    never sort.** Falsify-on-commit machinery and the path-collision decision nudge
    are deferred to the FT inbox.
