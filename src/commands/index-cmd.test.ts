@@ -722,4 +722,85 @@ describe("mage index — recall surface filtering & metadata genre overrides (AD
     expect(idx).toContain("[Gotcha Note]");
     expect(idx).not.toContain("[Foo Note]");
   });
+
+  // The governance line counts BOTH terminal "in force" spellings. `active` is the
+  // spelling several external KBs use; counting only `accepted` under-reported them.
+  it("governance line counts status accepted AND active, and excludes superseded/proposed", async () => {
+    const dir = await vault();
+    await note(dir, "gotcha.md", "---\ntype: gotcha\n---\n# Gotcha Note\n");
+    await note(
+      dir,
+      "adr-accepted.md",
+      "---\ntype: decision\nstatus: accepted\n---\n# Accepted Decision\n",
+    );
+    await note(
+      dir,
+      "adr-active.md",
+      "---\ntype: decision\nstatus: active\n---\n# Active Decision\n",
+    );
+
+    await index({ dir });
+    expect(await readIndex(join(dir, "mage"))).toContain(
+      "> 2 accepted decisions govern this repo — read `decisions/` before architectural or scope changes.",
+    );
+  });
+
+  it("governance line excludes superseded and proposed decisions", async () => {
+    const dir = await vault();
+    await note(dir, "gotcha.md", "---\ntype: gotcha\n---\n# Gotcha Note\n");
+    await note(
+      dir,
+      "adr-superseded.md",
+      "---\ntype: decision\nstatus: superseded\n---\n# Superseded Decision\n",
+    );
+    await note(
+      dir,
+      "adr-proposed.md",
+      "---\ntype: decision\nstatus: proposed\n---\n# Proposed Decision\n",
+    );
+
+    await index({ dir });
+    expect(await readIndex(join(dir, "mage"))).not.toContain("govern this repo");
+  });
+
+  // `mage skills` generates a skill per ALL-notes wing and points it at
+  // `_index.<wing>.md`. Deriving the per-wing FILE set from memory wings alone
+  // deleted that target for a document-only wing, leaving the skill dangling.
+  it("keeps a per-wing index file for a document-only wing, with zero note lines", async () => {
+    const dir = await vault();
+    // Five memory wings force hierarchical mode (FLAT_MAX_WINGS = 4).
+    for (const w of ["a", "b", "c", "d", "e"]) {
+      await note(
+        dir,
+        `${w}.md`,
+        `---\ntype: gotcha\ntags: [${w}/room]\n---\n# Memory ${w}\n`,
+      );
+    }
+    await note(
+      dir,
+      "plan.md",
+      "---\ntype: plan\ntags: [paperwork/room]\n---\n# Doc Only Plan\n",
+    );
+
+    const r = await index({ dir });
+    expect(r.hierarchical).toBe(true);
+    expect(r.wings).toEqual(["a", "b", "c", "d", "e"]); // recall surface: memory wings
+    expect(r.written).toContain("_index.paperwork.md"); // file surface: all wings
+
+    const wingIdx = await readFile(
+      join(dir, "mage", "_index.paperwork.md"),
+      "utf8",
+    );
+    expect(wingIdx).toContain("# paperwork");
+    expect(wingIdx).toContain("> 0 notes. Part of the [index](INDEX.md).");
+    expect(wingIdx).not.toContain("[Doc Only Plan]");
+    expect(wingIdx).not.toMatch(/^- `/m); // zero note lines
+
+    // A memory wing still lists its notes.
+    expect(await readFile(join(dir, "mage", "_index.a.md"), "utf8")).toContain(
+      "[Memory a]",
+    );
+    // The root recall surface does not advertise the document-only wing.
+    expect(await readIndex(join(dir, "mage"))).not.toContain("**paperwork**");
+  });
 });

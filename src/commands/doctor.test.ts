@@ -13,6 +13,7 @@ import { detectRedactHook, installRedactHook } from "../git-hooks.js";
 import { METADATA_SCHEMA, METADATA_SCHEMA_V1, exists } from "../paths.js";
 import { tmpDir } from "../../test/fixtures/kb.js";
 import { type DoctorCheck, doctor, mageInstalledIn, readinessFooter } from "./doctor.js";
+import { index } from "./index-cmd.js";
 import * as footprintModule from "../metrics/footprint.js";
 
 async function freshDir(prefix = "mage-doctor-"): Promise<string> {
@@ -1047,6 +1048,36 @@ describe("doctor — recall + skills readiness", () => {
     await makeInRepoKb(dir, { gitignoreSinks: true }); // INDEX is just '# Index\n'
     await writeNotes(dir, 2);
     expect(check((await doctor({ cwd: dir, quiet: true })).checks, "index freshness")).toBeUndefined();
+  });
+  // The header counts MEMORY-GENRE notes only (ADR-0041 §4). Counting every genre here
+  // made a KB holding any decision/plan/spec permanently false-STALE — `--fix` rewrote
+  // the same filtered header, so the check could never converge.
+  it("index freshness: a genre-mixed KB is fresh right after `mage index`, and still catches real staleness", async () => {
+    const dir = await freshDir();
+    await makeInRepoKb(dir, { gitignoreSinks: true });
+    await mkdir(join(dir, "mage", "notes"), { recursive: true });
+    await writeFile(
+      join(dir, "mage", "notes", "g1.md"),
+      "---\ntype: gotcha\ntags: [demo/room]\n---\n# Gotcha One\nbody\n",
+    );
+    await writeFile(
+      join(dir, "mage", "notes", "adr.md"),
+      "---\ntype: decision\nstatus: accepted\ntags: [demo/room]\n---\n# An ADR\nbody\n",
+    );
+    await index({ dir, quiet: true });
+
+    const fresh = check((await doctor({ cwd: dir, quiet: true })).checks, "index freshness");
+    expect(fresh?.ok).toBe(true);
+    expect(fresh?.detail).toBe("index reflects 1 note(s)"); // the decision is not a memory line
+
+    // A memory note added WITHOUT reindexing is still reported stale.
+    await writeFile(
+      join(dir, "mage", "notes", "g2.md"),
+      "---\ntype: gotcha\ntags: [demo/room]\n---\n# Gotcha Two\nbody\n",
+    );
+    const stale = check((await doctor({ cwd: dir, quiet: true })).checks, "index freshness");
+    expect(stale?.ok).toBe(false);
+    expect(stale?.detail).toMatch(/STALE — index reflects 1, 2 note\(s\) on disk/);
   });
 
   // ── AGENTS.md awareness ──

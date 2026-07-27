@@ -54,12 +54,23 @@ export async function index(opts: IndexOptions = {}): Promise<IndexResult> {
     (e) => genreOf(e.type, overrides) === "memory",
   );
   const acceptedDecisionsCount = entries.filter(
-    (e) => genreOf(e.type, overrides) === "decision" && (e.status === "accepted" || e.status === "active"),
+    (e) =>
+      genreOf(e.type, overrides) === "decision" &&
+      (e.status === "accepted" || e.status === "active"),
   ).length;
 
-  // Wings are the UNION of every memory note's tag-wings (multi-home, ADR-0012 §5).
+  // Wings are the UNION of tag-wings (multi-home, ADR-0012 §5), split in two:
+  //  - `wings` (memory genre) drives the RECALL surface — the root index's wing map,
+  //    its note lines, and the header counts (ADR-0041 §4).
+  //  - `allWings` (every genre) drives the per-wing index FILE set and the Obsidian
+  //    graph groups. `mage skills` generates a skill per all-notes wing pointing at
+  //    `_index.<wing>.md`; deriving the file set from memory wings alone deleted that
+  //    target for a document-only wing and left the skill pointing at nothing.
   const wings = [
     ...new Set(memoryEntries.flatMap((e) => e.wings.map((w) => w.wing))),
+  ].sort();
+  const allWings = [
+    ...new Set(entries.flatMap((e) => e.wings.map((w) => w.wing))),
   ].sort();
   const hierarchical =
     wings.length > FLAT_MAX_WINGS || memoryEntries.length > FLAT_MAX_NOTES;
@@ -70,7 +81,7 @@ export async function index(opts: IndexOptions = {}): Promise<IndexResult> {
   const registry = buildRegistryView(hubMeta?.projects ?? []);
 
   // Remove stale generated per-wing index files (idempotency across mode flips).
-  await cleanGeneratedWingIndexes(root, hierarchical ? wings : []);
+  await cleanGeneratedWingIndexes(root, hierarchical ? allWings : []);
 
   const written: string[] = [];
   if (hierarchical) {
@@ -85,7 +96,10 @@ export async function index(opts: IndexOptions = {}): Promise<IndexResult> {
       ),
     );
     written.push(INDEX_FILE);
-    for (const wing of wings) {
+    // One file per ALL-notes wing; the LINES inside stay memory-genre filtered, so a
+    // document-only wing renders its header (and its pointer back to the index, which
+    // carries the governance line) with zero note lines.
+    for (const wing of allWings) {
       const file = `_index.${wing}.md`;
       await writeFile(
         join(root, file),
@@ -124,7 +138,8 @@ export async function index(opts: IndexOptions = {}): Promise<IndexResult> {
   written.push(MEMORY_FILE);
 
   // Keep the Obsidian graph colored by wing (no-op without .obsidian/graph.json).
-  await updateGraphColorGroups(root, wings);
+  // The graph shows every note, so it colors every wing — not just the memory ones.
+  await updateGraphColorGroups(root, allWings);
 
   if (!opts.quiet) {
     logger.success(
