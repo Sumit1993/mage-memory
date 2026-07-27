@@ -11,6 +11,13 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.15](https://github.com/Sumit1993/mage-memory/compare/v0.0.14...v0.0.15) (2026-07-27)
+
+
+### Bug Fixes
+
+* **doctor:** read-only genre-tell annotations; noteSizeCap gains its first importer (ADR-0041 Wave 1) ([#94](https://github.com/Sumit1993/mage-memory/issues/94)) ([bdbfd52](https://github.com/Sumit1993/mage-memory/commit/bdbfd52026d64687344b23112ee3fba7345e2db3))
+
 ## [0.0.14](https://github.com/Sumit1993/mage-memory/compare/v0.0.13...v0.0.14) (2026-07-19)
 
 
