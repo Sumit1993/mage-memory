@@ -72,7 +72,7 @@ external.
 
 On `prismalens-docs-hub` the meter reads **4%, `ok`**, and that number describes almost nothing:
 
-```
+```text
 MEMORY.md                       1,038 B   <- the CAPPED surface: a 3-wing map, no notes
 _index.prismalens-platform.md  21,943 B   <- on-follow, 76 notes, ~5.5K est. tokens
 ```
