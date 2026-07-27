@@ -23,18 +23,18 @@ The goal is *do it faster and make fewer mistakes next time*, not *archive every
 
 For example, instead of pasting a service's entire API reference into a note, you capture the one non-obvious thing — "every charge needs an idempotency key or it double-bills" — plus a pointer to the canonical docs page. The fact is the insight; the link is the pointer.
 
-## Note types
+## Note types and genres
 
-A note carries an optional `type` in its frontmatter. The vocabulary is *suggested and open* — mage never enforces it — but a shared vocabulary makes notes scannable. The common types:
+A note carries an optional `type` in its frontmatter. Per ADR-0041, `type` maps to a **genre** that decides its recall rung. Only memory-genre notes populate the always-loaded recall index (`INDEX.md`):
 
-- **gotcha** — what *not* to do and why (a CLI flag that fails, an order that breaks something). Surfaced so you do not repeat the mistake.
-- **playbook** — how to do X faster: a reusable procedure.
-- **decision** — an ADR: a choice, the reasoning, and what it rules out.
-- **interface** — how to *use* a service or API: endpoints, useful params, auth, gotchas.
-- **pointer** / **reference** — where a canonical source lives and when to go there. Pure wayfinding, never a copy.
-- **principle**, **topology**, **relationship**, **tooling**, **trail**, **spec**, **plan**, **tasks** — the rest of the suggested set.
+- **gotcha** / **playbook** / **procedure** — gotchas and reusable procedures (procedural notes that can graduate into skills).
+- **interface** / **pointer** / **reference** / **principle** / **note** — insight, contracts, wayfinding, and durable rules forming the recall-bearing memory set.
 
-You can use any string you like; the listed values are just the ones mage's own tooling understands by convention. The full suggested vocabulary lives alongside the `type` field in the source (`src/note.ts`).
+Non-memory types (`plan`, `spec`, `tasks`, `decision`) remain legal note types for storage and linking, but are non-memory genres (`work`, `doc`, `decision` per ADR-0041) excluded from always-loaded recall — authored deliberately rather than as default destinations for captured knowledge:
+- **decision** — an ADR: a choice, the reasoning, and what it rules out (stored in `mage/decisions/`).
+- **spec** / **plan** / **tasks** — specifications, forward work plans, and checklists (stored in `mage/work/` or repo docs).
+
+Before authoring a memory note, walk the **better home** ladder (code comment → ticket/`mage/work/` → doc beside code → artifact+pointer → skill → decision → memory) to ensure memory is the right home.
 
 The two procedural types — **playbook** and **gotcha** — are special: only procedural notes can later [graduate](../loop/promote-graduate.md) into their own auto-loaded skill, because you push a procedure but you pull a fact.
 

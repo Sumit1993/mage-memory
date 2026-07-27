@@ -185,26 +185,36 @@ next time?"* If it's just an archive of what you read, it doesn't belong.
 
 ---
 
-## 6. Note-type vocabulary
+## 6. Note-type vocabulary, genres, and recall rungs
 
-`type` is open vocabulary — invent your own where it helps. Suggested set:
+`type` is an open vocabulary, but every note type maps onto a **genre** that decides its recall rung ([ADR-0041](mage/decisions/0041-genre-decides-the-recall-rung.md)). Only **memory** genre notes populate the always-loaded recall index (`INDEX.md`/`MEMORY.md`). Non-memory types (`plan`, `spec`, `tasks`, `decision`) remain legal types for storage and linking, but are non-memory genres (`work`, `doc`, `decision` per ADR-0041) excluded from always-loaded recall — authored deliberately, never the default destination for captured knowledge.
 
-| `type` | One-liner |
-|--------|-----------|
-| `interface` | The shape/contract of an API, module, or boundary. |
-| `tooling` | How to run/configure a tool, command, or dev workflow. |
-| `topology` | How systems, services, or data are laid out and connected. |
-| `relationship` | How two or more things interact or depend on each other. |
-| `playbook` | A repeatable procedure to accomplish a recurring task. |
-| `gotcha` | A trap, footgun, or surprising behavior and how to avoid it. |
-| `pointer` | A thin note whose value is mostly its `sources:` links. |
-| `trail` | A breadcrumb/navigation note that routes to other notes. |
-| `decision` | An ADR-style record of a choice and its rationale. |
-| `spec` | A specification of intended behavior. |
-| `plan` | A forward-looking plan of work. |
-| `tasks` | A concrete task list / checklist. |
-| `principle` | A durable rule or value the system holds to. |
-| `note` | Default — anything that doesn't fit a sharper type. |
+| `type:` | Genre | Recall Rung | Purpose & Lifecycle |
+|---|---|---|---|
+| `gotcha` `procedure` `pointer` `principle` `feedback` `reference` `note` | **memory** | 2 (1 when graduated) | Recall-bearing memories (edit-in-place). Default destination for captured knowledge. |
+| `decision` | **decision** | 3 (on demand) | Settled architectural choice (supersede/amend, never edit in place; `mage/decisions/`). |
+| `plan` `tasks` | **work** | 3 (on demand) | Task lists & work plans (complete and archive; lives in `mage/work/`). |
+| `spec` `doc` | **doc** | 3 (on demand) | System specification / current truth (expire on falsification). |
+
+### Memory test (4 properties)
+A finding belongs in a **memory** note if:
+1. **Recallable:** Small (~1–3 KB, single-purpose) to surface unbidden at point of need.
+2. **Actionable:** Alters immediate decisions or prevents repeating a footgun.
+3. **Survives its source:** Holds non-obvious insight not re-derivable from code or git history.
+4. **Has no better home:** Pass the **better home** ladder first before authoring a note.
+
+### The better home ladder
+Before creating a memory note, check whether a better home wins (in order):
+
+| If it is... | Better home | Action / Destination |
+|---|---|---|
+| File- or function-scoped detail | **Code comment** | Place directly in source code. |
+| Task with a done-state / forward plan | **Ticket / `work/`** | Track in `mage/work/<slug>/` or issue tracker (`type: plan`/`tasks`). |
+| Current-truth system spec | **Doc beside code** | Keep in repo docs beside code (`type: spec`). |
+| Investigation evidence / raw trace | **Artifact + pointer** | Save raw data in `work/<slug>/artifacts/`, keep thin pointer note. |
+| Agent instruction ("do X as Y") | **Skill / Prompt** | Place in `skills/` instruction. |
+| Settled architectural choice & rationale | **Decision record** | Author ADR in `mage/decisions/` (`type: decision`). |
+| Non-completing, recallable insight/gotcha | **Memory note** ✅ | Author a memory-genre note (`mage/notes/`). |
 
 ---
 
