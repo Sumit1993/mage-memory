@@ -12,6 +12,7 @@ provenance:
   commit: aad31f0
 sources:
   - cc-session:3c5c8534-8611-4d9d-9087-9975da48dd44
+  - cc-session:ee0349da-df7e-4672-b8be-dc8cb25cb2c5
 keywords:
   - future-thoughts
   - backlog
@@ -29,6 +30,7 @@ keywords:
   - export
   - agent-rules
   - use-cases
+modified: 2026-07-27T09:11:32.419Z
 ---
 
 # mage — future thoughts (the standing idea inbox)
@@ -376,6 +378,38 @@ debugs against the captured gotchas/playbooks/decisions.
 **mage angle:** a flagship *consumption* use case (most of mage so far is *capture*).
 The gotcha/decision notes are exactly what a reviewer should load first; could ship
 as an example skill that wires the KB into a review/debug flow.
+
+### Theme F — ADR-0041 deferrals (2026-07-27 batch)
+
+Deferred by [ADR-0041](../decisions/0041-genre-decides-the-recall-rung.md) during the genre/recall-rung grill — each needs its own bake, not a slot in a schema wave.
+
+#### FT-22 — path-collision decision nudge
+**Status:** raw
+**Touches:** [ADR-0041](../decisions/0041-genre-decides-the-recall-rung.md), [ADR-0009](../decisions/0009-no-runtime-automation-rides-host-hooks.md), [ADR-0038](../decisions/0038-promote-note-rung-deleted-graduate-on-usage.md)
+**Sequence:** unsequenced (post-0.1.0)
+A PostToolUse hook matching edited file paths against a generated map (path globs → governing ADR, from provenance + links) emitting one line: "heads up — ADR-0020 governs dashboard.html". Event-keyed, annotate-only.
+**mage angle:** the contextual complement to the wing-skill Governing-decisions section. False-positive tuning is the whole risk — see the Gate-2 stall gotchas; deserves a replay-gate before shipping.
+
+#### FT-23 — falsify-on-commit for doc-genre notes
+**Status:** raw
+**Touches:** [ADR-0041](../decisions/0041-genre-decides-the-recall-rung.md), [ADR-0037](../decisions/0037-readiness-doctor-remit-and-autofix-line.md)
+**Sequence:** unsequenced
+Event-driven staleness: watch `provenance.commit` + touched paths, stamp `stale-suspect` when a commit falsifies a current-truth note. Wave B shipped the cheap check (commits-behind count in doctor); this is the real event machinery.
+**mage angle:** rot rate is a property of genre, not age — this makes the `doc` lifecycle verb real. Needs its own false-positive bake.
+
+#### FT-24 — per-work-style type maps ride template wings
+**Status:** raw
+**Touches:** [ADR-0041](../decisions/0041-genre-decides-the-recall-rung.md) §3, FT-04
+**Sequence:** unsequenced (scaling track)
+The `metadata.json` `genres` override (new types → existing genres, never new genres) is the seam FT-04's template wings plug into: a template ships seed notes AND the type registrations they need (e.g. `runbook: memory` for an SRE wing).
+**mage angle:** makes "mage as a framework shaped by the user's work" concrete without forking the lingua franca.
+
+#### FT-25 — capture-side recurrence guard (deleted-note resurrection)
+**Status:** raw
+**Touches:** [ADR-0029](../decisions/0029-digest-to-agent-capture.md), [ADR-0038](../decisions/0038-promote-note-rung-deleted-graduate-on-usage.md)
+**Sequence:** unsequenced (grooming-quality)
+Soak evidence (sreforge, 2026-07-27): `all-seats-route-to-agy` was re-captured two days after commit f58db26 deleted near-identical content with a documented reason. Capture has no memory of what was deliberately removed, so rejected knowledge resurrects.
+**mage angle:** a groom/learn check against the git history of deleted notes (or a lightweight tombstone list) before authoring — "this was removed on <date> because <reason>; still capture?" Pairs with the reject-ledger (ADR-0031 Phase 2).
 
 ---
 

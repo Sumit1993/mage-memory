@@ -4,7 +4,7 @@ tags:
   - mage/build
 created: "2026-07-19"
 updated: 2026-07-19
-last_reviewed: 2026-07-19
+last_reviewed: 2026-07-27
 status: active
 provenance:
   repo: mage-memory
@@ -70,3 +70,11 @@ one in the tree. A redaction fix is not protecting you until it is released.
 
 Related: [[dogfood-before-release]] — dogfooding only tells you about the build you
 actually ran.
+
+## Recurrence (2026-07-27) — it bit the ADR-0041 rollout itself
+
+Hours after PR #98 merged the genre filter to main, a curation branch regenerated the index
+with `npx mage index` → published 0.0.15 (no filter) → MEMORY.md silently reverted to carrying
+all 41 decision lines the filter had just removed. Caught by the operator reading the PR diff,
+not by any check. Until the fix-carrying version is PUBLISHED, every in-repo regeneration must
+use the local build: `pnpm build && node dist/cli.js index`.
