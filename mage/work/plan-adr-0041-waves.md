@@ -29,7 +29,7 @@ keywords:
   - wave-c
   - connect-external
   - baseline
-modified: 2026-07-28T10:00:14.529Z
+modified: 2026-07-28T10:00:59.884Z
 ---
 
 # ADR-0041 wave plan — A, B, C, and the ratification gate
@@ -101,9 +101,12 @@ wing skills grow a Governing-decisions section.
 - #99 — wing skills list governing decisions
 
 Merged after a 14-agent extreme review (9 confirmed findings, 0 refuted, 2 real
-blockers fixed and re-verified). **Merged but unreleased** — sits in release PR
-[#100](https://github.com/Sumit1993/mage-memory/pull/100) (0.0.16), deliberately
-held for an overnight A-only observation window.
+blockers fixed and re-verified). **Released in 0.0.16
+([#100](https://github.com/Sumit1993/mage-memory/pull/100), 2026-07-28)** after an
+overnight window that was intended to be A-only. It was A-only *in effect* — the
+linked `dist/` had carried Wave B since 07-27 11:20Z, but because no hook re-runs
+`mage index`, sessions kept reading the pre-B recall files. Accidental, not
+designed; see the premise note above.
 
 Soak curation PRs, applied row-for-row against approved manifests:
 `prismalens-docs-hub#15` and `sreforge-memory#6`.
@@ -118,7 +121,8 @@ for `connect`/external layers. This is the one part of ADR-0041 that is genuinel
 taste-critical because users touch it directly — which is why the grill was
 queued for a fresh session rather than the tail of the 2026-07-27 wave day.
 
-Unblocks the moment 0.0.16 lands and the soaks pick it up.
+0.0.16 has landed, so C is unblocked once the soaks are re-indexed and the gate
+is judged.
 
 > [ADR-0042](../decisions/0042-reach-tier-harness-grants.md) (the reach tier) is
 > **adjacent, not a substitute** — a separate grill on the same day, about harness
@@ -127,7 +131,8 @@ Unblocks the moment 0.0.16 lands and the soaks pick it up.
 ## The ratification gate
 
 From [ADR-0041](../decisions/0041-genre-decides-the-recall-rung.md) — the ADR stays
-`status: proposed` until this is satisfied; ratification rides the Wave-B release.
+`status: proposed` until this is satisfied. The Wave-B release *opens* the window;
+the evidence below closes it. This gate governs **ADR-0041 only**.
 
 **Yield:**
 - After migration, `MEMORY.md` ≤ **~20%** of the host auto-memory budget, with
