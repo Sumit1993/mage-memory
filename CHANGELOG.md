@@ -11,6 +11,15 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.16](https://github.com/Sumit1993/mage-memory/compare/v0.0.15...v0.0.16) (2026-07-28)
+
+
+### Features
+
+* **connect:** the reach tier — grant the harness access to an out-of-repo KB (ADR-0042) ([#102](https://github.com/Sumit1993/mage-memory/issues/102)) ([f2ab7db](https://github.com/Sumit1993/mage-memory/commit/f2ab7db06fea4d2856e6041a37e712d98048ca51))
+* **recall:** INDEX/MEMORY carry memory-genre lines only + governance line (ADR-0041 Wave B) ([#98](https://github.com/Sumit1993/mage-memory/issues/98)) ([379ddcd](https://github.com/Sumit1993/mage-memory/commit/379ddcdb86d146375b222e42170a1aa935bffccc))
+* **skills:** wing skills list governing decisions (ADR-0041 Wave B) ([#99](https://github.com/Sumit1993/mage-memory/issues/99)) ([d73b6ee](https://github.com/Sumit1993/mage-memory/commit/d73b6eed44b25ac1df28c70f9b8204b40e2a5eda))
+
 ## [0.0.15](https://github.com/Sumit1993/mage-memory/compare/v0.0.14...v0.0.15) (2026-07-27)
 
 
