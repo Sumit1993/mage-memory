@@ -29,7 +29,7 @@ keywords:
   - wave-c
   - connect-external
   - baseline
-modified: 2026-07-28T08:56:08.459Z
+modified: 2026-07-28T10:00:14.529Z
 ---
 
 # ADR-0041 wave plan — A, B, C, and the ratification gate
@@ -45,7 +45,7 @@ modified: 2026-07-28T08:56:08.459Z
 sequencing *is* the point. Within a wave: parallel worktrees and delegation.
 Between waves: a release and soak evidence.
 
-```
+```text
 Wave 0: side-fixes + ADR drafts     (order-independent)
 Wave 1: A — curation + ladder       → release → wire into soaks → observe
 Wave 2: B — genre first-class       → migration → release → migrate soaks → observe
@@ -58,9 +58,18 @@ Wave 3: C — connect/external layers (needs B's fallback rooms to exist)
   before A fixed `CONVENTIONS.md` §6 and drained the PM notes into `work/` means
   stamping notes that are about to move.
 - **C after B** — C's fallback path *is* B's rooms. C cannot be tested until B ships.
-- **Release, not merge** — the soaks only exercise a **published** release
-  ([[npx-mage-runs-the-published-release]]). A merged-but-unreleased wave is
-  invisible to them. So every wave ends in a release.
+- **Release, not merge** — for a *real external* user, a merged-but-unreleased
+  wave is invisible ([[npx-mage-runs-the-published-release]]). So every wave ends
+  in a release.
+
+> **This premise does not hold for the home soaks — verified 2026-07-28.** The
+> global `mage` on this machine is an `npm link` to the working tree, so it
+> resolves to `mage-memory/dist/cli.js`, and every soak hook invokes bare `mage`
+> (never `npx`). The soaks therefore track the working-tree build continuously and
+> a release changes nothing for them. What actually makes a wave visible in a soak
+> is **running `mage index` there** — no hook regenerates `INDEX.md`/`MEMORY.md`,
+> so those files sit at whatever build last wrote them. Treat release-gating as
+> correct for users and *inert* for these soaks.
 
 ## Wave 0 — parallel, independent
 
@@ -136,9 +145,11 @@ corrections), **or** the closed vocabulary forces real knowledge into
 
 ## Baseline — measured 2026-07-28, before 0.0.16
 
-Installed `mage --version` → **0.0.15**, so the soaks are still on the *pre-filter*
-contract. The home KB was regenerated with the **local** build, which is why only
-it shows the post-filter shape.
+The soak files are still on the *pre-filter* contract — but **not because of the
+installed version**. They were last written before Wave B merged and nothing has
+regenerated them since (prismalens `MEMORY.md` 07-27 00:06Z, sreforge 02:06Z;
+Wave B merged 09:08Z). The home KB shows the post-filter shape only because
+`mage index` was actually re-run against it.
 
 | KB / file | lines | bytes | `decisions/` links | governance line |
 |---|--:|--:|--:|:--:|
@@ -170,12 +181,16 @@ small top-level `INDEX.md` is *not* evidence the filter landed.
 
 ## What is left, in order
 
-1. Merge #100 → 0.0.16 publishes. This is the ratification event.
+1. ~~Merge #100~~ **done 2026-07-28** — 0.0.16 published to npm. This *starts* the
+   observation window; it does not by itself ratify anything.
 2. Merge the soak curation PRs (`prismalens-docs-hub#15`, `sreforge-memory#6`).
-3. Regenerate the soak indexes on 0.0.16 and re-measure against the baseline above.
-4. Flip [ADR-0041](../decisions/0041-genre-decides-the-recall-rung.md) and
-   [ADR-0042](../decisions/0042-reach-tier-harness-grants.md) to `accepted` if the
-   gate holds.
+3. Run `mage index` in each soak repo — this, not the release, is what makes
+   Wave B visible there — then re-measure against the baseline above.
+4. Flip [ADR-0041](../decisions/0041-genre-decides-the-recall-rung.md) to
+   `accepted` if **its** gate holds (the yield/KILL criteria above).
+   [ADR-0042](../decisions/0042-reach-tier-harness-grants.md) is **not** covered by
+   that gate — it is a separate decision with its own revisit trigger, and is
+   evaluated on its own terms.
 5. Grill Wave C in a fresh session ([#104](https://github.com/Sumit1993/mage-memory/issues/104)).
 
 ## Relations
