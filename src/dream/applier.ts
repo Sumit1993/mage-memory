@@ -17,9 +17,10 @@
 // (mkdir -p + rename), removes (rm -rf, guarded). The applier NEVER commits.
 
 import { mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import type { Proposal } from "../grooming/types.js";
 import { noteWing, readNote } from "../note.js";
+import { isUnder } from "../paths.js";
 import { hasLiveSecret, scanSecrets } from "../redact.js";
 import { GEN_MARKER, TARGET_AGENT_DIRS } from "../skills-shared.js";
 import { planDemote } from "./demote.js";
@@ -194,13 +195,6 @@ async function guardRemoves(repo: string, removes: readonly string[]): Promise<s
     }
   }
   return null;
-}
-
-/** True iff `abs` is `root` itself or a descendant of `root` (no `..` escape). */
-function isUnder(root: string, abs: string): boolean {
-  if (abs === root) return true;
-  const rel = relative(root, abs);
-  return rel.length > 0 && !rel.startsWith(`..${sep}`) && rel !== ".." && !isAbsolute(rel);
 }
 
 // ─── perform (the one writer) ────────────────────────────────────────────────────

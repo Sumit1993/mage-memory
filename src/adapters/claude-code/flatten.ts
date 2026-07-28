@@ -30,9 +30,9 @@
 
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 import { parseNote, stringifyNote } from "../../note.js";
-import { resolveDocsRoot } from "../../paths.js";
+import { isUnder, resolveDocsRoot } from "../../paths.js";
 import { isGeneratedArtifact, listNotePaths } from "../../scan.js";
 import { run } from "../../shell.js";
 import { isCcShaped, recoverCcFrontmatter } from "./cc-note.js";
@@ -95,12 +95,6 @@ async function gitToplevel(repoPath: string): Promise<string | null> {
   );
   if (!res || res.code !== 0) return null;
   return res.stdout.trim() || null;
-}
-
-/** True when `child` is `parent` itself or nested inside it (no `../` escape). */
-function isUnder(parent: string, child: string): boolean {
-  const rel = relative(parent, child);
-  return rel === "" || (!rel.startsWith(`..${sep}`) && rel !== ".." && !isAbsolute(rel));
 }
 
 /**

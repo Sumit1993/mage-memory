@@ -40,6 +40,22 @@ export interface ClaudeSettings {
    * commandeered the tier, so `mage disconnect` can restore it instead of clobbering it.
    */
   mageStashedAutoMemoryDirectory?: string;
+  /**
+   * CC's permission block. mage touches exactly one key inside it —
+   * `additionalDirectories` (the reach tier, ADR-0042) — and preserves the rest.
+   */
+  permissions?: {
+    additionalDirectories?: string[];
+    [k: string]: unknown;
+  };
+  /**
+   * mage-owned: the `permissions.additionalDirectories` entries mage INSERTED, so
+   * `disconnect` removes exactly what it added and never a path the user listed
+   * themselves (ADR-0042). `additionalDirectories` is an array, so the scalar
+   * stash-and-restore used for `autoMemoryDirectory` cannot express this — an
+   * explicit ownership record is the only way to reverse the write safely.
+   */
+  mageOwnedAdditionalDirectories?: string[];
   [k: string]: unknown;
 }
 
@@ -326,6 +342,98 @@ export function removeMageHooks(settings: ClaudeSettings | null): {
     return { settings: rest, removed };
   }
   return { settings: { ...base, hooks: nextHooks }, removed };
+}
+
+// ─── reach tier (ADR-0042) ───────────────────────────────────────────────────
+/** Read a settings array key defensively — a hand-edited file may hold anything. */
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : [];
+}
+
+/**
+ * Write `dirs` / `owned` back onto a settings clone, pruning empties so a
+ * reconcile → remove round-trip restores the original object exactly (minus mage).
+ */
+function applyReach(base: ClaudeSettings, dirs: string[], owned: string[]): ClaudeSettings {
+  const out = { ...base };
+  const prior =
+    out.permissions && typeof out.permissions === "object" && !Array.isArray(out.permissions)
+      ? out.permissions
+      : undefined;
+  const perms: NonNullable<ClaudeSettings["permissions"]> = { ...prior };
+
+  if (dirs.length > 0) perms.additionalDirectories = dirs;
+  else delete perms.additionalDirectories;
+
+  if (Object.keys(perms).length > 0) out.permissions = perms;
+  else delete out.permissions;
+
+  if (owned.length > 0) out.mageOwnedAdditionalDirectories = owned;
+  else delete out.mageOwnedAdditionalDirectories;
+
+  return out;
+}
+
+/**
+ * Return a NEW settings object granting the agent access to `grants` — the
+ * out-of-repo KB roots from `outOfRepoKbRoots()`. Pure: the input is never mutated.
+ *
+ * Reconciles in BOTH directions, which is what stops a moved hub from accumulating
+ * stale grants:
+ *   - a granted path already present that mage did NOT insert stays present and stays
+ *     UNOWNED — a user's own entry is never claimed, so `disconnect` leaves it alone
+ *     (the same courtesy the `autoMemoryDirectory` stash pays the scalar case);
+ *   - a granted path that is absent is appended AND recorded as mage-owned;
+ *   - a mage-owned entry that is no longer granted (hub moved, mode changed to
+ *     in-repo, link removed) is dropped.
+ *
+ * Deliberately INDEPENDENT of the commandeer tier (ADR-0042 §1): reading the KB and
+ * redirecting memory writes are separate concerns, so disabling CC auto-memory must
+ * never sever filesystem reach to the knowledge base.
+ */
+export function reconcileReachGrants(
+  settings: ClaudeSettings | null,
+  grants: string[],
+): ClaudeSettings {
+  const base = structuredClone(settings ?? {}) as ClaudeSettings;
+  const owned = new Set(stringArray(base.mageOwnedAdditionalDirectories));
+  const current = stringArray(base.permissions?.additionalDirectories);
+  const wanted = new Set(grants);
+
+  // Drop what mage owns but no longer grants; leave every other entry in place.
+  const next = current.filter((d) => !(owned.has(d) && !wanted.has(d)));
+  const nextOwned: string[] = [];
+  for (const g of grants) {
+    if (!next.includes(g)) {
+      next.push(g);
+      nextOwned.push(g); // mage inserted it → mage owns it
+    } else if (owned.has(g)) {
+      nextOwned.push(g); // already ours, still granted
+    }
+    // else: present because the USER listed it → granted for free, never claimed
+  }
+
+  return applyReach(base, next, nextOwned);
+}
+
+/**
+ * Symmetric undo of {@link reconcileReachGrants}: drop only the entries mage owns and
+ * forget the ownership record. A user's own `additionalDirectories` entries — including
+ * one that happens to equal a former grant — are preserved, which is why the record
+ * exists rather than inferring the set from metadata at disconnect time (metadata may
+ * have already been unlinked, or its `hub_path` moved).
+ */
+export function removeReachGrants(settings: ClaudeSettings | null): {
+  settings: ClaudeSettings;
+  removed: number;
+} {
+  const base = structuredClone(settings ?? {}) as ClaudeSettings;
+  const owned = new Set(stringArray(base.mageOwnedAdditionalDirectories));
+  if (owned.size === 0) return { settings: base, removed: 0 };
+
+  const current = stringArray(base.permissions?.additionalDirectories);
+  const next = current.filter((d) => !owned.has(d));
+  return { settings: applyReach(base, next, []), removed: current.length - next.length };
 }
 
 // ─── write ───────────────────────────────────────────────────────────────────

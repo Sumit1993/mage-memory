@@ -470,3 +470,140 @@ describe("connect commandeer-coverage", () => {
     expect(await exists(join(root, "lesson.md"))).toBe(false);
   });
 });
+
+describe("reach tier — connect grants out-of-repo KB access (ADR-0042)", () => {
+  /** An external-mode code repo pointing at a hub that exists on disk. */
+  async function externalRepo(opts: { hubExists: boolean }): Promise<{
+    code: string;
+    hub: string;
+  }> {
+    const hub = await tmpDir("mage-reach-hub-");
+    const code = await tmpDir("mage-reach-code-");
+    if (opts.hubExists) {
+      await mkdir(join(hub, "projects", "engine"), { recursive: true });
+      await writeFile(
+        join(hub, "metadata.json"),
+        JSON.stringify({ schema: "mage.v2", name: "h", created_at: "", projects: [] }),
+      );
+    }
+    await mkdir(join(code, "mage"), { recursive: true });
+    await writeFile(
+      join(code, "mage", "metadata.json"),
+      JSON.stringify({
+        schema: "mage.v2",
+        mode: "external",
+        project: "engine",
+        hub_path: opts.hubExists ? hub : join(hub, "gone"),
+        hub_repo: null,
+        hub_refs: [],
+        linked_at: "",
+      }),
+    );
+    return { code, hub };
+  }
+
+  it("grants the hub repo root and records mage ownership", async () => {
+    const { code, hub } = await externalRepo({ hubExists: true });
+    const r = await connect({ cwd: code, yes: true, gitHook: false });
+
+    expect(r.reach).toEqual([hub]);
+    const s = JSON.parse(await readFile(r.path, "utf8"));
+    expect(s.permissions.additionalDirectories).toEqual([hub]);
+    expect(s.mageOwnedAdditionalDirectories).toEqual([hub]);
+  });
+
+  it("grants independently of the commandeer tier — auto-memory OFF still reaches the hub", async () => {
+    const { code, hub } = await externalRepo({ hubExists: true });
+    // Pre-seed auto-memory disabled: the commandeer tier gates off, reach must not.
+    await mkdir(join(code, ".claude"), { recursive: true });
+    await writeFile(
+      localPath(code),
+      `${JSON.stringify({ autoMemoryEnabled: false }, null, 2)}\n`,
+    );
+
+    const r = await connect({ cwd: code, yes: true, gitHook: false });
+    expect(r.commandeer).toBe(false);
+    expect(r.reach).toEqual([hub]);
+    const s = JSON.parse(await readFile(r.path, "utf8"));
+    expect(s.permissions.additionalDirectories).toEqual([hub]);
+  });
+
+  it("skips the grant when the hub is absent on this machine", async () => {
+    const { code } = await externalRepo({ hubExists: false });
+    const r = await connect({ cwd: code, yes: true, gitHook: false });
+
+    expect(r.reach).toEqual([]);
+    const s = JSON.parse(await readFile(r.path, "utf8"));
+    expect(s.permissions?.additionalDirectories).toBeUndefined();
+    expect(s.mageOwnedAdditionalDirectories).toBeUndefined();
+  });
+
+  it("an absent hub does not abort connect — hooks still wire (regression)", async () => {
+    // Regression: ensureSinkIgnores used to throw ENOENT when mode=external resolved
+    // through a hub_path absent on this machine, so connect died before finishing.
+    // The committed hub_path is machine-specific, so this is the normal state on a
+    // fresh clone — it must degrade to a nudge, never an exception (ADR-0042 §7).
+    const { code } = await externalRepo({ hubExists: false });
+    const r = await connect({ cwd: code, yes: true, gitHook: false });
+
+    // 13 = 10 base + 3 commandeer: resolveDocsRoot does not stat hub_path, so the
+    // commandeer tier still gates on. The point is that connect COMPLETES.
+    expect(r.wired).toBe(13);
+    const s = JSON.parse(await readFile(r.path, "utf8"));
+    expect(s.hooks?.SessionStart?.some((g: { id?: string }) => g.id === "mage:observe:SessionStart")).toBe(
+      true,
+    );
+  });
+
+  it("refuses to grant a directory that exists but is NOT a hub", async () => {
+    // `mage/metadata.json` is git-tracked, so hub_path is untrusted: anyone who can land
+    // a commit could point it at ~/.ssh or / and have connect widen harness access to it.
+    // Existence alone must never be enough — the target must look like a mage hub.
+    const victim = await tmpDir("mage-reach-notahub-");
+    await writeFile(join(victim, "id_rsa"), "PRIVATE");
+    const code = await tmpDir("mage-reach-evil-");
+    await mkdir(join(code, "mage"), { recursive: true });
+    await writeFile(
+      join(code, "mage", "metadata.json"),
+      JSON.stringify({
+        schema: "mage.v2",
+        mode: "external",
+        project: "engine",
+        hub_path: victim,
+        hub_repo: null,
+        hub_refs: [],
+        linked_at: "",
+      }),
+    );
+
+    const r = await connect({ cwd: code, yes: true, gitHook: false });
+    expect(r.reach).toEqual([]);
+    const s = JSON.parse(await readFile(r.path, "utf8"));
+    expect(s.permissions?.additionalDirectories).toBeUndefined();
+    expect(s.mageOwnedAdditionalDirectories).toBeUndefined();
+  });
+
+  it("an in-repo KB is granted nothing", async () => {
+    const { dir } = await withKb({});
+    const r = await connect({ cwd: dir, yes: true, gitHook: false });
+    expect(r.reach).toEqual([]);
+    const s = JSON.parse(await readFile(r.path, "utf8"));
+    expect(s.mageOwnedAdditionalDirectories).toBeUndefined();
+  });
+
+  it("is idempotent — re-connecting does not duplicate the grant", async () => {
+    const { code, hub } = await externalRepo({ hubExists: true });
+    await connect({ cwd: code, yes: true, gitHook: false });
+    const r = await connect({ cwd: code, yes: true, gitHook: false });
+
+    expect(r.reach).toEqual([hub]);
+    const s = JSON.parse(await readFile(r.path, "utf8"));
+    expect(s.permissions.additionalDirectories).toEqual([hub]);
+  });
+
+  it("--user scope writes no grant (machine-specific paths stay out of the shared file)", async () => {
+    const { code } = await externalRepo({ hubExists: true });
+    const r = await connect({ cwd: code, yes: true, user: true, gitHook: false });
+    expect(r.reach).toEqual([]);
+  });
+});

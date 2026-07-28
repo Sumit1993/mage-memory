@@ -188,3 +188,78 @@ describe("disconnect", () => {
     expect(await exists(hookPath)).toBe(true);
   });
 });
+
+describe("reach tier — disconnect reverses the grant (ADR-0042)", () => {
+  async function externalRepo(): Promise<{ code: string; hub: string }> {
+    const hub = await tmpDir("mage-reachdc-hub-");
+    await mkdir(join(hub, "projects", "engine"), { recursive: true });
+    await writeFile(
+      join(hub, "metadata.json"),
+      JSON.stringify({ schema: "mage.v2", name: "h", created_at: "", projects: [] }),
+    );
+    const code = await tmpDir("mage-reachdc-code-");
+    await mkdir(join(code, "mage"), { recursive: true });
+    await writeFile(
+      join(code, "mage", "metadata.json"),
+      JSON.stringify({
+        schema: "mage.v2",
+        mode: "external",
+        project: "engine",
+        hub_path: hub,
+        hub_repo: null,
+        hub_refs: [],
+        linked_at: "",
+      }),
+    );
+    return { code, hub };
+  }
+
+  const localPath = (dir: string): string => join(dir, ".claude", "settings.local.json");
+
+  it("removes mage's grant and the ownership record", async () => {
+    const { code } = await externalRepo();
+    await connect({ cwd: code, yes: true, gitHook: false });
+
+    const r = await disconnect({ cwd: code, gitHook: false });
+    expect(r.reachRemoved).toBe(1);
+
+    const s = JSON.parse(await readFile(localPath(code), "utf8"));
+    expect(s.permissions?.additionalDirectories).toBeUndefined();
+    expect(s.mageOwnedAdditionalDirectories).toBeUndefined();
+  });
+
+  it("leaves a grant the USER added themselves", async () => {
+    const { code, hub } = await externalRepo();
+    // The user lists the hub first; connect must not claim it, disconnect must keep it.
+    await mkdir(join(code, ".claude"), { recursive: true });
+    await writeFile(
+      localPath(code),
+      `${JSON.stringify({ permissions: { additionalDirectories: [hub] } }, null, 2)}\n`,
+    );
+    await connect({ cwd: code, yes: true, gitHook: false });
+
+    const r = await disconnect({ cwd: code, gitHook: false });
+    expect(r.reachRemoved).toBe(0);
+
+    const s = JSON.parse(await readFile(localPath(code), "utf8"));
+    expect(s.permissions.additionalDirectories).toEqual([hub]);
+  });
+
+  it("preserves the user's unrelated additionalDirectories entries", async () => {
+    const { code, hub } = await externalRepo();
+    await mkdir(join(code, ".claude"), { recursive: true });
+    await writeFile(
+      localPath(code),
+      `${JSON.stringify({ permissions: { additionalDirectories: ["/home/u/scratch"] } }, null, 2)}\n`,
+    );
+    await connect({ cwd: code, yes: true, gitHook: false });
+
+    const s1 = JSON.parse(await readFile(localPath(code), "utf8"));
+    expect(s1.permissions.additionalDirectories).toEqual(["/home/u/scratch", hub]);
+
+    const r = await disconnect({ cwd: code, gitHook: false });
+    expect(r.reachRemoved).toBe(1);
+    const s2 = JSON.parse(await readFile(localPath(code), "utf8"));
+    expect(s2.permissions.additionalDirectories).toEqual(["/home/u/scratch"]);
+  });
+});
