@@ -231,7 +231,7 @@
       "name": "index",
       "summary": "(Re)generate INDEX.md + the Claude Code MEMORY.md roster — the always-loaded index of notes (idempotent; roster order consults local metrics when present)",
       "aliases": [],
-      "hidden": true,
+      "hidden": false,
       "options": [
         {
           "flags": "-d, --dir <path>",

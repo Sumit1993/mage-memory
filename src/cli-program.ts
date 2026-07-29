@@ -119,7 +119,7 @@ export function buildProgram(): Command {
 
   // ─── index ───────────────────────────────────────────────────────────────────
   program
-    .command("index", { hidden: true })
+    .command("index")
     .description(
       "(Re)generate INDEX.md + the Claude Code MEMORY.md roster — the always-loaded index of notes (idempotent; roster order consults local metrics when present)",
     )
