@@ -2,12 +2,13 @@
 
 # mage
 
-> 29 notes. Part of the [index](INDEX.md).
+> 30 notes. Part of the [index](INDEX.md).
 
 ## build
 
 - `gotcha` [Gotcha — a throwaway measurement script is code, and its bug becomes an ADR's evidence](notes/ad-hoc-measurement-scripts-are-code.md) — analysis-script, parser, false-precision, cross-check, decision-input
 - `gotcha` [Gotcha — agy reports byte-exact compliance it did not deliver; verify the artifact, not the report](notes/agy-commit-message-compliance-is-unreliable.md) — gemini, delegation, false-compliance, trailer, verify-do-not-trust
+- `gotcha` [Gotcha — bare `mage` runs your WORKING TREE, so the soaks never exercise a release](notes/bare-mage-runs-the-working-tree.md) — npm-link, global-install, soak, release-gating, dogfood, version-lies, stale-index, symlink, verification
 - `gotcha` [Gotcha — a delegate sent after a command that does not exist will find the one you forbade](notes/delegation-prompts-must-name-real-commands.md) — agy, prompt, verification-commands, nonexistent-script, house-rules
 - `gotcha` [Gotcha — Gemini re-indents entire files with tabs; diff-stat inflation is the tell](notes/gemini-reindents-whole-files-with-tabs.md) — agy, indentation, diff-churn, delegation
 - `gotcha` [Gotcha — a link-graph harvest must genre-filter its SOURCES, not just its targets](notes/link-harvests-must-genre-filter-sources.md) — cross-links, recall
