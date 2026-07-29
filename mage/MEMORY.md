@@ -4,6 +4,7 @@
 
 > 38 accepted decisions govern this repo — read `decisions/` before architectural or scope changes.
 
+- `gotcha` [Gotcha — bare `mage` runs your WORKING TREE, so the soaks never exercise a release](notes/bare-mage-runs-the-working-tree.md) — npm-link, global-install, soak, release-gating, dogfood, version-lies, stale-index, symlink, verification
 - `reference` [Mining agentmemory's design into mage — conclusions](notes/agentmemory-mining-map.md) — iii, server-inverse, obsidian-ui, roadmap
 - `gotcha` [Gotcha — Gemini re-indents entire files with tabs; diff-stat inflation is the tell](notes/gemini-reindents-whole-files-with-tabs.md) — agy, indentation, diff-churn, delegation
 - `gotcha` [Gotcha — a link-graph harvest must genre-filter its SOURCES, not just its targets](notes/link-harvests-must-genre-filter-sources.md) — cross-links, recall
@@ -34,4 +35,4 @@
 - `gotcha` [Gotcha — scope Gate-2 to the knowledge base, not the whole repo](notes/gate2-blocks-own-redaction-fixtures.md) — pre-commit, hook, docs-root, connect, dogfood
 - `gotcha` [Gotcha — key bodies with `-`/`_` partially leak past the high-entropy detector](notes/redaction-anthropic-key-detector.md) — mage
 
-> 29 memory notes total (29 shown). Read INDEX.md before non-trivial work.
+> 30 memory notes total (30 shown). Read INDEX.md before non-trivial work.
