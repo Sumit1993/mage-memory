@@ -106,6 +106,8 @@ export interface ScannedNote {
   keywords: string[];
   status?: string;
   lastReviewed?: string;
+  updated?: string;
+  created?: string;
 }
 
 /**
@@ -235,6 +237,8 @@ function toScanned(fm: NoteFrontmatter, body: string, abs: string, relPath: stri
     // `typeof === "string"` check dropped it and dream falsely flagged the note "no
     // last_reviewed date". isoDate() normalizes both to `YYYY-MM-DD` (ADR-0035 §3).
     lastReviewed: isoDate(efm.last_reviewed),
+    updated: isoDate(efm.updated),
+    created: isoDate(efm.created),
   };
 }
 
