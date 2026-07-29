@@ -471,12 +471,25 @@ describe("mage index — fan out over owned project docs roots (#106)", () => {
     expect(alphaMem).toContain("Alpha Feature");
     expect(alphaMem).not.toContain("Beta Feature");
 
+    // Reporting must not diverge from what actually landed: read the project
+    // INDEX.md files off disk too, not just `r.written`.
+    const alphaIdx = await readFile(
+      join(root, "projects/alpha/INDEX.md"),
+      "utf8",
+    );
+    expect(alphaIdx).toContain("Alpha Feature");
+    expect(alphaIdx).not.toContain("Beta Feature");
+
     const betaMem = await readFile(
       join(root, "projects/beta/MEMORY.md"),
       "utf8",
     );
     expect(betaMem).toContain("Beta Feature");
     expect(betaMem).not.toContain("Alpha Feature");
+
+    const betaIdx = await readFile(join(root, "projects/beta/INDEX.md"), "utf8");
+    expect(betaIdx).toContain("Beta Feature");
+    expect(betaIdx).not.toContain("Alpha Feature");
 
     const hubMem = await readFile(join(root, "MEMORY.md"), "utf8");
     expect(hubMem).toContain("Alpha Feature");
@@ -524,6 +537,10 @@ describe("mage index — fan out over owned project docs roots (#106)", () => {
     );
     const posN1 = alphaMem.indexOf("First Note");
     const posN2 = alphaMem.indexOf("Second Note");
+    // Guard the rank comparison: a missing entry is -1, which would satisfy
+    // `toBeLessThan` for the wrong reason.
+    expect(posN1).toBeGreaterThanOrEqual(0);
+    expect(posN2).toBeGreaterThanOrEqual(0);
     expect(posN2).toBeLessThan(posN1);
   });
 
@@ -602,10 +619,25 @@ describe("mage index — fan out over owned project docs roots (#106)", () => {
     const r = await index({ dir: projAlpha });
 
     expect(r.written).toEqual(["INDEX.md", "MEMORY.md"]);
+
+    // Nothing outside the called project root may be touched: not the hub root's
+    // own pair, not the sibling project's.
     await expect(readFile(join(root, "INDEX.md"), "utf8")).rejects.toThrow();
+    await expect(readFile(join(root, "MEMORY.md"), "utf8")).rejects.toThrow();
     await expect(
       readFile(join(root, "projects/beta/INDEX.md"), "utf8"),
     ).rejects.toThrow();
+    await expect(
+      readFile(join(root, "projects/beta/MEMORY.md"), "utf8"),
+    ).rejects.toThrow();
+
+    // And what it did report must exist on disk, scoped to alpha.
+    const alphaIdx = await readFile(join(projAlpha, "INDEX.md"), "utf8");
+    const alphaMem = await readFile(join(projAlpha, "MEMORY.md"), "utf8");
+    expect(alphaIdx).toContain("Alpha");
+    expect(alphaIdx).not.toContain("Beta");
+    expect(alphaMem).toContain("Alpha");
+    expect(alphaMem).not.toContain("Beta");
   });
 
   it("does not fan out for in-repo (non-hub) KB", async () => {
