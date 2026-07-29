@@ -13,6 +13,7 @@ sources:
   - notes/dogfood-before-release.md
   - notes/mage-integration-test-framework.md
   - cc-session:d8d18f6f-21d4-4679-8b16-531132e1b88d
+  - cc-session:cc52271f-c247-4662-ac8c-94699ee8bb4d
 keywords:
   - npx
   - dogfood
@@ -25,7 +26,7 @@ keywords:
   - false-positive
   - self-hosting
   - verification
-modified: 2026-07-19T08:44:25.548Z
+modified: 2026-07-29T11:37:06.076Z
 ---
 
 # Gotcha — `npx mage` in this repo runs the PUBLISHED release, not your working tree
@@ -69,7 +70,9 @@ through the same resolution, so commits are scanned by the published redactor, n
 one in the tree. A redaction fix is not protecting you until it is released.
 
 Related: [[dogfood-before-release]] — dogfooding only tells you about the build you
-actually ran.
+actually ran. And its mirror image, [[bare-mage-runs-the-working-tree]]: the global `mage`
+is an `npm link`, so **`npx` runs published, bare `mage` runs your tree**. Knowing only half
+of that pair is how the ADR-0041 soak measurement was misread.
 
 ## Recurrence (2026-07-27) — it bit the ADR-0041 rollout itself
 
