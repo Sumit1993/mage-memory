@@ -57,11 +57,24 @@ deliberate and factual:
 |--|------|----------------------------|
 | Source of truth | **Files in your repo** (markdown + git) | A running server / database |
 | Curation | **Human-in-the-loop**: propose → confirm → *you* commit | Automatic writes / decay |
+| Trust | **Every memory is diffable** — `git log`, PR review, provenance fields | Opaque rows; you trust the retrieval |
 | Network | **Offline by default**; no telemetry | Typically server-hosted |
 | Viewer | Generated `dashboard.html` + Obsidian | Live web console |
 
 Same goal — memory that survives the session — reached by *file-as-truth +
 offline + human-curated* rather than an automatic, server-shaped store.
+
+The deeper reason is trust: **you cannot groom, review, or verify a memory
+you cannot read.** An embedding store is append-mostly and opaque — there is
+no `git diff` for what your agent believes. When memory is files, every
+claim your agent carries into a session has a history, a provenance line,
+and a reviewable diff; a wrong memory gets caught the same way a wrong line
+of code does — in review. mage's redaction gate runs at commit time because
+a memory *has* a commit, and its self-grooming loop (distill → promote →
+graduate → demote) is only possible because the memory is legible. That
+review gate is only as strong as your repo's own — a KB without PR review
+trusts notes on write, with provenance and `git log` as the audit trail when
+doubt arises.
 
 ## What it does
 
