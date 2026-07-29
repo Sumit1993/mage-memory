@@ -3,8 +3,8 @@ type: decision
 tags:
   - mage/decisions
 created: "2026-07-27"
-updated: 2026-07-27
-last_reviewed: 2026-07-27
+updated: 2026-07-29
+last_reviewed: 2026-07-29
 status: proposed
 provenance:
   repo: mage-memory
@@ -169,6 +169,112 @@ displaced bodies must stay committed notes).
 - Deferred to [future-thoughts](../notes/future-thoughts.md): falsify-on-commit,
   path-collision nudge, template wings (FT-04) as the delivery vehicle for
   per-work-style type maps.
+
+## Amendment (2026-07-29) — a bounded roster replaces the flat-percentage bound
+
+**Problem.** The yield half of Gate criterion 1 — `MEMORY.md` ≤ ~20% of the host
+auto-memory budget — is **unreachable by construction for any KB that folds its
+notes inline** (`foldInline` — flat or single-wing) **once its memory-note count
+passes the budget-derived target**. That is the scope of the claim, and it covers
+every KB that matures: not a target narrowly missed, but one the mechanism cannot
+hold. The budget is `AUTO_MEMORY_MAX_LINES = 200` / `AUTO_MEMORY_MAX_BYTES = 25_600`
+(`src/adapters/claude-code/constants.ts`), so the target is **40 lines /
+5,120 B**. Measured post-migration, 2026-07-29:
+
+| KB | lines | of 200 | bytes | of 25,600 | verdict |
+|---|---|---|---|---|---|
+| sreforge hub `MEMORY.md` | 86 | 43% | 7,493 | 29% | over |
+| home `mage/MEMORY.md` | 59 | 29% | 5,666 | 22% | over |
+| prismalens root `MEMORY.md` | 18 | 9% | 998 | 4% | passes — but see below |
+
+sreforge holds **41 memory-genre notes** (gotcha 20, feedback 8, reference 4,
+procedure 4, pointer 3, note 2). One line per note is **41 lines against a
+40-line target before a single heading or blank line exists**, and those 41
+entry lines alone are **7,006 B against the 5,120 B target — 1,886 B over with
+zero structure**. The filter worked; the arithmetic still fails.
+
+prismalens passes, and it is the scope boundary above rather than a
+counter-example to it: it is multi-wing, so it never folds inline
+(`foldInline = !hierarchical || wings.length <= 1`, `src/commands/index-cmd.ts`
+~L313) and its root file was **already a bounded roster before Wave B ever ran**.
+It measures the roster shape, not the genre filter — which makes it evidence
+**for** the mechanism this amendment adopts, not against the claim that the flat
+percentage is unreachable wherever notes fold inline.
+
+**The no-fixed-point argument.** Post-filter, an inline-folded `MEMORY.md` is a
+function of **how many memory-genre notes the KB holds**, and that count grows as
+the KB matures — which is the KB succeeding. A percentage-of-budget target
+therefore has no fixed point on that path: any inline-folding KB that keeps
+learning eventually crosses it, and the only way to hold the line is to stop
+capturing. This is the same shape of
+uncalibratable gate as
+[mature-kb-emits-no-capture-terminals](../notes/mature-kb-emits-no-capture-terminals.md)
+— a criterion whose measured quantity moves the wrong way as the system gets
+healthier. The remedy is the same: replace the moving target with a bound the
+mechanism enforces.
+
+**Amended criterion 1 (yield).** The gate is met when `MEMORY.md` **is a roster
+bounded by construction** rather than a file measured after the fact. What
+follows is the **contract a future renderer implementation must satisfy — not a
+description of current behavior**. Today `mage index` hands *every* memory-genre
+entry to `renderMemory`, and `renderFlat` only strips keyword tails and per-note
+lines once the budget is breached: **no K is computed, no ranking is applied, and
+no overflow line exists**. Building it is tracked separately as a 0.0.17
+deliverable; **until it lands, criterion 1 is unmet by definition.**
+
+1. **Shape.** One standing governance line (Decision §4) + the **top-K
+   memory-genre entries** + **one overflow line** naming the total note count
+   and pointing the reader at `INDEX.md`. Nothing else is pushed.
+2. **K is adapter-derived — never a universal constant.** K falls out of the
+   host's own budget constants, **lines AND bytes, whichever binds first**;
+   Claude Code derives its K from `AUTO_MEMORY_MAX_LINES` /
+   `AUTO_MEMORY_MAX_BYTES`, and a second harness brings its own budget and gets
+   its own K. A hard-coded K is the flat percentage in a new costume.
+3. **Ranking principle.** Usage-proven entries first — note-read usage where
+   local metrics exist, the same signal
+   [ADR-0038](0038-promote-note-rung-deleted-graduate-on-usage.md) graduates on
+   — with a **deterministic fallback ordering (recency)** so `mage index` stays
+   reproducible on machines that carry no metrics. Exact mechanics (tie-breaks,
+   overflow wording, where K is computed) belong to the implementation spec; the
+   ADR fixes only the principle: **push is bounded by construction, everything
+   else is pull via `INDEX.md`.**
+4. **The bound must reuse the bounding machinery that already exists.** The
+   implementation is required to express the roster in terms of `renderMemory`'s
+   existing `tier: 0 | 1 | 2` return and the `BREACH_RATIO` degradation ladder
+   (`src/commands/index-cmd.ts`; `BREACH_RATIO = 0.9` in
+   `src/metrics/footprint.ts`) rather than a flat percentage — the roster is to be
+   held against the same thresholds the renderer already degrades on, not against
+   a new parallel budget. Those thresholds exist today; **what does not exist is
+   anything that bounds the entry count before they are reached.**
+
+**Unchanged by this amendment.**
+
+- **The other half of criterion 1 stands — and passed.** Zero document-genre
+  lines in `MEMORY.md`, verified by type census on sreforge post-migration.
+- **Criteria 2 and 3 are untouched and still unobserved** — soak recall quality
+  (prismalens, sreforge) over the observation window, and groom's keep-rate
+  calibration unblocking. Neither has been measured at all. **The gate cannot
+  flip until they are:** this amendment makes criterion 1 *satisfiable*, it does
+  not satisfy the gate. Status stays `proposed`.
+- **No KILL condition fired.**
+
+**New consequence — the trust boundary, acknowledged, not solved.** The recall
+surface this amendment bounds is written by agents. Where the KB repo has **no
+PR review** — most setups, including this author's own soak hubs — an
+agent-written note is **trusted on write**: nothing stands between capture and
+the always-on recall rung but the operator's attention. The backstops are the
+ones the file format already supplies: `provenance` fields on every note,
+staleness marking (`status: stale-suspect`, `last_reviewed`), and
+**audit-on-suspicion via git history** — every claim has a commit, an author,
+and a diff. That is weaker than review-before-recall, and it is recorded here as
+an **accepted limitation, not a TODO**: mage does not answer it with a
+write-time tollbooth ([ADR-0035](0035-decouple-harness-memory-from-notes.md) §4).
+
+**Owner decision (2026-07-29).** The baseline table in the wave-plan note
+([plan-adr-0041-waves](../work/plan-adr-0041-waves.md)) still states the ~20%
+target and its pre-amendment measurements. It is **deliberately left as-is** — a
+point-in-time work record of what was measured under the old criterion;
+rewriting it would erase the evidence this amendment rests on.
 
 ## Relations
 
