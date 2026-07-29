@@ -84,7 +84,7 @@ Only the bottom three rows are committed to git; the top two are throwaway scrat
 mage has **no runtime** — it rides whatever hooks the host gives it. Left to itself, the loop's capture is *volitional* (you write a note when you remember to) and recall is a file you're *meant* to read. A host **adapter**, wired by `mage connect`, makes both deterministic. For Claude Code it plugs into the loop at exactly two points — and nowhere inside it:
 
 - **Capture.** Instead of Claude Code writing memories to its private store, mage co-opts that write, scrubs it before it touches disk, and drops it on the lesson path. See [Capture — the native-memory redirect](./capture.md).
-- **Recall.** mage's index is written as `MEMORY.md` — the same content as the portable `INDEX.md`, under the filename Claude Code's auto-load looks for — so your notes are present at launch every session without anyone having to "read the index."
+- **Recall.** mage's index is also written as `MEMORY.md`, under the filename Claude Code's auto-load looks for — so your notes are present at launch every session without anyone having to "read the index." It is a **bounded roster**, not a copy of `INDEX.md`: what is pushed at launch is the governance line plus the top-ranked entries that fit the host's auto-memory budget, and one overflow line sends you to the full `INDEX.md` for everything else. Ranking puts notes you have actually used first where local metrics exist, and falls back to recency where they don't.
 
 ```mermaid How the Claude Code adapter plugs into the harness-free core at two seams: Gate-0 scrubs a memory write and feeds the core's capture, and the core's recall index is written out as the auto-loaded MEMORY.md.
 flowchart LR
