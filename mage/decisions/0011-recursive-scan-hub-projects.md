@@ -2,8 +2,8 @@
 type: decision
 tags: [mage/decisions]
 created: "2026-06-02"
-updated: "2026-06-02"
-last_reviewed: "2026-06-02"
+updated: "2026-07-29"
+last_reviewed: "2026-07-29"
 status: active
 provenance:
   repo: mage-memory
@@ -45,6 +45,12 @@ Consistency is free: `index`, `skills`, and `dream` already share `scanNotes` (`
 - **Migration:** existing hubs need a one-time `mv projects/<name>/mage/* projects/<name>/` + deletion of the anchors and nested `.obsidian/`. Pre-1.0, cheap.
 - **Correctness now rides the skip-set** — a wrong entry would index `.obsidian` junk or generated files. Fixed for 0.2; a `.mageignore`-style override is a future nicety.
 - Closes the roadmap gaps "index hub-owned projects" and "`mage link` writes external awareness."
+
+## Amendment (2026-07-29) — generated indexes also land in each project root
+
+**Problem.** §4 ends "All generated indexes live at the vault root; `projects/<name>/` holds only notes." That held while the vault root was the only place anything read recall from. It stopped holding once external mode pointed a code repo's `autoMemoryDirectory` at `<hub>/projects/<name>/` — the harness auto-loads `MEMORY.md` *from that directory*, so a project root with no generated pair gives an external repo no session recall at all (issue [#106](https://github.com/Sumit1993/mage-memory/issues/106)).
+
+**Decision (supersedes §4's last clause, keeps the rest):** since 0.0.17, `mage index` at a hub root generates the hub's own `INDEX.md` + `MEMORY.md` **and** fans out one level to regenerate each registered project's `projects/<name>/INDEX.md` + `MEMORY.md` in place (a project root absent from disk is skipped). §4's substance is untouched — a project index is still **tag-defined**, not location-defined; the fan-out changes only *where the generated file is written*, never how its contents are derived. `_index.<wing>.md` at the vault root remains.
 
 ## Relations
 

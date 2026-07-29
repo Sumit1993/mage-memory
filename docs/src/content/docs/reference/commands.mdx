@@ -119,28 +119,52 @@ Two cases worth knowing:
 `mage doctor` reports the grant under **KB access grant** — a failing check when the
 hub is present but ungranted, and a skip when the hub simply isn't cloned here.
 
+Changing in 0.0.18: per ADR-0043 an external hub will be addressed by its remote
+(`hub_repo`) and located by derivation at `~/.mage/hubs/<host>/<owner>/<repo>`,
+cloned on demand — deprecating `hub_path` and the "isn't on this machine" case
+above. See [Modes and storage](../model/modes.md#reaching-a-hub-from-the-code-repo).
+
 ## Regenerating the index and skills
 
-Two generated artifacts keep agents oriented. `mage index` rebuilds
-`mage/INDEX.md`, the always-loaded map of every note (deterministic and
-idempotent — never hand-edit the output). `mage skills` regenerates one
+Two generated artifacts keep agents oriented. `mage index` rebuilds both recall
+surfaces — `mage/INDEX.md`, the full one-line-per-note index of every
+**memory-genre** note, and `mage/MEMORY.md`, the ranked, budget-bounded roster
+the host pushes at session launch (idempotent — never hand-edit either output;
+see [The two recall surfaces](../model/graph.md#the-two-recall-surfaces)).
+`mage skills` regenerates one
 auto-loaded skill per wing into `.claude/skills/` and `.agents/skills/` so agents
 discover your knowledge base. Each generated wing skill includes a "Governing decisions" section listing the accepted, non-superseded decision records (ADRs) that the wing's **memory-genre** notes link to — per-ADR recall rides linking memories, so an ADR reachable only from another ADR's Relations list does not govern (ADR-0041 §4). The section is capped at the 12 most recent decisions, with the remainder folded into one "…and N more in decisions/" line; the recall/footprint ceilings stay as a whole-file backstop (use `mage footprint`/`mage doctor` to diagnose breaches).
 
 ```bash
-# Rebuild the always-loaded index after adding or editing notes
+# Rebuild both recall surfaces after adding or editing notes
 mage index
 
 # Regenerate the per-wing skills (run this after a new wing appears)
 mage skills
 ```
 
+### At a hub root, `index` fans out
+
+Run inside a code repo's `mage/`, `mage index` writes that one pair. Run at a
+**hub root**, it writes the hub's own `INDEX.md` + `MEMORY.md` *and* regenerates
+each registered project's own `projects/<name>/INDEX.md` + `MEMORY.md` in place
+(a project whose directory is not on disk is skipped). Each project's pair is
+scoped to that project's notes; the hub's own pair spans the fleet.
+
+This is not cosmetic: an `external`-mode code repo's `autoMemoryDirectory` points
+at `projects/<name>/`, so that is where its session-launch recall has to be. The
+fan-out is one level deep only — calling `mage index` directly on a project root
+writes that project's pair and nothing else. See [Set up a hub and external
+mode](../guides/hub-and-external-mode.md).
+
 `mage/INDEX.md` (along with `MEMORY.md`, and `Dashboard.md` from `mage
 dashboard`) is **generated _and_ committed**, so on a team it will sometimes
 conflict on a merge — that is expected, not a mistake. Treat these like build
 output: after merging a branch that touched notes, re-run `mage index` (and
 `mage dashboard`, if you use it) to regenerate the file rather than
-hand-resolving the conflict.
+hand-resolving the conflict. That goes double for `MEMORY.md`: its roster order
+consults local usage metrics, so two machines with identical notes can
+legitimately produce different orderings — regenerate, never hand-merge.
 
 `mage index` is plumbing — the hooks and the `mage:learn` flow (the
 deliberate-capture skill that drafts a note for you and writes it after you

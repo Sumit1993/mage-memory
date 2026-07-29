@@ -25,7 +25,7 @@ For example, instead of pasting a service's entire API reference into a note, yo
 
 ## Note types and genres
 
-A note carries an optional `type` in its frontmatter. Per ADR-0041, `type` maps to a **genre** that decides its recall rung. Only memory-genre notes populate the always-loaded recall index (`INDEX.md`) (ADR-0041):
+A note carries an optional `type` in its frontmatter. Per ADR-0041, `type` maps to a **genre** that decides its recall rung. Only memory-genre notes reach recall at all — every one of them lands in `INDEX.md`, and passing the genre filter makes a note *eligible* for the pushed `MEMORY.md` roster rather than guaranteeing a slot in it: what gets pushed is the top-K by rank, and the rest stay in `INDEX.md` ([the two recall surfaces](./graph.md#the-two-recall-surfaces)). The memory genres (ADR-0041):
 
 - **gotcha** / **procedure** — traps and reusable procedures (procedural notes that can graduate into skills).
 - **pointer** / **reference** / **principle** / **feedback** / **note** — wayfinding, durable rules, and insight.

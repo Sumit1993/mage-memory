@@ -74,10 +74,11 @@ flowchart LR
 | **Raw capture** | `.mage/learnings/` | ignored | written automatically by the capture hook; auto-pruned |
 | **Draft** | `.mage/staging/` | ignored | `stage` (first sight) or `distill` → `promote` (recurrence); scrubbed + deduped |
 | **Note** | `notes/` | **committed** | `groom` — you accept the draft; re-indexed on the way |
-| **Recall index** | `INDEX.md` (and `MEMORY.md`) | **committed** | `index` regenerates it after every accept |
+| **Recall — pulled** | `INDEX.md` — every memory-genre note | **committed** | `index` regenerates it after every accept |
+| **Recall — pushed** | `MEMORY.md` — the top-ranked entries that fit the host's budget | **committed** | `index` regenerates it after every accept |
 | **Skill** | a loadable skill | **committed** | `graduate` — a proven procedural note that recurs enough |
 
-Only the bottom three rows are committed to git; the top two are throwaway scratch. And nothing here is durable until *you* run `git commit` — see [Nothing auto-commits](#nothing-auto-commits).
+Only the bottom four rows are committed to git; the top two are throwaway scratch. And nothing here is durable until *you* run `git commit` — see [Nothing auto-commits](#nothing-auto-commits).
 
 ## Using mage with a coding agent
 

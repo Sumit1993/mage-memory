@@ -48,15 +48,18 @@ A **hub** is a knowledge base that is its own repo, not nested in any one code r
 my-hub/
   metadata.json        # the registry of projects
   INDEX.md             # the hub's OWN index
+  MEMORY.md            # the hub's OWN pushed roster
   notes/  decisions/  work/   # the hub's own cross-cutting knowledge
   projects/
     engine/            # one project's flat docs root — its notes live here
+      INDEX.md         # the project's OWN index, scoped to its notes
+      MEMORY.md        # the project's OWN roster — what an external repo loads
     web/               # another
 ```
 
 Notice the layout is **flat**: a project's notes live at `projects/<name>/notes/`, not `projects/<name>/mage/notes/`. There is no second `mage/` nested inside the hub, because the hub root already *is* a mage knowledge base. A project looks like the hub it lives in, not like a code-repo `mage/` (this was settled in ADR-0011 and ratified in ADR-0023).
 
-The hub having its own `notes/` *and* `projects/<name>/` is intentional scope separation, not duplication: the hub's own notes hold what spans the whole fleet (the shared architecture, the conventions every project obeys); each project's notes hold what is scoped to that one code repo.
+The hub having its own `notes/` *and* `projects/<name>/` is intentional scope separation, not duplication: the hub's own notes hold what spans the whole fleet (the shared architecture, the conventions every project obeys); each project's notes hold what is scoped to that one code repo. That separation runs all the way through recall: `mage index` at the hub root regenerates the hub's own `INDEX.md` + `MEMORY.md` and fans out to give **each project its own pair**, scoped to that project's notes — which is what an `external`-mode code repo actually loads. See [Set up a hub and external mode](../guides/hub-and-external-mode.md).
 
 You create a hub with:
 
@@ -127,16 +130,27 @@ The on-disk schema is stamped as `mage.v2`. Older `mage.v1` metadata is read len
 
 Finding the knowledge base and being *allowed to read it* are two different things. In `external` and `hybrid` modes the docs root sits outside the repo your agent was launched in, and agent harnesses confine file access to the project root. So `mage connect` also grants access to the hub — for Claude Code, by adding it to `permissions.additionalDirectories` in the repo's local settings.
 
-Two consequences worth knowing:
+Three consequences worth knowing:
 
 - **`mage connect` is not optional for hub modes.** Without the grant the agent resolves the KB correctly and then cannot open it.
 - **`hub_path` is machine-specific.** It is an absolute path in a git-tracked file, so a clone on another machine may point at a hub that isn't there. mage skips the grant in that case rather than recording one for a path that doesn't exist; clone the hub and re-run `mage connect`. `mage doctor` reports the state either way.
 - **Only a real hub is ever granted.** Because `hub_path` lives in a tracked file, it is untrusted input — a bad value could otherwise point the grant at any directory. mage grants a path only when it actually looks like a hub (a `projects/` directory and a hub `metadata.json`), and skips it otherwise.
 
+:::note[Changing in 0.0.18 — hubs move to derived locations]
+ADR-0043 settles the direction: an external hub stops being addressed by a
+recorded path and becomes addressed by its **remote** (`hub_repo`), with its
+local location *derived* — one deterministic place per remote, at
+`~/.mage/hubs/<host>/<owner>/<repo>` — and cloned on demand if it isn't there
+yet. `hub_path` is deprecated at that point, and with it the machine-specificity
+caveat above: a derived path is the same on every machine, so a clone elsewhere
+no longer points at a hub that isn't there.
+:::
+
 An `in-repo` KB needs none of this — its docs already live under the project root.
 
 ## Where to next
 
+- [Set up a hub and external mode](../guides/hub-and-external-mode.md) — the four commands, in order, with the directory each one runs in.
 - [Install and Quickstart](../start/quickstart.md) — run `mage init` and capture your first note.
 - [Notes](./notes.md) and [The graph: wings and rooms](./graph.md) — what lives inside whichever shape you choose.
 - [Reference: commands](../reference/commands.mdx) — every flag on `init`, `link`, `unlink`, and the rest.

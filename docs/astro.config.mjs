@@ -90,6 +90,10 @@ export default defineConfig({
           label: 'Guides',
           items: [
             {
+              label: 'Set up a hub and external mode',
+              slug: 'guides/hub-and-external-mode',
+            },
+            {
               label: 'Import an existing notes folder',
               slug: 'guides/import-existing-notes',
             },
