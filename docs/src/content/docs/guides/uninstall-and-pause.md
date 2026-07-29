@@ -39,6 +39,35 @@ The `mage:*` skills are a Claude Code plugin. Remove it from inside Claude Code:
 open `/plugin` and uninstall **mage**, or run `/plugin uninstall mage@mage`. This
 only removes the namespaced skills; it does not touch your notes or the CLI.
 
+### Plugin cache
+
+Claude Code caches an installed plugin under `~/.claude/plugins/cache/`. How it got
+there decides how much it costs you.
+
+If you registered the marketplace by a **local directory** (`/plugin marketplace add
+./some/path`), Claude Code copies **the entire working tree at that path** — including
+everything untracked. On this repo that meant a 556 MB cache: `node_modules/` plus
+`docs/node_modules/`, none of which the plugin needs. Worse, that copy is a **snapshot**,
+so the installed plugin can quietly sit at an old version while you assume it tracks
+your tree.
+
+Register it by its **GitHub source** instead — the form the README and
+[Quickstart](../start/quickstart.md) already teach — and clear the stale copy:
+
+```bash
+# 1. drop the stale cached snapshot
+rm -rf ~/.claude/plugins/cache/mage
+```
+
+Then, inside Claude Code, re-add and reinstall:
+
+```text
+/plugin marketplace add Sumit1993/mage-memory
+/plugin install mage@mage
+```
+
+That is also what an actual user installs, so what you run matches what you ship.
+
 ## Uninstall the CLI
 
 The `mage` command is a global npm package:

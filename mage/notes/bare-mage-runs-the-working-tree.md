@@ -107,3 +107,6 @@ through and silently changes what every soak executes.
 
 Related: [[soak-targets]] · [[dogfood-before-release]] — and note the pair rule at the top:
 `npx` → published, bare → working tree.
+
+Its plugin-cache sibling: [a directory-source marketplace copies your untracked tree](plugin-directory-source-copies-untracked-tree.md)
+— same question ("what am I actually running?"), asked of the skills plugin rather than the binary.
