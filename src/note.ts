@@ -145,6 +145,8 @@ export function effectiveFrontmatter(fm: NoteFrontmatter): NoteFrontmatter {
     tags: pick(fm.tags, m.tags),
     status: pick(fm.status, m.status),
     last_reviewed: pick(fm.last_reviewed, m.last_reviewed),
+    updated: pick(fm.updated, m.updated),
+    created: pick(fm.created, m.created),
     keywords: pick(fm.keywords, m.keywords),
   };
 }

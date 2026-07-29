@@ -99,9 +99,10 @@ describe("mage index", () => {
     const r = await index({ dir });
     expect(r.written).toContain("MEMORY.md");
     const mem = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
-    // Flat KB: MEMORY.md folds the per-note list inline — byte-identical to INDEX.md.
+    // Flat KB: MEMORY.md folds the per-note list inline with an overflow line.
     expect(mem).toContain("[Pay](notes/billing/pay.md)");
-    expect(mem).toBe(await readFile(join(dir, "mage", "INDEX.md"), "utf8"));
+    expect(mem).toContain("1 memory note total (1 shown)");
+    expect(mem).toContain("Read INDEX.md before non-trivial work.");
   });
 
   it("folds the per-note list INTO MEMORY.md for a single-wing hierarchical KB", async () => {
@@ -503,14 +504,14 @@ describe("mage index — dedupe generated index payload (ADR-0039 §5)", () => {
   });
 });
 
-describe("mage index — progressive degradation (ADR-0039 §7)", () => {
-  const threshold = Math.floor(BREACH_RATIO * AUTO_MEMORY_MAX_BYTES);
+describe("mage index — bounded roster MEMORY.md (ADR-0041 Amendment)", () => {
+  const thresholdBytes = Math.floor(BREACH_RATIO * AUTO_MEMORY_MAX_BYTES);
 
   async function generateKb(dir: string, count: number) {
     for (let i = 0; i < count; i++) {
       await note(
         dir,
-        `note${i}.md`,
+        `note${i.toString().padStart(3, "0")}.md`,
         `---
 type: note
 status: stale-suspect
@@ -522,7 +523,91 @@ keywords: [kw${i}, ${"k".repeat(25)}]
     }
   }
 
-  it("a small KB renders at tier 0 — no announcement, suffixes and keywords intact", async () => {
+  it("1. roster fits both thresholds by construction with a large synthetic KB (300 notes)", async () => {
+    const dir = await vault();
+    await generateKb(dir, 300);
+    const r = await index({ dir, quiet: true });
+    expect(r.memoryTier).toBe(1);
+    const mem = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
+    const rawLines = mem.split("\n");
+    const lines = mem.endsWith("\n") ? rawLines.length - 1 : rawLines.length;
+    const bytes = Buffer.byteLength(mem, "utf8");
+    expect(lines).toBeLessThanOrEqual(180);
+    expect(bytes).toBeLessThanOrEqual(23040);
+    expect(mem).toContain("300 memory notes total");
+    expect(mem).toContain("Read INDEX.md before non-trivial work.");
+  });
+
+  it("2. ranking: proven-flag ordering, recency ordering within tier, relPath tiebreak", async () => {
+    const dir = await vault();
+    // note1: unproven, old date
+    await note(dir, "b.md", "---\ntype: note\nlast_reviewed: '2026-01-01'\n---\n# B\n");
+    // note2: unproven, new date
+    await note(dir, "c.md", "---\ntype: note\nlast_reviewed: '2026-07-29'\n---\n# C\n");
+    // note3: proven (in tally with 5 chapters >= threshold 5), old date
+    await note(dir, "a.md", "---\ntype: note\nlast_reviewed: '2026-01-01'\n---\n# A\n");
+
+    await mkdir(join(dir, "mage", ".mage", "metrics"), { recursive: true });
+    await writeFile(
+      join(dir, "mage", ".mage", "metrics", "promote.json"),
+      JSON.stringify({
+        v: 4,
+        notes: {
+          "notes/a.md": { chapters: 5 },
+        },
+        sessions: {},
+      }),
+    );
+
+    await index({ dir, quiet: true });
+    const mem = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
+    const posA = mem.indexOf("[A](notes/a.md)");
+    const posC = mem.indexOf("[C](notes/c.md)");
+    const posB = mem.indexOf("[B](notes/b.md)");
+    expect(posA).toBeGreaterThan(-1);
+    expect(posC).toBeGreaterThan(-1);
+    expect(posB).toBeGreaterThan(-1);
+    expect(posA).toBeLessThan(posC); // Proven A comes before unproven C
+    expect(posC).toBeLessThan(posB); // Newer C comes before older B
+  });
+
+  it("3. fail-open: no tally file -> recency order, no throw, byte-identical across runs", async () => {
+    const dir = await vault();
+    await note(dir, "old.md", "---\ntype: note\nlast_reviewed: '2026-01-01'\n---\n# Old\n");
+    await note(dir, "new.md", "---\ntype: note\nlast_reviewed: '2026-07-29'\n---\n# New\n");
+
+    const r1 = await index({ dir, quiet: true });
+    const mem1 = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
+    expect(mem1.indexOf("[New](notes/new.md)")).toBeLessThan(mem1.indexOf("[Old](notes/old.md)"));
+
+    const r2 = await index({ dir, quiet: true });
+    const mem2 = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
+    expect(mem2).toBe(mem1);
+    expect(r2.memoryTier).toBe(r1.memoryTier);
+  });
+
+  it("4. overflow line: always present; correct total and shown counts; points at INDEX.md", async () => {
+    const dir = await vault();
+    await note(dir, "n1.md", "---\ntype: note\n---\n# N1\n");
+    await note(dir, "n2.md", "---\ntype: note\n---\n# N2\n");
+    await index({ dir, quiet: true });
+    const mem = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
+    expect(mem).toContain("> 2 memory notes total (2 shown). Read INDEX.md before non-trivial work.");
+  });
+
+  it("5. tier values: 0 when all fit, 1 when cut", async () => {
+    const dir = await vault();
+    await note(dir, "small.md", "---\ntype: note\n---\n# Small\n");
+    const rSmall = await index({ dir, quiet: true });
+    expect(rSmall.memoryTier).toBe(0);
+
+    const dir2 = await vault();
+    await generateKb(dir2, 200);
+    const rLarge = await index({ dir: dir2, quiet: true });
+    expect(rLarge.memoryTier).toBe(1);
+  });
+
+  it("a small KB renders at tier 0 — suffixes and keywords intact with overflow line", async () => {
     const dir = await vault();
     await generateKb(dir, 5);
     const r = await index({ dir, quiet: true });
@@ -530,54 +615,22 @@ keywords: [kw${i}, ${"k".repeat(25)}]
     const mem = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
     expect(mem).toContain("_(stale-suspect)_");
     expect(mem).toContain(" — kw");
-    expect(mem).not.toContain("> Keyword tails");
+    expect(mem).toContain("> 5 memory notes total (5 shown). Read INDEX.md before non-trivial work.");
   });
 
-  it("a KB just over threshold sheds tier 1 only — keyword tails gone, suffixes still present", async () => {
+  it("a KB over threshold cuts entries (tier 1) to fit line and byte budget", async () => {
     const dir = await vault();
     await generateKb(dir, 110);
     const r = await index({ dir, quiet: true });
     expect(r.memoryTier).toBe(1);
     const mem = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
-    expect(mem).toContain("_(stale-suspect)_"); // suffixes never gone
-    expect(mem).not.toContain(" — kw"); // keywords gone
-    expect(mem).toContain("> Keyword tails omitted");
-    expect(Buffer.byteLength(mem, "utf8")).toBeLessThanOrEqual(threshold);
-  });
-
-  it("a KB still over after tier 1 falls back to tier 2 — category map", async () => {
-    const dir = await vault();
-    await generateKb(dir, 130);
-    const r = await index({ dir, quiet: true });
-    expect(r.memoryTier).toBe(2);
-    const mem = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
-    expect(mem).toContain("_(stale-suspect)_"); // never dropped
-    expect(mem).toContain("Fallen back to category map");
-  });
-
-  it("a degraded render (any tier) still contains caution statuses", async () => {
-    const dir = await vault();
-    await note(
-      dir,
-      "huge.md",
-      `---
-type: note
-status: stale-suspect
-keywords: [kw1, ${"k".repeat(30000)}]
----
-# Huge Note
-`,
-    );
-    const r = await index({ dir, quiet: true });
-    expect(r.memoryTier).toBe(1); // drops keyword tails
-    const mem = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
     expect(mem).toContain("_(stale-suspect)_");
+    expect(mem).toContain("110 memory notes total");
+    expect(Buffer.byteLength(mem, "utf8")).toBeLessThanOrEqual(thresholdBytes);
   });
 
-  it("a line-only breach goes straight to tier 3 and mentions line budget", async () => {
+  it("a line-only breach cuts entries to fit 180-line budget", async () => {
     const dir = await vault();
-    // 190 notes with short content: won't breach bytes, but will breach lines
-    // threshold = 0.9 * 200 = 180 lines. 190 notes = ~190 lines + headers = >180 lines.
     for (let i = 0; i < 190; i++) {
       await note(
         dir,
@@ -590,12 +643,13 @@ type: note
       );
     }
     const r = await index({ dir, quiet: true });
-    expect(r.memoryTier).toBe(2);
+    expect(r.memoryTier).toBe(1);
     const mem = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
-    expect(mem).toContain("Fallen back to category map");
-    expect(mem).toContain("200-line recall budget");
-    expect(mem).toContain("per-note lines omitted");
-    expect(mem).not.toContain("keyword tails");
+    const rawLines = mem.split("\n");
+    const lines = mem.endsWith("\n") ? rawLines.length - 1 : rawLines.length;
+    expect(lines).toBeLessThanOrEqual(180);
+    expect(mem).toContain("190 memory notes total");
+    expect(mem).toContain("Read INDEX.md before non-trivial work.");
   });
 
   it("determinism: rendering the same fixture twice produces byte-identical output", async () => {
@@ -608,7 +662,7 @@ type: note
     expect(second).toBe(first);
   });
 
-  it("tier selection does not depend on note-read state", async () => {
+  it("tier selection with empty metrics file", async () => {
     const dir = await vault();
     await generateKb(dir, 130);
     await index({ dir, quiet: true });
@@ -631,7 +685,7 @@ type: note
     const mem = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
     const idx = await readFile(join(dir, "mage", "INDEX.md"), "utf8");
     expect(mem).not.toBe(idx);
-    expect(idx).toContain("Note 0"); // Unaffected by tiering
+    expect(idx).toContain("Note 0");
     expect(idx).toContain("_(stale-suspect)_");
   });
 });
