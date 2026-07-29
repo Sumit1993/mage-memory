@@ -45,7 +45,10 @@ export interface IndexResult {
 
 /**
  * Generate the hierarchical INDEX (the always-loaded "closet"). Deterministic
- * and idempotent: same notes → identical output, re-run → no diff (ADR-0006).
+ * and idempotent: same notes → identical output, re-run → no diff (ADR-0006) —
+ * with one documented exception: MEMORY.md's roster order consults the local
+ * promote tally when present (ADR-0041 Amendment §3), so a machine without
+ * metrics renders the recency fallback order.
  */
 export async function index(opts: IndexOptions = {}): Promise<IndexResult> {
   const resolved = await requireDocsRoot(opts.dir);
