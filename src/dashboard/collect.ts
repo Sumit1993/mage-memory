@@ -417,8 +417,8 @@ function isoDate(v: unknown): string | null {
  * increments the created tally; `updated` OR `last_reviewed` (preferring updated)
  * increments the reviewed tally. Days with no signal are omitted; the series is
  * sorted ascending by date. Each note body is already on disk; we read the
- * frontmatter via `readNote` (fail-open per note). scan exposes lastReviewed but
- * not created/updated, so we read frontmatter here.
+ * frontmatter via `readNote` (fail-open per note). `ScannedNote` carries created /
+ * updated as well, but this series keeps its own more lenient date parse (below).
  */
 async function buildActivity(root: string, notes: ScannedNote[]): Promise<DashboardActivity[]> {
   const created = new Map<string, number>();
