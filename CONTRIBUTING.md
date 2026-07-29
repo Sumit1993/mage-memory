@@ -16,7 +16,7 @@ Contributions of all sizes are welcome.
 
 ## Development setup
 
-Requirements: **Node >= 18** and **pnpm** (this repo pins pnpm via the
+Requirements: **Node >= 20** and **pnpm** (this repo pins pnpm via the
 `packageManager` field; `corepack enable` will use the right version).
 
 ```bash
@@ -70,8 +70,9 @@ issue** — see [SECURITY.md](SECURITY.md).
 
 ## Releases
 
-Releases are cut by the maintainer: tag `vX.Y.Z`, GitHub release, then
-`npm publish`. Contributors do not need to touch versioning.
+Releases are cut via Release Please (`release-please-config.json`): merging the
+release PR tags `vX.Y.Z`, creates the GitHub release, and publishes to npm.
+Contributors do not need to touch versioning.
 
 ## License
 

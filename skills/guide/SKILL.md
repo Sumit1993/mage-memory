@@ -46,7 +46,8 @@ Inside a docs root:
 
 ```
 mage/
-├── INDEX.md              # GENERATED — the always-loaded index of notes
+├── INDEX.md              # GENERATED — the full index of memory-genre notes (the pull surface)
+├── MEMORY.md             # GENERATED — the budget-bounded recall roster the host auto-loads (the push surface)
 ├── _index.<wing>.md      # GENERATED per-wing index (hierarchical mode)
 ├── notes/                # durable topic notes (the encyclopedia)
 ├── work/<slug>/          # task-scoped work units & home for plans/specs/task lists (artifacts/ git-ignored)
