@@ -134,7 +134,7 @@ Three consequences worth knowing:
 
 - **`mage connect` is not optional for hub modes.** Without the grant the agent resolves the KB correctly and then cannot open it.
 - **`hub_path` is machine-specific.** It is an absolute path in a git-tracked file, so a clone on another machine may point at a hub that isn't there. mage skips the grant in that case rather than recording one for a path that doesn't exist; clone the hub and re-run `mage connect`. `mage doctor` reports the state either way.
-- **Only a real hub is ever granted.** Because `hub_path` lives in a tracked file, it is untrusted input — a bad value could otherwise point the grant at any directory. mage grants a path only when it actually looks like a hub (a `projects/` directory and a hub `metadata.json`), and skips it otherwise.
+- **The grant is bounded by hub *shape*, not by trust.** Because `hub_path` lives in a git-tracked file, it is untrusted input — a bad value could otherwise widen harness access to any directory (`~/.ssh`, `/`). So mage writes the grant only when the target is already **hub-shaped**: a `projects/` directory plus a hub `metadata.json`. Be clear about what that does and does not buy you (ADR-0042 §7). It is a **structural check**, not an identity check: it caps grant-widening at directories that are already mage hubs, and it does **not** verify that the hub is *the* hub you meant, or that its origin is trusted. The residual exposure — a legitimate hub whose contents someone else controls — is the same trust boundary as your notes themselves, not a new one. A path that fails the shape check is treated exactly like a hub that isn't cloned here: warn, grant nothing, record nothing.
 
 :::note[Changing in 0.0.18 — hubs move to derived locations]
 ADR-0043 settles the direction: an external hub stops being addressed by a
@@ -144,6 +144,11 @@ local location *derived* — one deterministic place per remote, at
 yet. `hub_path` is deprecated at that point, and with it the machine-specificity
 caveat above: a derived path is the same on every machine, so a clone elsewhere
 no longer points at a hub that isn't there.
+
+It also adds the identity check the shape check above deliberately is not:
+**verify on arrival** — mage canonicalizes the `origin` of the clone it finds at
+the derived path and requires it to match `hub_repo`, erroring loudly on a
+mismatch. Derive the address, verify the arrival.
 :::
 
 An `in-repo` KB needs none of this — its docs already live under the project root.

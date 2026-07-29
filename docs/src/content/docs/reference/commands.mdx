@@ -131,9 +131,23 @@ surfaces — `mage/INDEX.md`, the full one-line-per-note index of every
 **memory-genre** note, and `mage/MEMORY.md`, the ranked, budget-bounded roster
 the host pushes at session launch (idempotent — never hand-edit either output;
 see [The two recall surfaces](../model/graph.md#the-two-recall-surfaces)).
-`mage skills` regenerates one
-auto-loaded skill per wing into `.claude/skills/` and `.agents/skills/` so agents
-discover your knowledge base. Each generated wing skill includes a "Governing decisions" section listing the accepted, non-superseded decision records (ADRs) that the wing's **memory-genre** notes link to — per-ADR recall rides linking memories, so an ADR reachable only from another ADR's Relations list does not govern (ADR-0041 §4). The section is capped at the 12 most recent decisions, with the remainder folded into one "…and N more in decisions/" line; the recall/footprint ceilings stay as a whole-file backstop (use `mage footprint`/`mage doctor` to diagnose breaches).
+`mage skills` regenerates the **per-wing `mage-wing-*` skills** — one
+auto-loaded skill per wing, into `.claude/skills/` and `.agents/skills/` — so agents
+discover your knowledge base.
+
+There are two classes of generated skill, and only one of them is `mage skills`'
+business:
+
+- **Per-wing skills (`mage-wing-*`)** are *derived from your notes*, exactly like
+  the index. `mage skills` is their writer; re-running it rebuilds them from the
+  current wings, deterministically.
+- **Graduated skills (`mage-skill-*`)** come out of the grooming loop, when a
+  proven procedural note earns its own skill. `mage dream --apply` is the
+  **single writer** that mints those, and the ceilings it enforces are the reason
+  it is the only one. `mage skills` never creates, edits, or deletes a graduated
+  skill. See [Promote and graduate](../loop/promote-graduate.md).
+
+Each generated wing skill includes a "Governing decisions" section listing the accepted, non-superseded decision records (ADRs) that the wing's **memory-genre** notes link to — per-ADR recall rides linking memories, so an ADR reachable only from another ADR's Relations list does not govern (ADR-0041 §4). The section is capped at the 12 most recent decisions, with the remainder folded into one "…and N more in decisions/" line; the recall/footprint ceilings stay as a whole-file backstop (use `mage footprint`/`mage doctor` to diagnose breaches).
 
 ```bash
 # Rebuild both recall surfaces after adding or editing notes
@@ -145,7 +159,7 @@ mage skills
 
 ### At a hub root, `index` fans out
 
-Run inside a code repo's `mage/`, `mage index` writes that one pair. Run at a
+Run against a single knowledge base, `mage index` writes that one pair. Run at a
 **hub root**, it writes the hub's own `INDEX.md` + `MEMORY.md` *and* regenerates
 each registered project's own `projects/<name>/INDEX.md` + `MEMORY.md` in place
 (a project whose directory is not on disk is skipped). Each project's pair is
@@ -153,8 +167,9 @@ scoped to that project's notes; the hub's own pair spans the fleet.
 
 This is not cosmetic: an `external`-mode code repo's `autoMemoryDirectory` points
 at `projects/<name>/`, so that is where its session-launch recall has to be. The
-fan-out is one level deep only — calling `mage index` directly on a project root
-writes that project's pair and nothing else. See [Set up a hub and external
+fan-out is one level deep only — run at a project root, `mage index` writes that
+project's pair and nothing else (no recursion, and it never reaches back up to
+the hub root). See [Set up a hub and external
 mode](../guides/hub-and-external-mode.md).
 
 `mage/INDEX.md` (along with `MEMORY.md`, and `Dashboard.md` from `mage

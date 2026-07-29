@@ -45,8 +45,11 @@ node dist/cli.js --help
 3. Make sure `pnpm typecheck`, `pnpm build`, and `pnpm test` all pass.
 4. **Commit** using [Conventional Commits](https://www.conventionalcommits.org/):
    `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`, `ci:`, `perf:`.
-5. **Open a PR** against `main`. CI (build + typecheck + test on Node 18/20/22)
-   must be green before it can merge.
+5. **Open a PR** against `main`. CI must be green before it can merge. It runs
+   two matrices (`.github/workflows/ci.yml`): **build & test** — typecheck,
+   build, and test on Node **22 and 24** — and **cli smoke** — install the
+   packed tarball and run the CLI on Node **20 and 22**. Node 20 is the floor
+   the package declares, so the smoke job is what holds that promise.
 
 ## Working with the mage knowledge base
 

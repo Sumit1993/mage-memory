@@ -58,8 +58,13 @@ mage/
 
 ## C. Read order (before non-trivial work)
 
-1. **`<docs-root>/INDEX.md` FIRST** — one line per note (type · title · keywords
-   · → link). This tells you what exists. Open only what the task touches.
+1. **`<docs-root>/INDEX.md` FIRST** — one line per **memory-genre** note (type ·
+   title · keywords · → link). This is the *pull* surface: it tells you
+   everything that exists. Open only what the task touches. Do NOT stop at
+   what your session already auto-loaded — `MEMORY.md` is the *push* surface
+   and is deliberately truncated to a top-K roster that fits the host's budget,
+   ending in an overflow line back to `INDEX.md`. A note absent from `MEMORY.md`
+   is below the rank cut, not absent from the knowledge base.
 2. For a relevant wing, open its `_index.<wing>.md` (hierarchical) then the
    specific notes; follow their `[text](path.md)` links.
 3. Skim `<docs-root>/decisions/` for governing decisions.
@@ -97,10 +102,14 @@ See `CONVENTIONS.md` for the full spec. Essentials:
 - **Tags:** `#<wing>/<room>` — wing = project/repo/service/person, room = topic.
 - **Relations:** a `## Relations` section with typed links
   (`- depends_on [x](x.md)`).
-- **Genre & recall rungs (ADR-0041):** Note `type` maps to a genre that determines its recall rung — see `mage/decisions/0041-genre-decides-the-recall-rung.md`. Memory-genre notes (`gotcha`, `procedure`, `pointer`, `principle`, `feedback`, `reference`, `note`) form the recall-bearing set loaded in `INDEX.md` (ADR-0041). Non-memory genres (`decision`, `plan`, `tasks`, `spec`) are legal for storage and linking but are excluded from always-loaded recall — `mage/work/` is the home for plans/specs/task lists, while `mage/decisions/` holds decision records.
+- **Genre & recall rungs (ADR-0041):** Note `type` maps to a genre that determines its recall rung — see `mage/decisions/0041-genre-decides-the-recall-rung.md`. Memory-genre notes (`gotcha`, `procedure`, `pointer`, `principle`, `feedback`, `reference`, `note`) form the recall-bearing set: every one of them lands in `INDEX.md`, and passing the genre filter makes a note *eligible* for the `MEMORY.md` roster rather than guaranteeing a slot — that roster carries only the top-K by rank (usage-proven first where local metrics exist, else recency). Non-memory genres (`decision`, `plan`, `tasks`, `spec`) are legal for storage and linking but are excluded from recall entirely — `mage/work/` is the home for plans/specs/task lists, while `mage/decisions/` holds decision records.
 
-After editing notes, run `mage index` (refresh INDEX) and, if a new wing
-appeared, `mage skills` (refresh per-wing skills). Both are deterministic.
+After editing notes, run `mage index` — it regenerates **both** recall surfaces
+(`INDEX.md` and `MEMORY.md`) in one pass; never hand-edit either. At a hub root
+it also fans out to regenerate each `projects/<name>/`'s own pair. If a new wing
+appeared, run `mage skills` (refresh per-wing skills). Both commands are
+deterministic, with one caveat: `MEMORY.md`'s roster order consults local usage
+metrics, so it can order differently on another machine.
 
 ## G. Commit hygiene (HARD RULE)
 

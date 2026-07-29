@@ -103,7 +103,7 @@ so a stale index shows up here rather than as mysteriously missing recall.
 
 After the four steps, the split is:
 
-```
+```text
 my-hub/
   metadata.json           the registry — now lists my-service
   INDEX.md  MEMORY.md     the hub's OWN recall surfaces (cross-cutting notes)
