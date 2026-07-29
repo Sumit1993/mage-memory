@@ -52,7 +52,7 @@ The chapter boundary is a **view**, not a stored state: mage derives it from the
 
 A lesson is disposable until you accept it. It passes through two transient, git-ignored states before it becomes a committed one — and this table is the whole pipeline at a glance: where each state lives, whether git keeps it, and the one thing that moves it forward.
 
-```mermaid The states a lesson moves through: git-ignored throwaway scratch (raw capture, then draft) on the left flows rightward into the committed, durable side — a note, the recall index, and a skill.
+```mermaid The states a lesson moves through: git-ignored throwaway scratch (raw capture, then draft) on the left flows rightward into the committed, durable side — a note, the two recall surfaces it feeds, and a skill.
 flowchart LR
   subgraph IGN["git-ignored · throwaway scratch"]
     raw["Raw capture<br/>.mage/learnings"]
@@ -60,12 +60,15 @@ flowchart LR
   end
   subgraph COM["committed · durable"]
     note["Note<br/>notes/"]
-    index["Recall index<br/>INDEX.md"]
+    index["Recall · pulled<br/>INDEX.md — all memory notes"]
+    mem["Recall · pushed<br/>MEMORY.md — top-K roster"]
     skill["Skill"]
   end
   raw -->|"stage / distill+promote"| draft
   draft -->|"groom — you accept"| note
   note -->|"index"| index
+  note -->|"index"| mem
+  mem -. "overflow line" .-> index
   note -->|"graduate"| skill
 ```
 
@@ -74,10 +77,11 @@ flowchart LR
 | **Raw capture** | `.mage/learnings/` | ignored | written automatically by the capture hook; auto-pruned |
 | **Draft** | `.mage/staging/` | ignored | `stage` (first sight) or `distill` → `promote` (recurrence); scrubbed + deduped |
 | **Note** | `notes/` | **committed** | `groom` — you accept the draft; re-indexed on the way |
-| **Recall index** | `INDEX.md` (and `MEMORY.md`) | **committed** | `index` regenerates it after every accept |
+| **Recall — pulled** | `INDEX.md` — every memory-genre note | **committed** | `index` regenerates it after every accept |
+| **Recall — pushed** | `MEMORY.md` — the top-ranked entries that fit the host's budget | **committed** | `index` regenerates it after every accept |
 | **Skill** | a loadable skill | **committed** | `graduate` — a proven procedural note that recurs enough |
 
-Only the bottom three rows are committed to git; the top two are throwaway scratch. And nothing here is durable until *you* run `git commit` — see [Nothing auto-commits](#nothing-auto-commits).
+Only the bottom four rows are committed to git; the top two are throwaway scratch. And nothing here is durable until *you* run `git commit` — see [Nothing auto-commits](#nothing-auto-commits).
 
 ## Using mage with a coding agent
 

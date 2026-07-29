@@ -2,7 +2,7 @@
 
 # mage
 
-> 30 notes. Part of the [index](INDEX.md).
+> 31 notes. Part of the [index](INDEX.md).
 
 ## build
 
@@ -16,6 +16,7 @@
 - `note` [Mage main branch protected](notes/mage-main-branch-protected.md) — build
 - `note` [Mage no biome 2space](notes/mage-no-biome-2space.md) — build
 - `gotcha` [Gotcha — `npx mage` in this repo runs the PUBLISHED release, not your working tree](notes/npx-mage-runs-the-published-release.md) — dogfood, stale-binary, global-install, dist, dream, index, false-positive, self-hosting, verification
+- `gotcha` [Gotcha — a directory-source plugin marketplace copies your UNTRACKED tree, then serves it stale](notes/plugin-directory-source-copies-untracked-tree.md) — plugin-cache, github-source, node-modules, snapshot, dogfood, disk-bloat
 - `gotcha` [Gotcha — a lock on a hook path is the wrong mechanism; mage already folds append-only JSONL](notes/prefer-the-repos-lock-free-convention.md) — concurrency, lockfile, read-modify-write, fold-on-read, toctou, existing-convention
 - `gotcha` [Gotcha — filter on a frontmatter enum only after a census; vocabulary drifts silently](notes/status-vocabulary-drift-undercounts-filters.md) — accepted, active, census-first
 - `gotcha` [Test files were never type-checked (tsconfig excluded them)](notes/test-files-were-excluded-from-typecheck.md) — tsc, tests, exclude, vitest, tsup, esbuild, ci, fixture

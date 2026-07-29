@@ -11,7 +11,8 @@ procedure, and pointers (not copies of sources) — navigable as an Obsidian gra
 **Before non-trivial work in this repo:**
 
 1. Read `mage/INDEX.md` first — the always-current index of what's known
-   (one line per note: type · title · keywords · → link). Open only the notes
+   (one line per memory-genre note: type · title · keywords · → link; the
+   auto-loaded `MEMORY.md` roster is its bounded subset). Open only the notes
    the task actually touches; don't read everything.
 2. Follow the links in those notes (standard markdown `[text](path.md)` links)
    and skim `mage/decisions/` for governing decisions.

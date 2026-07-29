@@ -124,15 +124,20 @@ You rarely hand-write notes. The deliberate-capture path is the **`mage:learn`**
 
 `mage:learn` is the *deliberate* capture you trigger on the spot. The [grooming loop](../loop/overview.md) adds two more drafting paths you do not trigger by hand: inline [capture](../loop/capture.md) and the boundary [nudge](../loop/nudge.md) draft lessons as you work, and the recurrence path proposes a new note once a pattern recurs. All of them end the same way — a draft you review and confirm; **you** commit.
 
-## Regenerate the index
+## Regenerate the recall surfaces
 
-The **index** (`mage/INDEX.md`) is the always-loaded map of your knowledge base — one line per note. It is generated, never hand-edited. After adding or changing notes, regenerate it:
+`mage index` generates two files, and they are not the same thing:
+
+- **`mage/INDEX.md`** — the full index of your knowledge base, one line per memory-genre note. Your agent *pulls* this deliberately, before non-trivial work, to see what exists and then open only the notes a task touches.
+- **`mage/MEMORY.md`** — the ranked, budget-bounded roster your host agent *pushes* into every session on its own. Only the top entries that fit the host's auto-memory budget make it, and a final overflow line points back at `INDEX.md` for the rest.
+
+Both are generated, never hand-edited. After adding or changing notes, regenerate them:
 
 ```bash
 mage index
 ```
 
-Your agent loads this index first to know what exists, then opens only the notes a task touches.
+A new note that does not show up in `MEMORY.md` has not been lost — it is in `INDEX.md`, below the rank cut. See [The two recall surfaces](../model/graph.md#the-two-recall-surfaces).
 
 ## Commit it yourself
 
@@ -148,6 +153,7 @@ The capture sinks (`.mage/learnings/`, `.mage/metrics/`, `.mage/staging/`) are g
 ## Where to go next
 
 - [Modes and storage](../model/modes.md) — in-repo, hub, hybrid, and external.
+- [Set up a hub and external mode](../guides/hub-and-external-mode.md) — the end-to-end walkthrough: create a hub, link a repo as hub-owned, connect, verify.
 - [The grooming loop](../loop/overview.md) — how mage learns from your sessions.
 - [Import an existing notes folder](../guides/import-existing-notes.md) — bring old notes or a `docs/` tree in as distilled notes.
 - [Pause, disconnect, or uninstall](../guides/uninstall-and-pause.md) — turn capture off or remove mage; your notes stay.

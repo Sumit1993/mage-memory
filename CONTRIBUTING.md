@@ -16,7 +16,7 @@ Contributions of all sizes are welcome.
 
 ## Development setup
 
-Requirements: **Node >= 18** and **pnpm** (this repo pins pnpm via the
+Requirements: **Node >= 20** and **pnpm** (this repo pins pnpm via the
 `packageManager` field; `corepack enable` will use the right version).
 
 ```bash
@@ -45,8 +45,11 @@ node dist/cli.js --help
 3. Make sure `pnpm typecheck`, `pnpm build`, and `pnpm test` all pass.
 4. **Commit** using [Conventional Commits](https://www.conventionalcommits.org/):
    `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`, `ci:`, `perf:`.
-5. **Open a PR** against `main`. CI (build + typecheck + test on Node 18/20/22)
-   must be green before it can merge.
+5. **Open a PR** against `main`. CI must be green before it can merge. It runs
+   two matrices (`.github/workflows/ci.yml`): **build & test** — typecheck,
+   build, and test on Node **22 and 24** — and **cli smoke** — install the
+   packed tarball and run the CLI on Node **20 and 22**. Node 20 is the floor
+   the package declares, so the smoke job is what holds that promise.
 
 ## Working with the mage knowledge base
 
@@ -70,8 +73,9 @@ issue** — see [SECURITY.md](SECURITY.md).
 
 ## Releases
 
-Releases are cut by the maintainer: tag `vX.Y.Z`, GitHub release, then
-`npm publish`. Contributors do not need to touch versioning.
+Releases are cut via Release Please (`release-please-config.json`): merging the
+release PR tags `vX.Y.Z`, creates the GitHub release, and publishes to npm.
+Contributors do not need to touch versioning.
 
 ## License
 
