@@ -18,6 +18,7 @@ sources:
   - src/paths.ts
   - work/future-thoughts.md
   - https://github.com/Sumit1993/mage-memory/issues/103
+  - additionalDirectories tilde-expansion probe 2026-07-29 — two headless Claude Code projects on WSL, control vs. project-scope grant (local artifact; the method and both outcomes are inlined under Decision §8)
 keywords:
   - hub-repo
   - derived-path
@@ -29,6 +30,8 @@ keywords:
   - project-scope-grant
   - hub-path-deprecation
   - portability
+  - tilde-expansion
+  - workspace-trust
 ---
 
 # 0043 — A hub is addressed by its remote, located by derivation
@@ -142,6 +145,21 @@ a directory on disk that some other process may have created, so ADR-0042 §7's 
 origin-match check of §2. Two checks, one posture: **derive the address, verify the
 arrival.**
 
+**8. A git-tracked project-scope grant records the derived path HOME-RELATIVE** —
+`~/.mage/hubs/<host>/<owner>/<repo>`, never `/home/<user>/.mage/…`. `$HOME` differs across
+machines and users, so the home-relative form is the only one a committed `settings.json`
+can carry. **Tilde expansion inside `permissions.additionalDirectories` is verified
+empirically** (Claude Code, WSL, 2026-07-29): two headless probe projects with
+`permissions.defaultMode: "default"`, so an out-of-workspace read auto-denies
+non-interactively. Control, no grant — reading `$HOME/.mage/hubs/expansion-probe/probe.txt`
+was **denied**. Probe, with project-scope `.claude/settings.json` carrying
+`"additionalDirectories": ["~/.mage/hubs/expansion-probe"]` — the read **succeeded**, exact
+contents returned. Claude Code's docs document tilde/`$HOME` expansion for settings paths
+generally and `~/` in permission rules, but name neither for this array, so this rests on
+**documented general rules plus verification on this platform and version — not a
+documented contract**. Treat a future expansion regression as a supported failure mode:
+doctor's RECALL check already reads the effective grant, not the literal string.
+
 ## Considered options
 
 - **A symlink at the derived path pointing to the clone you already edit** (the grill's
@@ -173,9 +191,13 @@ arrival.**
 - **§2's grant table changes its source, not its shape.** `outOfRepoKbRoots` still returns
   the hub repo root; it computes it from `hub_repo` (falling back to `hub_path` during the
   transition) instead of reading it.
-- **"Project-scope grants are structurally blocked" is retired** — the structural blocker
-  was that no single path is correct from every worktree, and a derived absolute path is.
-  Delivery is gated on one unverified fact, below.
+- **"Project-scope grants are structurally blocked" is retired, and delivery is unblocked.**
+  The structural blocker was that no single path is correct from every worktree; a derived
+  path is. The one fact that stood between the principle and a shippable grant — whether the
+  harness expands `~` inside `additionalDirectories` — is now **verified working** (§8). A
+  git-tracked `settings.json` carrying `~/.mage/hubs/<host>/<owner>/<repo>` is effective from
+  every worktree of the repo, including worktrees mage never created. What remains is a
+  precondition, not a blocker: the workspace must be trusted once (see Consequences).
 - **"Worktree propagation needs its own research"** is answered: the research is
   [#103](https://github.com/Sumit1993/mage-memory/issues/103) and this is its decision.
 
@@ -183,13 +205,13 @@ arrival.**
 
 - **The command surface.** Which command clones, whether it prompts, the flag that makes it
   non-interactive — implementation, deliberately unfixed here (§4).
-- **Whether a committed grant can express the home prefix.** A tracked
-  `settings.json` must record the path home-relative (`~/.mage/hubs/…`), because `$HOME`
-  differs across machines and users. **Whether Claude Code expands `~`/`$HOME` inside
-  `permissions.additionalDirectories` is unverified.** This ADR unblocks project-scope
-  grants *in principle*; shipping one is gated on verifying that. Until then the ADR-0042
-  local-scope grant still applies — now pointed at a path that is at least identical across
-  every worktree on the machine.
+- **The edges of §8's expansion result.** `~/` as the leading segment is verified; the
+  `$HOME` and `${HOME}` forms are **untested** (so mage writes `~/`, the tested one).
+  Behaviour in scopes other than project `settings.json` is **untested** — the ADR-0042
+  local-scope grant keeps writing absolute paths, where the question does not arise. And
+  because the docs do not name this array, the behaviour is **not contract-protected across
+  versions**; a regression would surface as doctor's RECALL check failing, which is the
+  correct place for it to surface.
 - **Hubs with no remote.** See the ADR-0012 note below.
 - **[FT-20](../work/future-thoughts.md)'s global user-level hub.** That proposes a *new*
   hub as a personal memory tier. This decides **where all hubs live**. Independent.
@@ -237,6 +259,18 @@ arrival.**
 - **A one-time migration per existing hub**, human-run, that mage detects and suggests.
   `doctor` is the natural detector — read-only, consistent with
   [ADR-0037](0037-readiness-doctor-remit-and-autofix-line.md) §2.
+- **A project-scope grant is inert until the workspace is trusted once.** Found while
+  probing §8. Claude Code's exact warning: *"Ignoring 1
+  permissions.additionalDirectories entry from .claude/settings.json: this workspace has not
+  been trusted. Run Claude Code interactively here once and accept the trust dialog…"* So a
+  git-tracked grant does **not** make a fresh clone work unattended — it makes it work after
+  the one interactive acceptance that clone needed anyway. That is a reasonable precondition,
+  not a defect: trust is per-project and one-time, and doctor's RECALL check still reports a
+  grant that is present but not in force. **Residual unknown: the trust status of
+  harness-managed worktrees** (`.claude/worktrees/wf_*`, the case that motivated this ADR)
+  was **not tested** — if such a worktree counts as an untrusted workspace, the very scenario
+  §8 was meant to cover still needs one interactive visit. Worth settling before the
+  project-scope grant ships.
 - **A new failure mode: two remotes, one derived path.** Made loud by §2's origin check.
   Preferable to the silent alternative, and the check is cheap.
 - **A path under `$HOME` is now load-bearing for a permission grant.** Anything that wipes
