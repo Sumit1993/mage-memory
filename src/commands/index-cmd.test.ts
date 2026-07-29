@@ -428,6 +428,194 @@ describe("mage index — hub projects + registry (ADR-0011/0012)", () => {
   });
 });
 
+describe("mage index — fan out over owned project docs roots (#106)", () => {
+  it("fans out to write per-wing INDEX.md and MEMORY.md for all owned projects", async () => {
+    const root = await hub([
+      {
+        name: "alpha",
+        storage: "hub-owned",
+        code_repo_path: "/code/alpha",
+        code_repo_url: "git@github.com:me/alpha.git",
+      },
+      {
+        name: "beta",
+        storage: "hub-owned",
+        code_repo_path: "/code/beta",
+        code_repo_url: "git@github.com:me/beta.git",
+      },
+    ]);
+    await put(
+      root,
+      "projects/alpha/notes/a.md",
+      "---\ntype: note\ntags: [alpha/feature]\n---\n# Alpha Feature\n",
+    );
+    await put(
+      root,
+      "projects/beta/notes/b.md",
+      "---\ntype: note\ntags: [beta/feature]\n---\n# Beta Feature\n",
+    );
+
+    const r = await index({ dir: root });
+
+    expect(r.written).toContain("INDEX.md");
+    expect(r.written).toContain("MEMORY.md");
+    expect(r.written).toContain("projects/alpha/INDEX.md");
+    expect(r.written).toContain("projects/alpha/MEMORY.md");
+    expect(r.written).toContain("projects/beta/INDEX.md");
+    expect(r.written).toContain("projects/beta/MEMORY.md");
+
+    const alphaMem = await readFile(
+      join(root, "projects/alpha/MEMORY.md"),
+      "utf8",
+    );
+    expect(alphaMem).toContain("Alpha Feature");
+    expect(alphaMem).not.toContain("Beta Feature");
+
+    const betaMem = await readFile(
+      join(root, "projects/beta/MEMORY.md"),
+      "utf8",
+    );
+    expect(betaMem).toContain("Beta Feature");
+    expect(betaMem).not.toContain("Alpha Feature");
+
+    const hubMem = await readFile(join(root, "MEMORY.md"), "utf8");
+    expect(hubMem).toContain("Alpha Feature");
+    expect(hubMem).toContain("Beta Feature");
+  });
+
+  it("ranks per-wing MEMORY.md from co-located promote tally at projects/<a>/.mage/metrics/", async () => {
+    const root = await hub([
+      {
+        name: "alpha",
+        storage: "hub-owned",
+        code_repo_path: "/code/alpha",
+        code_repo_url: "git@github.com:me/alpha.git",
+      },
+    ]);
+    await put(
+      root,
+      "projects/alpha/notes/n1.md",
+      "---\ntype: note\ntags: [alpha/x]\ncreated: '2026-01-01'\n---\n# First Note\n",
+    );
+    await put(
+      root,
+      "projects/alpha/notes/n2.md",
+      "---\ntype: note\ntags: [alpha/x]\ncreated: '2026-01-01'\n---\n# Second Note\n",
+    );
+    const tally = {
+      v: 4,
+      notes: {
+        "notes/n2.md": { chapters: 5, lastSeen: "2026-07-29T10:00:00Z" },
+        "notes/n1.md": { chapters: 1, lastSeen: "2026-07-29T09:00:00Z" },
+      },
+      sessions: {},
+    };
+    await put(
+      root,
+      "projects/alpha/.mage/metrics/promote.json",
+      JSON.stringify(tally, null, 2),
+    );
+
+    await index({ dir: root });
+
+    const alphaMem = await readFile(
+      join(root, "projects/alpha/MEMORY.md"),
+      "utf8",
+    );
+    const posN1 = alphaMem.indexOf("First Note");
+    const posN2 = alphaMem.indexOf("Second Note");
+    expect(posN2).toBeLessThan(posN1);
+  });
+
+  it("is idempotent across fan-out runs (re-run byte-identical)", async () => {
+    const root = await hub([
+      {
+        name: "alpha",
+        storage: "hub-owned",
+        code_repo_path: "/code/alpha",
+        code_repo_url: "git@github.com:me/alpha.git",
+      },
+    ]);
+    await put(
+      root,
+      "projects/alpha/notes/a.md",
+      "---\ntype: note\ntags: [alpha/x]\n---\n# Alpha\n",
+    );
+
+    await index({ dir: root });
+    const hubIdx1 = await readFile(join(root, "INDEX.md"), "utf8");
+    const hubMem1 = await readFile(join(root, "MEMORY.md"), "utf8");
+    const alphaIdx1 = await readFile(
+      join(root, "projects/alpha/INDEX.md"),
+      "utf8",
+    );
+    const alphaMem1 = await readFile(
+      join(root, "projects/alpha/MEMORY.md"),
+      "utf8",
+    );
+
+    await index({ dir: root });
+    const hubIdx2 = await readFile(join(root, "INDEX.md"), "utf8");
+    const hubMem2 = await readFile(join(root, "MEMORY.md"), "utf8");
+    const alphaIdx2 = await readFile(
+      join(root, "projects/alpha/INDEX.md"),
+      "utf8",
+    );
+    const alphaMem2 = await readFile(
+      join(root, "projects/alpha/MEMORY.md"),
+      "utf8",
+    );
+
+    expect(hubIdx2).toBe(hubIdx1);
+    expect(hubMem2).toBe(hubMem1);
+    expect(alphaIdx2).toBe(alphaIdx1);
+    expect(alphaMem2).toBe(alphaMem1);
+  });
+
+  it("enforces depth-1 guard so direct project-root index call writes only there without recursion", async () => {
+    const root = await hub([
+      {
+        name: "alpha",
+        storage: "hub-owned",
+        code_repo_path: "/code/alpha",
+        code_repo_url: "git@github.com:me/alpha.git",
+      },
+      {
+        name: "beta",
+        storage: "hub-owned",
+        code_repo_path: "/code/beta",
+        code_repo_url: "git@github.com:me/beta.git",
+      },
+    ]);
+    await put(
+      root,
+      "projects/alpha/notes/a.md",
+      "---\ntype: note\ntags: [alpha/x]\n---\n# Alpha\n",
+    );
+    await put(
+      root,
+      "projects/beta/notes/b.md",
+      "---\ntype: note\ntags: [beta/x]\n---\n# Beta\n",
+    );
+
+    const projAlpha = join(root, "projects/alpha");
+    const r = await index({ dir: projAlpha });
+
+    expect(r.written).toEqual(["INDEX.md", "MEMORY.md"]);
+    await expect(readFile(join(root, "INDEX.md"), "utf8")).rejects.toThrow();
+    await expect(
+      readFile(join(root, "projects/beta/INDEX.md"), "utf8"),
+    ).rejects.toThrow();
+  });
+
+  it("does not fan out for in-repo (non-hub) KB", async () => {
+    const dir = await vault();
+    await note(dir, "a.md", "---\ntype: note\ntags: [alpha/x]\n---\n# Alpha\n");
+    const r = await index({ dir });
+    expect(r.written).toEqual(["INDEX.md", "MEMORY.md"]);
+  });
+});
+
 describe("mage index — dedupe generated index payload (ADR-0039 §5)", () => {
   it("drops keywords redundant with title, path, or type badge", async () => {
     const dir = await vault();

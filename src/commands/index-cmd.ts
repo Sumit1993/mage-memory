@@ -1,5 +1,5 @@
 import { readdir, readFile, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import {
   AUTO_MEMORY_MAX_BYTES,
   AUTO_MEMORY_MAX_LINES,
@@ -11,6 +11,8 @@ import {
   type HubProject,
   INDEX_FILE,
   MEMORY_FILE,
+  exists,
+  ownedDocsRoots,
   readGenreOverrides,
   readHubMetadata,
   requireDocsRoot,
@@ -53,6 +55,9 @@ export interface IndexResult {
 export async function index(opts: IndexOptions = {}): Promise<IndexResult> {
   const resolved = await requireDocsRoot(opts.dir);
   const root = resolved.root;
+
+  const owned = await ownedDocsRoots(resolved);
+  const projectRoots = owned.slice(1);
 
   const entries = await scanNotes(root);
   const overrides = await readGenreOverrides(resolved, !opts.quiet);
@@ -160,6 +165,15 @@ export async function index(opts: IndexOptions = {}): Promise<IndexResult> {
   // Keep the Obsidian graph colored by wing (no-op without .obsidian/graph.json).
   // The graph shows every note, so it colors every wing — not just the memory ones.
   await updateGraphColorGroups(root, allWings);
+
+  // Fan out over each owned project docs root
+  for (const projRoot of projectRoots) {
+    if (!(await exists(projRoot))) continue;
+    const subResult = await index({ dir: projRoot, quiet: true });
+    for (const file of subResult.written) {
+      written.push(relative(root, join(projRoot, file)));
+    }
+  }
 
   if (!opts.quiet) {
     logger.success(
