@@ -133,6 +133,12 @@ export async function index(opts: IndexOptions = {}): Promise<IndexResult> {
   const sensitivity = await readSensitivity(resolved);
   const { graduateSessions } = thresholdsFor(sensitivity);
   const tally = await readTally(root);
+  // The host's own budget, derived HERE and passed in (ADR-0041 Amendment §2): K falls
+  // out of these two numbers, so a second harness supplies its own and gets its own K.
+  const budget: RosterBudget = {
+    byteThreshold: Math.floor(BREACH_RATIO * AUTO_MEMORY_MAX_BYTES),
+    lineThreshold: Math.floor(BREACH_RATIO * AUTO_MEMORY_MAX_LINES),
+  };
 
   const { content: memoryContent, tier: memoryTier } = renderMemory(
     memoryEntries,
@@ -143,6 +149,7 @@ export async function index(opts: IndexOptions = {}): Promise<IndexResult> {
     acceptedDecisionsCount,
     tally,
     graduateSessions,
+    budget,
   );
   await writeFile(join(root, MEMORY_FILE), memoryContent);
   written.push(MEMORY_FILE);
@@ -253,14 +260,20 @@ function renderFlat(
     );
   }
   if (acceptedDecisionsCount > 0) {
-    const noun =
-      acceptedDecisionsCount === 1 ? "decision governs" : "decisions govern";
-    lines.push(
-      `> ${acceptedDecisionsCount} accepted ${noun} this repo — read \`decisions/\` before architectural or scope changes.`,
-      "",
-    );
+    lines.push(governanceLine(acceptedDecisionsCount), "");
   }
   return `${lines.join("\n").replace(/\n+$/, "")}\n`;
+}
+
+/**
+ * The ONE standing governance line (ADR-0041 Amendment §1). Shared by every recall
+ * surface — the root index, the wings map, and the bounded MEMORY.md roster — so the
+ * three cannot drift into three different sentences.
+ */
+function governanceLine(acceptedDecisionsCount: number): string {
+  const noun =
+    acceptedDecisionsCount === 1 ? "decision governs" : "decisions govern";
+  return `> ${acceptedDecisionsCount} accepted ${noun} this repo — read \`decisions/\` before architectural or scope changes.`;
 }
 
 function renderRootHierarchical(
@@ -295,12 +308,7 @@ function renderRootHierarchical(
   }
   pushLinkedRepos(lines, reg);
   if (acceptedDecisionsCount > 0) {
-    const noun =
-      acceptedDecisionsCount === 1 ? "decision governs" : "decisions govern";
-    lines.push(
-      `> ${acceptedDecisionsCount} accepted ${noun} this repo — read \`decisions/\` before architectural or scope changes.`,
-      "",
-    );
+    lines.push(governanceLine(acceptedDecisionsCount), "");
   }
   return `${lines.join("\n").replace(/\n+$/, "")}\n`;
 }
@@ -308,9 +316,9 @@ function renderRootHierarchical(
 /**
  * Note on ranking: ranking consults local metrics when present (ADR-0041 Amendment §3);
  * machines without metrics render the recency order — a deliberate, documented exception
- * to the byte-identical re-run contract in the header comment at index-cmd.ts:42-44.
+ * to the byte-identical re-run contract stated in `index()`'s header comment above.
  */
-export function rankMemoryNotes(
+function rankMemoryNotes(
   entries: ScannedNote[],
   tally: PromoteTally | undefined,
   graduateSessions: number,
@@ -343,44 +351,125 @@ export function rankMemoryNotes(
   });
 }
 
-function buildMemoryDoc(
-  rankedEntries: ScannedNote[],
-  k: number,
-  acceptedDecisionsCount = 0,
-): string {
-  const lines: string[] = [
-    GEN_MARKER,
-    "",
-    "# Index",
-    "",
-  ];
-  if (acceptedDecisionsCount > 0) {
-    const noun =
-      acceptedDecisionsCount === 1 ? "decision governs" : "decisions govern";
-    lines.push(
-      `> ${acceptedDecisionsCount} accepted ${noun} this repo — read \`decisions/\` before architectural or scope changes.`,
-      "",
-    );
-  }
-  const total = rankedEntries.length;
-  const shownEntries = rankedEntries.slice(0, k);
-  for (const e of shownEntries) {
-    lines.push(closetLine(e, 0));
-  }
-  if (k > 0) {
-    lines.push("");
-  }
-  lines.push(
-    `> ${total} memory ${plural(total, "note")} total (${k} shown). Read INDEX.md before non-trivial work.`,
-    "",
-  );
-  return `${lines.join("\n").replace(/\n+$/, "")}\n`;
+/**
+ * The host budget the roster is held against — the caller's own constants scaled by the
+ * `BREACH_RATIO` ladder (ADR-0041 Amendment §2/§4). Passed in, never re-derived here, so
+ * a second harness brings its own numbers and gets its own K.
+ */
+export interface RosterBudget {
+  byteThreshold: number;
+  lineThreshold: number;
 }
 
-function countLines(content: string): number {
-  let lines = content.split("\n").length;
-  if (content.endsWith("\n")) lines--;
-  return lines;
+/** A rendered line's cost in bytes, including the `\n` that follows it. */
+function lineCost(line: string): number {
+  return Buffer.byteLength(line, "utf8") + 1;
+}
+
+/** The overflow line (ADR-0041 Amendment §1): the total, what is shown, and the pointer. */
+function overflowLine(total: number, shown: number): string {
+  return `> ${total} memory ${plural(total, "note")} total (${shown} shown). Read INDEX.md before non-trivial work.`;
+}
+
+interface RosterFill {
+  content: string;
+  /** K — entries actually rendered. */
+  shown: number;
+  /** An entry was rendered without its keyword tail to fit. */
+  degraded: boolean;
+  /** An entry did not fit even stripped bare, and was skipped. */
+  omitted: boolean;
+  /** The fixed structure alone breaches the budget — the caller must fall back. */
+  structureBreaches: boolean;
+}
+
+/**
+ * Fill the roster in rank order against a running line/byte total — O(N), one pass, never
+ * a re-render per candidate K.
+ *
+ * Each entry is offered a LADDER rather than an all-or-nothing prefix cut: its full line
+ * first, then the keyword-less line (tier 1's keyword shed, repurposed per-entry), and
+ * only then is it skipped so lower-ranked entries keep filling. A prefix-only cut let ONE
+ * bloated note at rank 1 zero the whole roster — 51 notes rendering `(0 shown)` — which is
+ * the opposite of what a recall surface is for.
+ *
+ * The accounting reserves the fixed structure BEFORE any entry is admitted, and reserves
+ * it conservatively: the overflow line at its maximal width (`total` shown, the widest the
+ * count can print) and the blank separator unconditionally. Over-reserving only ever makes
+ * the fill stricter, so the finished document cannot exceed either threshold.
+ */
+function fillRoster(
+  ranked: ScannedNote[],
+  acceptedDecisionsCount: number,
+  budget: RosterBudget,
+): RosterFill {
+  const total = ranked.length;
+  const header = [GEN_MARKER, "", "# Index", ""];
+  const governance =
+    acceptedDecisionsCount > 0
+      ? [governanceLine(acceptedDecisionsCount), ""]
+      : [];
+
+  // Structure alone = the zero-entry document (no separator). Breaching THAT is the
+  // pathological case tier 2 exists for; it is reachable for any host whose budget is
+  // too small to carry the governance line and the pointer.
+  const structure = [...header, ...governance, overflowLine(total, 0)];
+  if (
+    structure.length > budget.lineThreshold ||
+    structure.reduce((n, l) => n + lineCost(l), 0) > budget.byteThreshold
+  ) {
+    return {
+      content: "",
+      shown: 0,
+      degraded: false,
+      omitted: false,
+      structureBreaches: true,
+    };
+  }
+
+  const reserved = [...header, ...governance, "", overflowLine(total, total)];
+  let usedLines = reserved.length;
+  let usedBytes = reserved.reduce((n, l) => n + lineCost(l), 0);
+
+  const rendered: string[] = [];
+  let degraded = false;
+  let omitted = false;
+
+  for (const e of ranked) {
+    // Every entry costs exactly one line, so once the line budget is spent no
+    // lower-ranked entry can fit either — stop rather than scan the tail.
+    if (usedLines + 1 > budget.lineThreshold) {
+      omitted = true;
+      break;
+    }
+    const full = closetLine(e, 0);
+    const bare = closetLine(e, 1);
+    let line: string | undefined;
+    if (usedBytes + lineCost(full) <= budget.byteThreshold) {
+      line = full;
+    } else if (usedBytes + lineCost(bare) <= budget.byteThreshold) {
+      line = bare;
+      degraded = true;
+    }
+    if (line === undefined) {
+      omitted = true; // oversized even bare — skip it, keep filling.
+      continue;
+    }
+    rendered.push(line);
+    usedLines++;
+    usedBytes += lineCost(line);
+  }
+
+  const lines = [...header, ...governance, ...rendered];
+  if (rendered.length > 0) lines.push("");
+  lines.push(overflowLine(total, rendered.length), "");
+  return {
+    content: `${lines.join("\n").replace(/\n+$/, "")}\n`,
+    shown: rendered.length,
+    degraded,
+    omitted,
+    structureBreaches: false,
+  };
 }
 
 /**
@@ -388,20 +477,25 @@ function countLines(content: string): number {
  * A single-wing (or flat) KB folds the top-K memory entries inline as a roster bounded by
  * construction (lines AND bytes, whichever binds first).
  * Multi-wing hierarchical KBs stay the bounded wings-map twin.
+ *
+ * Tiers (Amendment §4 — the existing ladder, not a new parallel budget):
+ *  - 0: every entry rendered in full.
+ *  - 1: at least one entry lost its keyword tail or was skipped; the overflow line
+ *       carries the count that the old omission blockquote used to.
+ *  - 2: the fixed structure alone breaches — fall back to the category map.
  */
-function renderMemory(
+export function renderMemory(
   entries: ScannedNote[],
   wings: string[],
   hierarchical: boolean,
   reg: RegistryView,
   logWarn: boolean,
-  acceptedDecisionsCount = 0,
-  tally?: PromoteTally,
-  graduateSessions = 5,
+  acceptedDecisionsCount: number,
+  tally: PromoteTally | undefined,
+  graduateSessions: number,
+  budget: RosterBudget,
 ): { content: string; tier: 0 | 1 | 2 } {
   const foldInline = !hierarchical || wings.length <= 1;
-  const byteThreshold = Math.floor(BREACH_RATIO * AUTO_MEMORY_MAX_BYTES);
-  const lineThreshold = Math.floor(BREACH_RATIO * AUTO_MEMORY_MAX_LINES);
 
   if (!foldInline) {
     return {
@@ -417,33 +511,25 @@ function renderMemory(
   }
 
   const ranked = rankMemoryNotes(entries, tally, graduateSessions);
-  const N = ranked.length;
+  const roster = fillRoster(ranked, acceptedDecisionsCount, budget);
 
-  let chosenK = -1;
-  let chosenContent = "";
-
-  for (let k = N; k >= 0; k--) {
-    const candidate = buildMemoryDoc(ranked, k, acceptedDecisionsCount);
-    const lines = countLines(candidate);
-    const bytes = Buffer.byteLength(candidate, "utf8");
-    if (bytes <= byteThreshold && lines <= lineThreshold) {
-      chosenK = k;
-      chosenContent = candidate;
-      break;
+  if (!roster.structureBreaches) {
+    if (!roster.degraded && !roster.omitted) {
+      return { content: roster.content, tier: 0 };
     }
-  }
-
-  if (chosenK === N) {
-    return { content: chosenContent, tier: 0 };
-  }
-
-  if (chosenK >= 0) {
     if (logWarn) {
+      const cut =
+        roster.shown < ranked.length
+          ? `bounded to ${roster.shown} of ${ranked.length} entries — the rest are in INDEX.md`
+          : "";
+      const shed = roster.degraded
+        ? "keyword tails shed where an entry was too wide for the budget"
+        : "";
       logger.warn(
-        `MEMORY.md roster bounded to top ${chosenK} of ${N} entries to fit recall budget.`,
+        `MEMORY.md roster: ${[cut, shed].filter(Boolean).join("; ")}.`,
       );
     }
-    return { content: chosenContent, tier: 1 };
+    return { content: roster.content, tier: 1 };
   }
 
   const msg =

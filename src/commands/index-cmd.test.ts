@@ -2,10 +2,14 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { tmpDir } from "../../test/fixtures/kb.js";
-import { AUTO_MEMORY_MAX_BYTES } from "../adapters/claude-code/constants.js";
+import {
+  AUTO_MEMORY_MAX_BYTES,
+  AUTO_MEMORY_MAX_LINES,
+} from "../adapters/claude-code/constants.js";
 import { BREACH_RATIO } from "../metrics/footprint.js";
 import type { HubProject } from "../paths.js";
-import { index, SCAFFOLDING_WORDS } from "./index-cmd.js";
+import type { ScannedNote } from "../scan.js";
+import { index, renderMemory, SCAFFOLDING_WORDS } from "./index-cmd.js";
 import { init } from "./init.js";
 
 async function vault(): Promise<string> {
@@ -506,6 +510,31 @@ describe("mage index — dedupe generated index payload (ADR-0039 §5)", () => {
 
 describe("mage index — bounded roster MEMORY.md (ADR-0041 Amendment)", () => {
   const thresholdBytes = Math.floor(BREACH_RATIO * AUTO_MEMORY_MAX_BYTES);
+  const thresholdLines = Math.floor(BREACH_RATIO * AUTO_MEMORY_MAX_LINES);
+
+  /** Line count the way the renderer and `mage footprint` both count. */
+  function countLines(content: string): number {
+    const raw = content.split("\n").length;
+    return content.endsWith("\n") ? raw - 1 : raw;
+  }
+
+  /** Write the co-located promote tally: note relPath → distinct chapters read. */
+  async function tally(
+    dir: string,
+    notes: Record<string, number>,
+  ): Promise<void> {
+    await mkdir(join(dir, "mage", ".mage", "metrics"), { recursive: true });
+    await writeFile(
+      join(dir, "mage", ".mage", "metrics", "promote.json"),
+      JSON.stringify({
+        v: 4,
+        notes: Object.fromEntries(
+          Object.entries(notes).map(([rel, chapters]) => [rel, { chapters }]),
+        ),
+        sessions: {},
+      }),
+    );
+  }
 
   async function generateKb(dir: string, count: number) {
     for (let i = 0; i < count; i++) {
@@ -529,10 +558,8 @@ keywords: [kw${i}, ${"k".repeat(25)}]
     const r = await index({ dir, quiet: true });
     expect(r.memoryTier).toBe(1);
     const mem = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
-    const rawLines = mem.split("\n");
-    const lines = mem.endsWith("\n") ? rawLines.length - 1 : rawLines.length;
     const bytes = Buffer.byteLength(mem, "utf8");
-    expect(lines).toBeLessThanOrEqual(180);
+    expect(countLines(mem)).toBeLessThanOrEqual(180);
     expect(bytes).toBeLessThanOrEqual(23040);
     expect(mem).toContain("300 memory notes total");
     expect(mem).toContain("Read INDEX.md before non-trivial work.");
@@ -540,24 +567,13 @@ keywords: [kw${i}, ${"k".repeat(25)}]
 
   it("2. ranking: proven-flag ordering, recency ordering within tier, relPath tiebreak", async () => {
     const dir = await vault();
-    // note1: unproven, old date
+    // unproven, old date
     await note(dir, "b.md", "---\ntype: note\nlast_reviewed: '2026-01-01'\n---\n# B\n");
-    // note2: unproven, new date
+    // unproven, new date
     await note(dir, "c.md", "---\ntype: note\nlast_reviewed: '2026-07-29'\n---\n# C\n");
-    // note3: proven (in tally with 5 chapters >= threshold 5), old date
+    // proven (5 chapters >= the normal-dial graduateSessions of 5), old date
     await note(dir, "a.md", "---\ntype: note\nlast_reviewed: '2026-01-01'\n---\n# A\n");
-
-    await mkdir(join(dir, "mage", ".mage", "metrics"), { recursive: true });
-    await writeFile(
-      join(dir, "mage", ".mage", "metrics", "promote.json"),
-      JSON.stringify({
-        v: 4,
-        notes: {
-          "notes/a.md": { chapters: 5 },
-        },
-        sessions: {},
-      }),
-    );
+    await tally(dir, { "notes/a.md": 5 });
 
     await index({ dir, quiet: true });
     const mem = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
@@ -567,8 +583,51 @@ keywords: [kw${i}, ${"k".repeat(25)}]
     expect(posA).toBeGreaterThan(-1);
     expect(posC).toBeGreaterThan(-1);
     expect(posB).toBeGreaterThan(-1);
-    expect(posA).toBeLessThan(posC); // Proven A comes before unproven C
-    expect(posC).toBeLessThan(posB); // Newer C comes before older B
+    expect(posA).toBeLessThan(posC); // proven A beats unproven C despite being older
+    expect(posC).toBeLessThan(posB); // newer C beats older B
+  });
+
+  it("2b. relPath ascending breaks a full tie (same proven bucket, same date)", async () => {
+    const dir = await vault();
+    // z + m tie on everything but relPath; y is newer and must sort above both, so the
+    // tie is asserted around a moving neighbour rather than on an already-sorted list.
+    await note(dir, "z-tie.md", "---\ntype: note\nlast_reviewed: '2026-02-02'\n---\n# Ztie\n");
+    await note(dir, "m-tie.md", "---\ntype: note\nlast_reviewed: '2026-02-02'\n---\n# Mtie\n");
+    await note(dir, "y-new.md", "---\ntype: note\nlast_reviewed: '2026-09-09'\n---\n# Ynew\n");
+
+    await index({ dir, quiet: true });
+    const mem = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
+    const posY = mem.indexOf("[Ynew](notes/y-new.md)");
+    const posM = mem.indexOf("[Mtie](notes/m-tie.md)");
+    const posZ = mem.indexOf("[Ztie](notes/z-tie.md)");
+    expect(posY).toBeGreaterThan(-1);
+    expect(posY).toBeLessThan(posM); // recency still outranks the tied pair
+    expect(posM).toBeLessThan(posZ); // notes/m-tie.md < notes/z-tie.md
+  });
+
+  it("2c. a proven note survives the cut that drops a newer unproven one", async () => {
+    const dir = await vault();
+    // 200 fillers dated 2026-06-01 overflow the 180-line budget on their own.
+    for (let i = 0; i < 200; i++) {
+      await note(
+        dir,
+        `f${i.toString().padStart(3, "0")}.md`,
+        `---\ntype: note\nlast_reviewed: '2026-06-01'\n---\n# Filler ${i}\n`,
+      );
+    }
+    // Oldest of all, so recency alone would rank it dead last — the tally lifts it.
+    await note(dir, "proven.md", "---\ntype: note\nlast_reviewed: '2020-01-01'\n---\n# Proven\n");
+    // Unproven and NEWER than the proven note, but still below every filler.
+    await note(dir, "oldish.md", "---\ntype: note\nlast_reviewed: '2021-01-01'\n---\n# Oldish\n");
+    await tally(dir, { "notes/proven.md": 5 });
+
+    const r = await index({ dir, quiet: true });
+    expect(r.memoryTier).toBe(1);
+    const mem = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
+    expect(mem).toContain("[Proven](notes/proven.md)"); // proven, ranked first, kept
+    expect(mem).not.toContain("[Oldish](notes/oldish.md)"); // newer but unproven, cut
+    expect(mem).toContain("202 memory notes total");
+    expect(countLines(mem)).toBeLessThanOrEqual(thresholdLines);
   });
 
   it("3. fail-open: no tally file -> recency order, no throw, byte-identical across runs", async () => {
@@ -625,8 +684,126 @@ keywords: [kw${i}, ${"k".repeat(25)}]
     expect(r.memoryTier).toBe(1);
     const mem = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
     expect(mem).toContain("_(stale-suspect)_");
+    expect(mem).toContain(" — kw"); // entries that FIT keep their keyword tails
     expect(mem).toContain("110 memory notes total");
     expect(Buffer.byteLength(mem, "utf8")).toBeLessThanOrEqual(thresholdBytes);
+    expect(countLines(mem)).toBeLessThanOrEqual(thresholdLines);
+  });
+
+  it("an oversized entry sheds its keyword tail instead of nuking the roster", async () => {
+    const dir = await vault();
+    // Ranked first (newest) AND far too wide to render in full: the prefix-cut fill this
+    // replaced stopped dead here and shipped `(0 shown)` for the whole KB.
+    await note(
+      dir,
+      "huge.md",
+      `---
+type: note
+status: stale-suspect
+last_reviewed: '2026-12-31'
+keywords: [kw1, ${"k".repeat(30000)}]
+---
+# Huge Note
+`,
+    );
+    await generateKb(dir, 20);
+    const r = await index({ dir, quiet: true });
+    expect(r.memoryTier).toBe(1);
+    const mem = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
+    const hugeLine = mem.split("\n").find((l) => l.includes("notes/huge.md"));
+    expect(hugeLine).toBeDefined();
+    expect(hugeLine).toContain("[Huge Note](notes/huge.md)"); // still listed
+    expect(hugeLine).not.toContain("kkkk"); // its keyword tail is what got shed
+    expect(hugeLine).toContain("_(stale-suspect)_"); // caution statuses never dropped
+    expect(mem).toContain(" — kw"); // entries that FIT keep theirs
+    expect(mem).toContain("[Note 0"); // the other 20 entries still fill the roster
+    expect(mem).toContain("21 memory notes total (21 shown)");
+    expect(Buffer.byteLength(mem, "utf8")).toBeLessThanOrEqual(thresholdBytes);
+  });
+
+  it("an entry too wide even bare is skipped, and lower-ranked entries still fill", async () => {
+    const dir = await vault();
+    // No keyword tail to shed — the title alone blows the byte budget, so the ladder's
+    // last rung (skip) is the only one left.
+    await note(
+      dir,
+      "monster.md",
+      `---\ntype: note\nlast_reviewed: '2026-12-31'\n---\n# ${"M".repeat(30000)}\n`,
+    );
+    await generateKb(dir, 20);
+    const r = await index({ dir, quiet: true });
+    expect(r.memoryTier).toBe(1);
+    const mem = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
+    expect(mem).not.toContain("notes/monster.md"); // skipped
+    expect(mem).toContain("[Note 0"); // everything else still rendered
+    expect(mem).toContain("21 memory notes total (20 shown)");
+    expect(Buffer.byteLength(mem, "utf8")).toBeLessThanOrEqual(thresholdBytes);
+  });
+
+  it("tier 2: a budget too small for the structure alone falls back to the category map", () => {
+    const entries: ScannedNote[] = [
+      {
+        relPath: "notes/a.md",
+        wings: [{ wing: "w", room: "" }],
+        wing: "w",
+        room: "",
+        title: "A",
+        type: "note",
+        keywords: [],
+      },
+    ];
+    const reg = {
+      decorationByWing: new Map<string, string>(),
+      inRepoMembers: [],
+    };
+    // Four lines of header + the governance line + the overflow pointer cannot fit in
+    // three lines — the pathological case the hierarchical fallback exists for.
+    const { content, tier } = renderMemory(
+      entries,
+      ["w"],
+      false,
+      reg,
+      false,
+      3,
+      undefined,
+      5,
+      { byteThreshold: 20, lineThreshold: 3 },
+    );
+    expect(tier).toBe(2);
+    expect(content).toContain("## Wings");
+    expect(content).toContain("Fallen back to category map");
+    expect(content).toContain("_index.w.md");
+  });
+
+  it("tier 0/1 boundary is driven by the injected budget, not a hard-coded K", () => {
+    const entries: ScannedNote[] = Array.from({ length: 5 }, (_, i) => ({
+      relPath: `notes/n${i}.md`,
+      wings: [{ wing: "w", room: "" }],
+      wing: "w",
+      room: "",
+      title: `N${i}`,
+      type: "note",
+      keywords: [],
+    }));
+    const reg = {
+      decorationByWing: new Map<string, string>(),
+      inRepoMembers: [],
+    };
+    const render = (lineThreshold: number) =>
+      renderMemory(entries, ["w"], false, reg, false, 0, undefined, 5, {
+        byteThreshold: 23040,
+        lineThreshold,
+      });
+
+    const roomy = render(180);
+    expect(roomy.tier).toBe(0);
+    expect(roomy.content).toContain("5 memory notes total (5 shown)");
+
+    // Header(4) + separator(1) + overflow(1) = 6 reserved, so 8 lines admits 2 entries.
+    const tight = render(8);
+    expect(tight.tier).toBe(1);
+    expect(tight.content).toContain("5 memory notes total (2 shown)");
+    expect(countLines(tight.content)).toBeLessThanOrEqual(8);
   });
 
   it("a line-only breach cuts entries to fit 180-line budget", async () => {
@@ -645,9 +822,7 @@ type: note
     const r = await index({ dir, quiet: true });
     expect(r.memoryTier).toBe(1);
     const mem = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
-    const rawLines = mem.split("\n");
-    const lines = mem.endsWith("\n") ? rawLines.length - 1 : rawLines.length;
-    expect(lines).toBeLessThanOrEqual(180);
+    expect(countLines(mem)).toBeLessThanOrEqual(180);
     expect(mem).toContain("190 memory notes total");
     expect(mem).toContain("Read INDEX.md before non-trivial work.");
   });
