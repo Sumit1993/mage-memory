@@ -26,7 +26,7 @@ keywords:
   - stale-index
   - symlink
   - verification
-modified: 2026-07-29T11:36:49.988Z
+modified: 2026-07-29T11:49:33.454Z
 ---
 
 # Gotcha — bare `mage` runs your WORKING TREE, so the soaks never exercise a release
@@ -36,7 +36,7 @@ whole trap: **`npx mage` runs the published package; bare `mage` runs your worki
 
 The global binary is an `npm link`:
 
-```
+```text
 $ readlink -f "$(which mage)"
 /home/sumit/mage-memory/dist/cli.js
 
@@ -44,9 +44,22 @@ $ npm ls -g --depth=0 | grep mage
 ├── mage-memory@0.0.15 -> ./../../../../../mage-memory
 ```
 
-Every soak hook invokes **bare `mage`** — `mage observe`, `mage nudge`, `mage memory-hook`,
-`mage skills --metrics`, `mage flatten` — never `npx`. So the soaks track the working-tree
-build continuously.
+Every `mage` hook the soaks register invokes **bare `mage`**, never `npx`. Verified
+2026-07-29 by parsing each soak's `.claude/settings.local.json` — five distinct commands
+across nine hook events:
+
+| command | events |
+|---|---|
+| `mage observe` | SessionStart · UserPromptSubmit · PostToolUse · PostToolUseFailure · PreCompact · SessionEnd · Stop · SubagentStop |
+| `mage memory-hook` | PreToolUse · PostToolUse |
+| `mage nudge` | SessionStart |
+| `mage skills --metrics --quiet` | Stop |
+| `mage flatten --quiet` | Stop (absent in prismalens-docs-hub) |
+
+So the soaks track the working-tree build continuously.
+
+Note the inventory is **not derivable from this repo** — `settings.local.json` is gitignored
+and lives in the soak repos. Anything reasoning only over `mage/` will under-count it.
 
 ## What it cost
 
@@ -65,9 +78,12 @@ Three compounding errors on 2026-07-28/29, all from believing the soaks ran a re
 
 ## The second, separate cause of stale soak recall
 
-`mage index` is **not hooked anywhere**. The hooked commands never regenerate
+`mage index` is **not among those registered hooks** — by design, not by omission: the repo's
+commit and grooming guidance expects a manual refresh (`mage index` after capture, before the
+commit). The consequence is still real. Nothing in the automatic path regenerates
 `INDEX.md`/`MEMORY.md`, so those files sit at whatever build last wrote them — sreforge's was
-from 07-20, nine hours before Wave B even merged.
+from 07-20, nine hours before Wave B even merged. A migration that lands on disk does not
+reach recall until someone runs the refresh.
 
 That, not the installed version, is why soak recall goes stale. The two causes look identical
 from the outside and have opposite fixes: one is *which binary*, the other is *nothing ran it*.
