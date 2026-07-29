@@ -173,8 +173,11 @@ displaced bodies must stay committed notes).
 ## Amendment (2026-07-29) — a bounded roster replaces the flat-percentage bound
 
 **Problem.** The yield half of Gate criterion 1 — `MEMORY.md` ≤ ~20% of the host
-auto-memory budget — is **unreachable by construction**, not merely missed. The
-budget is `AUTO_MEMORY_MAX_LINES = 200` / `AUTO_MEMORY_MAX_BYTES = 25_600`
+auto-memory budget — is **unreachable by construction for any KB that folds its
+notes inline** (`foldInline` — flat or single-wing) **once its memory-note count
+passes the budget-derived target**. That is the scope of the claim, and it covers
+every KB that matures: not a target narrowly missed, but one the mechanism cannot
+hold. The budget is `AUTO_MEMORY_MAX_LINES = 200` / `AUTO_MEMORY_MAX_BYTES = 25_600`
 (`src/adapters/claude-code/constants.ts`), so the target is **40 lines /
 5,120 B**. Measured post-migration, 2026-07-29:
 
@@ -190,24 +193,34 @@ procedure 4, pointer 3, note 2). One line per note is **41 lines against a
 entry lines alone are **7,006 B against the 5,120 B target — 1,886 B over with
 zero structure**. The filter worked; the arithmetic still fails.
 
-prismalens passes for a reason that is not evidence: it is multi-wing, so its
-root file was already a bounded roster before Wave B ever ran
+prismalens passes, and it is the scope boundary above rather than a
+counter-example to it: it is multi-wing, so it never folds inline
 (`foldInline = !hierarchical || wings.length <= 1`, `src/commands/index-cmd.ts`
-~L313). It measures the roster shape — not the genre filter.
+~L313) and its root file was **already a bounded roster before Wave B ever ran**.
+It measures the roster shape, not the genre filter — which makes it evidence
+**for** the mechanism this amendment adopts, not against the claim that the flat
+percentage is unreachable wherever notes fold inline.
 
-**The no-fixed-point argument.** Post-filter, `MEMORY.md` size is a function of
-**how many memory-genre notes the KB holds**, and that count grows as the KB
-matures — which is the KB succeeding. A percentage-of-budget target therefore
-has no fixed point: any KB that keeps learning eventually crosses it, and the
-only way to hold the line is to stop capturing. This is the same shape of
+**The no-fixed-point argument.** Post-filter, an inline-folded `MEMORY.md` is a
+function of **how many memory-genre notes the KB holds**, and that count grows as
+the KB matures — which is the KB succeeding. A percentage-of-budget target
+therefore has no fixed point on that path: any inline-folding KB that keeps
+learning eventually crosses it, and the only way to hold the line is to stop
+capturing. This is the same shape of
 uncalibratable gate as
 [mature-kb-emits-no-capture-terminals](../notes/mature-kb-emits-no-capture-terminals.md)
 — a criterion whose measured quantity moves the wrong way as the system gets
 healthier. The remedy is the same: replace the moving target with a bound the
 mechanism enforces.
 
-**Amended criterion 1 (yield).** `MEMORY.md` is a **roster bounded by
-construction**, not a file measured after the fact:
+**Amended criterion 1 (yield).** The gate is met when `MEMORY.md` **is a roster
+bounded by construction** rather than a file measured after the fact. What
+follows is the **contract a future renderer implementation must satisfy — not a
+description of current behavior**. Today `mage index` hands *every* memory-genre
+entry to `renderMemory`, and `renderFlat` only strips keyword tails and per-note
+lines once the budget is breached: **no K is computed, no ranking is applied, and
+no overflow line exists**. Building it is tracked separately as a 0.0.17
+deliverable; **until it lands, criterion 1 is unmet by definition.**
 
 1. **Shape.** One standing governance line (Decision §4) + the **top-K
    memory-genre entries** + **one overflow line** naming the total note count
@@ -225,11 +238,14 @@ construction**, not a file measured after the fact:
    overflow wording, where K is computed) belong to the implementation spec; the
    ADR fixes only the principle: **push is bounded by construction, everything
    else is pull via `INDEX.md`.**
-4. **The bound rides the machinery that already exists.** The amended gate
-   references `renderMemory`'s `tier: 0 | 1 | 2` return and the `BREACH_RATIO`
-   degradation ladder (`src/commands/index-cmd.ts`; `BREACH_RATIO = 0.9` in
-   `src/metrics/footprint.ts`) rather than a flat percentage — the roster is held
-   against the same thresholds the renderer already degrades on.
+4. **The bound must reuse the bounding machinery that already exists.** The
+   implementation is required to express the roster in terms of `renderMemory`'s
+   existing `tier: 0 | 1 | 2` return and the `BREACH_RATIO` degradation ladder
+   (`src/commands/index-cmd.ts`; `BREACH_RATIO = 0.9` in
+   `src/metrics/footprint.ts`) rather than a flat percentage — the roster is to be
+   held against the same thresholds the renderer already degrades on, not against
+   a new parallel budget. Those thresholds exist today; **what does not exist is
+   anything that bounds the entry count before they are reached.**
 
 **Unchanged by this amendment.**
 
