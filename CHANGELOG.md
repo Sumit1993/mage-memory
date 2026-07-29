@@ -11,6 +11,20 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.17](https://github.com/Sumit1993/mage-memory/compare/v0.0.16...v0.0.17) (2026-07-29)
+
+
+### Features
+
+* **index:** bound MEMORY.md to a ranked roster (ADR-0041 amendment) ([#109](https://github.com/Sumit1993/mage-memory/issues/109)) ([bf4f515](https://github.com/Sumit1993/mage-memory/commit/bf4f5150c7117a65bca98e289b27f225d53eb5f4))
+
+
+### Bug Fixes
+
+* **cli:** surface mage index in --help — it is user-facing, not hook plumbing ([84de119](https://github.com/Sumit1993/mage-memory/commit/84de1199615f63c47d6c87c0ee1d224975b560fd))
+* **cli:** surface mage index in --help ([#115](https://github.com/Sumit1993/mage-memory/issues/115)) ([84de119](https://github.com/Sumit1993/mage-memory/commit/84de1199615f63c47d6c87c0ee1d224975b560fd))
+* **index:** per-wing recall fan-out + docs refresh + plugin-cache resolution ([#112](https://github.com/Sumit1993/mage-memory/issues/112)) ([bfe67fb](https://github.com/Sumit1993/mage-memory/commit/bfe67fbb2eb2c695dbacdf3de25db79b43acb063))
+
 ## [0.0.16](https://github.com/Sumit1993/mage-memory/compare/v0.0.15...v0.0.16) (2026-07-28)
 
 
