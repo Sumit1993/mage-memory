@@ -254,7 +254,12 @@ evidence base. **The window effectively restarts 2026-07-31.**
    [ADR-0042](../decisions/0042-reach-tier-harness-grants.md) is **not** covered by
    that gate — it is a separate decision with its own revisit trigger, and is
    evaluated on its own terms.
-6. Grill Wave C in a fresh session ([#104](https://github.com/Sumit1993/mage-memory/issues/104)).
+6. ~~Grill Wave C in a fresh session~~ **done 2026-07-31** — became
+   [ADR-0044](../decisions/0044-setup-is-a-conversation-over-one-address.md)
+   ([#104](https://github.com/Sumit1993/mage-memory/issues/104) closed). Its
+   implementation is sequenced after
+   [#117](https://github.com/Sumit1993/mage-memory/pull/117) lands, and `hub_path`
+   cannot be removed until that follow-on ships.
 
 ## Relations
 
