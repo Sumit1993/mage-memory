@@ -54,6 +54,10 @@ Each leaf holds a different kind of working state:
 - **`.mage/metrics/`** — generated rollups and bookkeeping (read-only for you, but written by mage as it runs): the context-match results (did the skills that auto-loaded actually match the work?), the distill/promote watermarks, reject ledgers (`staged-rejects.json`, `rejected.json`), the autonomous keep-rate ledger maintained by the reconciler (`keep-rate.json`, `src/grooming/reconcile.ts`), and the boundary-nudge throttle (`nudge-throttle.json`).
 - **`.mage/staging/`** — judged-but-uncommitted lesson drafts. When the [stage and groom](../loop/stage-groom.md) step drafts a lesson, it lands here as a `<slug>.md` file, *out* of the live index, until you accept it. Accepting moves it into `notes/` and re-indexes; rejecting discards it and records the key.
 
+### Hub clones live at a machine level, not under the docs root
+
+External and hybrid mode ([Set up a hub and external mode](../guides/hub-and-external-mode.md)) reach into a *second* gitignored location that isn't under `mage/.mage/` at all: `~/.mage/hubs/<host>/<owner>/<repo>` (`$MAGE_HOME/hubs` when set). This is where a hub's own clone is derived and lands — one conventional home per remote, shared across every repo and worktree that links to it. It follows the same rule as everything else on this page — regenerable working state, never committed — just rooted at `$HOME` instead of at a docs root.
+
 ### Why these stay out of git
 
 The split is by lifecycle, not by feature: `notes/` is durable, reviewed knowledge you own; everything under `.mage/` is regenerable working state that would only add churn and noise to your history. Keeping it gitignored also means raw captured signal never lands in a shared commit by accident.

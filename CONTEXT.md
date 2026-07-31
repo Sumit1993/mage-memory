@@ -35,6 +35,29 @@ hand-assembling the low-level draft utilities. The utilities behind it (`compose
 stay exported as genuine shared primitives.
 _Avoid_: helper, util (for these two operations — they are the interface, not helpers)
 
+**Derived hub path** (`src/hub-url.ts`):
+The deterministic local clone location mage computes from a hub's `hub_repo` remote
+(`canonicalizeHubRepo` + `deriveHubPath`) — never a recorded path (ADR-0043). `chosenHubRoot`
+picks it over the deprecated `hub_path` fallback whenever `hub_repo` resolves.
+_Avoid_: hub path (bare, meaning the deprecated `hub_path` field — always say which one)
+
+**Arrival verification** (`src/hub-url.ts`):
+`verifyHubArrival` canonicalizes the `origin` of whatever clone sits at a derived path and
+compares it against the requested `hub_repo`, before that clone is trusted. Distinct from
+`looksLikeHub` (path-guards.ts), which only checks shape (`projects/` + `metadata.json`) —
+derivation says where to look, arrival verification says whether what's there is the right hub.
+
+**Displaced-clone scan** (`src/hub-scan.ts`):
+`findDisplacedHubs` walks the hubs root looking for an existing clone of a wanted remote
+sitting somewhere other than its derived path, so mage can suggest a `mv` instead of cloning a
+duplicate. Read-only — never moves, never clones.
+
+**path-guards split** (`src/path-guards.ts`):
+`isUnder`/`looksLikeHub`/`exists` were pulled out of `paths.ts` so hub derivation
+(`src/hub-url.ts`) can use them without importing `paths.ts` — `paths.ts` imports hub
+derivation (for `chosenHubRoot`), so a leaf module is what keeps the two from being mutually
+recursive. `paths.ts` re-exports everything here for existing call sites.
+
 ## Example dialogue
 
 **Dev:** A CC capture comes in restamped — its real `type`/`tags` are buried under `metadata`.

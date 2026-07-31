@@ -44,6 +44,44 @@
   text-align: center;
 }
 
+/* Autonomy-ladder diagram (loop/autonomy.mdx, the hand-authored inline SVG) —
+ * per-theme tokens so the diagram matches the site instead of carrying
+ * hardcoded light-mode colors. Dark first (the site default), light as the
+ * override, same pattern as the accent ramp above. */
+:root {
+  --mage-ladder-bg: #1e1b29;
+  --mage-ladder-border: #3f3a52;
+  --mage-ladder-muted: #94a3b8;
+  --mage-ladder-ceiling: #f87171;
+  --mage-ladder-floor: #38bdf8;
+  --mage-ladder-overseer-bg: #14532d;
+  --mage-ladder-overseer-border: #22c55e;
+  --mage-ladder-overseer-text: #bbf7d0;
+  --mage-ladder-approver-bg: #1e3a8a;
+  --mage-ladder-approver-border: #3b82f6;
+  --mage-ladder-approver-text: #bfdbfe;
+  --mage-ladder-operator-bg: #1e293b;
+  --mage-ladder-operator-border: #64748b;
+  --mage-ladder-operator-text: #cbd5e1;
+}
+
+:root[data-theme='light'] {
+  --mage-ladder-bg: #fbfcfd;
+  --mage-ladder-border: #d0d7de;
+  --mage-ladder-muted: #475569;
+  --mage-ladder-ceiling: #b42318;
+  --mage-ladder-floor: #0369a1;
+  --mage-ladder-overseer-bg: #dcfce7;
+  --mage-ladder-overseer-border: #16a34a;
+  --mage-ladder-overseer-text: #14532d;
+  --mage-ladder-approver-bg: #dbeafe;
+  --mage-ladder-approver-border: #2563eb;
+  --mage-ladder-approver-text: #1e3a8a;
+  --mage-ladder-operator-bg: #f1f5f9;
+  --mage-ladder-operator-border: #64748b;
+  --mage-ladder-operator-text: #1e293b;
+}
+
 /* A subtle marker for hidden / plumbing commands. */
 .mage-plumbing-badge {
   display: inline-block;

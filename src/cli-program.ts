@@ -388,7 +388,10 @@ export function buildProgram(): Command {
     .description(
       "Link this code repo to an existing hub (auto-detects storage based on mage/ content)",
     )
-    .argument("<hub-path>", "path to the hub root")
+    .argument(
+      "<hub-path>",
+      "path that locates the hub; its git origin is recorded as the authoritative hub_repo, and the path itself is kept only as a deprecated fallback",
+    )
     .option(
       "--project <name>",
       "project name in the hub (default: basename of code repo)",
@@ -572,7 +575,7 @@ export function buildProgram(): Command {
   program
     .command("connect")
     .description(
-      "Wire mage capture hooks into this repo's Claude Code settings (.claude/settings.local.json; personal + gitignored)",
+      "Wire mage capture hooks into this repo's Claude Code settings (.claude/settings.local.json; personal + gitignored); in hub/hybrid modes also grants reach to the hub and offers to clone it if absent",
     )
     .option(
       "--user",
@@ -583,7 +586,10 @@ export function buildProgram(): Command {
       "from a hub: wire every registered project's code repo (repo-local each)",
     )
     .option("--no-git-hook", "skip installing the redaction pre-commit hook")
-    .option("-y, --yes", "non-interactive: skip the confirmation prompt")
+    .option(
+      "-y, --yes",
+      "non-interactive: auto-confirm prompts, including cloning the hub (a real `git clone`) on a hub-absent machine",
+    )
     .action(async (opts) => {
       if (opts.allProjects) {
         await connectAllProjects({ yes: opts.yes, gitHook: opts.gitHook });

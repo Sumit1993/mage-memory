@@ -49,6 +49,12 @@ already has `mage/` content — pass it explicitly when you want the hub to own
 the docs regardless. The project name defaults to the repo's directory name;
 `--project <name>` overrides it.
 
+Under the hood, `link` reads the hub's git `origin` remote and records it as
+`hub_repo` — that remote, not the path you passed on the command line, becomes
+the authoritative address for the hub. Every later lookup derives the hub's
+local home from that address: `~/.mage/hubs/<host>/<owner>/<repo>`
+(`$MAGE_HOME/hubs` when set), never a recorded path.
+
 `mage unlink` undoes the link, from both sides' metadata.
 
 ## 3. Run `mage connect` — in the code repo
@@ -72,7 +78,8 @@ per-repo:
   project root, and in external mode the KB is *outside* it. `connect` adds the
   hub to `permissions.additionalDirectories` in the repo's local settings.
   Without it the agent resolves the knowledge base correctly and then cannot
-  open it.
+  open it. On a hub-absent machine, that same `connect` run offers to clone the
+  hub to its derived location first, rather than merely skipping the grant.
 
 Because those settings are local and gitignored, a fresh clone or a new worktree
 of the same repo starts without them — run `mage connect` again there.
@@ -88,13 +95,18 @@ mage doctor
 ```
 
 The check to look for is **KB access grant**, in the readiness group. It has
-three outcomes:
+four outcomes:
 
 - **granted** — the hub is present and reachable. This is what you want.
-- **failing** — the hub is on this machine but ungranted: "the agent cannot read
-  it; run `mage connect`". Re-run `connect` in the code repo.
+- **failing (ungranted)** — the hub is on this machine but ungranted: "the agent
+  cannot read it; run `mage connect`". Re-run `connect` in the code repo.
 - **skipped** — no hub on this machine at all, so there is nothing to grant yet.
-  Clone the hub, then re-run `mage connect`.
+  Re-run `mage connect` in the code repo — it offers to clone the hub to its
+  derived location on the spot (or clones it non-interactively with `--yes`),
+  or prints the exact command to do it yourself.
+- **failing (mismatch)** — a clone exists at the derived location, but its
+  `origin` doesn't match `hub_repo`. A hard error naming both remotes — never
+  reused, never clobbered.
 
 `doctor` also reports index freshness against the right root for external mode,
 so a stale index shows up here rather than as mysteriously missing recall.

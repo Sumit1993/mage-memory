@@ -1,14 +1,16 @@
 // Link-integrity checks for `mage doctor` (0.0.9 setup-integrity). A code repo and
-// its hub keep TWO cross-references — the code repo's `mage/metadata.json.hub_path`
-// (forward) and the hub registry's `projects[].code_repo_path` (back). A move
-// breaks one or both SILENTLY: captures then route to a dead path, or hub→repo
-// tools (the soak digest, `dream`) can't find the repo. `mage connect` never
-// touches these — only `mage link` (or this repair) does.
+// its hub keep TWO cross-references — the code repo's `mage/metadata.json.hub_repo`
+// (forward; derived per ADR-0043, with the deprecated `hub_path` read only as a
+// fallback) and the hub registry's `projects[].code_repo_path` (back). A stale
+// back-reference breaks hub→repo tools (the soak digest, `dream`) SILENTLY —
+// they can't find the repo. `mage connect` never touches these — only `mage link`
+// (or this repair) does.
 //
 // What `--fix` can safely auto-repair: the hub's stale BACK-reference when run from
 // the code repo (the repo knows its own true location). What it can only DETECT: a
-// moved HUB (the code repo's hub_path is stale and we don't know the new location)
-// or a missing project registration — both need an explicit `mage link <hub>`.
+// hub absent at its derived location, an origin mismatch between that clone and
+// `hub_repo` (never reused, never clobbered — ADR-0043 §2), or a missing project
+// registration — all three need an explicit `mage link <hub>` or a manual clone/move.
 
 import { dirname, join } from "node:path";
 import type { DoctorCheck, DoctorOptions } from "../commands/doctor.js";
