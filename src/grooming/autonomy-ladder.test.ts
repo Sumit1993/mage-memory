@@ -44,7 +44,7 @@ describe("narrowAutonomy", () => {
 
 describe("meaningOf", () => {
   it("gives a one-line meaning per level", () => {
-    expect(meaningOf("operator")).toMatch(/you run mage:groom/);
+    expect(meaningOf("operator")).toMatch(/you run \/mage:groom/);
     expect(meaningOf("approver")).toMatch(/review the diff \+ commit/);
     expect(meaningOf("overseer")).toMatch(/graduates eligible notes/);
   });
@@ -61,7 +61,7 @@ describe("mandateFor", () => {
     const m = mandateFor("operator", line);
     expect(m).toContain("autonomy: operator");
     expect(m).toContain("ASK");
-    expect(m).toContain("mage:learn"); // offers single-insight capture too
+    expect(m).toContain("/mage:learn"); // offers single-insight capture too — slash-prefixed, as a skill is invoked
     expect(m).not.toContain("authorized");
   });
 

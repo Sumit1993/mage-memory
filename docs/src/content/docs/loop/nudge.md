@@ -37,13 +37,13 @@ On a `source: "compact"` start, mage reads the just-closed chapter from the capt
 At every firing source mage also surfaces a deterministic, capped **backlog tally** — a single line that always leads:
 
 ```text
-mage: 3 staged · 6 chapters unmined · up to 1 eligible to graduate → mage:groom
+mage: 3 staged · 6 chapters unmined · up to 1 eligible to graduate → /mage:groom
 ```
 
 The three parts are: staged drafts waiting in `.mage/staging/`, closed chapters not yet mined, and an upper bound on graduation-eligible signatures (a count, not an exact proposal). Below that line, mage templates a **mandate** scaled to this KB's [autonomy level](./autonomy.md):
 
-- **Operator** (default) — a plain reminder, no autonomous-write authorization: `Review with mage:groom (autonomy: operator).`
-- **Approver** — authorizes the agent to run `mage:groom` and write the clearly-durable notes into the working tree, uncommitted, leaving borderline drafts staged.
+- **Operator** (default) — no autonomous-write authorization. The agent is told to wait for a natural pause (never mid-task), offer in its own words to run `/mage:groom` or `/mage:learn`, name a genuine keeper from the digest rather than relaying the raw tally, and **ask first**.
+- **Approver** — authorizes the agent to run `/mage:groom` and write the clearly-durable notes into the working tree, uncommitted, leaving borderline drafts staged.
 - **Overseer** — authorizes the full ladder: write durable notes, merge related lessons into existing notes, dispose the borderline tier, and graduate eligible notes — all uncommitted.
 
 See [Autonomy levels](./autonomy.md) for the exact mandate wording at each level and the one invariant that holds at all three: nothing is durable until **you** `git commit` ([ADR-0030](https://github.com/Sumit1993/mage-memory/blob/main/mage/decisions/0030-agent-autonomy-ladder.md)).
@@ -58,4 +58,4 @@ When there is no fresh chapter and no backlog to report, the nudge stays silent.
 
 ## Where it leads
 
-The nudge surfaces work; it never writes a note or commits anything. What happens next depends on your autonomy level: at Operator you mine the digest and drain the backlog by hand with the [`mage:groom`](./stage-groom.md) skill; at Approver and Overseer the host agent acts on the mandate during the session, writing uncommitted changes you then review and commit. Either way, the review step is the next page: [Stage and groom](./stage-groom.md).
+The nudge surfaces work; it never writes a note or commits anything. What happens next depends on your autonomy level: at Operator you mine the digest and drain the backlog by hand with the [`/mage:groom`](./stage-groom.md) skill; at Approver and Overseer the host agent acts on the mandate during the session, writing uncommitted changes you then review and commit. Either way, the review step is the next page: [Stage and groom](./stage-groom.md).
