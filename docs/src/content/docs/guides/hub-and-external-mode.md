@@ -49,11 +49,14 @@ already has `mage/` content — pass it explicitly when you want the hub to own
 the docs regardless. The project name defaults to the repo's directory name;
 `--project <name>` overrides it.
 
-Under the hood, `link` reads the hub's git `origin` remote and records it as
-`hub_repo` — that remote, not the path you passed on the command line, becomes
-the authoritative address for the hub. Every later lookup derives the hub's
-local home from that address: `~/.mage/hubs/<host>/<owner>/<repo>`
-(`$MAGE_HOME/hubs` when set), never a recorded path.
+Under the hood, when the hub has a usable git `origin` remote, `link` reads it
+and records it as `hub_repo` — that remote, not the path you passed on the
+command line, becomes the authoritative address for the hub. Every later
+lookup derives the hub's local home from that address:
+`~/.mage/hubs/<host>/<owner>/<repo>` (`$MAGE_HOME/hubs` when set), never a
+recorded path. A hub with no usable origin has no `hub_repo` to record and
+falls back to the deprecated `hub_path` (the path you passed) instead — see
+[Modes and storage](../model/modes.md) for that fallback.
 
 `mage unlink` undoes the link, from both sides' metadata.
 
@@ -100,10 +103,12 @@ four outcomes:
 - **granted** — the hub is present and reachable. This is what you want.
 - **failing (ungranted)** — the hub is on this machine but ungranted: "the agent
   cannot read it; run `mage connect`". Re-run `connect` in the code repo.
-- **skipped** — no hub on this machine at all, so there is nothing to grant yet.
-  Re-run `mage connect` in the code repo — it offers to clone the hub to its
-  derived location on the spot (or clones it non-interactively with `--yes`),
-  or prints the exact command to do it yourself.
+- **skipped** — no usable hub at the derived location: either nothing is
+  cloned there yet, or something is but it doesn't look like a hub (no
+  `projects/` + `metadata.json`) — `connect` grants neither case. Re-run
+  `mage connect` in the code repo — for the absent case it offers to clone the
+  hub to its derived location on the spot (or clones it non-interactively with
+  `--yes`), or prints the exact command to do it yourself.
 - **failing (mismatch)** — a clone exists at the derived location, but its
   `origin` doesn't match `hub_repo`. A hard error naming both remotes — never
   reused, never clobbered.

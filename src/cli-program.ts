@@ -390,7 +390,7 @@ export function buildProgram(): Command {
     )
     .argument(
       "<hub-path>",
-      "path that locates the hub; its git origin is recorded as the authoritative hub_repo, and the path itself is kept only as a deprecated fallback",
+      "path that locates the hub; when it has a usable git origin, that origin is recorded as the authoritative hub_repo and this path is kept only as a deprecated fallback",
     )
     .option(
       "--project <name>",

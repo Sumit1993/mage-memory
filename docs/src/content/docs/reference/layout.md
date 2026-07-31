@@ -56,7 +56,7 @@ Each leaf holds a different kind of working state:
 
 ### Hub clones live at a machine level, not under the docs root
 
-External and hybrid mode ([Set up a hub and external mode](../guides/hub-and-external-mode.md)) reach into a *second* gitignored location that isn't under `mage/.mage/` at all: `~/.mage/hubs/<host>/<owner>/<repo>` (`$MAGE_HOME/hubs` when set). This is where a hub's own clone is derived and lands — one conventional home per remote, shared across every repo and worktree that links to it. It follows the same rule as everything else on this page — regenerable working state, never committed — just rooted at `$HOME` instead of at a docs root.
+External and hybrid mode ([Set up a hub and external mode](../guides/hub-and-external-mode.md)) reach into a *second* gitignored location that isn't under `mage/.mage/` at all: `~/.mage/hubs/<host>/<owner>/<repo>` (`$MAGE_HOME/hubs` when set). This is where a hub's own clone is derived and lands — one conventional home per remote, shared across every repo and worktree that links to it. Unlike the rest of this page, it is **not** disposable scratch: it is an ordinary git clone with its own history, and it may hold committed notes, unpushed commits, or uncommitted edits. It is regenerable only in the sense that a remote clone always is — push or otherwise back up anything not yet on the remote before deleting it.
 
 ### Why these stay out of git
 
