@@ -77,9 +77,28 @@ describe("canonicalizeHubRepo — spec §8 unit tests", () => {
     );
     expect(rDefaultHttps.host).toBe("github.com");
 
-    const rNonDefault = canonicalizeHubRepo("git@host:2222/o/r.git");
+    // A port only exists in URL form. `ssh://host:2222/...` really is port 2222.
+    const rNonDefault = canonicalizeHubRepo("ssh://git@host:2222/o/r.git");
     expect(rNonDefault.host).toBe("host_2222");
     expect(rNonDefault.key).toBe("host_2222/o/r");
+  });
+
+  it("scp-like form has NO port syntax — a leading numeric segment is a PATH", () => {
+    // git's `[user@]host:path` has no port field; everything after the colon is
+    // the path. Reading "2222" as a port here would collide with the ssh:// URL
+    // below — two different repositories at one derived directory, the exact
+    // injectivity violation ADR-0043 §2 rejects the flat-slug design to prevent.
+    const scp = canonicalizeHubRepo("git@host:2222/o/r.git");
+    expect(scp.host).toBe("host");
+    expect(scp.key).toBe("host/2222/o/r");
+
+    const url = canonicalizeHubRepo("ssh://git@host:2222/o/r.git");
+    expect(url.key).toBe("host_2222/o/r");
+
+    expect(scp.key).not.toBe(url.key);
+    expect(deriveHubPath("git@host:2222/o/r.git")).not.toBe(
+      deriveHubPath("ssh://git@host:2222/o/r.git"),
+    );
   });
 
   it("Subgroups: GitLab subgroups yield multi-segment paths", () => {

@@ -104,14 +104,14 @@ export function canonicalizeHubRepo(url: string): CanonicalHubRepo {
       throw new HubUrlError(`Invalid git remote URL '${url}': empty host`);
     }
 
-    // Check if pathPart starts with a port, e.g. "2222/o/r.git"
-    const portMatch = pathPart.match(/^(\d+)(\/.*)?$/);
-    if (portMatch) {
-      rawPort = portMatch[1] ?? "";
-      rawPath = portMatch[2] ?? "";
-    } else {
-      rawPath = pathPart;
-    }
+    // NO port parsing here. git's scp-like form is `[user@]host:path` and has no
+    // port syntax — everything after the colon is the path, and a port requires
+    // the `ssh://host:port/path` form. Reading a leading numeric segment as a
+    // port would make `git@host:2222/o/r.git` (path "2222/o/r") collide with
+    // `ssh://git@host:2222/o/r.git` (port 2222, path "o/r") at one derived
+    // directory — two different repositories, one home. That is exactly the
+    // injectivity violation ADR-0043 §2 rejects the flat-slug design to prevent.
+    rawPath = pathPart;
   }
 
   if (!rawHost) {
