@@ -82,7 +82,9 @@ per-repo:
   hub to `permissions.additionalDirectories` in the repo's local settings.
   Without it the agent resolves the knowledge base correctly and then cannot
   open it. On a hub-absent machine, that same `connect` run offers to clone the
-  hub to its derived location first, rather than merely skipping the grant.
+  hub to its derived location first, rather than merely skipping the grant —
+  when a usable `hub_repo` is recorded; a remote-less hub falls back to
+  `hub_path`, which `connect` grants if usable rather than cloning.
 
 Because those settings are local and gitignored, a fresh clone or a new worktree
 of the same repo starts without them — run `mage connect` again there.

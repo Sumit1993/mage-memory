@@ -585,11 +585,12 @@ async function refreshHookBlock(conn: Connection): Promise<MageDiff | null> {
  * simply lacks a clone is never mistaken for a misconfiguration:
  *   - grant present                 → pass
  *   - no hub at the derived path    → pass, optional, with a note. Covers BOTH a hub absent
- *                                     on this machine and a `hub_path` that resolves to
- *                                     something which is not a hub — `connect` grants neither,
- *                                     so neither must fail a CI runner or nag for a fix that
- *                                     will never be made. The path is DERIVED (ADR-0043 §1),
- *                                     never recorded.
+ *                                     at its `hub_repo`-derived path (ADR-0043 §1 — never
+ *                                     recorded, only paths derived from `hub_repo` have that
+ *                                     guarantee) and a deprecated `hub_path` fallback that does
+ *                                     not resolve to a hub — `connect` grants neither, so
+ *                                     neither must fail a CI runner or nag for a fix that will
+ *                                     never be made.
  *   - hub present, grant missing    → FAIL, with `mage connect` as the fix
  *   - hub present, origin mismatch  → FAIL, hard error naming both remotes — never reused,
  *                                     never clobbered (ADR-0043 §2)

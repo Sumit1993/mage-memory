@@ -680,7 +680,7 @@
     },
     {
       "name": "connect",
-      "summary": "Wire mage capture hooks into this repo's Claude Code settings (.claude/settings.local.json; personal + gitignored); in hub/hybrid modes also grants reach to the hub and offers to clone it if absent",
+      "summary": "Wire mage capture hooks into this repo's Claude Code settings (.claude/settings.local.json; personal + gitignored); in hub/hybrid modes also grants reach to the hub, and offers to clone it if absent and a usable hub_repo is recorded",
       "aliases": [],
       "hidden": false,
       "options": [
@@ -698,7 +698,7 @@
         },
         {
           "flags": "-y, --yes",
-          "description": "non-interactive: auto-confirm prompts, including cloning the hub (a real `git clone`) on a hub-absent machine"
+          "description": "non-interactive: auto-confirm prompts, including cloning the hub (a real `git clone`) on a hub-absent machine when a usable hub_repo is recorded"
         }
       ]
     },

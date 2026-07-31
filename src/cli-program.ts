@@ -575,7 +575,7 @@ export function buildProgram(): Command {
   program
     .command("connect")
     .description(
-      "Wire mage capture hooks into this repo's Claude Code settings (.claude/settings.local.json; personal + gitignored); in hub/hybrid modes also grants reach to the hub and offers to clone it if absent",
+      "Wire mage capture hooks into this repo's Claude Code settings (.claude/settings.local.json; personal + gitignored); in hub/hybrid modes also grants reach to the hub, and offers to clone it if absent and a usable hub_repo is recorded",
     )
     .option(
       "--user",
@@ -588,7 +588,7 @@ export function buildProgram(): Command {
     .option("--no-git-hook", "skip installing the redaction pre-commit hook")
     .option(
       "-y, --yes",
-      "non-interactive: auto-confirm prompts, including cloning the hub (a real `git clone`) on a hub-absent machine",
+      "non-interactive: auto-confirm prompts, including cloning the hub (a real `git clone`) on a hub-absent machine when a usable hub_repo is recorded",
     )
     .action(async (opts) => {
       if (opts.allProjects) {
