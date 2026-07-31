@@ -181,6 +181,20 @@ function finishCanonicalize(
   if (/[/\\:[\]\0]/.test(rawHost)) {
     fail("Hub URL host contains an unsafe character (/ \\ : [ ] or NUL)", original);
   }
+  // A host must actually look like a hostname. Rejecting anything else is not
+  // cosmetic: `hub_repo` is git-tracked, and the scp-like branch will happily
+  // read `--upload-pack=x:y` as host `--upload-pack=x` + path `y`. That value is
+  // then handed to `git clone`, where a leading `-` is an OPTION, and
+  // `--upload-pack` names the command git runs for the remote side — an
+  // arbitrary-execution primitive reachable from a committed metadata.json.
+  // The `--` separator at the clone call site is the other half of this fix;
+  // both are kept, because either alone leaves the other path unguarded.
+  if (!/^[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?$/.test(rawHost)) {
+    fail(
+      `Hub URL host '${rawHost}' is not a valid hostname (letters, digits, '.' and '-', not leading or trailing '-')`,
+      original,
+    );
+  }
 
   let host = rawHost.toLowerCase();
   if (port !== null) {

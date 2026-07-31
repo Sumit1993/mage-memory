@@ -111,6 +111,25 @@ describe("canonicalizeHubRepo — safety", () => {
     expect(() => canonicalizeHubRepo("https://../o/r.git")).toThrow(HubUrlError);
   });
 
+  it("an option-shaped host is rejected — git-clone argument injection", () => {
+    // `hub_repo` is git-tracked, and the scp-like branch reads
+    // `--upload-pack=x:y` as host `--upload-pack=x` + path `y`. Handed to
+    // `git clone`, a leading `-` is an OPTION, and `--upload-pack` names the
+    // command git runs for the remote side — arbitrary execution from a
+    // committed metadata.json. The `--` separator at the call site is the other
+    // half of this; both are required.
+    expect(() => canonicalizeHubRepo("--upload-pack=x:y")).toThrow(HubUrlError);
+    expect(() => canonicalizeHubRepo("-x:o/r.git")).toThrow(HubUrlError);
+
+    // ...without rejecting hostnames that legitimately contain a hyphen.
+    expect(canonicalizeHubRepo("https://git-scm.com/o/r.git").key).toBe(
+      "git-scm.com/o/r",
+    );
+    expect(canonicalizeHubRepo("ssh://my-host.example.com:2222/o/r.git").key).toBe(
+      "my-host.example.com_2222/o/r",
+    );
+  });
+
   it("an IPv6 host literal is rejected", () => {
     expect(() => canonicalizeHubRepo("ssh://git@[::1]:22/o/r.git")).toThrow(HubUrlError);
   });

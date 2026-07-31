@@ -311,7 +311,14 @@ async function offerHubTargetGrant(
     );
     return null;
   }
-  const cloneResult = await run("git", ["clone", hubRepo, target.root], { inherit: true });
+  // `--` ends option parsing. hubRepo comes from a git-tracked metadata.json, and
+  // without the separator a value like `--upload-pack=…` is read by git as an
+  // OPTION naming the command to run for the remote side, not as a URL. The
+  // hostname guard in canonicalizeHubRepo rejects such values too; both stay,
+  // because either alone leaves the other entry point unguarded.
+  const cloneResult = await run("git", ["clone", "--", hubRepo, target.root], {
+    inherit: true,
+  });
   if (cloneResult.code !== 0) {
     logger.warn(`Clone into ${target.root} failed — skipping its access grant.`);
     return null;
