@@ -107,17 +107,45 @@ derive to the same directory.
 > `host:path` syntax and is ambiguous with an SSH remote to a host named `local`.
 > The scheme form is unambiguous under the existing parser.
 
+**`<name>` grammar.** `<name>` is **exactly one path segment** and inherits
+ADR-0043 §2's segment rules rather than inventing its own: lowercased (so
+`local://My-Hub` and `local://my-hub` are one hub, matching the case fold that
+keeps a remote from minting two clones); rejected when empty, `.`, or `..`;
+rejected when it contains `/`, since a local hub has no owner namespace to nest
+under and multi-segment names would collide with the `<host>/<segments…>` shape.
+Percent-encoding is **not decoded** — consistent with the remote path, where
+`%2e%2e` stays a literal directory name and never becomes traversal. Permitted
+characters are those legal in a repository name: alphanumerics, `-`, `_`, `.`.
+
 Consequently `mage init --local` **mints a `local://<name>` address** rather than
 leaving `hub_repo` null. Existing local-only hubs carry a filesystem path in
 `hub_repo` and need a one-time migration — see Consequences.
 
-**4. `link` takes an ADDRESS. A path is a deprecated shim.** The canonical form is
-`mage link <address>` — a remote URL or `local://<name>` — with derivation
-finding, or offering to clone, the hub. A filesystem path still works: mage reads
-its origin, resolves the address, **prints the canonical command**, and warns.
-This follows the house posture that mage suggests the command rather than
-silently doing something adjacent to what you asked (ADR-0043 §5), and gives
-existing users a migration path instead of a broken invocation.
+**4. `link` takes an ADDRESS. A path is a deprecated shim. `link` never clones.**
+The canonical form is `mage link <address>` — a remote URL or `local://<name>` —
+and derivation resolves it to the hub's location.
+
+`link` **registers**; it does not obtain. Its writes are confined to the code
+repo's own `mage/metadata.json` (mode, project, `hub_repo`, or a `hub_refs[]`
+entry). It writes nothing hub-side and performs no network operation. When the
+derived path is absent, `link` reports the hub as unobtained and points at the
+command that obtains it — `mage connect` for a remote-backed hub,
+`mage init --local <name>` for a local one — and exits without registering.
+Clone-on-demand stays wired to `connect` alone, which is what keeps
+[ADR-0009](0009-no-runtime-automation-rides-host-hooks.md) honest and the capture
+path free of network calls.
+
+> An earlier draft of this section said derivation would find "or offer to clone"
+> the hub, which contradicted this ADR's own Relations line. Recorded here rather
+> than silently corrected: **`connect` obtains, `link` registers, and neither
+> borrows the other's job.**
+
+A filesystem path still works as a deprecated shim: mage reads its origin,
+resolves the address, **prints the canonical command**, warns, and — having
+resolved a real hub — proceeds with the registration. This follows the house
+posture that mage suggests the command rather than silently doing something
+adjacent to what you asked (ADR-0043 §5), and gives existing users a migration
+path instead of a broken invocation.
 
 **5. The inferred storage mode is CONFIRMED, not announced.** The heuristic stays
 — empty-vs-populated `mage/` is a genuinely strong signal — and the reason string
@@ -168,9 +196,25 @@ model the operator must understand the first time anything breaks.
 - **§6 (`hub_path` deprecated, slated for removal) becomes completable.** With
   local hubs addressable, no case requires the fallback, so removal stops being
   blocked on an unhandled scenario.
-- **Everything else stands.** Origin-match verification (§2), no symlinks (§3),
-  clone-on-demand (§4), suggest-the-move (§5), the `looksLikeHub` gate (§7), and
-  home-relative grants (§8) are untouched.
+- **Everything else stands for remote-backed hubs** — no symlinks (§3),
+  clone-on-demand (§4), suggest-the-move (§5), and home-relative grants (§8) are
+  untouched.
+- **The verification pair needs a local reading, because a local hub has no
+  origin.** "Derive the address, verify the arrival" is the posture; only the
+  arrival half changes shape:
+  - **`looksLikeHub` (§7) remains mandatory and unchanged.** It is the check that
+    does not care where the address came from — `_local/<name>` is still just a
+    directory some other process may have created, so the shape gate is exactly as
+    load-bearing here as anywhere.
+  - **Origin-match (§2) is replaced, not skipped.** There is no remote to
+    canonicalize, so the identity check becomes: the hub's own `metadata.json` at
+    the derived path must record the same `local://<name>` address being resolved.
+    A mismatch is a hard error naming both, mirroring the remote case. Skipping the
+    check outright would make `_local/` the one unguarded rung in the mechanism.
+  - **A missing derived path is not a clone opportunity.** There is nothing to
+    clone from, so §4's remedy does not apply; the remedy is
+    `mage init --local <name>`, and §5's suggest-the-move still applies to a local
+    hub found at the wrong path.
 
 ## Consequences
 
