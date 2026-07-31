@@ -257,7 +257,7 @@ describe("mage nudge — startup digest (ADR-0030 amendment)", () => {
     expect(r.notice).toContain("mage · recent work:");
     expect(r.notice).toContain("1 error"); // "failures" surface as plain "errors"
     expect(r.notice).toContain("1 correction");
-    expect(r.notice).toContain("mage:learn"); // the actionable command in the guaranteed channel
+    expect(r.notice).toContain("/mage:learn"); // the actionable command in the guaranteed channel
     // counts only — the teaser must NOT surface the failure text (mage narrows, it never ranks).
     expect(r.notice).not.toContain("alpha tests failed");
   });
@@ -402,8 +402,8 @@ describe("mage nudge — user-visible notice (systemMessage)", () => {
     await seedChapter(learningsPath(root), "s1", "alpha");
     const r = await nudgeCmd({ cwd: dir, source: "startup", force: true });
     expect(r.notice).not.toBeNull();
-    expect(r.notice).toContain("mage:groom"); // file them
-    expect(r.notice).toContain("mage:learn"); // or capture one
+    expect(r.notice).toContain("/mage:groom"); // file them
+    expect(r.notice).toContain("/mage:learn"); // or capture one
   });
 });
 
@@ -415,7 +415,7 @@ describe("mage nudge — compact bypasses the backlog throttle (resume→compact
     // First resume: never reminded → shows the backlog line AND arms the 4h throttle.
     const first = await nudgeCmd({ cwd: dir, source: "resume" });
     expect(first.notice).not.toBeNull();
-    expect(first.notice).toContain("mage:groom");
+    expect(first.notice).toContain("/mage:groom");
 
     // A second resume moments later is inside the window → throttled, nothing user-visible.
     const throttled = await nudgeCmd({ cwd: dir, source: "resume" });
@@ -425,7 +425,7 @@ describe("mage nudge — compact bypasses the backlog throttle (resume→compact
     // so the morning resume→compact pattern can no longer eat the compact's nudge.
     const compact = await nudgeCmd({ cwd: dir, source: "compact" });
     expect(compact.notice).not.toBeNull();
-    expect(compact.notice).toContain("mage:groom");
+    expect(compact.notice).toContain("/mage:groom");
   });
 });
 

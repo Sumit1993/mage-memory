@@ -67,7 +67,7 @@ const FIRING_SOURCES = new Set(["compact", "startup", "resume"]);
 const ENTRY_DIGEST_NOTE =
   "(session start) The digest above is from your LAST session's final chapter. If one entry is a " +
   "genuine keeper (a gotcha, a hard-won procedure, an env/API constraint), name it to the user in a " +
-  "line and offer to capture it with `mage:learn` — do NOT auto-file on entry, whatever the autonomy level.";
+  "line and offer to capture it with `/mage:learn` — do NOT auto-file on entry, whatever the autonomy level.";
 
 export interface NudgeOptions {
   /** Working directory used to resolve the KB (default: cwd). */
@@ -284,7 +284,7 @@ function teaserLine(d: Digest): string {
     parts.push(`${d.corrections.total} correction${d.corrections.total === 1 ? "" : "s"}`);
   }
   if (parts.length === 0) return "";
-  return `mage · recent work: ${parts.join(" · ")} — worth saving any? \`mage:learn\``;
+  return `mage · recent work: ${parts.join(" · ")} — worth saving any? \`/mage:learn\``;
 }
 
 /** Join the present context parts (digest · mandate · health) with blank lines; null when all empty. */
@@ -326,7 +326,7 @@ function noticeLine(
     const unmined = t.unminedCapped ? "9+" : String(t.unmined);
     lines.push(
       `mage · ${t.staged} staged · ${unmined} unmined · ${t.graduable} graduable — ` +
-        "`mage:groom` to file, `mage:learn` to capture one.",
+        "`/mage:groom` to file, `/mage:learn` to capture one.",
     );
   }
   if (health.length > 0) lines.push(health);
@@ -425,7 +425,7 @@ function backlogLine(t: BacklogTally): string {
     `${unmined} chapter${t.unmined === 1 && !t.unminedCapped ? "" : "s"} unmined`,
     `up to ${t.graduable} eligible to graduate`,
   ];
-  return `mage: ${parts.join(" · ")} → mage:groom`;
+  return `mage: ${parts.join(" · ")} → /mage:groom`;
 }
 
 // ─── throttle window ─────────────────────────────────────────────────────────────
