@@ -101,7 +101,10 @@ async function checkExternalLink(
     checks.push({
       name: CHECK,
       ok: false,
-      detail: resolution.detail!,
+      detail:
+        `hub at ${chosen.root} is a clone of a different remote` +
+        `${resolution.detail ? ` (${resolution.detail})` : ""}` +
+        " — not reused and not repaired; re-run `mage link <hub>` to re-point this repo",
     });
     return;
   }

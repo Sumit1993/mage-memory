@@ -560,7 +560,12 @@ describe("doctor — link integrity", () => {
       const r = await doctor({ cwd: repo, fix: true });
       const c = check(r.checks, "link integrity");
       expect(c?.ok).toBe(false);
-      expect(c?.detail).toMatch(/does not match/i);
+      expect(c?.detail).toBe(
+        `hub at ${derivedRoot} is a clone of a different remote ` +
+          `(hub_repo https://github.com/acme/expected-hub.git does not match the clone's origin ` +
+          `https://github.com/unrelated/stranger-hub.git found at ${derivedRoot} — never reused, never clobbered)` +
+          " — not reused and not repaired; re-run `mage link <hub>` to re-point this repo",
+      );
 
       const afterMeta = await readFile(join(derivedRoot, "metadata.json"), "utf8");
       expect(afterMeta).toBe(originalMeta);

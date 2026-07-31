@@ -57,11 +57,7 @@ export default defineConfig({
       // the validator runs, authored `./foo.md` links are real routes, so a 404
       // means either a bad target or a rewrite bug. Runs inside `astro build`, so
       // the existing per-PR docs.yml build step is the gate (no new CI step).
-      plugins: [
-        starlightLinksValidator({
-          exclude: ({ link }) => link.includes('src/'),
-        }),
-      ],
+      plugins: [starlightLinksValidator()],
       sidebar: [
         {
           label: 'Start Here',
