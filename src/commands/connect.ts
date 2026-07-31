@@ -14,19 +14,25 @@ import { adopt } from "./adopt.js";
 import { isInteractive, resolveDecision } from "../interactive.js";
 import { installRedactHook } from "../git-hooks.js";
 import { ensureGitignored } from "../gitignore.js";
+import { findDisplacedHubs } from "../hub-scan.js";
+import { canonicalizeHubRepo, redactUrl } from "../hub-url.js";
 import { logger } from "../logger.js";
 import {
+  type HubTarget,
   type ResolvedDocsRoot,
   absolutePath,
   exists,
   findCodeRepoRoot,
+  hubsRoot,
   looksLikeHub,
-  outOfRepoKbRoots,
+  outOfRepoKbTargets,
   ownedDocsRoots,
   readHubMetadata,
   readMetadata,
   resolveDocsRoot,
+  resolveHubGrant,
 } from "../paths.js";
+import { run } from "../shell.js";
 
 /** Options for {@link connect}. */
 export interface ConnectOptions {
@@ -152,34 +158,25 @@ export async function connect(opts: ConnectOptions): Promise<ConnectResult> {
     logger.detail("Released the CC auto-memory relocation (commandeer tier off).");
   }
 
-  // Reach tier (ADR-0042): grant the harness filesystem access to any KB root that
-  // lives OUTSIDE this code repo, or the agent cannot read its own knowledge base.
-  // Gated on LOCAL scope only — these are machine-specific absolute paths, the same
-  // reason autoMemoryDirectory is local-only. Deliberately NOT gated on the commandeer
-  // tier: reading the KB and redirecting memory writes are separate concerns, so
-  // disabling CC auto-memory must never sever reach. Always reconciled in local scope
-  // (even to an empty grant set) so an in-repo/unlinked repo sheds a stale grant.
+  // Reach tier (ADR-0042/ADR-0043): grant the harness filesystem access to any KB
+  // root that lives OUTSIDE this code repo, or the agent cannot read its own
+  // knowledge base. Gated on LOCAL scope only — these are machine-specific absolute
+  // paths, the same reason autoMemoryDirectory is local-only. Deliberately NOT gated
+  // on the commandeer tier: reading the KB and redirecting memory writes are
+  // separate concerns, so disabling CC auto-memory must never sever reach. Always
+  // reconciled in local scope (even to an empty grant set) so an in-repo/unlinked
+  // repo sheds a stale grant.
+  //
+  // Every target's root comes from outOfRepoKbTargets → the ONE shared
+  // chosenHubRoot (ADR-0043 §5) — never a bespoke lookup here.
   const reach: string[] = [];
   let settingsToWrite = merged;
   if (target.scope === "local") {
     const codeRepo = await findCodeRepoRoot(opts.cwd ?? process.cwd());
     const meta = codeRepo ? await readMetadata(codeRepo).catch(() => null) : null;
-    for (const dir of meta && codeRepo ? outOfRepoKbRoots(meta, codeRepo) : []) {
-      // Grant ONLY a real hub root. `hub_path` is untrusted input: `mage/metadata.json`
-      // is git-tracked, so anyone who can land a commit can point it anywhere, and mere
-      // existence would then widen harness access to an arbitrary directory (~/.ssh, /).
-      // looksLikeHub requires `projects/` + a hub `metadata.json`, which every legitimate
-      // grant target has. Doubles as the absent-hub gate (ADR-0042 §7): no grant, and
-      // never an ownership record for a path we did not grant.
-      if (await looksLikeHub(dir)) {
-        reach.push(dir);
-        continue;
-      }
-      logger.warn(
-        (await exists(dir))
-          ? `${dir} is not a mage hub (no projects/ + metadata.json) — skipping its access grant; check hub_path in mage/metadata.json.`
-          : `Hub not found at ${dir} — skipping its access grant. Clone it there, then re-run \`mage connect\`.`,
-      );
+    for (const hubTarget of meta && codeRepo ? outOfRepoKbTargets(meta, codeRepo) : []) {
+      const granted = await offerHubTargetGrant(hubTarget, { yes: opts.yes });
+      if (granted) reach.push(granted);
     }
     settingsToWrite = reconcileReachGrants(merged, reach);
   }
@@ -222,6 +219,105 @@ export async function connect(opts: ConnectOptions): Promise<ConnectResult> {
   }
 
   return { path: target.path, scope: target.scope, wired, backedUp, commandeer, reach, hook };
+}
+
+/**
+ * Decide whether ONE hub target (ADR-0043 §5's resolution order, via the ONE
+ * shared {@link resolveHubGrant} — the same function doctor's readiness check
+ * uses, so the two can never drift) is grantable, and log why when it isn't.
+ * Returns the granted path, or null.
+ *
+ *   - resolved "derived" or "hub_path" → grant it (a "hub_path" resolution —
+ *     whether because the pair had no usable hub_repo, or because a derived
+ *     root failed arrival and hub_path rescued it — is always the deprecated
+ *     fallback; warn naming it).
+ *   - resolved "mismatch" → loud, NEVER granted, NEVER reused, NEVER clobbered.
+ *   - resolved "absent" with a `hubRepo` on the pair (i.e. hub_repo derived
+ *     but nothing usable was found there OR at hub_path) → scan for a
+ *     displaced clone of the same remote (ADR-0043 §4) before offering
+ *     clone-on-demand — never both silently.
+ *   - resolved "absent" with no `hubRepo` at all → just report it (nothing to
+ *     scan or clone without a remote).
+ *
+ * Never quotes hub_repo/origin unredacted (ADR-0043 §1's redaction rule
+ * applies to diagnostics, not just parse errors).
+ */
+async function offerHubTargetGrant(
+  target: HubTarget,
+  opts: { yes?: boolean },
+): Promise<string | null> {
+  const resolution = await resolveHubGrant(target);
+
+  if (resolution.reason === "derived") return resolution.root;
+
+  if (resolution.reason === "hub_path") {
+    logger.warn(
+      `${resolution.root}: resolved via the deprecated \`hub_path\` (no usable \`hub_repo\` on ` +
+        "this pair, or hub_repo did not resolve) — run `mage link` again to record hub_repo.",
+    );
+    return resolution.root;
+  }
+
+  if (resolution.reason === "mismatch") {
+    logger.error(`Hub mismatch at ${target.root}: ${resolution.detail}. Skipping its access grant.`);
+    return null;
+  }
+
+  // resolution.reason === "absent". Nothing to scan/clone without a hub_repo.
+  if (!target.hubRepo) {
+    logger.warn(
+      `${target.root} is not a mage hub (no projects/ + metadata.json) — skipping its access grant; ` +
+        "check hub_path in mage/metadata.json.",
+    );
+    return null;
+  }
+  const hubRepo = target.hubRepo;
+
+  // Before offering clone-on-demand, scan for a clone of the same remote sitting
+  // somewhere else under the hubs root (ADR-0043 §4). Depth is derived from the
+  // requested key's own segment count — never hard-coded, so nested hubs (GitLab
+  // subgroups) are found too.
+  const key = canonicalizeHubRepo(hubRepo).key;
+  const depth = key.split("/").length;
+  const candidates = await findDisplacedHubs(hubsRoot(), key, depth);
+  if (candidates.length > 0) {
+    const first = candidates[0] as { path: string };
+    logger.warn(`Hub for ${redactUrl(hubRepo)} found at ${first.path}, not its derived location.`);
+    logger.detail(`  mv "${first.path}" "${target.root}"`);
+    if (candidates.length > 1) {
+      logger.detail(
+        `  (${candidates.length} clones of this remote found — showing the first in sorted ` +
+          "order; the rest need a manual look.)",
+      );
+    }
+    return null; // mage only SUGGESTS the move (ADR-0043 §5); never performs it.
+  }
+
+  // No displaced clone either. Offer clone-on-demand (ADR-0043 §4) — `connect` is
+  // the surface this is wired to; never the capture path (ADR-0009).
+  const shouldClone = await resolveDecision<boolean>({
+    flagValue: undefined,
+    yes: opts.yes,
+    interactive: () =>
+      confirm({ message: `Hub not found at ${target.root} — clone it now?`, default: true }),
+    fallback: { value: false },
+    flagName: "yes",
+  });
+  if (!shouldClone) {
+    logger.warn(
+      `Hub not found at ${target.root} — skipping its access grant. Clone the remote recorded ` +
+        "in mage/metadata.json's hub_repo to that path, then re-run `mage connect` (or re-run it " +
+        "interactively to clone it now).",
+    );
+    return null;
+  }
+  const cloneResult = await run("git", ["clone", hubRepo, target.root], { inherit: true });
+  if (cloneResult.code !== 0) {
+    logger.warn(`Clone into ${target.root} failed — skipping its access grant.`);
+    return null;
+  }
+  logger.success(`Cloned into ${target.root}.`);
+  return target.root;
 }
 
 /**

@@ -29,9 +29,9 @@ to avoid), and **pointers** to canonical sources — never a copy of the source
 ## Steps
 
 1. **Resolve the knowledge base.** Find the nearest `mage/metadata.json`
-   (walk up). docs root = `<repo>/mage/` (in-repo) or
-   `<hub_path>/projects/<project>/` (external). If none, tell the user to
-   run `mage init` first.
+   (walk up). docs root = `<repo>/mage/` (in-repo) or `<hub root>/projects/<project>/`
+   (external — the hub root is derived from `hub_repo`, ADR-0043). If none, tell
+   the user to run `mage init` first.
 
 2. **Walk the better home ladder (ADR-0041).** Ask: *"Would an agent, mid-task and not looking for it, be better off if this arrived unbidden?"* Check the ladder rows in order before authoring a note:
    - **Code comment:** file/function-scoped detail that rots with the code.

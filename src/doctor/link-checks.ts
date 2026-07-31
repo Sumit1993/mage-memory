@@ -16,6 +16,7 @@ import {
   META_DIR,
   META_FILE,
   absolutePath,
+  chosenHubRoot,
   exists,
   looksLikeHub,
   readHubMetadata,
@@ -41,7 +42,7 @@ export async function pushLinkChecks(checks: DoctorCheck[], opts: DoctorOptions)
   if (codeRepo) {
     const meta = await readMetadata(codeRepo).catch(() => null);
     if (meta?.mode === "external") {
-      await checkExternalLink(checks, opts, codeRepo, meta.hub_path, meta.project);
+      await checkExternalLink(checks, opts, codeRepo, meta.hub_repo, meta.hub_path, meta.project);
     }
     return; // in-repo: no hub link to validate.
   }
@@ -62,19 +63,27 @@ async function findCodeRepo(startDir: string): Promise<string | null> {
   }
 }
 
-/** Validate (and optionally repair) an external code repo's two-way hub link. */
+/**
+ * Validate (and optionally repair) an external code repo's two-way hub link.
+ * Resolves the hub root the ADR-0043 way — via the shared {@link chosenHubRoot}
+ * (hub_repo-derived, falling back to hub_path) — so a repo linked under either
+ * field still gets its back-reference checked.
+ */
 async function checkExternalLink(
   checks: DoctorCheck[],
   opts: DoctorOptions,
   codeRepo: string,
-  hubPath: string | null,
+  hubRepo: string | null,
+  hubPathField: string | null,
   project: string,
 ): Promise<void> {
+  const chosen = chosenHubRoot(hubRepo, hubPathField);
+  const hubPath = chosen?.root ?? null;
   if (!hubPath || !(await looksLikeHub(hubPath))) {
     checks.push({
       name: CHECK,
       ok: false,
-      detail: `hub_path ${hubPath ?? "(missing)"} is not a reachable hub (moved?) — re-run \`mage link <hub>\``,
+      detail: `hub at ${hubPath ?? "(no hub_repo/hub_path)"} is not a reachable hub (moved?) — re-run \`mage link <hub>\``,
     });
     return;
   }

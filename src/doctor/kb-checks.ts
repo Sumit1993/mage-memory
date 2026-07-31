@@ -30,11 +30,12 @@ import {
   findCodeRepoRoot,
   learningsPath,
   looksLikeHub,
-  outOfRepoKbRoots,
+  outOfRepoKbTargets,
   ownedDocsRoots,
   readGenreOverrides,
   readHubMetadata,
   readMetadata,
+  resolveHubGrant,
   type resolveDocsRoot,
 } from "../paths.js";
 import { genreOf } from "../scanner/genre-map.js";
@@ -599,15 +600,22 @@ async function refreshHookBlock(conn: Connection): Promise<MageDiff | null> {
  */
 async function pushReachGrantCheck(checks: DoctorCheck[], opts: DoctorOptions): Promise<void> {
   const cwd = opts.cwd ?? process.cwd();
-  let wanted: string[] = [];
+  let resolutions: Awaited<ReturnType<typeof resolveHubGrant>>[] = [];
   try {
     const codeRepo = await findCodeRepoRoot(cwd);
     const meta = codeRepo ? await readMetadata(codeRepo) : null;
-    wanted = meta && codeRepo ? outOfRepoKbRoots(meta, codeRepo) : [];
+    const targets = meta && codeRepo ? outOfRepoKbTargets(meta, codeRepo) : [];
+    // Mirror connect's gate EXACTLY — resolveHubGrant, the same function connect
+    // uses to decide what to grant AND what path it grants (ADR-0043 §5's
+    // one-shared-function rule). Reporting a target connect would never grant as
+    // "missing" would nag for a fix connect will never make; checking the WRONG
+    // path (e.g. the derived root when connect actually fell back to hub_path)
+    // would report a real grant as missing.
+    resolutions = await Promise.all(targets.map((t) => resolveHubGrant(t)));
   } catch {
     return; // unreadable/foreign metadata — schema drift check owns that story
   }
-  if (wanted.length === 0) return; // in-repo KB: nothing lives outside the project root
+  if (resolutions.length === 0) return; // in-repo KB: nothing lives outside the project root
 
   const granted = new Set<string>();
   for (const t of [resolveSettingsTarget({ cwd }), resolveSettingsTarget({ user: true })]) {
@@ -617,16 +625,28 @@ async function pushReachGrantCheck(checks: DoctorCheck[], opts: DoctorOptions): 
   }
 
   const missing: string[] = [];
-  const absent: string[] = [];
-  for (const dir of wanted) {
-    if (granted.has(dir)) continue;
-    // Mirror connect's gate exactly (looksLikeHub, NOT exists): `hub_path` is untrusted
-    // git-tracked input, so connect refuses to grant a non-hub. Reporting such a path as
-    // a missing grant would nag for a fix connect will never make.
-    if (await looksLikeHub(dir)) missing.push(dir);
-    else absent.push(dir);
+  const mismatched: string[] = [];
+  let sawAbsent = false;
+  for (const resolution of resolutions) {
+    if (resolution.reason === "mismatch") {
+      mismatched.push(resolution.detail ?? "hub mismatch");
+      continue;
+    }
+    if (resolution.reason === "absent") {
+      sawAbsent = true;
+      continue;
+    }
+    if (!granted.has(resolution.root as string)) missing.push(resolution.root as string);
   }
 
+  if (mismatched.length > 0) {
+    checks.push({
+      name: "KB access grant",
+      ok: false,
+      detail: `hub mismatch — never reused, never clobbered: ${mismatched.join("; ")}`,
+    });
+    return;
+  }
   if (missing.length > 0) {
     checks.push({
       name: "KB access grant",
@@ -637,19 +657,19 @@ async function pushReachGrantCheck(checks: DoctorCheck[], opts: DoctorOptions): 
     });
     return;
   }
-  if (absent.length > 0) {
+  if (sawAbsent) {
     checks.push({
       name: "KB access grant",
       ok: true,
       optional: true,
-      detail: `no mage hub present on this machine (${absent.join(", ")}) — nothing to grant yet`,
+      detail: "no mage hub present on this machine yet — nothing to grant yet",
     });
     return;
   }
   checks.push({
     name: "KB access grant",
     ok: true,
-    detail: `granted: ${wanted.join(", ")}`,
+    detail: `granted: ${resolutions.map((r) => r.root).join(", ")}`,
   });
 }
 

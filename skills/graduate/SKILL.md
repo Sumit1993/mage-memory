@@ -35,9 +35,9 @@ write through the single applier.
 ## Steps
 
 1. **Resolve the knowledge base.** Find the nearest `mage/metadata.json` (walk
-   up). docs root = `<repo>/mage/` (in-repo) or
-   `<hub_path>/projects/<project>/` (external). If none, tell the user to run
-   `mage init` first — there is nothing to graduate.
+   up). docs root = `<repo>/mage/` (in-repo) or `<hub root>/projects/<project>/`
+   (external — the hub root is derived from `hub_repo`, ADR-0043). If none, tell
+   the user to run `mage init` first — there is nothing to graduate.
 
 2. **Run the deterministic graduation reader.**
    ```bash

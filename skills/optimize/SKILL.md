@@ -60,9 +60,9 @@ trigger has no signal to optimize against yet.
 ## Steps
 
 1. **Resolve the knowledge base.** Find the nearest `mage/metadata.json`
-   (walk up). docs root = `<repo>/mage/` (in-repo) or
-   `<hub_path>/projects/<project>/` (external). If none, tell the user to
-   run `mage init` first — there is nothing to optimize.
+   (walk up). docs root = `<repo>/mage/` (in-repo) or `<hub root>/projects/<project>/`
+   (external — the hub root is derived from `hub_repo`, ADR-0043). If none, tell
+   the user to run `mage init` first — there is nothing to optimize.
 
 2. **Read the context-match report (read-only).**
    ```bash
