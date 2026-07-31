@@ -222,6 +222,16 @@ lines once the budget is breached: **no K is computed, no ranking is applied, an
 no overflow line exists**. Building it is tracked separately as a 0.0.17
 deliverable; **until it lands, criterion 1 is unmet by definition.**
 
+> **Landed 2026-07-29 — the paragraph above is a point-in-time record, not the
+> current state.** The renderer shipped in
+> [#109](https://github.com/Sumit1993/mage-memory/pull/109) and released in 0.0.17;
+> #109 merged *before* this amendment (#108), which is why the text reads as though
+> it were still pending. The overflow line renders in every soak unit
+> (`> 41 memory notes total (41 shown)`). **Criterion 1 is met.** Note that K has
+> not yet bound in any observed KB — all entries are shown — so the ranking half of
+> the contract is live but unexercised. Criteria 2 and 3 are what still gate
+> ratification; see [plan-adr-0041-waves](../work/plan-adr-0041-waves.md).
+
 1. **Shape.** One standing governance line (Decision §4) + the **top-K
    memory-genre entries** + **one overflow line** naming the total note count
    and pointing the reader at `INDEX.md`. Nothing else is pushed.
