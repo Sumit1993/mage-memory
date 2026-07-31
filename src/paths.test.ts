@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { tmpDir } from "../test/fixtures/kb.js";
 import {
   type HubMetadata,
@@ -15,6 +15,7 @@ import {
   isUnder,
   looksLikeHub,
   outOfRepoKbRoots,
+  outOfRepoKbTargets,
   metadataPath,
   normalizeHubMetadata,
   normalizeMetadata,
@@ -123,6 +124,117 @@ describe("paths", () => {
       expect(r?.repo).toBe(hub);
       expect(r?.kind).toBe("hub");
     }
+  });
+
+  it("resolveDocsRoot derives the hub from hub_repo when its origin matches (ADR-0043)", async () => {
+    const mageHome = await tmpDir("mage-derive-home-");
+    const saved = process.env.MAGE_HOME;
+    process.env.MAGE_HOME = mageHome;
+    try {
+      const hubRepo = "https://github.com/acme/docs.git";
+      const derived = join(mageHome, "hubs", "github.com", "acme", "docs");
+      await mkdir(join(derived, "projects", "engine"), { recursive: true });
+      await writeFile(
+        join(derived, "metadata.json"),
+        JSON.stringify({ schema: METADATA_SCHEMA, name: "h", created_at: "", projects: [] }),
+      );
+      await mkdir(join(derived, ".git"), { recursive: true });
+      await writeFile(join(derived, ".git", "config"), `[remote "origin"]\n\turl = ${hubRepo}\n`);
+
+      const code = await tmpDir("mage-derive-code-");
+      await mkdir(join(code, "mage"), { recursive: true });
+      await writeFile(
+        join(code, "mage", "metadata.json"),
+        JSON.stringify({
+          schema: METADATA_SCHEMA,
+          mode: "external",
+          project: "engine",
+          hub_path: null,
+          hub_repo: hubRepo,
+          hub_refs: [],
+          linked_at: "",
+        }),
+      );
+
+      const r = await resolveDocsRoot(code);
+      expect(r?.root).toBe(hubProjectDocsRoot(derived, "engine"));
+      expect(r?.repo).toBe(derived);
+    } finally {
+      if (saved === undefined) delete process.env.MAGE_HOME;
+      else process.env.MAGE_HOME = saved;
+    }
+  });
+
+  it("resolveDocsRoot degrades to hub_path when the derived hub's origin MISMATCHES (never throws, never reuses)", async () => {
+    const mageHome = await tmpDir("mage-derive-mismatch-home-");
+    const saved = process.env.MAGE_HOME;
+    process.env.MAGE_HOME = mageHome;
+    try {
+      const hubRepo = "https://github.com/acme/docs.git";
+      const derived = join(mageHome, "hubs", "github.com", "acme", "docs");
+      await mkdir(join(derived, "projects"), { recursive: true });
+      await writeFile(
+        join(derived, "metadata.json"),
+        JSON.stringify({ schema: METADATA_SCHEMA, name: "h", created_at: "", projects: [] }),
+      );
+      await mkdir(join(derived, ".git"), { recursive: true });
+      // A DIFFERENT remote sits at the derived location.
+      await writeFile(
+        join(derived, ".git", "config"),
+        '[remote "origin"]\n\turl = https://github.com/other/repo.git\n',
+      );
+
+      const legacyHub = await tmpDir("mage-derive-legacy-");
+      await mkdir(join(legacyHub, "projects", "engine"), { recursive: true });
+      await writeFile(
+        join(legacyHub, "metadata.json"),
+        JSON.stringify({ schema: METADATA_SCHEMA, name: "h2", created_at: "", projects: [] }),
+      );
+
+      const code = await tmpDir("mage-derive-mismatch-code-");
+      await mkdir(join(code, "mage"), { recursive: true });
+      await writeFile(
+        join(code, "mage", "metadata.json"),
+        JSON.stringify({
+          schema: METADATA_SCHEMA,
+          mode: "external",
+          project: "engine",
+          hub_path: legacyHub,
+          hub_repo: hubRepo,
+          hub_refs: [],
+          linked_at: "",
+        }),
+      );
+
+      const r = await resolveDocsRoot(code);
+      // Never throws, never silently reuses the mismatched derived clone —
+      // degrades to the deprecated hub_path fallback instead.
+      expect(r?.repo).toBe(legacyHub);
+      expect(r?.root).toBe(hubProjectDocsRoot(legacyHub, "engine"));
+    } finally {
+      if (saved === undefined) delete process.env.MAGE_HOME;
+      else process.env.MAGE_HOME = saved;
+    }
+  });
+
+  it("resolveDocsRoot degrades to the repo KB on a malformed hub_repo — never throws", async () => {
+    const code = await tmpDir("mage-derive-malformed-");
+    await mkdir(join(code, "mage"), { recursive: true });
+    await writeFile(
+      join(code, "mage", "metadata.json"),
+      JSON.stringify({
+        schema: METADATA_SCHEMA,
+        mode: "external",
+        project: "engine",
+        hub_path: null,
+        hub_repo: "/not/a/valid/git/url", // a bare local path — canonicalizeHubRepo rejects it
+        hub_refs: [],
+        linked_at: "",
+      }),
+    );
+    const r = await resolveDocsRoot(code);
+    expect(r?.kind).toBe("repo");
+    expect(r?.root).toBe(join(code, "mage"));
   });
 
   it("resolveDocsRoot falls back to repo KB when external metadata is malformed", async () => {
@@ -351,9 +463,24 @@ describe("isUnder", () => {
   });
 });
 
-describe("outOfRepoKbRoots (ADR-0042)", () => {
+describe("outOfRepoKbRoots / outOfRepoKbTargets (ADR-0043)", () => {
   const REPO = "/home/u/org/code";
-  const HUB = "/home/u/org/docs-hub";
+  const HUB = "/home/u/org/docs-hub"; // a legacy hub_path fallback value
+  let mageHome: string;
+  const savedMageHome = process.env.MAGE_HOME;
+
+  beforeEach(async () => {
+    mageHome = await tmpDir("mage-outofrepo-");
+    process.env.MAGE_HOME = mageHome;
+  });
+
+  afterEach(() => {
+    if (savedMageHome === undefined) delete process.env.MAGE_HOME;
+    else process.env.MAGE_HOME = savedMageHome;
+  });
+
+  const hubsRootDir = () => join(mageHome, "hubs");
+
   const base = (over: Partial<MageMetadata> = {}): MageMetadata => ({
     schema: METADATA_SCHEMA,
     mode: "in-repo",
@@ -369,16 +496,26 @@ describe("outOfRepoKbRoots (ADR-0042)", () => {
     expect(outOfRepoKbRoots(base(), REPO)).toEqual([]);
   });
 
-  it("external grants the HUB REPO root, not the project docs root beneath it", () => {
+  it("external with hub_repo DERIVES its path — hub_repo is authoritative over hub_path", () => {
     const meta = base({ mode: "external", hub_path: HUB, hub_repo: "git@x:y.git" });
+    expect(outOfRepoKbRoots(meta, REPO)).toEqual([join(hubsRootDir(), "x", "y")]);
+  });
+
+  it("external with no hub_repo falls back to hub_path", () => {
+    const meta = base({ mode: "external", hub_path: HUB, hub_repo: null });
     expect(outOfRepoKbRoots(meta, REPO)).toEqual([HUB]);
   });
 
-  it("external with no hub_path grants nothing (degraded metadata)", () => {
+  it("external with an unparseable hub_repo falls back to hub_path rather than throwing", () => {
+    const meta = base({ mode: "external", hub_path: HUB, hub_repo: "/not/a/valid/git/url" });
+    expect(outOfRepoKbRoots(meta, REPO)).toEqual([HUB]);
+  });
+
+  it("external with neither hub_repo nor hub_path grants nothing (degraded metadata)", () => {
     expect(outOfRepoKbRoots(base({ mode: "external" }), REPO)).toEqual([]);
   });
 
-  it("hybrid grants every registered hub_ref", () => {
+  it("hybrid grants every registered hub_ref, each independently derived", () => {
     const meta = base({
       hub_refs: [
         { hub_path: HUB, hub_repo: "git@x:a.git", project: "p" },
@@ -386,7 +523,10 @@ describe("outOfRepoKbRoots (ADR-0042)", () => {
       ],
     });
     // v1-shaped (mode "in-repo" + refs) normalizes to hybrid in memory.
-    expect(outOfRepoKbRoots(meta, REPO)).toEqual([HUB, "/home/u/org/hub2"]);
+    expect(outOfRepoKbRoots(meta, REPO)).toEqual([
+      join(hubsRootDir(), "x", "a"),
+      join(hubsRootDir(), "x", "b"),
+    ]);
   });
 
   it("drops a hub that sits INSIDE the project root (self-referential)", () => {
@@ -407,12 +547,31 @@ describe("outOfRepoKbRoots (ADR-0042)", () => {
         { hub_path: HUB, hub_repo: "git@x:a.git", project: "q" },
       ],
     });
-    expect(outOfRepoKbRoots(meta, REPO)).toEqual([HUB]);
+    expect(outOfRepoKbRoots(meta, REPO)).toEqual([join(hubsRootDir(), "x", "a")]);
   });
 
-  it("is pure — no filesystem access, so a non-existent hub is still returned", () => {
-    const meta = base({ mode: "external", hub_path: "/nope/not/here", hub_repo: null });
-    expect(outOfRepoKbRoots(meta, REPO)).toEqual(["/nope/not/here"]);
+  it("is pure — no filesystem access, so a non-existent derived hub is still returned", () => {
+    const meta = base({ mode: "external", hub_repo: "git@nope-host:not/here.git", hub_path: null });
+    expect(outOfRepoKbRoots(meta, REPO)).toEqual([join(hubsRootDir(), "nope-host", "not", "here")]);
+  });
+
+  it("outOfRepoKbTargets exposes source + hubRepo + hubPath (fallback) for the caller", () => {
+    const meta = base({ mode: "external", hub_repo: "git@x:y.git", hub_path: HUB });
+    expect(outOfRepoKbTargets(meta, REPO)).toEqual([
+      {
+        root: join(hubsRootDir(), "x", "y"),
+        source: "derived",
+        hubRepo: "git@x:y.git",
+        hubPath: HUB,
+      },
+    ]);
+  });
+
+  it("outOfRepoKbTargets marks a hub_path fallback with source 'hub_path' and no hubRepo", () => {
+    const meta = base({ mode: "external", hub_repo: null, hub_path: HUB });
+    expect(outOfRepoKbTargets(meta, REPO)).toEqual([
+      { root: HUB, source: "hub_path", hubRepo: undefined, hubPath: HUB },
+    ]);
   });
 });
 

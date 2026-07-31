@@ -1,9 +1,10 @@
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { tmpDir, withKb } from "../../test/fixtures/kb.js";
 import { gitInit } from "../git.js";
 import { REDACT_HOOK_MARKER, resolveHooksDir } from "../git-hooks.js";
+import { canonicalizeHubRepo } from "../hub-url.js";
 import { connect, connectAllProjects } from "./connect.js";
 
 async function freshDir(): Promise<string> {
@@ -605,5 +606,179 @@ describe("reach tier — connect grants out-of-repo KB access (ADR-0042)", () =>
     const { code } = await externalRepo({ hubExists: true });
     const r = await connect({ cwd: code, yes: true, user: true, gitHook: false });
     expect(r.reach).toEqual([]);
+  });
+});
+
+// ─── reach tier — hub_repo derivation (ADR-0043) ───────────────────────────
+
+describe("reach tier — hub_repo derivation (ADR-0043)", () => {
+  const savedMageHome = process.env.MAGE_HOME;
+  let mageHome: string;
+  let logs: string[];
+  let logSpy: ReturnType<typeof vi.spyOn>;
+  let errSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(async () => {
+    mageHome = await tmpDir("mage-connect-derive-home-");
+    process.env.MAGE_HOME = mageHome;
+    logs = [];
+    logSpy = vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logs.push(args.map(String).join(" "));
+    });
+    errSpy = vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
+      logs.push(args.map(String).join(" "));
+    });
+  });
+
+  afterEach(() => {
+    logSpy.mockRestore();
+    errSpy.mockRestore();
+    if (savedMageHome === undefined) delete process.env.MAGE_HOME;
+    else process.env.MAGE_HOME = savedMageHome;
+  });
+
+  async function makeHubClone(path: string, origin: string): Promise<void> {
+    await mkdir(join(path, "projects", "engine"), { recursive: true });
+    await writeFile(
+      join(path, "metadata.json"),
+      JSON.stringify({ schema: "mage.v2", name: "h", created_at: "", projects: [] }),
+    );
+    await mkdir(join(path, ".git"), { recursive: true });
+    await writeFile(join(path, ".git", "config"), `[remote "origin"]\n\turl = ${origin}\n`);
+  }
+
+  async function externalCodeRepo(opts: {
+    hubRepo: string | null;
+    hubPath: string | null;
+  }): Promise<string> {
+    const code = await tmpDir("mage-connect-derive-code-");
+    await mkdir(join(code, "mage"), { recursive: true });
+    await writeFile(
+      join(code, "mage", "metadata.json"),
+      JSON.stringify({
+        schema: "mage.v2",
+        mode: "external",
+        project: "engine",
+        hub_path: opts.hubPath,
+        hub_repo: opts.hubRepo,
+        hub_refs: [],
+        linked_at: "",
+      }),
+    );
+    return code;
+  }
+
+  it("origin match → the derived hub is used and granted", async () => {
+    const hubRepo = "https://github.com/acme/docs.git";
+    const derived = join(mageHome, "hubs", "github.com", "acme", "docs");
+    await makeHubClone(derived, hubRepo);
+    const code = await externalCodeRepo({ hubRepo, hubPath: null });
+
+    const r = await connect({ cwd: code, yes: true, gitHook: false });
+    expect(r.reach).toEqual([derived]);
+  });
+
+  it("origin mismatch is a hard, named failure — never granted, both remotes named + redacted", async () => {
+    const hubRepo = "https://x-access-token:ghp_WANTED@github.com/acme/docs.git";
+    const derived = join(mageHome, "hubs", "github.com", "acme", "docs");
+    // A DIFFERENT remote sits at the derived location.
+    await makeHubClone(derived, "https://x-access-token:ghp_ACTUAL@github.com/other/repo.git");
+    const code = await externalCodeRepo({ hubRepo, hubPath: null });
+
+    const r = await connect({ cwd: code, yes: true, gitHook: false });
+    expect(r.reach).toEqual([]);
+
+    const combined = logs.join("\n");
+    expect(combined).toMatch(/mismatch/i);
+    expect(combined).toContain("github.com/acme/docs");
+    expect(combined).toContain("github.com/other/repo");
+    expect(combined).not.toContain("ghp_WANTED");
+    expect(combined).not.toContain("ghp_ACTUAL");
+  });
+
+  it("derived absent + a valid hub_path → falls back to hub_path and grants it, with a deprecation notice", async () => {
+    const hubRepo = "https://github.com/acme/docs.git"; // derives to a path nothing lives at
+    const legacyHub = await tmpDir("mage-connect-legacy-hub-");
+    await mkdir(join(legacyHub, "projects"), { recursive: true });
+    await writeFile(
+      join(legacyHub, "metadata.json"),
+      JSON.stringify({ schema: "mage.v2", name: "h", created_at: "", projects: [] }),
+    );
+    const code = await externalCodeRepo({ hubRepo, hubPath: legacyHub });
+
+    const r = await connect({ cwd: code, yes: true, gitHook: false });
+    expect(r.reach).toEqual([legacyHub]);
+    expect(logs.join("\n")).toMatch(/deprecated/i);
+  });
+
+  it("a displaced clone with a matching origin is SUGGESTED (mv), never moved, never granted", async () => {
+    const hubRepo = "https://github.com/acme/docs.git";
+    const derived = join(mageHome, "hubs", "github.com", "acme", "docs");
+    const displaced = join(mageHome, "hubs", "github.com", "old-acme", "old-docs");
+    await makeHubClone(displaced, hubRepo);
+    const code = await externalCodeRepo({ hubRepo, hubPath: null });
+
+    const r = await connect({ cwd: code, yes: true, gitHook: false });
+    expect(r.reach).toEqual([]);
+    expect(await exists(join(derived, "metadata.json"))).toBe(false); // never moved
+    expect(await exists(join(displaced, "metadata.json"))).toBe(true); // still there
+    const combined = logs.join("\n");
+    expect(combined).toContain(displaced);
+    expect(combined).toMatch(/mv/);
+  });
+
+  it("two displaced clones → the FIRST in sorted order is suggested, deterministically", async () => {
+    const hubRepo = "https://github.com/acme/docs.git";
+    // Create in reverse-sorted order to prove the pick is sort-based, not creation-order.
+    const zLoc = join(mageHome, "hubs", "github.com", "z-owner", "docs");
+    const aLoc = join(mageHome, "hubs", "github.com", "a-owner", "docs");
+    await makeHubClone(zLoc, hubRepo);
+    await makeHubClone(aLoc, hubRepo);
+    const code = await externalCodeRepo({ hubRepo, hubPath: null });
+
+    const r = await connect({ cwd: code, yes: true, gitHook: false });
+    expect(r.reach).toEqual([]);
+    const combined = logs.join("\n");
+    expect(combined).toContain(aLoc);
+    expect(combined).not.toContain(zLoc);
+  });
+
+  it("a hybrid ref whose derived hub does not exist yet still reaches the grant decision (not silently dropped)", async () => {
+    const hubRepo = "https://github.com/acme/docs.git";
+    const { dir } = await withKb({ kind: "repo" }); // an in-repo KB registering a hybrid hub_ref
+    const meta = JSON.parse(await readFile(join(dir, "mage", "metadata.json"), "utf8"));
+    meta.mode = "hybrid";
+    meta.hub_refs = [{ hub_path: "/nonexistent/legacy", hub_repo: hubRepo, project: "p" }];
+    await writeFile(join(dir, "mage", "metadata.json"), `${JSON.stringify(meta, null, 2)}\n`);
+
+    const r = await connect({ cwd: dir, yes: true, gitHook: false });
+    expect(r.reach).toEqual([]);
+    // The candidate reached the grant decision (and was reported), rather than the
+    // hub_ref vanishing before ever being considered — the v1 drift bug this spec
+    // calls out (one lookup gated on existsSync, one didn't, so a not-yet-cloned
+    // hub_ref's grant was silently skipped with no trace at all).
+    expect(logs.join("\n")).toMatch(/hub not found|clone/i);
+  });
+
+  it("--yes reaches the clone path while non-yes non-interactive path does not clone", async () => {
+    const hubRepo = "https://github.com/acme/docs.git";
+    const code = await externalCodeRepo({ hubRepo, hubPath: null });
+
+    // 1. Non-yes non-interactive run: shouldClone is false, never attempts clone
+    logs.length = 0;
+    const rNoYes = await connect({ cwd: code, yes: false, gitHook: false });
+    expect(rNoYes.reach).toEqual([]);
+    expect(logs.join("\n")).toContain("interactively or with `--yes` to clone it now");
+    expect(logs.join("\n")).not.toContain("Clone into");
+
+    // 2. --yes run: shouldClone is true, reaches clone path
+    logs.length = 0;
+    const rYes = await connect({ cwd: code, yes: true, gitHook: false });
+    expect(rYes.reach).toEqual([]);
+    expect(logs.join("\n")).toMatch(/Clone into .* failed/);
+  });
+
+  it("canonicalizeHubRepo agrees with what connect derived (sanity check on the fixture paths above)", () => {
+    expect(canonicalizeHubRepo("https://github.com/acme/docs.git").key).toBe("github.com/acme/docs");
   });
 });

@@ -1,13 +1,20 @@
-import { access, readFile, stat, writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
+import { type ChosenHubRootSource, chosenHubRoot, verifyHubArrival } from "./hub-url.js";
+import { exists, hubMetadataPath, isUnder, looksLikeHub, META_FILE, PROJECTS_DIR } from "./path-guards.js";
 import { type Genre, resolveGenreOverrides } from "./scanner/genre-map.js";
+
+// ADR-0043: isUnder/looksLikeHub/exists/hubMetadataPath/PROJECTS_DIR/META_FILE now
+// live in the leaf module path-guards.ts (hub-url.ts needs them without importing
+// this file, which itself imports hub-url.ts). Re-exported here so every existing
+// `from "./paths.js"` import keeps working unchanged.
+export { exists, hubMetadataPath, isUnder, looksLikeHub, META_FILE, PROJECTS_DIR };
+export { chosenHubRoot, hubsRoot, type ChosenHubRoot, type ChosenHubRootSource } from "./hub-url.js";
 
 // ─── path constants ──────────────────────────────────────────────────────
 /** The knowledge-base (KB) dir nested in a code repo (in-repo and hybrid modes). */
 export const META_DIR = "mage";
-export const META_FILE = "metadata.json";
-export const PROJECTS_DIR = "projects";
 export const ARCHIVE_DIR = "archive";
 
 // KB layout (inside a docs root, whether a repo `mage/` or a hub root).
@@ -116,9 +123,20 @@ export interface GroomingConfig {
  *                 hub_path/hub_repo are null.
  *   - "hybrid":   the KB lives at `<code-repo>/mage/` (same docs root as in-repo)
  *                 AND is registered with one or more external hubs. hub_refs is
- *                 non-empty; hub_path/hub_repo remain null.
- *   - "external": the KB is hub-owned; docs live at `<hub_path>/projects/<project>/`.
- *                 hub_path/hub_repo are populated; hub_refs is empty.
+ *                 non-empty; hub_path/hub_repo remain null (each hub_ref carries
+ *                 its own pair — see {@link HubRef}).
+ *   - "external": the KB is hub-owned; docs live at `<hub root>/projects/<project>/`.
+ *                 hub_repo/hub_path are populated; hub_refs is empty.
+ *
+ * ADR-0043 — `hub_repo` is now the AUTHORITATIVE address; `hub_path` is a
+ * deprecated fallback read during the transition window. The hub root a
+ * (hub_repo, hub_path) pair resolves to is never read off either field
+ * directly — every call site derives it through the ONE shared
+ * {@link chosenHubRoot} (prefers `hub_repo`, deriving its deterministic local
+ * path under `hubsRoot()`; falls back to `hub_path` only when `hub_repo` is
+ * absent or fails to canonicalize). See src/hub-url.ts for the derivation
+ * rules and src/paths.ts's {@link outOfRepoKbTargets}/`externalDocsRoot` for
+ * where it's applied.
  */
 export interface MageMetadata {
   schema: string;
@@ -193,11 +211,6 @@ export function metadataPath(codeRepo: string): string {
  */
 export function codeRepoDocsRoot(codeRepo: string): string {
   return join(codeRepo, META_DIR);
-}
-
-/** Hub's top-level metadata file. */
-export function hubMetadataPath(hubRoot: string): string {
-  return join(hubRoot, META_FILE);
 }
 
 /** Guard against path traversal via a name that becomes a directory segment. */
@@ -408,21 +421,6 @@ export async function writeHubMetadata(
 
 // ─── structural checks ──────────────────────────────────────────────────
 
-/**
- * True iff `path` looks like a hub root — has the projects/ registry dir AND a
- * top-level metadata.json. (cross-refs/ is gone in mage; relationships are
- * notes/edges, not a directory — see ADR-0006.)
- */
-export async function looksLikeHub(path: string): Promise<boolean> {
-  try {
-    const s = await stat(join(path, PROJECTS_DIR));
-    if (!s.isDirectory()) return false;
-  } catch {
-    return false;
-  }
-  return exists(hubMetadataPath(path));
-}
-
 /** What {@link resolveDocsRoot} resolves to: the docs root to operate on, its
  *  kind, and the git repo the sinks live under (== root for a repo-KB/hub; the hub
  *  for an external project, whose docs live inside the hub's repo). `kind` is the
@@ -531,19 +529,50 @@ function hubDocsRoot(hub: string, abs: string): ResolvedDocsRoot {
 }
 
 /**
- * If the code repo at `dir` is linked in external mode (its `mage/metadata.json`
- * has mode=external with a usable hub_path + project), the hub project docs root
- * it points to; otherwise null (caller falls back to repo-KB handling). May throw
- * on an unknown/foreign schema or unsafe project name — {@link resolveDocsRoot} catches it.
+ * If the code repo at `dir` is linked in external mode, the hub project docs
+ * root it points to; otherwise null (caller falls back to repo-KB handling).
+ * ADR-0043 resolution order, via the ONE shared {@link chosenHubRoot}:
+ *
+ *   1. `hub_repo` present → derive its path, and use it only if BOTH arrival
+ *      checks pass ({@link verifyHubArrival}: hub-shaped + origin matches).
+ *   2. Else (absent, wrong shape, unreadable origin, OR a hard origin
+ *      MISMATCH) fall back to `hub_path`, gated on the same shape check —
+ *      the deprecated transition path (ADR-0043 §6).
+ *   3. Else null — the hub-absent state; {@link resolveDocsRoot} degrades to
+ *      the repo KB. This function must never throw for that case (the hot-path
+ *      contract): a mismatch here is silently absorbed, NOT surfaced as an
+ *      error — `doctor`/`connect` re-run the same resolution to report it
+ *      loudly (see {@link outOfRepoKbTargets} + connect.ts).
+ *
+ * May still throw on an unknown/foreign metadata schema or unsafe project
+ * name — {@link resolveDocsRoot} catches it.
  */
 async function externalDocsRoot(dir: string): Promise<ResolvedDocsRoot | null> {
   const meta = await readMetadata(dir);
-  if (!meta || meta.mode !== "external" || !meta.hub_path || !meta.project)
-    return null;
+  if (!meta || meta.mode !== "external" || !meta.project) return null;
+
+  const chosen = chosenHubRoot(meta.hub_repo, meta.hub_path);
+  if (!chosen) return null;
+
+  let hubRoot: string;
+  if (chosen.source === "derived") {
+    const arrival = await verifyHubArrival(chosen.root, meta.hub_repo as string);
+    if (arrival.ok) {
+      hubRoot = chosen.root;
+    } else if (meta.hub_path && (await looksLikeHub(meta.hub_path))) {
+      hubRoot = meta.hub_path; // fall back to the deprecated hub_path (incl. on a mismatch)
+    } else {
+      return null; // hub-absent state
+    }
+  } else {
+    if (!(await looksLikeHub(chosen.root))) return null;
+    hubRoot = chosen.root;
+  }
+
   return {
-    root: hubProjectDocsRoot(meta.hub_path, meta.project),
+    root: hubProjectDocsRoot(hubRoot, meta.project),
     kind: "hub",
-    repo: meta.hub_path,
+    repo: hubRoot,
   };
 }
 
@@ -574,75 +603,135 @@ export async function ownedDocsRoots(kb: ResolvedDocsRoot): Promise<string[]> {
 }
 
 /**
- * True when `child` is `parent` itself or nested inside it (no `../` escape).
- * The one canonical containment rule — it was written five times across the
- * codebase before this; adapters and `dream` import it rather than re-deriving it.
+ * One (hub_repo, hub_path) pair's resolution, as picked by the single shared
+ * {@link chosenHubRoot} — plus the `hubRepo` that produced a "derived" root, so
+ * a caller that needs to scan for a displaced clone or offer clone-on-demand
+ * has the canonical address without re-deriving it.
  */
-export function isUnder(parent: string, child: string): boolean {
-  const rel = relative(parent, child);
-  return rel === "" || (!rel.startsWith(`..${sep}`) && rel !== ".." && !isAbsolute(rel));
+export interface HubTarget {
+  root: string;
+  source: ChosenHubRootSource;
+  /** Present only when `source === "derived"` — the hub_repo that derived `root`. */
+  hubRepo?: string;
+  /**
+   * The pair's `hub_path`, when the metadata carries one — regardless of
+   * `source`. A caller doing the full ADR-0043 §3 arrival check (shape +
+   * origin match) on a "derived" root falls back to THIS when arrival fails
+   * for a reason short of a hard mismatch (absent / wrong shape / unreadable
+   * origin) — the same fallback {@link resolveDocsRoot}'s `externalDocsRoot`
+   * performs, so a grant decision never drifts from a docs-root decision.
+   */
+  hubPath?: string;
 }
 
 /**
- * The KB directories that live OUTSIDE a code repo's project root — what a harness
+ * The out-of-repo KB roots a code repo's metadata resolves to — what a harness
  * must be granted access to before the agent can read its own knowledge base
- * (ADR-0042, the reach tier).
+ * (ADR-0042, the reach tier), now sourced via ADR-0043 derivation. EVERY call
+ * site that needs to answer "which hub root does this pair resolve to" routes
+ * through {@link chosenHubRoot} via this function — the previous attempt had
+ * two independently written lookups drift (one gated on `existsSync`, one
+ * didn't), silently skipping a permission grant whenever the hub wasn't yet
+ * cloned. `chosenHubRoot` is pure and synchronous (no filesystem access), so
+ * that particular drift is structurally impossible now.
  *
  *   - in-repo  → `[]`  (docs sit at `<repo>/mage/`, already under the project root)
- *   - external → `[hub_path]` — the hub REPO root, not the project docs root beneath
- *                it. The hub top carries its own `INDEX.md`/`decisions/`/`notes/` plus
- *                the cross-project `_index.*` files, so one grant covers both levels
- *                and following a hub-root link never trips a permission prompt.
- *   - hybrid   → every `hub_refs[].hub_path` (docs are local, but the registered hubs
- *                are not).
+ *   - external → the ONE hub pair's chosen root (hub_repo-derived, falling back
+ *                to hub_path) — the hub REPO root, not the project docs root
+ *                beneath it.
+ *   - hybrid   → every `hub_refs[]` pair's chosen root.
  *
- * Harness-NEUTRAL by design (ADR-0036): this returns paths, never policy. The adapter
- * decides how a given harness expresses the grant — for Claude Code that is
- * `permissions.additionalDirectories`. When a second harness lands, it consumes this
- * same list; that is the seam ADR-0036 defers, not a reason to build it now.
- *
- * Paths at or under `projectRoot` are dropped (self-referential when cwd is inside the
- * hub itself). Order-stable, de-duplicated, and pure — no filesystem access, so an
- * absent hub is the CALLER's business to detect (connect skips it; doctor reports it).
+ * Harness-NEUTRAL by design (ADR-0036): this returns paths, never policy.
+ * Paths at or under `projectRoot` are dropped (self-referential when cwd is
+ * inside the hub itself). Order-stable, de-duplicated, and pure — no
+ * filesystem access, so an absent/unverified hub is the CALLER's business to
+ * detect (connect skips it, offering a scan/clone; doctor reports it).
  */
-export function outOfRepoKbRoots(meta: MageMetadata, projectRoot: string): string[] {
+export function outOfRepoKbTargets(meta: MageMetadata, projectRoot: string): HubTarget[] {
   const normalized = normalizeMetadata(meta);
-  const candidates =
+  const pairs: { hubRepo: string | null; hubPath: string | null }[] =
     normalized.mode === "external"
-      ? normalized.hub_path
-        ? [normalized.hub_path]
-        : []
+      ? [{ hubRepo: normalized.hub_repo, hubPath: normalized.hub_path }]
       : normalized.mode === "hybrid"
-        ? normalized.hub_refs.map((r) => r.hub_path)
+        ? normalized.hub_refs.map((r) => ({ hubRepo: r.hub_repo, hubPath: r.hub_path }))
         : [];
 
   const seen = new Set<string>();
-  const out: string[] = [];
-  for (const raw of candidates) {
-    if (!raw) continue;
-    const abs = absolutePath(raw);
+  const out: HubTarget[] = [];
+  for (const { hubRepo, hubPath } of pairs) {
+    const chosen = chosenHubRoot(hubRepo, hubPath);
+    if (!chosen) continue;
+    const abs = absolutePath(chosen.root);
     if (seen.has(abs)) continue;
     seen.add(abs);
     // Self-referential: cwd is inside the hub, so the hub is already reachable.
     if (isUnder(projectRoot, abs)) continue;
-    out.push(abs);
+    out.push({
+      root: abs,
+      source: chosen.source,
+      hubRepo: chosen.source === "derived" ? (hubRepo ?? undefined) : undefined,
+      hubPath: hubPath ?? undefined,
+    });
   }
   return out;
+}
+
+/** {@link outOfRepoKbTargets}, flattened to just the resolved paths — the shape
+ *  most callers (doctor's grant check, `connect`'s base grant list) actually want. */
+export function outOfRepoKbRoots(meta: MageMetadata, projectRoot: string): string[] {
+  return outOfRepoKbTargets(meta, projectRoot).map((t) => t.root);
+}
+
+/** What {@link resolveHubGrant} decides for ONE {@link HubTarget}. */
+export interface HubGrantResolution {
+  /** The path to actually grant, or null when nothing is currently grantable. */
+  root: string | null;
+  reason: "derived" | "hub_path" | "mismatch" | "absent";
+  /** Redacted diagnostic detail — present for "mismatch". */
+  detail?: string;
+}
+
+/**
+ * The SAME resolution `connect` uses to decide what to grant and doctor uses to
+ * decide what to check for — the one place the full ADR-0043 §5 order (derive →
+ * verify arrival → fall back to hub_path → hub-absent) is implemented, so the
+ * two can never drift (the exact failure this spec calls out: two independently
+ * written gates — one checking `existsSync`, one not — silently skipping a
+ * permission grant).
+ *
+ *   - source "hub_path" → grantable iff hub-shaped ({@link looksLikeHub}; it's
+ *     untrusted git-tracked input with no remote to origin-match).
+ *   - source "derived" → the full ADR-0043 §3 arrival check
+ *     ({@link verifyHubArrival}: shape + origin match).
+ *       - ok → "derived", grant the derived root.
+ *       - origin MISMATCH → "mismatch", root null — a hard, named failure that
+ *         never silently falls back (never reused, never clobbered).
+ *       - absent / wrong shape / unreadable origin → fall back to `hub_path`
+ *         when the pair carries one and it's hub-shaped (mirrors
+ *         `externalDocsRoot`'s fallback, so a grant decision never drifts from
+ *         a docs-root decision); else "absent", root null.
+ */
+export async function resolveHubGrant(target: HubTarget): Promise<HubGrantResolution> {
+  if (target.source === "hub_path") {
+    return (await looksLikeHub(target.root))
+      ? { root: target.root, reason: "hub_path" }
+      : { root: null, reason: "absent" };
+  }
+
+  const arrival = await verifyHubArrival(target.root, target.hubRepo as string);
+  if (arrival.ok) return { root: target.root, reason: "derived" };
+  if (arrival.reason === "origin-mismatch") {
+    return { root: null, reason: "mismatch", detail: arrival.detail };
+  }
+  if (target.hubPath && (await looksLikeHub(target.hubPath))) {
+    return { root: target.hubPath, reason: "hub_path" };
+  }
+  return { root: null, reason: "absent" };
 }
 
 /** Resolve a path (relative → absolute relative to cwd). */
 export function absolutePath(p: string): string {
   return isAbsolute(p) ? p : resolve(process.cwd(), p);
-}
-
-/** True iff a file/dir exists at `path`. */
-export async function exists(path: string): Promise<boolean> {
-  try {
-    await access(path);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 /** Read genre overrides from metadata.json (ADR-0041 §3). */
