@@ -71,6 +71,8 @@ After scaffolding an in-repo knowledge base, `mage init` auto-connects capture �
 - **Wires the capture hooks** into this repo's `.claude/settings.local.json` — a personal, gitignored, per-repo file. These hooks let mage observe what your agent does (which tool, which files, which skill loaded) and feed the [grooming loop](../loop/overview.md). They include the boundary [nudge](../loop/nudge.md) on a post-compaction start. See the full list on the [Hooks](../reference/hooks.mdx) page.
 - **Installs the Gate-2 redaction pre-commit hook** (`mage redact --check --staged`). This is a blocking, deterministic scan at the commit boundary: if a staged note carries a live secret, the commit is refused. It is your safety net so a captured secret never lands in git. See [Redaction](../reference/redaction.md).
 
+In hub or hybrid mode, this same step also grants the harness reach to the hub outside this repo, and — when a usable `hub_repo` is recorded — offers to clone it if this machine doesn't have it yet — see [Set up a hub and external mode](../guides/hub-and-external-mode.md).
+
 `mage connect` is idempotent, backs up the settings file to `.bak`, and refuses to touch malformed JSON. To skip the auto-connect during init, pass `--no-connect`; to wire it later, just run:
 
 ```bash
@@ -120,9 +122,9 @@ Everything in the frontmatter is optional; mage falls back to the title, headers
 
 ## Let mage draft the note for you
 
-You rarely hand-write notes. The deliberate-capture path is the **`mage:learn`** skill. Inside Claude Code, say `mage:learn` (or just "remember this") right after you figure something non-obvious out. mage classifies the finding, checks the index for an existing note to update, drafts the note for you — the reusable insight, the procedure, and pointers to canonical sources, never a copy — and writes it only after you confirm. (It also runs the redaction gate on the draft first, so a captured secret never lands in a tracked note.)
+You rarely hand-write notes. The deliberate-capture path is the **`/mage:learn`** skill. Inside Claude Code, say `/mage:learn` (or just "remember this") right after you figure something non-obvious out. mage classifies the finding, checks the index for an existing note to update, drafts the note for you — the reusable insight, the procedure, and pointers to canonical sources, never a copy — and writes it only after you confirm. (It also runs the redaction gate on the draft first, so a captured secret never lands in a tracked note.)
 
-`mage:learn` is the *deliberate* capture you trigger on the spot. The [grooming loop](../loop/overview.md) adds two more drafting paths you do not trigger by hand: inline [capture](../loop/capture.md) and the boundary [nudge](../loop/nudge.md) draft lessons as you work, and the recurrence path proposes a new note once a pattern recurs. All of them end the same way — a draft you review and confirm; **you** commit.
+`/mage:learn` is the *deliberate* capture you trigger on the spot. The [grooming loop](../loop/overview.md) adds two more drafting paths you do not trigger by hand: inline [capture](../loop/capture.md) and the boundary [nudge](../loop/nudge.md) draft lessons as you work, and the recurrence path proposes a new note once a pattern recurs. All of them end the same way — a draft you review and confirm; **you** commit.
 
 ## Regenerate the recall surfaces
 

@@ -12,7 +12,10 @@ your `mage/` notes, `INDEX.md`, and decisions are committed files that stay put.
 
 Capture is just hooks, so turning it off is one command. `mage disconnect`
 removes exactly the hooks `mage connect` added from this repo's
-`.claude/settings.local.json`, leaving any host hooks of your own intact:
+`.claude/settings.local.json`, leaving any host hooks of your own intact. In
+hub and hybrid modes it also removes only the `permissions.additionalDirectories`
+reach-grant entries mage itself added (ADR-0042) — any entry you added yourself
+is left in place:
 
 ```bash
 # Remove mage's capture hooks from this repo
@@ -84,6 +87,12 @@ npm rm -g mage-memory
 - **The capture scratch is throwaway.** The git-ignored sinks
   (`.mage/learnings/`, `.mage/staging/`, `.mage/metrics/`) are disposable by
   design — delete the `.mage/` directory if you want a clean slate.
+- **Hub clones `connect` may have made.** External and hybrid mode derive a
+  hub's local clone at `~/.mage/hubs/<host>/<owner>/<repo>`, outside any repo
+  (`$MAGE_HOME/hubs` when set, else `~/.mage/hubs`). It's an ordinary git
+  clone, not disposable scratch — push or otherwise back up anything
+  uncommitted or unpushed in it first. Uninstalling the CLI doesn't touch it;
+  once you've done that, `rm -rf ~/.mage/hubs` (or `$MAGE_HOME/hubs`) clears it.
 
 If you only wanted to *quiet* mage rather than remove it, prefer
 `mage disconnect` over uninstalling — it stops the capture machinery while

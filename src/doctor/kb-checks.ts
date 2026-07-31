@@ -581,15 +581,19 @@ async function refreshHookBlock(conn: Connection): Promise<MageDiff | null> {
  * becomes a permission prompt mid-task.
  *
  * A RECALL failure, not an advisory one: this is the same class as a stale index or a
- * missing MEMORY twin, and strictly worse in practice. Three states, so a machine that
+ * missing MEMORY twin, and strictly worse in practice. Four states, so a machine that
  * simply lacks a clone is never mistaken for a misconfiguration:
- *   - grant present             → pass
- *   - no hub at the path        → pass, optional, with a note. Covers BOTH a hub absent
- *                                 on this machine and a `hub_path` that resolves to
- *                                 something which is not a hub — `connect` grants neither,
- *                                 so neither must fail a CI runner or nag for a fix that
- *                                 will never be made.
- *   - hub present, grant missing → FAIL, with `mage connect` as the fix
+ *   - grant present                 → pass
+ *   - no hub at the derived path    → pass, optional, with a note. Covers BOTH a hub absent
+ *                                     at its `hub_repo`-derived path (ADR-0043 §1 — never
+ *                                     recorded, only paths derived from `hub_repo` have that
+ *                                     guarantee) and a deprecated `hub_path` fallback that does
+ *                                     not resolve to a hub — `connect` grants neither, so
+ *                                     neither must fail a CI runner or nag for a fix that will
+ *                                     never be made.
+ *   - hub present, grant missing    → FAIL, with `mage connect` as the fix
+ *   - hub present, origin mismatch  → FAIL, hard error naming both remotes — never reused,
+ *                                     never clobbered (ADR-0043 §2)
  *
  * Detect-and-instruct only. ADR-0037 §2 holds doctor to read-only over host config, so
  * even though this repair passes §3's auto-fix test (idempotent ∧ mage-owned ∧ local ∧

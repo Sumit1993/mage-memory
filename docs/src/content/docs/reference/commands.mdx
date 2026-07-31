@@ -29,26 +29,26 @@ mage init --help
 
 The `mage` binary above is only part of the surface — there are agent skills too. Sorting every name into one of **three channels** is the fastest way to keep them straight:
 
-**A · Agent skills** — invoked *inside* your coding agent as `mage:<name>`, not in a terminal. These are the verbs of everyday use; each one orchestrates plumbing calls for you. There are exactly five:
+**A · Agent skills** — invoked *inside* your coding agent as `/mage:<name>`, not in a terminal. These are the verbs of everyday use; each one orchestrates plumbing calls for you. There are exactly five:
 
 | Skill | What you get |
 |---|---|
-| `mage:guide` | orient in the knowledge base — navigate notes and decisions |
-| `mage:learn` | capture a note now, or bulk-import a folder (`--from`) |
-| `mage:groom` | turn captured scratch into notes — accept or reject the batch |
-| `mage:graduate` | elevate a proven procedural note into a loadable skill |
-| `mage:optimize` | sharpen a skill's trigger — reword or demote weak ones |
+| `/mage:guide` | orient in the knowledge base — navigate notes and decisions |
+| `/mage:learn` | capture a note now, or bulk-import a folder (`--from`) |
+| `/mage:groom` | turn captured scratch into notes — accept or reject the batch |
+| `/mage:graduate` | elevate a proven procedural note into a loadable skill |
+| `/mage:optimize` | sharpen a skill's trigger — reword or demote weak ones |
 
 **B · CLI commands you type** — the terminal verbs for setup and housekeeping that doesn't belong inside the agent (`init`, `link`, `connect`, `doctor`, `dashboard`, `dream`, and friends). The rest of this page is their reference.
 
-**C · Plumbing** — hidden CLI verbs you never type by hand (`observe`, `distill`, `promote`, `stage`, `index`, `nudge`, `memory-hook`, `redact`, `ingest`, `flatten`, and friends). A skill or a host hook runs them for you; the complete, generated set is in [the full inventory](#the-full-inventory) — that table, not this list, is the authoritative roster.
+**C · Plumbing** — hidden CLI verbs you never type by hand (`observe`, `distill`, `promote`, `stage`, `nudge`, `memory-hook`, `redact`, `ingest`, `flatten`, and friends). A skill or a host hook runs them for you; the complete, generated set is in [the full inventory](#the-full-inventory) — that table, not this list, is the authoritative roster.
 
-**The rhythm:** skills (A) when you curate · CLI (B) at setup and check-ups · plumbing (C) never by hand. **The one hybrid:** `groom` is both the `mage:groom` skill (what you use) and a hidden `mage groom` CLI verb (what the skill calls) — every other name is cleanly one channel.
+**The rhythm:** skills (A) when you curate · CLI (B) at setup and check-ups · plumbing (C) never by hand. **The one hybrid:** `groom` is both the `/mage:groom` skill (what you use) and a hidden `mage groom` CLI verb (what the skill calls) — every other name is cleanly one channel.
 
 ```mermaid The rhythm of the three channels: set up with the CLI, then work is captured automatically, you curate with skills, and you check health with the CLI — looping back to the work.
 flowchart LR
   setup["set up — CLI<br/>init · link · connect"] --> work["work — automatic<br/>observe · Gate-0 · nudge"]
-  work --> curate["curate — skills<br/>mage:groom · mage:learn"]
+  work --> curate["curate — skills<br/>/mage:groom · /mage:learn"]
   curate --> health["check up — CLI<br/>doctor · dashboard · dream"]
   health --> work
 ```
@@ -109,7 +109,7 @@ This is independent of everything else `connect` wires: turning off your harness
 own auto-memory does not revoke it. mage records exactly which entries it added, so
 `mage disconnect` removes those and leaves any you added yourself untouched.
 
-Three cases worth knowing:
+Four cases worth knowing:
 
 - **The hub isn't on this machine yet.** No grant is written (there is nothing
   to grant yet). `mage connect` offers to clone `hub_repo` to its derived
@@ -120,6 +120,11 @@ Three cases worth knowing:
   to its derived location. It never performs the move itself.
 - **A new worktree.** Local settings are gitignored, so a fresh worktree starts
   without them. Run `mage connect` in it.
+- **A pre-ADR-0043 link with no usable `hub_repo`.** If a target only resolves
+  through the deprecated `hub_path` field, `connect` still grants it but warns:
+  "resolved via the deprecated `hub_path` … run `mage link` again to record
+  hub_repo." Re-run `mage link` on that repo to migrate it to the
+  remote-addressed form.
 
 `mage doctor` reports the grant under **KB access grant** — a failing check when the
 hub is present but ungranted, a skip when the hub simply isn't cloned here, and a
@@ -184,9 +189,10 @@ hand-resolving the conflict. That goes double for `MEMORY.md`: its roster order
 consults local usage metrics, so two machines with identical notes can
 legitimately produce different orderings — regenerate, never hand-merge.
 
-`mage index` is plumbing — the hooks and the `mage:learn` flow (the
-deliberate-capture skill that drafts a note for you and writes it after you
-confirm) run it for you — but it is safe to run yourself. `mage skills` also carries a read-only metrics
+`mage index` is a visible, typeable command — you can run it yourself any time.
+The hooks and the `/mage:learn` flow (the deliberate-capture skill that drafts a
+note for you and writes it after you confirm) also run it for you
+automatically, so you rarely need to. `mage skills` also carries a read-only metrics
 mode that reports context-match (whether the skills that auto-loaded matched the
 work that followed):
 

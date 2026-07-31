@@ -84,7 +84,7 @@ A note records what was true *when it was written*. Code moves on; a note can qu
 
 This matters most for AI agents working in the repo. The guidance in `AGENTS.md` is explicit: treat notes as point-in-time, and if a note looks stale, verify it against the current code before relying on it. A note is a fast path to understanding, not an oracle.
 
-When you learn something durable, you do not hand-write all this. The deliberate-capture skill `mage:learn` drafts the note for you on the spot and writes it after you confirm (see [Install and Quickstart](../start/quickstart.md)), and the [capture](../loop/capture.md) and [stage / groom](../loop/stage-groom.md) stages of the loop draft notes for you as you work.
+When you learn something durable, you do not hand-write all this. The deliberate-capture skill `/mage:learn` drafts the note for you on the spot and writes it after you confirm (see [Install and Quickstart](../start/quickstart.md)), and the [capture](../loop/capture.md) and [stage / groom](../loop/stage-groom.md) stages of the loop draft notes for you as you work.
 
 ## Where to next
 

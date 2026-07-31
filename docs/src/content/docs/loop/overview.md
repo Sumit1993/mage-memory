@@ -112,7 +112,7 @@ Strip the adapter away and the loop above is unchanged. On any other harness the
 |---|---|---|
 | Capture | A hook-fired trail of session events, written to a git-ignored scratch; never blocks your work. | [Capture](./capture.md) |
 | Boundary nudge | On a post-compaction start, surfaces a read-only digest of the closed chapter plus the grooming backlog for the agent to mine — it writes nothing itself. | [The boundary nudge](./nudge.md) |
-| Stage and groom | The lesson path: staged drafts → the `mage:groom` skill → accepted notes. | [Stage and groom](./stage-groom.md) |
+| Stage and groom | The lesson path: staged drafts → the `/mage:groom` skill → accepted notes. | [Stage and groom](./stage-groom.md) |
 | Promote and graduate | The recurrence path: recurring signatures → note candidates → graduated skills. | [Promote and graduate](./promote-graduate.md) |
 | Optimize | Context-match rewords or demotes the generated skills. | [Optimize](./optimize.md) |
 | Claude Code adapter | The opt-in capture redirect + recall twin that make the loop deterministic on Claude Code. | [Capture](./capture.md) |

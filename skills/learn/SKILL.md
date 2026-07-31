@@ -11,7 +11,7 @@ allowed-tools: Read, Grep, Glob, Write, Edit, Bash
 disable-model-invocation: true
 ---
 
-# mage:learn — capture a note
+# /mage:learn — capture a note
 
 Turn something you just learned into a durable mage note. mage stores the
 reusable **insight**, the **procedure** (how to do it faster; the bad commands
@@ -20,10 +20,10 @@ to avoid), and **pointers** to canonical sources — never a copy of the source
 
 ## Modes
 
-- `mage:learn "<finding>"` — capture the stated finding.
-- `mage:learn` — scan the current work unit (`mage/work/<slug>/`) and the
+- `/mage:learn "<finding>"` — capture the stated finding.
+- `/mage:learn` — scan the current work unit (`mage/work/<slug>/`) and the
   recent conversation for the most capture-worthy insight, then propose it.
-- `mage:learn --from <dir>` — bulk-import a directory of existing docs,
+- `/mage:learn --from <dir>` — bulk-import a directory of existing docs,
   transcripts, and skills (see **Bulk import** below).
 
 ## Steps
@@ -100,7 +100,7 @@ to avoid), and **pointers** to canonical sources — never a copy of the source
     git -C <repo> add mage && git -C <repo> commit -m "note: <title> (#<wing>)"
     ```
 
-## Bulk import — mage:learn --from <dir>
+## Bulk import — /mage:learn --from <dir>
 
 Backfill the knowledge base from existing material in one pass. Distill prose
 docs and transcripts into notes, **and adopt the user's own skills in place** —
@@ -139,7 +139,7 @@ adopting an authored skill is *remembering*, not copying a source (ADR-0013 §5)
 
 > **Observed scratch is a different lane.** `--from` imports *foreign* docs by
 > pointer. Distilling mage's **own** observed `.learnings/*.jsonl` into notes
-> lives in the separate **mage:groom** skill — mage reads only its own
+> lives in the separate **/mage:groom** skill — mage reads only its own
 > artifacts; foreign memory stores (ECC instincts, Claude `MEMORY.md`) are not
 > harvested (ADR-0018).
 

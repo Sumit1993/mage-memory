@@ -22,8 +22,10 @@ import { exists, isUnder, looksLikeHub } from "./path-guards.js";
 //     [user@]host.xz:/~[user]/path — rejected (would collide with the
 //     home-relative grant form, ADR-0043 §8).
 //
-//   local: /path/to/repo.git, file:///path/to/repo.git — rejected (a local
-//     hub is addressed `local://<name>` per ADR-0044, never by path).
+//   local: /path/to/repo.git, file:///path/to/repo.git — rejected (a hub
+//     without a remote keeps its deprecated `hub_path` fallback instead of a
+//     derived address; a future `local://<name>` scheme is proposed under
+//     ADR-0044, status: proposed, not implemented).
 
 export class HubUrlError extends Error {
   constructor(message: string) {
@@ -106,7 +108,7 @@ export function canonicalizeHubRepo(url: string): CanonicalHubRepo {
       fail(`${scheme}:// is fetch-only and deprecated by git — not accepted as a hub address`, trimmed);
     }
     if (scheme === "file") {
-      fail("file:// is a local path — a local hub is addressed local://<name> (ADR-0044), never by path", trimmed);
+      fail("file:// is a local path — a hub without a remote keeps its deprecated hub_path fallback (ADR-0043), it is never given a derived hub_repo address", trimmed);
     }
     if (!ACCEPTED_SCHEMES.has(scheme)) {
       fail(`Unrecognized git URL scheme '${scheme}://'`, trimmed);
@@ -127,7 +129,7 @@ export function canonicalizeHubRepo(url: string): CanonicalHubRepo {
   const firstSlash = trimmed.indexOf("/");
   const looksLikeScp = firstColon !== -1 && (firstSlash === -1 || firstColon < firstSlash);
   if (!looksLikeScp) {
-    fail("Hub URL is a local path — a local hub is addressed local://<name> (ADR-0044), never by path", trimmed);
+    fail("Hub URL is a local path — a hub without a remote keeps its deprecated hub_path fallback (ADR-0043), it is never given a derived hub_repo address", trimmed);
   }
   const authority = trimmed.slice(0, firstColon);
   const pathPart = trimmed.slice(firstColon + 1);
