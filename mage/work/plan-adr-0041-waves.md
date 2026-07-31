@@ -78,7 +78,7 @@ Wave 3: C — connect/external layers (needs B's fallback rooms to exist)
 | Plugin packaging allowlist (kills the 556MB plugin cache) | **not built** — filed as [#96](https://github.com/Sumit1993/mage-memory/issues/96) |
 | `noteSizeCap`: wire or delete | **done** — wired in #94; `src/doctor/genre-tells.ts` is its first importer |
 | ADR-B draft | **done** — became [ADR-0041](../decisions/0041-genre-decides-the-recall-rung.md) |
-| ADR-C draft | **never written** — see Wave C below, [#104](https://github.com/Sumit1993/mage-memory/issues/104) |
+| ADR-C draft | **done 2026-07-31** — became [ADR-0044](../decisions/0044-setup-is-a-conversation-over-one-address.md) |
 
 ## Wave A — curation + the better-home ladder
 
@@ -113,18 +113,40 @@ Soak curation PRs, applied row-for-row against approved manifests:
 
 ## Wave C — connect / external layers
 
-**Not started.** No ADR, no spec. Tracked at
+**Grilled 2026-07-31; ADR drafted.** Became
+[ADR-0044](../decisions/0044-setup-is-a-conversation-over-one-address.md), closing
 [#104](https://github.com/Sumit1993/mage-memory/issues/104).
 
-Scope as far as it was designed: the grilled **config format + question flow**
-for `connect`/external layers. This is the one part of ADR-0041 that is genuinely
-taste-critical because users touch it directly — which is why the grill was
-queued for a fresh session rather than the tail of the 2026-07-27 wave day.
+Scope as designed: the grilled **config format + question flow** for
+`connect`/external layers — the one part of ADR-0041 that is genuinely
+taste-critical because users touch it directly, which is why the grill was queued
+for a fresh session rather than the tail of the 2026-07-27 wave day.
 
-0.0.16 has landed, so C is unblocked once the soaks are re-indexed and the gate
-is judged.
+**C shrank before it was drafted.** Two ADRs landed in the interval and each took
+a bite: [ADR-0042](../decisions/0042-reach-tier-harness-grants.md) took the grant
+question, [ADR-0043](../decisions/0043-hub-addressed-by-remote-located-by-derivation.md)
+took addressing and location. What was left in the middle is the part neither
+touched — **the conversation a human has with the tool**. So ADR-C is a
+human-surface design doc sitting on top of two settled mechanisms, not a third
+mechanism.
 
-> [ADR-0042](../decisions/0042-reach-tier-harness-grants.md) (the reach tier) is
+What it decided, in one line each:
+
+| | Decision |
+|---|---|
+| §2–3 | Local-only hubs get a derived home, addressed `local://<name>` → reserved `_local/<name>` |
+| §4 | `link` takes an **address**; a filesystem path becomes a deprecated shim that prints the canonical command |
+| §5 | Inferred storage mode becomes **confirmed**, not merely announced |
+| §6 | Three commands stay; the chaining becomes explicit and every step idempotent |
+
+> **The grill found a live hole, verified empirically.** `link.ts:171` writes a
+> *filesystem path* into `hub_repo` for a hub with no remote, which ADR-0043's
+> canonicalizer rejects (`missing host:path separator`) and `deriveHubPathSafe`
+> turns into `null`. It degrades to `hub_path` today, so nothing is broken — but
+> 0043 calls `hub_path` "slated for removal", and on that day every local-only hub
+> would become unaddressable. ADR-0044 §2–3 is what makes 0043 completable.
+
+> [ADR-0042](../decisions/0042-reach-tier-harness-grants.md) (the reach tier) was
 > **adjacent, not a substitute** — a separate grill on the same day, about harness
 > grants rather than the config surface.
 
