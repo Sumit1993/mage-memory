@@ -103,7 +103,7 @@ tree, not a per-note yes.
 Find the nearest `mage/metadata.json` (walk up). The docs root to groom is:
 
 - **in-repo / hybrid** → `<repo>/mage/`
-- **external** → the hub project it points at: `<hub_path>/projects/<project>/`
+- **external** → the hub project it points at: `<derived_hub_path>/projects/<project>/`
   — **FLAT**, no nested `mage/` (ADR-0011 / ADR-0023: a project looks like the hub
   it lives in, not like a code-repo `mage/`).
 

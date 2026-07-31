@@ -108,6 +108,22 @@ export interface GroomingConfig {
   crownThreshold?: number;
 }
 
+import { deriveHubPathSafe, resolveHubPath } from "./hub-url.js";
+
+export {
+  canonicalizeHubRepo,
+  deriveHubPath,
+  deriveHubPathSafe,
+  HubUrlError,
+  hubsRoot,
+  readGitOriginUrl,
+  resolveHubPath,
+  scanForDisplacedHub,
+  toAbsolutePath,
+  toHomeRelative,
+  verifyHubOrigin,
+} from "./hub-url.js";
+
 /**
  * Code-repo-side metadata. Lives at `<code-repo>/mage/metadata.json`.
  *
@@ -117,13 +133,17 @@ export interface GroomingConfig {
  *   - "hybrid":   the KB lives at `<code-repo>/mage/` (same docs root as in-repo)
  *                 AND is registered with one or more external hubs. hub_refs is
  *                 non-empty; hub_path/hub_repo remain null.
- *   - "external": the KB is hub-owned; docs live at `<hub_path>/projects/<project>/`.
- *                 hub_path/hub_repo are populated; hub_refs is empty.
+ *   - "external": the KB is hub-owned; docs live at `<derived_hub_path>/projects/<project>/`.
+ *                 hub_repo is canonical; hub_path is deprecated fallback (ADR-0043).
  */
 export interface MageMetadata {
   schema: string;
   mode: "in-repo" | "hybrid" | "external";
   project: string;
+  /**
+   * @deprecated Deprecated by ADR-0043. Use `hub_repo` and derived path.
+   * `hub_path` is kept as a fallback during the transition window.
+   */
   hub_path: string | null;
   hub_repo: string | null;
   hub_refs: HubRef[];
@@ -141,6 +161,10 @@ export interface MageMetadata {
  * registered with one or more external hubs for cross-cutting context.
  */
 export interface HubRef {
+  /**
+   * @deprecated Deprecated by ADR-0043. Use `hub_repo` and derived path.
+   * `hub_path` is kept as a fallback during the transition window.
+   */
   hub_path: string;
   hub_repo: string;
   /** Project name as registered in that hub (may differ from code-repo's own project). */
@@ -440,7 +464,9 @@ export interface ResolvedDocsRoot {
  * Callers needing the metadata itself pair this with {@link readMetadata}. Returns null
  * when no code-repo KB is found walking up to the filesystem root.
  */
-export async function findCodeRepoRoot(startDir: string): Promise<string | null> {
+export async function findCodeRepoRoot(
+  startDir: string,
+): Promise<string | null> {
   let dir = absolutePath(startDir);
   for (;;) {
     if (await exists(join(dir, META_DIR, META_FILE))) return dir;
@@ -475,7 +501,11 @@ export async function resolveDocsRoot(
     // Honor mode=external by following hub_path; a bad read degrades to repo KB.
     const external = await externalDocsRoot(codeRepo).catch(() => null);
     return (
-      external ?? { root: codeRepoDocsRoot(codeRepo), kind: "repo", repo: codeRepo }
+      external ?? {
+        root: codeRepoDocsRoot(codeRepo),
+        kind: "repo",
+        repo: codeRepo,
+      }
     );
   }
 
@@ -532,18 +562,25 @@ function hubDocsRoot(hub: string, abs: string): ResolvedDocsRoot {
 
 /**
  * If the code repo at `dir` is linked in external mode (its `mage/metadata.json`
- * has mode=external with a usable hub_path + project), the hub project docs root
+ * has mode=external with a usable hub_repo or hub_path + project), the hub project docs root
  * it points to; otherwise null (caller falls back to repo-KB handling). May throw
  * on an unknown/foreign schema or unsafe project name — {@link resolveDocsRoot} catches it.
  */
 async function externalDocsRoot(dir: string): Promise<ResolvedDocsRoot | null> {
   const meta = await readMetadata(dir);
-  if (!meta || meta.mode !== "external" || !meta.hub_path || !meta.project)
-    return null;
+  if (!meta || meta.mode !== "external" || !meta.project) return null;
+
+  const resolved = await resolveHubPath({
+    hub_repo: meta.hub_repo,
+    hub_path: meta.hub_path,
+  }).catch(() => null);
+
+  if (!resolved?.hubRoot) return null;
+
   return {
-    root: hubProjectDocsRoot(meta.hub_path, meta.project),
+    root: hubProjectDocsRoot(resolved.hubRoot, meta.project),
     kind: "hub",
-    repo: meta.hub_path,
+    repo: resolved.hubRoot,
   };
 }
 
@@ -580,21 +617,22 @@ export async function ownedDocsRoots(kb: ResolvedDocsRoot): Promise<string[]> {
  */
 export function isUnder(parent: string, child: string): boolean {
   const rel = relative(parent, child);
-  return rel === "" || (!rel.startsWith(`..${sep}`) && rel !== ".." && !isAbsolute(rel));
+  return (
+    rel === "" ||
+    (!rel.startsWith(`..${sep}`) && rel !== ".." && !isAbsolute(rel))
+  );
 }
+
+import { existsSync } from "node:fs";
 
 /**
  * The KB directories that live OUTSIDE a code repo's project root — what a harness
  * must be granted access to before the agent can read its own knowledge base
- * (ADR-0042, the reach tier).
+ * (ADR-0042, the reach tier, updated by ADR-0043 for derived paths).
  *
  *   - in-repo  → `[]`  (docs sit at `<repo>/mage/`, already under the project root)
- *   - external → `[hub_path]` — the hub REPO root, not the project docs root beneath
- *                it. The hub top carries its own `INDEX.md`/`decisions/`/`notes/` plus
- *                the cross-project `_index.*` files, so one grant covers both levels
- *                and following a hub-root link never trips a permission prompt.
- *   - hybrid   → every `hub_refs[].hub_path` (docs are local, but the registered hubs
- *                are not).
+ *   - external → `[derived_hub_path]` (or fallback `hub_path`) — the hub REPO root.
+ *   - hybrid   → every `hub_refs[].hub_repo` derived path (or fallback `hub_path`).
  *
  * Harness-NEUTRAL by design (ADR-0036): this returns paths, never policy. The adapter
  * decides how a given harness expresses the grant — for Claude Code that is
@@ -605,16 +643,27 @@ export function isUnder(parent: string, child: string): boolean {
  * hub itself). Order-stable, de-duplicated, and pure — no filesystem access, so an
  * absent hub is the CALLER's business to detect (connect skips it; doctor reports it).
  */
-export function outOfRepoKbRoots(meta: MageMetadata, projectRoot: string): string[] {
+export function outOfRepoKbRoots(
+  meta: MageMetadata,
+  projectRoot: string,
+): string[] {
   const normalized = normalizeMetadata(meta);
-  const candidates =
-    normalized.mode === "external"
-      ? normalized.hub_path
-        ? [normalized.hub_path]
-        : []
-      : normalized.mode === "hybrid"
-        ? normalized.hub_refs.map((r) => r.hub_path)
-        : [];
+  const candidates: string[] = [];
+  if (normalized.mode === "external") {
+    const derived = deriveHubPathSafe(normalized.hub_repo);
+    const chosen =
+      derived && existsSync(derived)
+        ? derived
+        : (normalized.hub_path ?? derived);
+    if (chosen) candidates.push(chosen);
+  } else if (normalized.mode === "hybrid") {
+    for (const r of normalized.hub_refs) {
+      const derived = deriveHubPathSafe(r.hub_repo);
+      const chosen =
+        derived && existsSync(derived) ? derived : (r.hub_path ?? derived);
+      if (chosen) candidates.push(chosen);
+    }
+  }
 
   const seen = new Set<string>();
   const out: string[] = [];

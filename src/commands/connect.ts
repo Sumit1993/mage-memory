@@ -1,32 +1,36 @@
 import { confirm } from "@inquirer/prompts";
+import { discoverMemoryDirs } from "../adapters/claude-code/projects.js";
 import {
   hasCommandeerHooks,
   isAutoMemoryEnabled,
+  MAGE_HOOKS,
   readClaudeSettings,
   reconcileReachGrants,
   resolveSettingsTarget,
   upsertMageHooks,
   writeClaudeSettings,
-  MAGE_HOOKS,
 } from "../adapters/claude-code/settings.js";
-import { discoverMemoryDirs } from "../adapters/claude-code/projects.js";
-import { adopt } from "./adopt.js";
-import { isInteractive, resolveDecision } from "../interactive.js";
 import { installRedactHook } from "../git-hooks.js";
 import { ensureGitignored } from "../gitignore.js";
+import { isInteractive, resolveDecision } from "../interactive.js";
 import { logger } from "../logger.js";
 import {
-  type ResolvedDocsRoot,
   absolutePath,
+  deriveHubPathSafe,
   exists,
   findCodeRepoRoot,
   looksLikeHub,
   outOfRepoKbRoots,
   ownedDocsRoots,
+  type ResolvedDocsRoot,
   readHubMetadata,
   readMetadata,
   resolveDocsRoot,
+  resolveHubPath,
+  toHomeRelative,
 } from "../paths.js";
+import { run } from "../shell.js";
+import { adopt } from "./adopt.js";
 
 /** Options for {@link connect}. */
 export interface ConnectOptions {
@@ -111,7 +115,9 @@ export async function connect(opts: ConnectOptions): Promise<ConnectResult> {
   // gitignored settings.local.json, never a shared/global file (`--user`).
   const kb = await resolveDocsRoot(opts.cwd ?? process.cwd());
   const commandeer =
-    isAutoMemoryEnabled(r.settings, process.env) && kb !== null && target.scope === "local";
+    isAutoMemoryEnabled(r.settings, process.env) &&
+    kb !== null &&
+    target.scope === "local";
 
   const merged = upsertMageHooks(r.settings, { commandeer });
   if (commandeer && kb) {
@@ -133,7 +139,10 @@ export async function connect(opts: ConnectOptions): Promise<ConnectResult> {
       }
     }
     merged.autoMemoryDirectory = kb.root;
-  } else if (hasCommandeerHooks(r.settings) && "autoMemoryDirectory" in merged) {
+  } else if (
+    hasCommandeerHooks(r.settings) &&
+    "autoMemoryDirectory" in merged
+  ) {
     // The commandeer tier just gated OFF (auto-memory disabled, KB no longer resolvable,
     // or --user scope) but mage previously owned the relocation. upsertMageHooks already
     // stripped the scrub hooks; reconcile autoMemoryDirectory symmetrically so CC is never
@@ -149,11 +158,13 @@ export async function connect(opts: ConnectOptions): Promise<ConnectResult> {
       delete merged.autoMemoryDirectory;
     }
     delete merged.mageStashedAutoMemoryDirectory;
-    logger.detail("Released the CC auto-memory relocation (commandeer tier off).");
+    logger.detail(
+      "Released the CC auto-memory relocation (commandeer tier off).",
+    );
   }
 
-  // Reach tier (ADR-0042): grant the harness filesystem access to any KB root that
-  // lives OUTSIDE this code repo, or the agent cannot read its own knowledge base.
+  // Reach tier (ADR-0042 / ADR-0043): grant the harness filesystem access to any KB root
+  // that lives OUTSIDE this code repo, or the agent cannot read its own knowledge base.
   // Gated on LOCAL scope only — these are machine-specific absolute paths, the same
   // reason autoMemoryDirectory is local-only. Deliberately NOT gated on the commandeer
   // tier: reading the KB and redirecting memory writes are separate concerns, so
@@ -163,38 +174,137 @@ export async function connect(opts: ConnectOptions): Promise<ConnectResult> {
   let settingsToWrite = merged;
   if (target.scope === "local") {
     const codeRepo = await findCodeRepoRoot(opts.cwd ?? process.cwd());
-    const meta = codeRepo ? await readMetadata(codeRepo).catch(() => null) : null;
-    for (const dir of meta && codeRepo ? outOfRepoKbRoots(meta, codeRepo) : []) {
-      // Grant ONLY a real hub root. `hub_path` is untrusted input: `mage/metadata.json`
-      // is git-tracked, so anyone who can land a commit can point it anywhere, and mere
-      // existence would then widen harness access to an arbitrary directory (~/.ssh, /).
-      // looksLikeHub requires `projects/` + a hub `metadata.json`, which every legitimate
-      // grant target has. Doubles as the absent-hub gate (ADR-0042 §7): no grant, and
-      // never an ownership record for a path we did not grant.
-      if (await looksLikeHub(dir)) {
-        reach.push(dir);
-        continue;
+    const meta = codeRepo
+      ? await readMetadata(codeRepo).catch(() => null)
+      : null;
+    if (meta && codeRepo) {
+      for (const candidateDir of outOfRepoKbRoots(meta, codeRepo)) {
+        let hubRepoUrl: string | null = null;
+        let hubPathFallback: string | null = null;
+        if (meta.mode === "external") {
+          hubRepoUrl = meta.hub_repo;
+          hubPathFallback = meta.hub_path;
+        } else if (meta.mode === "hybrid") {
+          const ref = meta.hub_refs.find(
+            (r) =>
+              (deriveHubPathSafe(r.hub_repo) ?? r.hub_path) === candidateDir,
+          );
+          if (ref) {
+            hubRepoUrl = ref.hub_repo;
+            hubPathFallback = ref.hub_path;
+          }
+        }
+
+        const res = await resolveHubPath({
+          hub_repo: hubRepoUrl,
+          hub_path: hubPathFallback,
+        });
+
+        if (res.status === "derived" && res.hubRoot) {
+          reach.push(res.hubRoot);
+          continue;
+        }
+
+        if (res.status === "origin_mismatch") {
+          const errMsg = res.error ?? "Hub origin mismatch";
+          logger.error(errMsg);
+          throw new Error(errMsg);
+        }
+
+        if (res.status === "fallback" && res.hubRoot) {
+          reach.push(res.hubRoot);
+          if (res.deprecationNotice) {
+            logger.warn(res.deprecationNotice);
+          }
+          continue;
+        }
+
+        if (res.status === "misplaced" && res.displacedScan?.misplaced) {
+          const m = res.displacedScan.misplaced;
+          logger.warn(
+            `Displaced hub detected at ${m.path} (origin '${m.key}').\n` +
+              `  To relocate it to the derived path, run:\n` +
+              `    ${m.mvCommand}`,
+          );
+          continue;
+        }
+
+        // res.status === "absent"
+        if (
+          res.displacedScan?.candidates &&
+          res.displacedScan.candidates.length > 0
+        ) {
+          logger.warn(
+            `Hub for '${hubRepoUrl}' not found at derived path ${res.derivedPath}.\n` +
+              `  Candidate hub clones found on disk:\n` +
+              res.displacedScan.candidates
+                .map(
+                  (c: { path: string; originUrl: string | null }) =>
+                    `    ${c.path} (origin: ${c.originUrl ?? "none"})`,
+                )
+                .join("\n") +
+              `\n  If one of these is this hub renamed, move it to ${res.derivedPath} and update hub_repo.`,
+          );
+        }
+
+        if (hubRepoUrl && res.derivedPath) {
+          const doClone = await resolveDecision<boolean>({
+            flagValue: opts.yes ? true : undefined,
+            yes: opts.yes,
+            interactive: () =>
+              confirm({
+                message: `Hub missing at ${res.derivedPath}. Clone on demand from ${hubRepoUrl}?`,
+                default: true,
+              }),
+            fallback: { value: false },
+            flagName: "yes",
+          });
+
+          if (doClone) {
+            logger.info(`Cloning ${hubRepoUrl} -> ${res.derivedPath}…`);
+            const cloneRes = await run("git", [
+              "clone",
+              hubRepoUrl,
+              res.derivedPath,
+            ]);
+            if (cloneRes.code === 0 && (await looksLikeHub(res.derivedPath))) {
+              logger.success(`Cloned hub to ${res.derivedPath}`);
+              reach.push(res.derivedPath);
+            } else {
+              logger.warn(
+                `Failed to clone hub: ${cloneRes.stderr || "directory is not a valid hub after clone"}`,
+              );
+            }
+          } else {
+            logger.warn(
+              `Hub not found at ${res.derivedPath} — skipping its access grant. Clone it there or re-run \`mage connect --yes\` to clone on demand.`,
+            );
+          }
+        }
       }
-      logger.warn(
-        (await exists(dir))
-          ? `${dir} is not a mage hub (no projects/ + metadata.json) — skipping its access grant; check hub_path in mage/metadata.json.`
-          : `Hub not found at ${dir} — skipping its access grant. Clone it there, then re-run \`mage connect\`.`,
-      );
     }
-    settingsToWrite = reconcileReachGrants(merged, reach);
+    settingsToWrite = reconcileReachGrants(merged, reach.map(toHomeRelative));
   }
 
   const { backedUp } = await writeClaudeSettings(target.path, settingsToWrite);
 
-  const wired = MAGE_HOOKS.filter((h) => h.commandeer !== true || commandeer).length;
+  const wired = MAGE_HOOKS.filter(
+    (h) => h.commandeer !== true || commandeer,
+  ).length;
   // settings.local.json is itself personal + gitignored by Claude Code; the capture
   // SINKS those hooks feed (.learnings/, .metrics/) are gitignored separately below.
-  logger.success(`Wired ${wired} events into ${target.path} (personal settings file).`);
+  logger.success(
+    `Wired ${wired} events into ${target.path} (personal settings file).`,
+  );
   if (commandeer && kb) {
-    logger.detail(`Commandeered CC auto-memory → ${kb.root} (writes redirect + scrub into mage; MEMORY.md mage-owned).`);
+    logger.detail(
+      `Commandeered CC auto-memory → ${kb.root} (writes redirect + scrub into mage; MEMORY.md mage-owned).`,
+    );
   }
   for (const dir of reach) {
-    logger.detail(`Granted read access to ${dir} (the KB lives outside this repo).`);
+    logger.detail(
+      `Granted read access to ${dir} (the KB lives outside this repo).`,
+    );
   }
   logger.detail("Run `mage disconnect` to remove.");
 
@@ -210,7 +320,10 @@ export async function connect(opts: ConnectOptions): Promise<ConnectResult> {
   // Gate 2 (ADR-0018 §7): the blocking, un-skippable redaction net at the tracked
   // write. Independently toggleable; the installer refuses to clobber a foreign
   // hook, so this is safe to attempt unconditionally. A non-repo cwd no-ops.
-  const hook = opts.gitHook === false ? undefined : await installHook(opts.cwd ?? process.cwd());
+  const hook =
+    opts.gitHook === false
+      ? undefined
+      : await installHook(opts.cwd ?? process.cwd());
 
   // Commandeer-coverage (ADR-0034 §6-7): the redirect we just wired covers FUTURE
   // captures for THIS cwd only, but CC keys memory by launch cwd — so sibling cwds
@@ -218,10 +331,22 @@ export async function connect(opts: ConnectOptions): Promise<ConnectResult> {
   // this same KB. Surface them and, interactively, offer to adopt now. Fail-open and
   // read-only here — we flag/offer but never reach into another cwd's settings.
   if (commandeer && kb) {
-    await offerCommandeerCoverage(kb, { cwd: opts.cwd, yes: opts.yes, home: opts.home });
+    await offerCommandeerCoverage(kb, {
+      cwd: opts.cwd,
+      yes: opts.yes,
+      home: opts.home,
+    });
   }
 
-  return { path: target.path, scope: target.scope, wired, backedUp, commandeer, reach, hook };
+  return {
+    path: target.path,
+    scope: target.scope,
+    wired,
+    backedUp,
+    commandeer,
+    reach,
+    hook,
+  };
 }
 
 /**
@@ -254,17 +379,24 @@ async function offerCommandeerCoverage(
         `across ${cwds.size} cwd(s) map to this KB but predate the redirect.`,
     );
     if (!(isInteractive() && !opts.yes)) {
-      logger.detail("Run `mage adopt` to fold them into the inbox (you can do it later).");
+      logger.detail(
+        "Run `mage adopt` to fold them into the inbox (you can do it later).",
+      );
       return;
     }
-    const adoptNow = await confirm({ message: `Adopt them now?`, default: true });
+    const adoptNow = await confirm({
+      message: `Adopt them now?`,
+      default: true,
+    });
     if (adoptNow) {
       await adopt({ dir: opts.cwd, yes: true, home: opts.home });
     } else {
       logger.detail("Skipped — run `mage adopt` anytime to fold them in.");
     }
   } catch (err) {
-    logger.detail(`Commandeer-coverage check skipped: ${(err as Error).message}`);
+    logger.detail(
+      `Commandeer-coverage check skipped: ${(err as Error).message}`,
+    );
   }
 }
 
@@ -313,7 +445,9 @@ async function ensureSinkIgnores(startDir: string): Promise<void> {
 
   const added = await ensureGitignored(root, patterns);
   if (added.length > 0) {
-    logger.success(`Gitignored ${added.length} capture sink(s): ${added.join(", ")}`);
+    logger.success(
+      `Gitignored ${added.length} capture sink(s): ${added.join(", ")}`,
+    );
   }
 }
 
@@ -323,7 +457,9 @@ async function ensureSinkIgnores(startDir: string): Promise<void> {
  * overwrite it); "already" → quiet detail; "not-a-repo" → silent (connect is
  * routinely run outside a repo). Returns the additive `hook` field for the result.
  */
-async function installHook(repo: string): Promise<{ installed: boolean; reason?: string }> {
+async function installHook(
+  repo: string,
+): Promise<{ installed: boolean; reason?: string }> {
   const r = await installRedactHook(repo);
   if (r.installed) {
     logger.success(
@@ -387,31 +523,53 @@ export async function connectAllProjects(
   const out: ConnectAllResult = { hub, projects: [], wired: 0 };
 
   if (projects.length === 0) {
-    logger.info(`Hub ${hub} has no registered projects yet — run \`mage link <hub>\` from each code repo.`);
+    logger.info(
+      `Hub ${hub} has no registered projects yet — run \`mage link <hub>\` from each code repo.`,
+    );
     return out;
   }
 
   for (const p of projects) {
     if (!p.code_repo_path || !(await exists(p.code_repo_path))) {
       const reason = "code repo not present on this machine";
-      out.projects.push({ project: p.name, codeRepo: p.code_repo_path || "(unset)", skipped: reason });
-      logger.warn(`Skipped '${p.name}': ${reason} (${p.code_repo_path || "unset"}).`);
+      out.projects.push({
+        project: p.name,
+        codeRepo: p.code_repo_path || "(unset)",
+        skipped: reason,
+      });
+      logger.warn(
+        `Skipped '${p.name}': ${reason} (${p.code_repo_path || "unset"}).`,
+      );
       continue;
     }
     logger.blank();
     logger.info(`Wiring '${p.name}' (${p.code_repo_path})…`);
     try {
-      const result = await connect({ cwd: p.code_repo_path, yes: opts.yes, gitHook: opts.gitHook });
-      out.projects.push({ project: p.name, codeRepo: p.code_repo_path, result });
+      const result = await connect({
+        cwd: p.code_repo_path,
+        yes: opts.yes,
+        gitHook: opts.gitHook,
+      });
+      out.projects.push({
+        project: p.name,
+        codeRepo: p.code_repo_path,
+        result,
+      });
       out.wired += 1;
     } catch (err) {
       const reason = (err as Error).message;
-      out.projects.push({ project: p.name, codeRepo: p.code_repo_path, skipped: reason });
+      out.projects.push({
+        project: p.name,
+        codeRepo: p.code_repo_path,
+        skipped: reason,
+      });
       logger.warn(`Skipped '${p.name}': ${reason}`);
     }
   }
 
   logger.blank();
-  logger.success(`connect --all-projects: wired ${out.wired}/${projects.length} project code repo(s) from hub ${hub}.`);
+  logger.success(
+    `connect --all-projects: wired ${out.wired}/${projects.length} project code repo(s) from hub ${hub}.`,
+  );
   return out;
 }

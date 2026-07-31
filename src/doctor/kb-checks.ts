@@ -3,7 +3,7 @@
 // Governed by ADR-0021 and the connect-doesnt-ensure-ignores gotcha. Each helper
 // pushes one or more DoctorChecks onto the shared array.
 
-import { readFile, readdir } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   type ClaudeSettings,
@@ -15,34 +15,38 @@ import {
   upsertMageHooks,
   writeClaudeSettings,
 } from "../adapters/claude-code/settings.js";
-import { LAYOUT_LEAVES, mageMigrate } from "../commands/migrate.js";
 import type { DoctorCheck, DoctorOptions } from "../commands/doctor.js";
+import { index } from "../commands/index-cmd.js";
+import { LAYOUT_LEAVES, mageMigrate } from "../commands/migrate.js";
 import { detectRedactHook } from "../git-hooks.js";
 import { ensureGitignored } from "../gitignore.js";
+import { measureFootprint } from "../metrics/footprint.js";
 import {
   AGENTS_FILE,
+  exists,
+  findCodeRepoRoot,
   INDEX_FILE,
+  learningsPath,
+  looksLikeHub,
   META_DIR,
   META_FILE,
   METADATA_SCHEMA,
-  STATE_DIR,
-  exists,
-  findCodeRepoRoot,
-  learningsPath,
-  looksLikeHub,
   outOfRepoKbRoots,
   ownedDocsRoots,
   readGenreOverrides,
   readHubMetadata,
   readMetadata,
   type resolveDocsRoot,
+  STATE_DIR,
+  toAbsolutePath,
 } from "../paths.js";
+import { scanNotes } from "../scan.js";
 import { genreOf } from "../scanner/genre-map.js";
 import { run } from "../shell.js";
-import { scanNotes } from "../scan.js";
-import { index } from "../commands/index-cmd.js";
-import { measureFootprint } from "../metrics/footprint.js";
-import { formatGenreTellsSummary, type GenreTellsReport } from "./genre-tells.js";
+import {
+  formatGenreTellsSummary,
+  type GenreTellsReport,
+} from "./genre-tells.js";
 
 type ResolvedKb = Awaited<ReturnType<typeof resolveDocsRoot>>;
 type Kb = NonNullable<ResolvedKb>;
@@ -94,7 +98,10 @@ export async function pushKbChecks(
       name: "genre tells",
       ok: true,
       optional: true,
-      detail: formatGenreTellsSummary(genreTellsReport.flagged.length, genreTellsReport.scannedCount),
+      detail: formatGenreTellsSummary(
+        genreTellsReport.flagged.length,
+        genreTellsReport.scannedCount,
+      ),
     });
   }
   // Hub-aware: a per-project liveness rollup when run AT a hub (Decision 11B).
@@ -109,7 +116,10 @@ export async function pushKbChecks(
  * started here captures into nothing. Warn loudly (no down-scan magic — we never
  * treat the children as the KB). Otherwise, the benign "no KB here" note.
  */
-async function pushNoKbCheck(checks: DoctorCheck[], opts: DoctorOptions): Promise<void> {
+async function pushNoKbCheck(
+  checks: DoctorCheck[],
+  opts: DoctorOptions,
+): Promise<void> {
   const cwd = opts.cwd ?? process.cwd();
   const children = await childKbCount(cwd);
   if (children > 0) {
@@ -129,7 +139,8 @@ async function pushNoKbCheck(checks: DoctorCheck[], opts: DoctorOptions): Promis
   checks.push({
     name: "mage KB",
     ok: true,
-    detail: "No mage KB here — run `mage init` to create one (env checks above still apply)",
+    detail:
+      "No mage KB here — run `mage init` to create one (env checks above still apply)",
     optional: true,
   });
 }
@@ -151,7 +162,10 @@ async function childKbCount(dir: string): Promise<number> {
   for (const name of entries) {
     if (name.startsWith(".") || name === META_DIR) continue; // skip hidden + this dir's own mage/
     const child = join(dir, name);
-    if ((await exists(join(child, META_DIR, META_FILE))) || (await looksLikeHub(child))) {
+    if (
+      (await exists(join(child, META_DIR, META_FILE))) ||
+      (await looksLikeHub(child))
+    ) {
       count += 1;
     }
   }
@@ -165,7 +179,10 @@ async function childKbCount(dir: string): Promise<number> {
  * repo may simply not be cloned here, and an unconnected project is a nudge, not a
  * hub failure. Reads each project's settings once; never throws.
  */
-async function pushHubProjectsCheck(checks: DoctorCheck[], hub: string): Promise<void> {
+async function pushHubProjectsCheck(
+  checks: DoctorCheck[],
+  hub: string,
+): Promise<void> {
   const meta = await readHubMetadata(hub).catch(() => null);
   const projects = meta?.projects ?? [];
   if (projects.length === 0) {
@@ -173,7 +190,8 @@ async function pushHubProjectsCheck(checks: DoctorCheck[], hub: string): Promise
       name: "hub projects",
       ok: true,
       optional: true,
-      detail: "no projects registered yet — `mage link <hub>` from each code repo",
+      detail:
+        "no projects registered yet — `mage link <hub>` from each code repo",
     });
     return;
   }
@@ -187,7 +205,9 @@ async function pushHubProjectsCheck(checks: DoctorCheck[], hub: string): Promise
       continue;
     }
     present += 1;
-    const read = await readClaudeSettings(resolveSettingsTarget({ cwd: p.code_repo_path }).path);
+    const read = await readClaudeSettings(
+      resolveSettingsTarget({ cwd: p.code_repo_path }).path,
+    );
     if (diffMageHooks(read.settings).connected) {
       connected += 1;
     } else {
@@ -222,8 +242,16 @@ async function learningsHasHistory(root: string): Promise<boolean> {
 }
 
 /** KB structure: confirm the docs root, then flag a missing INDEX.md (advisory). */
-function pushKbStructureChecks(checks: DoctorCheck[], kb: Kb, hasIndex: boolean): void {
-  checks.push({ name: "KB structure", ok: true, detail: `KB: ${kb.kind} at ${kb.root}` });
+function pushKbStructureChecks(
+  checks: DoctorCheck[],
+  kb: Kb,
+  hasIndex: boolean,
+): void {
+  checks.push({
+    name: "KB structure",
+    ok: true,
+    detail: `KB: ${kb.kind} at ${kb.root}`,
+  });
   checks.push({
     name: "INDEX.md",
     ok: hasIndex,
@@ -255,7 +283,8 @@ async function pushIndexFreshnessCheck(
   // an EXTERNAL code repo (kind "hub" whose root is a project subdir UNDER the hub) it's the
   // HUB's root index — project indexes (projects/<name>/INDEX.md) are generated by hub-root
   // fan-out.
-  const indexRoot = kb.kind === "hub" && kb.root !== kb.repo ? kb.repo : kb.root;
+  const indexRoot =
+    kb.kind === "hub" && kb.root !== kb.repo ? kb.repo : kb.root;
   const indexPath = join(indexRoot, INDEX_FILE);
   if (!(await exists(indexPath))) return; // absence handled by pushKbStructureChecks
   let onDisk: number;
@@ -273,11 +302,17 @@ async function pushIndexFreshnessCheck(
 
   if (advertised !== onDisk && opts.fix) {
     await index({ dir: indexRoot, quiet: true }).catch(() => {});
-    advertised = parseIndexCount(await readFile(indexPath, "utf8").catch(() => "")) ?? advertised;
+    advertised =
+      parseIndexCount(await readFile(indexPath, "utf8").catch(() => "")) ??
+      advertised;
   }
 
   if (advertised === onDisk) {
-    checks.push({ name: "index freshness", ok: true, detail: `index reflects ${onDisk} note(s)` });
+    checks.push({
+      name: "index freshness",
+      ok: true,
+      detail: `index reflects ${onDisk} note(s)`,
+    });
     return;
   }
   checks.push({
@@ -311,7 +346,10 @@ const RETIRED_SKILL_TOKENS = [
  * re-run `mage link`/`mage init` to refresh. (A full template-drift compare rides the
  * version-stamp enabler; see plan-readiness-doctor.) Fail-open on a missing/unreadable file.
  */
-async function pushAgentsBlockCheck(checks: DoctorCheck[], opts: DoctorOptions): Promise<void> {
+async function pushAgentsBlockCheck(
+  checks: DoctorCheck[],
+  opts: DoctorOptions,
+): Promise<void> {
   // The AGENTS.md the SESSION reads sits at its cwd (the code repo for an external KB, the
   // repo/hub root otherwise) — NOT at kb.repo, which for an external repo is the hub.
   const cwd = opts.cwd ?? process.cwd();
@@ -326,7 +364,11 @@ async function pushAgentsBlockCheck(checks: DoctorCheck[], opts: DoctorOptions):
   const retired = RETIRED_SKILL_TOKENS.filter((t) => block.includes(t));
   checks.push(
     retired.length === 0
-      ? { name: "AGENTS.md awareness", ok: true, detail: "no retired command names" }
+      ? {
+          name: "AGENTS.md awareness",
+          ok: true,
+          detail: "no retired command names",
+        }
       : {
           name: "AGENTS.md awareness",
           ok: false,
@@ -367,12 +409,19 @@ async function pushSinkIgnoreCheck(
   // Guard the write on the root existing: an external repo can resolve to a hub
   // project dir not yet materialized on disk — writing a .gitignore there would
   // throw ENOENT, and doctor must never throw. Nothing to ignore yet anyway.
-  const added = opts.fix && (await exists(root)) ? await ensureGitignored(root, patterns) : [];
+  const added =
+    opts.fix && (await exists(root))
+      ? await ensureGitignored(root, patterns)
+      : [];
   const unignored = await unignoredProbes(root, probes);
 
   if (unignored.length === 0) {
     const note = added.length > 0 ? ` (added: ${added.join(", ")})` : "";
-    checks.push({ name: "gitignore (sinks)", ok: true, detail: `capture sinks ignored${note}` });
+    checks.push({
+      name: "gitignore (sinks)",
+      ok: true,
+      detail: `capture sinks ignored${note}`,
+    });
     return;
   }
 
@@ -413,7 +462,10 @@ export function sinkIgnoreSpec(kb: Kb): { root: string; patterns: string[] } {
  * repo). On >1 we conservatively treat probes as ignored (no false leak alarm; the
  * env `git` check already covers a missing/broken git).
  */
-async function unignoredProbes(repoRoot: string, probes: string[]): Promise<string[]> {
+async function unignoredProbes(
+  repoRoot: string,
+  probes: string[],
+): Promise<string[]> {
   const r = await run("git", ["-C", repoRoot, "check-ignore", ...probes]);
   if (r.code > 1) return [];
   const ignored = new Set(
@@ -453,7 +505,9 @@ async function resolveConnection(opts: DoctorOptions): Promise<Connection> {
   // file is drift-checked for its mage:memory:* rows (else a stale commandeer command
   // across a version bump is silently never detected/fixed), while a base-only file is
   // not falsely flagged as "missing commandeer rows".
-  let diff = diffMageHooks(localRead.settings, { commandeer: hasCommandeerHooks(localRead.settings) });
+  let diff = diffMageHooks(localRead.settings, {
+    commandeer: hasCommandeerHooks(localRead.settings),
+  });
   let scope = "local";
   let settingsPath = localPath;
   let settings = localRead.settings;
@@ -461,7 +515,9 @@ async function resolveConnection(opts: DoctorOptions): Promise<Connection> {
   if (!diff.connected) {
     const userPath = resolveSettingsTarget({ user: true }).path;
     const userRead = await readClaudeSettings(userPath);
-    const userDiff = diffMageHooks(userRead.settings, { commandeer: hasCommandeerHooks(userRead.settings) });
+    const userDiff = diffMageHooks(userRead.settings, {
+      commandeer: hasCommandeerHooks(userRead.settings),
+    });
     if (userDiff.connected) {
       diff = userDiff;
       scope = "user";
@@ -535,7 +591,8 @@ async function pushConnectionCheck(
       }
     }
 
-    const missing = diff.missingIds.length > 0 ? diff.missingIds.join(",") : "none";
+    const missing =
+      diff.missingIds.length > 0 ? diff.missingIds.join(",") : "none";
     const stale = diff.staleIds.length > 0 ? diff.staleIds.join(",") : "none";
     checks.push({
       name: "connection",
@@ -547,7 +604,11 @@ async function pushConnectionCheck(
     return;
   }
 
-  checks.push({ name: "connection", ok: true, detail: `${scope}: mage hooks current` });
+  checks.push({
+    name: "connection",
+    ok: true,
+    detail: `${scope}: mage hooks current`,
+  });
 }
 
 /**
@@ -597,7 +658,10 @@ async function refreshHookBlock(conn: Connection): Promise<MageDiff | null> {
  * `~/.claude/settings.json` is genuinely effective and must not be reported as missing.
  * Fail-open throughout: an unreadable metadata or settings file pushes no check at all.
  */
-async function pushReachGrantCheck(checks: DoctorCheck[], opts: DoctorOptions): Promise<void> {
+async function pushReachGrantCheck(
+  checks: DoctorCheck[],
+  opts: DoctorOptions,
+): Promise<void> {
   const cwd = opts.cwd ?? process.cwd();
   let wanted: string[] = [];
   try {
@@ -609,17 +673,24 @@ async function pushReachGrantCheck(checks: DoctorCheck[], opts: DoctorOptions): 
   }
   if (wanted.length === 0) return; // in-repo KB: nothing lives outside the project root
 
-  const granted = new Set<string>();
-  for (const t of [resolveSettingsTarget({ cwd }), resolveSettingsTarget({ user: true })]) {
+  const grantedAbs = new Set<string>();
+  for (const t of [
+    resolveSettingsTarget({ cwd }),
+    resolveSettingsTarget({ user: true }),
+  ]) {
     const r = await readClaudeSettings(t.path).catch(() => null);
     const dirs = r?.settings?.permissions?.additionalDirectories;
-    if (Array.isArray(dirs)) for (const d of dirs) if (typeof d === "string") granted.add(d);
+    if (Array.isArray(dirs)) {
+      for (const d of dirs) {
+        if (typeof d === "string") grantedAbs.add(toAbsolutePath(d));
+      }
+    }
   }
 
   const missing: string[] = [];
   const absent: string[] = [];
   for (const dir of wanted) {
-    if (granted.has(dir)) continue;
+    if (grantedAbs.has(dir)) continue;
     // Mirror connect's gate exactly (looksLikeHub, NOT exists): `hub_path` is untrusted
     // git-tracked input, so connect refuses to grant a non-hub. Reporting such a path as
     // a missing grant would nag for a fix connect will never make.
@@ -727,7 +798,11 @@ async function pushSchemaDriftCheck(
   if (onDisk === null) return; // unreadable/absent — the structure check covers it
 
   if (onDisk === METADATA_SCHEMA) {
-    checks.push({ name: "metadata schema", ok: true, detail: `current (${METADATA_SCHEMA})` });
+    checks.push({
+      name: "metadata schema",
+      ok: true,
+      detail: `current (${METADATA_SCHEMA})`,
+    });
     return;
   }
 
@@ -809,7 +884,11 @@ async function pushLayoutDriftCheck(
             "pre-fold state at the docs root (.learnings/.metrics/.staging or .redactignore) — " +
             "run `mage migrate` or `mage doctor --fix` to move it under `.mage/`",
         }
-      : { name: "state layout", ok: true, detail: "state consolidated under `.mage/`" },
+      : {
+          name: "state layout",
+          ok: true,
+          detail: "state consolidated under `.mage/`",
+        },
   );
 }
 
@@ -855,8 +934,11 @@ async function readOnDiskSchema(kb: Kb): Promise<string | null> {
  * ADR-0039 §8: Doctor fails on breach. Warn at 70%, fail at 90%.
  * `--fix` does not auto-degrade.
  */
-async function pushFootprintBudgetCheck(checks: DoctorCheck[], kb: Kb): Promise<void> {
-  let fp;
+async function pushFootprintBudgetCheck(
+  checks: DoctorCheck[],
+  kb: Kb,
+): Promise<void> {
+  let fp: Awaited<ReturnType<typeof measureFootprint>> | null = null;
   try {
     fp = await measureFootprint(kb.root);
   } catch {
@@ -871,7 +953,8 @@ async function pushFootprintBudgetCheck(checks: DoctorCheck[], kb: Kb): Promise<
 
   const { state, ratio, usedBytes, usedLines, binding } = fp.budget;
   const pct = Math.round(ratio * 100);
-  const bindingLabel = binding === "lines" ? `${usedLines} lines` : `${usedBytes} bytes`;
+  const bindingLabel =
+    binding === "lines" ? `${usedLines} lines` : `${usedBytes} bytes`;
 
   if (state === "breach") {
     checks.push({

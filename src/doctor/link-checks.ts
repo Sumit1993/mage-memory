@@ -13,13 +13,14 @@
 import { dirname, join } from "node:path";
 import type { DoctorCheck, DoctorOptions } from "../commands/doctor.js";
 import {
-  META_DIR,
-  META_FILE,
   absolutePath,
   exists,
   looksLikeHub,
+  META_DIR,
+  META_FILE,
   readHubMetadata,
   readMetadata,
+  resolveHubPath,
   writeHubMetadata,
 } from "../paths.js";
 
@@ -34,14 +35,24 @@ const CHECK = "link integrity";
  *    it may simply not be cloned on this machine).
  * In-repo (no hub) and non-KB dirs append nothing.
  */
-export async function pushLinkChecks(checks: DoctorCheck[], opts: DoctorOptions): Promise<void> {
+export async function pushLinkChecks(
+  checks: DoctorCheck[],
+  opts: DoctorOptions,
+): Promise<void> {
   const startDir = absolutePath(opts.cwd ?? process.cwd());
 
   const codeRepo = await findCodeRepo(startDir);
   if (codeRepo) {
     const meta = await readMetadata(codeRepo).catch(() => null);
     if (meta?.mode === "external") {
-      await checkExternalLink(checks, opts, codeRepo, meta.hub_path, meta.project);
+      await checkExternalLink(
+        checks,
+        opts,
+        codeRepo,
+        meta.hub_repo,
+        meta.hub_path,
+        meta.project,
+      );
     }
     return; // in-repo: no hub link to validate.
   }
@@ -67,31 +78,70 @@ async function checkExternalLink(
   checks: DoctorCheck[],
   opts: DoctorOptions,
   codeRepo: string,
-  hubPath: string | null,
+  hubRepoUrl: string | null,
+  hubPathFallback: string | null,
   project: string,
 ): Promise<void> {
-  if (!hubPath || !(await looksLikeHub(hubPath))) {
+  const res = await resolveHubPath({
+    hub_repo: hubRepoUrl,
+    hub_path: hubPathFallback,
+  });
+
+  if (res.status === "origin_mismatch") {
     checks.push({
       name: CHECK,
       ok: false,
-      detail: `hub_path ${hubPath ?? "(missing)"} is not a reachable hub (moved?) — re-run \`mage link <hub>\``,
+      detail: res.error ?? "Hub origin mismatch",
     });
     return;
   }
 
-  const hubMeta = await readHubMetadata(hubPath).catch(() => null);
+  if (res.status === "misplaced" && res.displacedScan?.misplaced) {
+    const m = res.displacedScan.misplaced;
+    checks.push({
+      name: CHECK,
+      ok: false,
+      detail: `misplaced hub at '${m.path}' (origin '${m.key}') — run: ${m.mvCommand}`,
+    });
+    return;
+  }
+
+  if (res.status === "fallback" && res.deprecationNotice) {
+    checks.push({
+      name: CHECK,
+      ok: true,
+      optional: true,
+      detail: res.deprecationNotice,
+    });
+  }
+
+  const effectiveHubPath = res.hubRoot;
+  if (!effectiveHubPath || !(await looksLikeHub(effectiveHubPath))) {
+    checks.push({
+      name: CHECK,
+      ok: false,
+      detail: `hub for ${hubRepoUrl ?? hubPathFallback ?? "(missing)"} is not a reachable hub — re-run \`mage link <hub>\` or \`mage connect\``,
+    });
+    return;
+  }
+
+  const hubMeta = await readHubMetadata(effectiveHubPath).catch(() => null);
   const entry = hubMeta?.projects?.find((p) => p.name === project);
   if (!hubMeta || !entry) {
     checks.push({
       name: CHECK,
       ok: false,
-      detail: `project '${project}' is not registered in hub ${hubPath} — re-run \`mage link\``,
+      detail: `project '${project}' is not registered in hub ${effectiveHubPath} — re-run \`mage link\``,
     });
     return;
   }
 
   if (entry.code_repo_path === codeRepo) {
-    checks.push({ name: CHECK, ok: true, detail: `external link to '${hubMeta.name}' (project '${project}') consistent` });
+    checks.push({
+      name: CHECK,
+      ok: true,
+      detail: `external link to '${hubMeta.name}' (project '${project}') consistent`,
+    });
     return;
   }
 
@@ -99,9 +149,11 @@ async function checkExternalLink(
   if (opts.fix) {
     const repaired = {
       ...hubMeta,
-      projects: hubMeta.projects.map((p) => (p.name === project ? { ...p, code_repo_path: codeRepo } : p)),
+      projects: hubMeta.projects.map((p) =>
+        p.name === project ? { ...p, code_repo_path: codeRepo } : p,
+      ),
     };
-    await writeHubMetadata(hubPath, repaired);
+    await writeHubMetadata(effectiveHubPath, repaired);
     checks.push({
       name: CHECK,
       ok: true,
@@ -120,7 +172,10 @@ async function checkExternalLink(
 }
 
 /** From a hub: flag any registered project whose code repo has moved/vanished. */
-async function checkHubBackrefs(checks: DoctorCheck[], hub: string): Promise<void> {
+async function checkHubBackrefs(
+  checks: DoctorCheck[],
+  hub: string,
+): Promise<void> {
   const hubMeta = await readHubMetadata(hub).catch(() => null);
   const projects = hubMeta?.projects ?? [];
   if (projects.length === 0) return;
@@ -133,7 +188,11 @@ async function checkHubBackrefs(checks: DoctorCheck[], hub: string): Promise<voi
   }
 
   if (missing.length === 0) {
-    checks.push({ name: CHECK, ok: true, detail: `${projects.length} project code repo(s) present` });
+    checks.push({
+      name: CHECK,
+      ok: true,
+      detail: `${projects.length} project code repo(s) present`,
+    });
     return;
   }
 

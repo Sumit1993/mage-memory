@@ -119,7 +119,7 @@ Most mage commands need to locate the docs root to operate on. They do this by w
 
 1. Look upward for a code repo with `mage/metadata.json`.
    - If its mode is `in-repo` or `hybrid`, the docs root is that repo's `mage/`.
-   - If its mode is `external`, mage follows the `hub_path` in the metadata to the hub's `projects/<name>/` — so captures and grooming land in the hub, where the notes actually are, not in the code repo.
+   - If its mode is `external`, mage derives the hub location from `hub_repo` (`~/.mage/hubs/<host>/<owner>/<repo>`) to the hub's `projects/<name>/` — so captures and grooming land in the hub, where the notes actually are, not in the code repo.
 2. Otherwise, look upward for a **hub root** (a directory with a `projects/` registry and a top-level `metadata.json`). Inside a `projects/<name>/` directory it resolves to that project's flat docs root; anywhere else under the hub it resolves to the hub root itself.
 
 This is why you can run `mage` commands from anywhere inside a repo or hub and they find the right knowledge base. It is also why an `external`-mode code repo's captures end up in the hub even though you were working in the code repo — the metadata pointer redirects them.
@@ -133,23 +133,8 @@ Finding the knowledge base and being *allowed to read it* are two different thin
 Three consequences worth knowing:
 
 - **`mage connect` is not optional for hub modes.** Without the grant the agent resolves the KB correctly and then cannot open it.
-- **`hub_path` is machine-specific.** It is an absolute path in a git-tracked file, so a clone on another machine may point at a hub that isn't there. mage skips the grant in that case rather than recording one for a path that doesn't exist; clone the hub and re-run `mage connect`. `mage doctor` reports the state either way.
-- **The grant is bounded by hub *shape*, not by trust.** Because `hub_path` lives in a git-tracked file, it is untrusted input — a bad value could otherwise widen harness access to any directory (`~/.ssh`, `/`). So mage writes the grant only when the target is already **hub-shaped**: a `projects/` directory plus a hub `metadata.json`. Be clear about what that does and does not buy you (ADR-0042 §7). It is a **structural check**, not an identity check: it caps grant-widening at directories that are already mage hubs, and it does **not** verify that the hub is *the* hub you meant, or that its origin is trusted. The residual exposure — a legitimate hub whose contents someone else controls — is the same trust boundary as your notes themselves, not a new one. A path that fails the shape check is treated exactly like a hub that isn't cloned here: warn, grant nothing, record nothing.
-
-:::note[Changing in 0.0.18 — hubs move to derived locations]
-ADR-0043 settles the direction: an external hub stops being addressed by a
-recorded path and becomes addressed by its **remote** (`hub_repo`), with its
-local location *derived* — one deterministic place per remote, at
-`~/.mage/hubs/<host>/<owner>/<repo>` — and cloned on demand if it isn't there
-yet. `hub_path` is deprecated at that point, and with it the machine-specificity
-caveat above: a derived path is the same on every machine, so a clone elsewhere
-no longer points at a hub that isn't there.
-
-It also adds the identity check the shape check above deliberately is not:
-**verify on arrival** — mage canonicalizes the `origin` of the clone it finds at
-the derived path and requires it to match `hub_repo`, erroring loudly on a
-mismatch. Derive the address, verify the arrival.
-:::
+- **Hub location is derived and portable.** Per ADR-0043, an external hub is addressed by its remote (`hub_repo`) and located by derivation at `~/.mage/hubs/<host>/<owner>/<repo>`. `hub_path` is deprecated. If the derived path is absent, `mage connect` offers clone-on-demand.
+- **Verify on arrival.** Beyond the structural shape check (`looksLikeHub`), mage canonicalizes the `origin` remote URL of the clone found at the derived path and requires it to match `hub_repo`, erroring loudly on a mismatch (derive the address, verify the arrival). Grants are recorded as home-relative paths (`~/.mage/hubs/...`) so they are portable across worktrees and machines.
 
 An `in-repo` KB needs none of this — its docs already live under the project root.
 

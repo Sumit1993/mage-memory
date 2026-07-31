@@ -77,20 +77,52 @@ export const MAGE_HOOKS: ReadonlyArray<{
   /** Commandeer-tier row (ADR-0032) — gated on auto-memory + a docs root. */
   commandeer?: boolean;
 }> = [
-  { event: "SessionStart", id: "mage:observe:SessionStart", command: "mage observe" },
+  {
+    event: "SessionStart",
+    id: "mage:observe:SessionStart",
+    command: "mage observe",
+  },
   // The boundary nudge (0.0.12, ADR-0009 §24 step 2; ADR-0030 §5): fires on
   // SessionStart source compact/startup/resume — on compact it distills the just-closed
   // chapter and surfaces staged lessons + the autonomy-scaled backlog tally; startup/resume
   // carry the (mtime-gated) backlog reminder. `clear` (and any other source) stays a fast
   // no-op. SessionEnd is NOT used — a SessionEnd hook's stdout cannot inject context (the
   // session is already ending).
-  { event: "SessionStart", id: "mage:nudge:SessionStart", command: "mage nudge" },
-  { event: "UserPromptSubmit", id: "mage:observe:UserPromptSubmit", command: "mage observe" },
-  { event: "PostToolUse", id: "mage:observe:PostToolUse", command: "mage observe" },
-  { event: "PostToolUseFailure", id: "mage:observe:PostToolUseFailure", command: "mage observe" },
-  { event: "PreCompact", id: "mage:observe:PreCompact", command: "mage observe" },
-  { event: "SessionEnd", id: "mage:observe:SessionEnd", command: "mage observe" },
-  { event: "Stop", id: "mage:metrics:Stop", command: "mage skills --metrics --quiet" },
+  {
+    event: "SessionStart",
+    id: "mage:nudge:SessionStart",
+    command: "mage nudge",
+  },
+  {
+    event: "UserPromptSubmit",
+    id: "mage:observe:UserPromptSubmit",
+    command: "mage observe",
+  },
+  {
+    event: "PostToolUse",
+    id: "mage:observe:PostToolUse",
+    command: "mage observe",
+  },
+  {
+    event: "PostToolUseFailure",
+    id: "mage:observe:PostToolUseFailure",
+    command: "mage observe",
+  },
+  {
+    event: "PreCompact",
+    id: "mage:observe:PreCompact",
+    command: "mage observe",
+  },
+  {
+    event: "SessionEnd",
+    id: "mage:observe:SessionEnd",
+    command: "mage observe",
+  },
+  {
+    event: "Stop",
+    id: "mage:metrics:Stop",
+    command: "mage skills --metrics --quiet",
+  },
   // Second Stop group: capture the agent's final reply (ADR-0019 amendment to
   // ADR-0015). Distinct id from mage:metrics:Stop, so both coexist on Stop.
   { event: "Stop", id: "mage:observe:Stop", command: "mage observe" },
@@ -98,7 +130,11 @@ export const MAGE_HOOKS: ReadonlyArray<{
   // calls never reach the main-session PostToolUse hook, so its final reply — read
   // from the subagent transcript, exactly like Stop → assistant_msg — is the one
   // capture point as harnesses move toward autonomous multi-agent workflows.
-  { event: "SubagentStop", id: "mage:observe:SubagentStop", command: "mage observe" },
+  {
+    event: "SubagentStop",
+    id: "mage:observe:SubagentStop",
+    command: "mage observe",
+  },
   // ADR-0032 commandeer tier: one `mage memory-hook` command on Write|Edit. PreToolUse
   // redirects + scrubs a native-memory write into mage's note schema (Gate-0) or denies a
   // write to a generated index; PostToolUse nudges `mage groom`. The PostToolUse matcher
@@ -150,7 +186,9 @@ export function isAutoMemoryEnabled(
 /** True iff any installed group belongs to the commandeer tier (the mage:memory:* id family). */
 export function hasCommandeerHooks(settings: ClaudeSettings | null): boolean {
   const groups = settings?.hooks ? Object.values(settings.hooks).flat() : [];
-  return groups.some((g) => typeof g?.id === "string" && g.id.startsWith("mage:memory:"));
+  return groups.some(
+    (g) => typeof g?.id === "string" && g.id.startsWith("mage:memory:"),
+  );
 }
 
 // ─── drift diff (doctor) ─────────────────────────────────────────────────────
@@ -249,14 +287,19 @@ export function resolveSettingsTarget(opts: { user?: boolean; cwd?: string }): {
  *   - present but unparseable -> {settings:null, existed:true, malformed:true}
  *   - present and valid       -> {settings:parsed, existed:true, malformed:false}
  */
-export async function readClaudeSettings(
-  path: string,
-): Promise<{ settings: ClaudeSettings | null; existed: boolean; malformed: boolean }> {
+export async function readClaudeSettings(path: string): Promise<{
+  settings: ClaudeSettings | null;
+  existed: boolean;
+  malformed: boolean;
+}> {
   let raw: string;
   try {
     raw = await readFile(path, "utf8");
   } catch (err: unknown) {
-    if (err instanceof Error && (err as NodeJS.ErrnoException).code === "ENOENT") {
+    if (
+      err instanceof Error &&
+      (err as NodeJS.ErrnoException).code === "ENOENT"
+    ) {
       return { settings: null, existed: false, malformed: false };
     }
     throw err;
@@ -285,7 +328,9 @@ export function upsertMageHooks(
   const base = structuredClone(settings ?? {}) as ClaudeSettings;
   // Detach the hooks map from `base` before mutating it, so this stays a clean
   // immutable construction (we never write through an alias of the clone).
-  const hooks: Record<string, HookGroup[]> = base.hooks ? { ...base.hooks } : {};
+  const hooks: Record<string, HookGroup[]> = base.hooks
+    ? { ...base.hooks }
+    : {};
 
   for (const entry of MAGE_HOOKS) {
     const current = hooks[entry.event];
@@ -330,7 +375,8 @@ export function removeMageHooks(settings: ClaudeSettings | null): {
 
   for (const [event, groups] of Object.entries(base.hooks)) {
     const kept = groups.filter((g) => {
-      const isMage = typeof g.id === "string" && g.id.startsWith(MAGE_ID_PREFIX);
+      const isMage =
+        typeof g.id === "string" && g.id.startsWith(MAGE_ID_PREFIX);
       if (isMage) removed += 1;
       return !isMage;
     });
@@ -347,17 +393,25 @@ export function removeMageHooks(settings: ClaudeSettings | null): {
 // ─── reach tier (ADR-0042) ───────────────────────────────────────────────────
 /** Read a settings array key defensively — a hand-edited file may hold anything. */
 function stringArray(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : [];
+  return Array.isArray(value)
+    ? value.filter((v): v is string => typeof v === "string")
+    : [];
 }
 
 /**
  * Write `dirs` / `owned` back onto a settings clone, pruning empties so a
  * reconcile → remove round-trip restores the original object exactly (minus mage).
  */
-function applyReach(base: ClaudeSettings, dirs: string[], owned: string[]): ClaudeSettings {
+function applyReach(
+  base: ClaudeSettings,
+  dirs: string[],
+  owned: string[],
+): ClaudeSettings {
   const out = { ...base };
   const prior =
-    out.permissions && typeof out.permissions === "object" && !Array.isArray(out.permissions)
+    out.permissions &&
+    typeof out.permissions === "object" &&
+    !Array.isArray(out.permissions)
       ? out.permissions
       : undefined;
   const perms: NonNullable<ClaudeSettings["permissions"]> = { ...prior };
@@ -373,6 +427,8 @@ function applyReach(base: ClaudeSettings, dirs: string[], owned: string[]): Clau
 
   return out;
 }
+
+import { toAbsolutePath, toHomeRelative } from "../../paths.js";
 
 /**
  * Return a NEW settings object granting the agent access to `grants` — the
@@ -396,21 +452,34 @@ export function reconcileReachGrants(
   grants: string[],
 ): ClaudeSettings {
   const base = structuredClone(settings ?? {}) as ClaudeSettings;
-  const owned = new Set(stringArray(base.mageOwnedAdditionalDirectories));
-  const current = stringArray(base.permissions?.additionalDirectories);
-  const wanted = new Set(grants);
+  const ownedRaw = stringArray(base.mageOwnedAdditionalDirectories);
+  const currentRaw = stringArray(base.permissions?.additionalDirectories);
+
+  // Normalize wanted grants to home-relative form per ADR-0043
+  const wantedHomeRel = grants.map(toHomeRelative);
+  const wantedAbsSet = new Set(grants.map(toAbsolutePath));
+  const ownedAbsSet = new Set(ownedRaw.map(toAbsolutePath));
 
   // Drop what mage owns but no longer grants; leave every other entry in place.
-  const next = current.filter((d) => !(owned.has(d) && !wanted.has(d)));
+  const next = currentRaw.filter((d) => {
+    const abs = toAbsolutePath(d);
+    return !(ownedAbsSet.has(abs) && !wantedAbsSet.has(abs));
+  });
+
   const nextOwned: string[] = [];
-  for (const g of grants) {
-    if (!next.includes(g)) {
+  for (const g of wantedHomeRel) {
+    const gAbs = toAbsolutePath(g);
+    const inNext = next.some((d) => toAbsolutePath(d) === gAbs);
+    const isOwned = ownedAbsSet.has(gAbs);
+
+    if (!inNext) {
       next.push(g);
       nextOwned.push(g); // mage inserted it → mage owns it
-    } else if (owned.has(g)) {
-      nextOwned.push(g); // already ours, still granted
+    } else if (isOwned) {
+      if (!nextOwned.some((d) => toAbsolutePath(d) === gAbs)) {
+        nextOwned.push(g); // already ours, still granted
+      }
     }
-    // else: present because the USER listed it → granted for free, never claimed
   }
 
   return applyReach(base, next, nextOwned);
@@ -433,7 +502,10 @@ export function removeReachGrants(settings: ClaudeSettings | null): {
 
   const current = stringArray(base.permissions?.additionalDirectories);
   const next = current.filter((d) => !owned.has(d));
-  return { settings: applyReach(base, next, []), removed: current.length - next.length };
+  return {
+    settings: applyReach(base, next, []),
+    removed: current.length - next.length,
+  };
 }
 
 // ─── write ───────────────────────────────────────────────────────────────────
@@ -452,7 +524,10 @@ export async function writeClaudeSettings(
     await copyFile(path, `${path}.bak`);
     backedUp = true;
   } catch (err: unknown) {
-    if (!(err instanceof Error) || (err as NodeJS.ErrnoException).code !== "ENOENT") {
+    if (
+      !(err instanceof Error) ||
+      (err as NodeJS.ErrnoException).code !== "ENOENT"
+    ) {
       throw err;
     }
   }

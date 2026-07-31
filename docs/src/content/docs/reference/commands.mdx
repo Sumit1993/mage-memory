@@ -111,18 +111,10 @@ own auto-memory does not revoke it. mage records exactly which entries it added,
 
 Two cases worth knowing:
 
-- **The hub isn't on this machine.** No grant is written (there is nothing to grant
-  yet). Clone the hub, then re-run `mage connect`.
-- **A new worktree.** Local settings are gitignored, so a fresh worktree starts
-  without them. Run `mage connect` in it.
+- **Clone-on-demand.** Per ADR-0043, when `mage connect` detects that a hub is missing at its derived path (`~/.mage/hubs/<host>/<owner>/<repo>`), it offers to clone it on demand.
+- **A new worktree.** Local settings are gitignored, so a fresh worktree starts without them. Run `mage connect` in it.
 
-`mage doctor` reports the grant under **KB access grant** — a failing check when the
-hub is present but ungranted, and a skip when the hub simply isn't cloned here.
-
-Changing in 0.0.18: per ADR-0043 an external hub will be addressed by its remote
-(`hub_repo`) and located by derivation at `~/.mage/hubs/<host>/<owner>/<repo>`,
-cloned on demand — deprecating `hub_path` and the "isn't on this machine" case
-above. See [Modes and storage](../model/modes.md#reaching-a-hub-from-the-code-repo).
+`mage doctor` reports the grant under **KB access grant** — a failing check when the hub is present but ungranted, and a skip when the hub simply isn't cloned here.
 
 ## Regenerating the index and skills
 

@@ -37,7 +37,7 @@ there the hub root itself is the knowledge base.
 | `mode` | Docs root |
 |--------|-----------|
 | `in-repo`  | `<code-repo>/mage/` |
-| `external` | `<hub_path>/projects/<project>/` |
+| `external` | `<derived_hub_path>/projects/<project>/` |
 
 Hybrid (mode=in-repo with non-empty `hub_refs[]`): docs root is the in-repo
 `mage/`; each `hub_ref` is a cross-cutting registration with a hub.
