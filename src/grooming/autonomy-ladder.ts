@@ -27,7 +27,7 @@ export const DEFAULT_AUTONOMY: Autonomy = "operator";
 
 /** One-line meaning per level (ADR-0030 §1) — the human-role summary printed by `mage autonomy`. */
 const MEANING: Record<Autonomy, string> = {
-  operator: "you run mage:groom, judge each draft, write + commit (HITL; the default)",
+  operator: "you run /mage:groom, judge each draft, write + commit (HITL; the default)",
   approver: "the agent grooms + writes clearly-durable notes uncommitted (Gate-2 runs); you review the diff + commit",
   overseer: "as approver + the agent disposes the borderline tier and graduates eligible notes; you audit git log + commit",
 };
@@ -68,7 +68,7 @@ export function mandateFor(level: Autonomy, backlogLine: string): string {
   if (level === "approver") {
     return (
       `${backlogLine}\n` +
-      "You are authorized (autonomy: approver) to run `mage:groom` now and write the clearly-durable " +
+      "You are authorized (autonomy: approver) to run `/mage:groom` now and write the clearly-durable " +
       "notes into the working tree, UNCOMMITTED (Gate-2 redaction runs); leave borderline drafts staged. " +
       "Reviewing the diff is the review; the human's `git commit` is the confirm — mage never commits. " +
       "When you're done, tell them in one friendly line what you filed (name a real keeper) so they stay in the loop."
@@ -77,8 +77,8 @@ export function mandateFor(level: Autonomy, backlogLine: string): string {
   if (level === "overseer") {
     return (
       `${backlogLine}\n` +
-      "You are authorized (autonomy: overseer) to run `mage:groom` now: write durable notes, merge related " +
-      "lessons into existing notes, dispose the borderline tier, and `mage:graduate` eligible notes (Gate-2 " +
+      "You are authorized (autonomy: overseer) to run `/mage:groom` now: write durable notes, merge related " +
+      "lessons into existing notes, dispose the borderline tier, and `/mage:graduate` eligible notes (Gate-2 " +
       "runs; recurrence-gated). All writes land UNCOMMITTED in the working tree — the human audits `git log` " +
       "and `git commit`s; mage never commits. " +
       "When you're done, tell them in one friendly line what you filed and graduated (name a real keeper) so they stay in the loop."
@@ -90,8 +90,8 @@ export function mandateFor(level: Autonomy, backlogLine: string): string {
   return (
     `${backlogLine}\n` +
     "At a natural pause in the user's work (never mid-task), warmly offer — in your own words, a line " +
-    "or two, not a wall of text — to tidy this up for them: run `mage:groom` to file the backlog, or " +
-    "`mage:learn` to capture one specific lesson. If a genuine keeper surfaced in the digest above " +
+    "or two, not a wall of text — to tidy this up for them: run `/mage:groom` to file the backlog, or " +
+    "`/mage:learn` to capture one specific lesson. If a genuine keeper surfaced in the digest above " +
     "(a gotcha, a hard-won procedure, an API/env constraint), name one or two in a few words so they " +
     "can decide — don't relay the raw list. ASK first; do not write notes without their go-ahead " +
     "(autonomy: operator)."
