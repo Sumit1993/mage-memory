@@ -222,9 +222,11 @@ model the operator must understand the first time anything breaks.
   the same pair as the top-level fields and inherits the same fix; hybrid mode
   gains the portability property external mode got in 0043. Treated as a
   consequence of §2, not a separate decision.
-- **Existing local-only hubs need a one-time migration.** The migration mechanics are
-  specified in [#123](https://github.com/Sumit1993/mage-memory/issues/123), which
-  blocks the removal of `hub_path`.
+- **Existing local-only hubs need a one-time migration.** Their `hub_repo` holds a
+  filesystem path that now throws on canonicalization. This is a real upgrade step,
+  not a no-op, and belongs in the same release as the `local://` scheme. Its
+  mechanics are specified in [#123](https://github.com/Sumit1993/mage-memory/issues/123),
+  which blocks the removal of `hub_path`.
 - **The implementation lands in two passes, deliberately.**
   [#121](https://github.com/Sumit1993/mage-memory/pull/121) (superseding #117)
   implements ADR-0043 as written — allowlist `ssh/https/http/git`, no `local`
