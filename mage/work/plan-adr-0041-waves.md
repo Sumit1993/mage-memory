@@ -277,9 +277,8 @@ evidence base. **The window effectively restarts 2026-07-31.**
    evaluated on its own terms.
 6. Ratify and implement [ADR-0044](../decisions/0044-setup-is-a-conversation-over-one-address.md)
    (drafted in PR #118, closing [#104](https://github.com/Sumit1993/mage-memory/issues/104)).
-   Implementation is sequenced after
-   [#121](https://github.com/Sumit1993/mage-memory/pull/121) lands; `hub_path` cannot
-   be removed until the migration specified in
+   [#121](https://github.com/Sumit1993/mage-memory/pull/121) has landed, so implementation is
+   unblocked; `hub_path` cannot be removed until the migration specified in
    [#123](https://github.com/Sumit1993/mage-memory/issues/123) ships.
 
 ## Relations
