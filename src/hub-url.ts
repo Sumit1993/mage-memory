@@ -1,7 +1,7 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { isAbsolute, join, resolve, sep } from "node:path";
-import { looksLikeHub } from "./paths.js";
+import { isUnder, looksLikeHub } from "./path-guards.js";
 
 // ─── types & errors ──────────────────────────────────────────────────────────
 
@@ -180,9 +180,9 @@ export function deriveHubPath(url: string, root?: string): string {
   const hRoot = root ?? hubsRoot();
   const derived = join(hRoot, canonical.host, ...canonical.segments);
 
-  // Assert containment
-  const rel = relativePath(hRoot, derived);
-  if (!rel || rel.startsWith("..") || isAbsolute(rel)) {
+  // Assert containment — `hub_repo` is git-tracked and therefore untrusted
+  // input, exactly as `hub_path` was (ADR-0043 §2).
+  if (!isUnder(hRoot, derived)) {
     throw new HubUrlError(
       `Derived path '${derived}' escapes hubs root '${hRoot}'`,
     );
@@ -223,14 +223,6 @@ export function toAbsolutePath(p: string): string {
     return join(homedir(), p.slice(2));
   }
   return isAbsolute(p) ? p : resolve(process.cwd(), p);
-}
-
-function relativePath(parent: string, child: string): string {
-  const p = resolve(parent);
-  const c = resolve(child);
-  if (p === c) return "";
-  if (!c.startsWith(p + sep) && !c.startsWith(`${p}/`)) return "..";
-  return c.slice(p.length + 1);
 }
 
 // ─── git config parsing & origin verification ────────────────────────────────

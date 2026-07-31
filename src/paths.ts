@@ -1,13 +1,32 @@
-import { access, readFile, stat, writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
+import {
+  exists,
+  hubMetadataPath,
+  isUnder,
+  looksLikeHub,
+  META_FILE,
+  PROJECTS_DIR,
+} from "./path-guards.js";
 import { type Genre, resolveGenreOverrides } from "./scanner/genre-map.js";
+
+// Containment, the hub shape gate, and the constants they need live in
+// `path-guards.ts` — a leaf module `hub-url.ts` can also import without making
+// the two mutually recursive. Re-exported here so callers importing from
+// `./paths.js` are unaffected.
+export {
+  exists,
+  hubMetadataPath,
+  isUnder,
+  looksLikeHub,
+  META_FILE,
+  PROJECTS_DIR,
+};
 
 // ─── path constants ──────────────────────────────────────────────────────
 /** The knowledge-base (KB) dir nested in a code repo (in-repo and hybrid modes). */
 export const META_DIR = "mage";
-export const META_FILE = "metadata.json";
-export const PROJECTS_DIR = "projects";
 export const ARCHIVE_DIR = "archive";
 
 // KB layout (inside a docs root, whether a repo `mage/` or a hub root).
@@ -219,10 +238,6 @@ export function codeRepoDocsRoot(codeRepo: string): string {
   return join(codeRepo, META_DIR);
 }
 
-/** Hub's top-level metadata file. */
-export function hubMetadataPath(hubRoot: string): string {
-  return join(hubRoot, META_FILE);
-}
 
 /** Guard against path traversal via a name that becomes a directory segment. */
 export function assertSafeName(name: string, kind: string): void {
@@ -432,20 +447,8 @@ export async function writeHubMetadata(
 
 // ─── structural checks ──────────────────────────────────────────────────
 
-/**
- * True iff `path` looks like a hub root — has the projects/ registry dir AND a
- * top-level metadata.json. (cross-refs/ is gone in mage; relationships are
- * notes/edges, not a directory — see ADR-0006.)
- */
-export async function looksLikeHub(path: string): Promise<boolean> {
-  try {
-    const s = await stat(join(path, PROJECTS_DIR));
-    if (!s.isDirectory()) return false;
-  } catch {
-    return false;
-  }
-  return exists(hubMetadataPath(path));
-}
+// `looksLikeHub` — the hub shape gate (ADR-0042 §7) — now lives in
+// `path-guards.ts` and is re-exported at the top of this file.
 
 /** What {@link resolveDocsRoot} resolves to: the docs root to operate on, its
  *  kind, and the git repo the sinks live under (== root for a repo-KB/hub; the hub
@@ -610,18 +613,9 @@ export async function ownedDocsRoots(kb: ResolvedDocsRoot): Promise<string[]> {
   return roots;
 }
 
-/**
- * True when `child` is `parent` itself or nested inside it (no `../` escape).
- * The one canonical containment rule — it was written five times across the
- * codebase before this; adapters and `dream` import it rather than re-deriving it.
- */
-export function isUnder(parent: string, child: string): boolean {
-  const rel = relative(parent, child);
-  return (
-    rel === "" ||
-    (!rel.startsWith(`..${sep}`) && rel !== ".." && !isAbsolute(rel))
-  );
-}
+// `isUnder` — the one canonical containment rule (it was written five times
+// across the codebase before ADR-0042 consolidated it) — now lives in
+// `path-guards.ts` and is re-exported at the top of this file.
 
 import { existsSync } from "node:fs";
 
@@ -684,15 +678,7 @@ export function absolutePath(p: string): string {
   return isAbsolute(p) ? p : resolve(process.cwd(), p);
 }
 
-/** True iff a file/dir exists at `path`. */
-export async function exists(path: string): Promise<boolean> {
-  try {
-    await access(path);
-    return true;
-  } catch {
-    return false;
-  }
-}
+// `exists` now lives in `path-guards.ts` and is re-exported at the top.
 
 /** Read genre overrides from metadata.json (ADR-0041 §3). */
 export async function readGenreOverrides(
