@@ -109,20 +109,23 @@ This is independent of everything else `connect` wires: turning off your harness
 own auto-memory does not revoke it. mage records exactly which entries it added, so
 `mage disconnect` removes those and leaves any you added yourself untouched.
 
-Two cases worth knowing:
+Three cases worth knowing:
 
-- **The hub isn't on this machine.** No grant is written (there is nothing to grant
-  yet). Clone the hub, then re-run `mage connect`.
+- **The hub isn't on this machine yet.** No grant is written (there is nothing
+  to grant yet). `mage connect` offers to clone `hub_repo` to its derived
+  location (`~/.mage/hubs/<host>/<owner>/<repo>`, ADR-0043) on the spot, or
+  prints the command to do it yourself.
+- **A clone of the hub already exists somewhere else.** `mage connect` scans
+  the hubs root for one, and — if found — prints the exact `mv` to relocate it
+  to its derived location. It never performs the move itself.
 - **A new worktree.** Local settings are gitignored, so a fresh worktree starts
   without them. Run `mage connect` in it.
 
 `mage doctor` reports the grant under **KB access grant** — a failing check when the
-hub is present but ungranted, and a skip when the hub simply isn't cloned here.
-
-Changing in 0.0.18: per ADR-0043 an external hub will be addressed by its remote
-(`hub_repo`) and located by derivation at `~/.mage/hubs/<host>/<owner>/<repo>`,
-cloned on demand — deprecating `hub_path` and the "isn't on this machine" case
-above. See [Modes and storage](../model/modes.md#reaching-a-hub-from-the-code-repo).
+hub is present but ungranted, a skip when the hub simply isn't cloned here, and a
+distinct failing check when the clone found at the derived location doesn't match
+`hub_repo`'s origin (a hard error, never silently reused). See
+[Modes and storage](../model/modes.md#where-a-hub-actually-lives--derived-not-recorded).
 
 ## Regenerating the index and skills
 

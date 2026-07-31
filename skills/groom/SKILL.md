@@ -103,9 +103,11 @@ tree, not a per-note yes.
 Find the nearest `mage/metadata.json` (walk up). The docs root to groom is:
 
 - **in-repo / hybrid** → `<repo>/mage/`
-- **external** → the hub project it points at: `<hub_path>/projects/<project>/`
+- **external** → the hub project it points at: `<hub root>/projects/<project>/`
   — **FLAT**, no nested `mage/` (ADR-0011 / ADR-0023: a project looks like the hub
-  it lives in, not like a code-repo `mage/`).
+  it lives in, not like a code-repo `mage/`). The hub root is DERIVED from
+  `hub_repo` (ADR-0043) — `~/.mage/hubs/<host>/<owner>/<repo>` — not read off
+  `hub_path`, which is now only a deprecated fallback.
 
 If none is found and the cwd is not a hub, you are not in a knowledge base —
 `mage doctor` flags a **"bare parent"** when a dir sits above several KBs but is

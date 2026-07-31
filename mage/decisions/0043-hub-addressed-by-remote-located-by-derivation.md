@@ -3,8 +3,8 @@ type: decision
 tags:
   - mage/decisions
 created: "2026-07-29"
-updated: 2026-07-29
-last_reviewed: 2026-07-29
+updated: 2026-07-31
+last_reviewed: 2026-07-31
 status: proposed
 provenance:
   repo: mage-memory
@@ -133,10 +133,25 @@ for you). The move preserves uncommitted work, which a delete-and-reclone would 
 that is why it is a move and not a fresh clone.
 
 **6. `hub_repo` becomes the authoritative address; `hub_path` is deprecated.** `hub_path`
-is read as a **fallback** during a transition window and is slated for removal. This is
-what retires the absolute-path smell ADR-0042 §7 had to defend against: an attacker who
-lands a commit can no longer name an arbitrary directory, only a remote — and the path mage
-derives from it is confined under the hubs root by construction.
+is read as a **fallback** during a transition window and is slated for removal.
+
+**The fallback may widen a LOCAL-scope grant, never a git-tracked one.** ADR-0042 §7's
+absolute-path smell is retired in two steps, not one. A `hub_path` resolution stays
+grantable in local scope (`settings.local.json` — gitignored, machine-specific, written
+while a human is running `mage connect`), because that is exactly the posture ADR-0042 §7
+already accepted, and because withdrawing it would strand every hub linked before this ADR
+behind a migration they have not been offered yet. It is **never** written into a
+project-scope grant: a committed `settings.json` takes effect in every clone and every
+worktree, unattended, which is precisely where "an attacker lands a commit" stops being
+theoretical. §8's project-scope grant therefore emits only the derived home-relative form;
+a target that resolved via `hub_path` is skipped there and reported as a migration prompt
+(`mage link` again, to record `hub_repo`).
+
+So the guarantee — an attacker who lands a commit can name only a remote, and the path
+mage derives from it is confined under the hubs root by construction — holds
+**unconditionally for project-scope grants from the day they ship, and for every grant
+once `hub_path` is removed**. Until then local scope carries the deprecated fallback,
+under the unchanged `looksLikeHub` gate of §7.
 
 **7. The `looksLikeHub` gate REMAINS, at the derived path.** Derivation changes *where the
 path comes from*, not *whether its contents are trusted*. `~/.mage/hubs/<derived>` is still

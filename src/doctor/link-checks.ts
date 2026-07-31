@@ -15,11 +15,14 @@ import type { DoctorCheck, DoctorOptions } from "../commands/doctor.js";
 import {
   META_DIR,
   META_FILE,
+  type HubTarget,
   absolutePath,
+  chosenHubRoot,
   exists,
   looksLikeHub,
   readHubMetadata,
   readMetadata,
+  resolveHubGrant,
   writeHubMetadata,
 } from "../paths.js";
 
@@ -41,7 +44,7 @@ export async function pushLinkChecks(checks: DoctorCheck[], opts: DoctorOptions)
   if (codeRepo) {
     const meta = await readMetadata(codeRepo).catch(() => null);
     if (meta?.mode === "external") {
-      await checkExternalLink(checks, opts, codeRepo, meta.hub_path, meta.project);
+      await checkExternalLink(checks, opts, codeRepo, meta.hub_repo, meta.hub_path, meta.project);
     }
     return; // in-repo: no hub link to validate.
   }
@@ -62,19 +65,56 @@ async function findCodeRepo(startDir: string): Promise<string | null> {
   }
 }
 
-/** Validate (and optionally repair) an external code repo's two-way hub link. */
+/**
+ * Validate (and optionally repair) an external code repo's two-way hub link.
+ * Resolves the hub root the ADR-0043 way — via the shared {@link resolveHubGrant}
+ * (origin-verifying derived hub_repo, falling back to hub_path) — so an origin mismatch
+ * is flagged before reading or repairing the hub.
+ */
 async function checkExternalLink(
   checks: DoctorCheck[],
   opts: DoctorOptions,
   codeRepo: string,
-  hubPath: string | null,
+  hubRepo: string | null,
+  hubPathField: string | null,
   project: string,
 ): Promise<void> {
-  if (!hubPath || !(await looksLikeHub(hubPath))) {
+  const chosen = chosenHubRoot(hubRepo, hubPathField);
+  if (!chosen) {
     checks.push({
       name: CHECK,
       ok: false,
-      detail: `hub_path ${hubPath ?? "(missing)"} is not a reachable hub (moved?) — re-run \`mage link <hub>\``,
+      detail: "hub at (no hub_repo/hub_path) is not a reachable hub (moved?) — re-run `mage link <hub>`",
+    });
+    return;
+  }
+
+  const target: HubTarget = {
+    root: absolutePath(chosen.root),
+    source: chosen.source,
+    hubRepo: chosen.source === "derived" ? (hubRepo ?? undefined) : undefined,
+    hubPath: hubPathField ?? undefined,
+  };
+  const resolution = await resolveHubGrant(target);
+
+  if (resolution.reason === "mismatch") {
+    checks.push({
+      name: CHECK,
+      ok: false,
+      detail:
+        `hub at ${chosen.root} is a clone of a different remote` +
+        `${resolution.detail ? ` (${resolution.detail})` : ""}` +
+        " — not reused and not repaired; re-run `mage link <hub>` to re-point this repo",
+    });
+    return;
+  }
+
+  const hubPath = resolution.root;
+  if (!hubPath) {
+    checks.push({
+      name: CHECK,
+      ok: false,
+      detail: `hub at ${chosen.root} is not a reachable hub (moved?) — re-run \`mage link <hub>\``,
     });
     return;
   }

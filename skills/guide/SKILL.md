@@ -27,7 +27,7 @@ test -f mage/metadata.json && cat mage/metadata.json
 ```
 
 - **Absent** (and not inside a mage hub) → this repo isn't mage-managed; this skill doesn't apply. Skip.
-- **Present** → note `mode`, `project`, `hub_path`, `hub_refs`.
+- **Present** → note `mode`, `project`, `hub_repo`, `hub_path`, `hub_refs`.
 
 A **hub** is a repo whose root has `projects/` + a top-level `metadata.json`;
 there the hub root itself is the knowledge base.
@@ -37,7 +37,12 @@ there the hub root itself is the knowledge base.
 | `mode` | Docs root |
 |--------|-----------|
 | `in-repo`  | `<code-repo>/mage/` |
-| `external` | `<hub_path>/projects/<project>/` |
+| `external` | `<hub root>/projects/<project>/` |
+
+The hub root itself (ADR-0043) is **derived from `hub_repo`** — one deterministic
+location per remote, at `~/.mage/hubs/<host>/<owner>/<repo>` (`$MAGE_HOME/hubs`
+when set) — never read off a recorded path. `hub_path` is a deprecated fallback,
+used only when `hub_repo` is absent or doesn't resolve.
 
 Hybrid (mode=in-repo with non-empty `hub_refs[]`): docs root is the in-repo
 `mage/`; each `hub_ref` is a cross-cutting registration with a hub.
@@ -144,9 +149,9 @@ Code-repo side (`<repo>/mage/metadata.json`):
   "schema": "mage.v1",
   "mode": "in-repo",                 // or "external"
   "project": "my-api",
-  "hub_path": null,                  // set when external OR hub_refs non-empty
-  "hub_repo": null,
-  "hub_refs": [],                    // hybrid: [{ hub_path, hub_repo, project }]
+  "hub_repo": null,                  // set when external OR hub_refs non-empty — the AUTHORITATIVE address (ADR-0043)
+  "hub_path": null,                  // deprecated fallback, read only when hub_repo is absent/unresolved
+  "hub_refs": [],                    // hybrid: [{ hub_repo, hub_path, project }]
   "linked_at": "ISO-8601"
 }
 ```

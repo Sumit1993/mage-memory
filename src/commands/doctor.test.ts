@@ -10,7 +10,7 @@ import {
 } from "../adapters/claude-code/settings.js";
 import { gitInit } from "../git.js";
 import { detectRedactHook, installRedactHook } from "../git-hooks.js";
-import { METADATA_SCHEMA, METADATA_SCHEMA_V1, exists } from "../paths.js";
+import { METADATA_SCHEMA, METADATA_SCHEMA_V1, chosenHubRoot, exists } from "../paths.js";
 import { tmpDir } from "../../test/fixtures/kb.js";
 import { type DoctorCheck, doctor, mageInstalledIn, readinessFooter } from "./doctor.js";
 import { index } from "./index-cmd.js";
@@ -522,6 +522,57 @@ describe("doctor — link integrity", () => {
     const c = check((await doctor({ cwd: hub })).checks, "link integrity");
     expect(c?.ok).toBe(false);
     expect(c?.optional).toBe(true);
+  });
+
+  it("flags an origin mismatch and leaves metadata.json at derived root byte-identical even with --fix", async () => {
+    const mageHome = await freshDir("mage-home-");
+    const origMageHome = process.env.MAGE_HOME;
+    process.env.MAGE_HOME = mageHome;
+
+    try {
+      const hubRepo = "https://github.com/acme/expected-hub.git";
+      const chosen = chosenHubRoot(hubRepo, null);
+      expect(chosen?.source).toBe("derived");
+      const derivedRoot = chosen!.root;
+
+      await makeHub(derivedRoot, [{ name: "engine", code_repo_path: "/old/moved/away" }]);
+      await gitInit(derivedRoot);
+      await writeFile(
+        join(derivedRoot, ".git", "config"),
+        '[remote "origin"]\n\turl = https://github.com/unrelated/stranger-hub.git\n',
+      );
+
+      const originalMeta = await readFile(join(derivedRoot, "metadata.json"), "utf8");
+
+      const repo = await freshDir("mage-ext-");
+      await mkdir(join(repo, "mage"), { recursive: true });
+      const repoMeta = {
+        schema: METADATA_SCHEMA,
+        mode: "external",
+        project: "engine",
+        hub_path: null,
+        hub_repo: hubRepo,
+        hub_refs: [],
+        linked_at: "",
+      };
+      await writeFile(join(repo, "mage", "metadata.json"), `${JSON.stringify(repoMeta, null, 2)}\n`);
+
+      const r = await doctor({ cwd: repo, fix: true });
+      const c = check(r.checks, "link integrity");
+      expect(c?.ok).toBe(false);
+      expect(c?.detail).toBe(
+        `hub at ${derivedRoot} is a clone of a different remote ` +
+          `(hub_repo https://github.com/acme/expected-hub.git does not match the clone's origin ` +
+          `https://github.com/unrelated/stranger-hub.git found at ${derivedRoot} — never reused, never clobbered)` +
+          " — not reused and not repaired; re-run `mage link <hub>` to re-point this repo",
+      );
+
+      const afterMeta = await readFile(join(derivedRoot, "metadata.json"), "utf8");
+      expect(afterMeta).toBe(originalMeta);
+    } finally {
+      if (origMageHome === undefined) delete process.env.MAGE_HOME;
+      else process.env.MAGE_HOME = origMageHome;
+    }
   });
 });
 
