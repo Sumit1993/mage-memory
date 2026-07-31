@@ -136,7 +136,7 @@ remote, at `~/.mage/hubs/<host>/<owner>/<repo>` (`$MAGE_HOME/hubs` when set) —
 the same path on every machine, from every worktree, from every harness. `mage`
 canonicalizes whatever form the remote was written in (`git@host:owner/repo.git`,
 `https://host/owner/repo`, `ssh://git@host/owner/repo.git`, …) to that one
-location; see [`src/hub-url.ts`](https://github.com/Sumit1993/mage-memory/blob/main/src/hub-url.ts)
+location; see [`src/hub-url.ts`](../../../../../src/hub-url.ts)
 for the exact rules (they follow `git help clone`'s GIT URLS grammar, not an
 inferred pattern).
 

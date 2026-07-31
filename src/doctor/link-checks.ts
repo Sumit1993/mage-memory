@@ -15,12 +15,14 @@ import type { DoctorCheck, DoctorOptions } from "../commands/doctor.js";
 import {
   META_DIR,
   META_FILE,
+  type HubTarget,
   absolutePath,
   chosenHubRoot,
   exists,
   looksLikeHub,
   readHubMetadata,
   readMetadata,
+  resolveHubGrant,
   writeHubMetadata,
 } from "../paths.js";
 
@@ -65,9 +67,9 @@ async function findCodeRepo(startDir: string): Promise<string | null> {
 
 /**
  * Validate (and optionally repair) an external code repo's two-way hub link.
- * Resolves the hub root the ADR-0043 way — via the shared {@link chosenHubRoot}
- * (hub_repo-derived, falling back to hub_path) — so a repo linked under either
- * field still gets its back-reference checked.
+ * Resolves the hub root the ADR-0043 way — via the shared {@link resolveHubGrant}
+ * (origin-verifying derived hub_repo, falling back to hub_path) — so an origin mismatch
+ * is flagged before reading or repairing the hub.
  */
 async function checkExternalLink(
   checks: DoctorCheck[],
@@ -78,12 +80,38 @@ async function checkExternalLink(
   project: string,
 ): Promise<void> {
   const chosen = chosenHubRoot(hubRepo, hubPathField);
-  const hubPath = chosen?.root ?? null;
-  if (!hubPath || !(await looksLikeHub(hubPath))) {
+  if (!chosen) {
     checks.push({
       name: CHECK,
       ok: false,
-      detail: `hub at ${hubPath ?? "(no hub_repo/hub_path)"} is not a reachable hub (moved?) — re-run \`mage link <hub>\``,
+      detail: "hub at (no hub_repo/hub_path) is not a reachable hub (moved?) — re-run `mage link <hub>`",
+    });
+    return;
+  }
+
+  const target: HubTarget = {
+    root: absolutePath(chosen.root),
+    source: chosen.source,
+    hubRepo: chosen.source === "derived" ? (hubRepo ?? undefined) : undefined,
+    hubPath: hubPathField ?? undefined,
+  };
+  const resolution = await resolveHubGrant(target);
+
+  if (resolution.reason === "mismatch") {
+    checks.push({
+      name: CHECK,
+      ok: false,
+      detail: resolution.detail!,
+    });
+    return;
+  }
+
+  const hubPath = resolution.root;
+  if (!hubPath) {
+    checks.push({
+      name: CHECK,
+      ok: false,
+      detail: `hub at ${chosen.root} is not a reachable hub (moved?) — re-run \`mage link <hub>\``,
     });
     return;
   }

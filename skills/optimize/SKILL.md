@@ -61,8 +61,9 @@ trigger has no signal to optimize against yet.
 
 1. **Resolve the knowledge base.** Find the nearest `mage/metadata.json`
    (walk up). docs root = `<repo>/mage/` (in-repo) or `<hub root>/projects/<project>/`
-   (external — the hub root is derived from `hub_repo`, ADR-0043). If none, tell
-   the user to run `mage init` first — there is nothing to optimize.
+   (external — the hub root is derived from `hub_repo`, ADR-0043). The deprecated
+   `hub_path` fallback is read only when `hub_repo` is absent or does not resolve.
+   If none, tell the user to run `mage init` first — there is nothing to optimize.
 
 2. **Read the context-match report (read-only).**
    ```bash

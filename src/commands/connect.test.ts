@@ -760,6 +760,24 @@ describe("reach tier — hub_repo derivation (ADR-0043)", () => {
     expect(logs.join("\n")).toMatch(/hub not found|clone/i);
   });
 
+  it("--yes reaches the clone path while non-yes non-interactive path does not clone", async () => {
+    const hubRepo = "https://github.com/acme/docs.git";
+    const code = await externalCodeRepo({ hubRepo, hubPath: null });
+
+    // 1. Non-yes non-interactive run: shouldClone is false, never attempts clone
+    logs.length = 0;
+    const rNoYes = await connect({ cwd: code, yes: false, gitHook: false });
+    expect(rNoYes.reach).toEqual([]);
+    expect(logs.join("\n")).toContain("interactively or with `--yes` to clone it now");
+    expect(logs.join("\n")).not.toContain("Clone into");
+
+    // 2. --yes run: shouldClone is true, reaches clone path
+    logs.length = 0;
+    const rYes = await connect({ cwd: code, yes: true, gitHook: false });
+    expect(rYes.reach).toEqual([]);
+    expect(logs.join("\n")).toMatch(/Clone into .* failed/);
+  });
+
   it("canonicalizeHubRepo agrees with what connect derived (sanity check on the fixture paths above)", () => {
     expect(canonicalizeHubRepo("https://github.com/acme/docs.git").key).toBe("github.com/acme/docs");
   });

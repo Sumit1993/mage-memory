@@ -296,7 +296,7 @@ async function offerHubTargetGrant(
   // No displaced clone either. Offer clone-on-demand (ADR-0043 §4) — `connect` is
   // the surface this is wired to; never the capture path (ADR-0009).
   const shouldClone = await resolveDecision<boolean>({
-    flagValue: undefined,
+    flagValue: opts.yes ? true : undefined,
     yes: opts.yes,
     interactive: () =>
       confirm({ message: `Hub not found at ${target.root} — clone it now?`, default: true }),
@@ -306,8 +306,8 @@ async function offerHubTargetGrant(
   if (!shouldClone) {
     logger.warn(
       `Hub not found at ${target.root} — skipping its access grant. Clone the remote recorded ` +
-        "in mage/metadata.json's hub_repo to that path, then re-run `mage connect` (or re-run it " +
-        "interactively to clone it now).",
+        "in mage/metadata.json's hub_repo to that path, then re-run `mage connect` (or re-run " +
+        "interactively or with `--yes` to clone it now).",
     );
     return null;
   }
