@@ -12,7 +12,7 @@ description: |
 allowed-tools: Read, Grep, Glob, Bash
 ---
 
-# mage:optimize — reword or demote on context-match
+# /mage:optimize — reword or demote on context-match
 
 A generated mage skill (`mage-skill-<slug>`, `mage-wing-<x>`) auto-loads on its
 frontmatter `description:` trigger. **context-match** measures whether the work
@@ -135,7 +135,7 @@ trigger has no signal to optimize against yet.
    ```
    Demote **archives the skill and keeps the backing note** — the note is the
    substrate; only its pushed (auto-loaded) form retires (the reverse of
-   `mage:graduate`). The ceiling holds: demote never hard-deletes — the skill is
+   `/mage:graduate`). The ceiling holds: demote never hard-deletes — the skill is
    archived, recoverable, never `rm`-ed. The knowledge survives in the note; it
    just stops auto-loading where it never helped.
 
@@ -218,9 +218,9 @@ edits this pass — the learning rate held.
 
 ## See also
 
-- **mage:graduate** (`skills/graduate/SKILL.md`) — the forward move (note →
+- **/mage:graduate** (`skills/graduate/SKILL.md`) — the forward move (note →
   Procedure skill); demote is its reverse (skill → archived, note kept).
-- **mage:groom** (`skills/groom/SKILL.md`) — its Phase 2 (recurrence catch-net)
+- **/mage:groom** (`skills/groom/SKILL.md`) — its Phase 2 (recurrence catch-net)
   feeds new generated skills into the catalog this skill then tunes.
 - **ADR-0016** (`mage/decisions/0016-context-match-confidence-ladder-applier.md`)
   — context-match as the load-bearing predicate, the confidence ladder, the

@@ -265,9 +265,9 @@ clean names, no `mage-` baked into each one (see [ADR-0013](mage/decisions/0013-
 
 | Installed as | Skill | Source |
 |---|---|---|
-| `mage:learn` | capture a durable note | plugin (`skills/learn/`) |
-| `mage:guide` | how to use the knowledge base | plugin (`skills/guide/`) |
-| `mage:groom` · `mage:graduate` · `mage:optimize` | the self-grooming loop (scratch → note → skill) | plugin (`skills/<name>/`) |
+| `/mage:learn` | capture a durable note | plugin (`skills/learn/`) |
+| `/mage:guide` | how to use the knowledge base | plugin (`skills/guide/`) |
+| `/mage:groom` · `/mage:graduate` · `/mage:optimize` | the self-grooming loop (scratch → note → skill) | plugin (`skills/<name>/`) |
 | `mage-wing-<wing>` | per-wing awareness skill | **generated** by `mage skills` into `.claude/skills/` + `.agents/skills/` |
 | `mage-skill-<slug>` | **Procedure skill** (a graduated Playbook/Gotcha note) | **generated** on graduate |
 
@@ -292,7 +292,7 @@ mage's CLI is one binary but **three tiers**, sorted by the deterministic/judgme
 | Tier | Commands | Invoked by | Notes |
 |---|---|---|---|
 | **Hook-fired** (plumbing seams) | `observe`, `skills --metrics --quiet` (Stop rollup fold), `index --if-changed`, `skills`, `verify --check`, `redact --check[ --staged]`, `ingest --json`, `distill --json` / `--seen`, `promote --json` / `--seen`, `groom` (accept/reject the staged lesson batch), `dream --apply` / `--reject` (the single-writer applier reading ONE Proposal JSON from stdin) | host hooks · git pre-commit · the learn/graduate/optimize skills | Deterministic. **Users never type these.** They are commands only because hooks/skills/git reach mage across a process boundary. |
-| **Judgment — nudged** | `learn`, `mage:groom` (distill+promote phases, drives the hidden `groom` command), `graduate` (`mage:graduate`), `optimize` (`mage:optimize`), `dream` | the agent, *nudged* by a hook | The hook prints a nudge; the **agent** reasons. Never blindly auto-run. `mage:graduate`/`optimize` apply by piping a Proposal JSON to `mage dream --apply` — there is no `mage graduate`/`mage optimize` verb. |
+| **Judgment — nudged** | `learn`, `/mage:groom` (distill+promote phases, drives the hidden `groom` command), `graduate` (`/mage:graduate`), `optimize` (`/mage:optimize`), `dream` | the agent, *nudged* by a hook | The hook prints a nudge; the **agent** reasons. Never blindly auto-run. `/mage:graduate`/`optimize` apply by piping a Proposal JSON to `mage dream --apply` — there is no `mage graduate`/`mage optimize` verb. |
 | **Human verbs** | `init`, `connect`, `disconnect`, `link`, `unlink`, `list`, `status`, `verify`, `doctor`, `dashboard`, `dream`, `migrate`, `skills --metrics` (read-only report), `footprint`, `adopt`, `autonomy` | a person | Setup + read-only queries + judgment-invoked mutations. **The only tier `mage --help` shows** — the hook-fired plumbing commands (`observe`, `index`, `ingest`, `distill`, `promote`, `redact`, `stage`, `groom`, `flatten`, `nudge`, `memory-hook`) are registered `hidden` in the CLI (0.0.10). `dream`/`skills`/`verify` are dual-tier (a visible human face + unadvertised plumbing flags). |
 
 **Guardrails (all tiers):**

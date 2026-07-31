@@ -13,13 +13,13 @@ The match data is rolled up by a hook: `mage:metrics:Stop` runs `mage skills --m
 
 ## Two moves: reword, or demote
 
-Optimize is driven by the `mage:optimize` skill. It reads the read-only context-match report and acts on each skill's match rate. There are exactly two corrective moves, and a match-rate threshold gates each:
+Optimize is driven by the `/mage:optimize` skill. It reads the read-only context-match report and acts on each skill's match rate. There are exactly two corrective moves, and a match-rate threshold gates each:
 
 - **Reword** — the trigger matches *some* of the time but mis-fires on look-alike work. Triggered when the match rate falls below **0.4**. The fix is one sharper single-line `description` that names the real scenario tighter and excludes the work it kept catching wrongly.
 - **Demote** — the skill matches almost never; the trigger is unsalvageable. Triggered when the match rate falls below **0.2**. Demote archives the skill and keeps the backing note. The knowledge survives; only its auto-loaded form retires. Demote is the exact reverse of graduation.
 
 ```bash
-# (Plumbing the mage:optimize skill reads for you.) The read-only report:
+# (Plumbing the /mage:optimize skill reads for you.) The read-only report:
 mage skills --metrics --json
 ```
 

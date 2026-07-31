@@ -25,7 +25,7 @@ Every draft is scrubbed for secrets before it touches disk, even though `.mage/s
 
 ## Groom: review the batch
 
-Staging fills the inbox; **grooming empties it.** You invoke the `mage:groom` skill (say "groom", "what did we learn", or "review the lessons", or follow the nudge's prompt). It surfaces the pending drafts as a deduped batch and asks you to keep or drop each one. Nothing is written to `notes/` without your yes — the judgment is always yours.
+Staging fills the inbox; **grooming empties it.** You invoke the `/mage:groom` skill (say "groom", "what did we learn", or "review the lessons", or follow the nudge's prompt). It surfaces the pending drafts as a deduped batch and asks you to keep or drop each one. Nothing is written to `notes/` without your yes — the judgment is always yours.
 
 ```bash
 # Surface the pending, deduped batch:

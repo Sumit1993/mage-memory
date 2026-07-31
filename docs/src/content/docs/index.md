@@ -45,7 +45,7 @@ mage was designed by mining the *idea* behind server-backed agent-memory tools �
 
 mage does not just store what you tell it. As you work, it quietly captures what your agent actually does, then helps turn the recurring, durable lessons into notes — and proven procedures into loadable agent skills. Two paths feed this loop:
 
-- The **organic path** drafts a short lesson the moment something worth remembering happens — when you trigger it deliberately with the `mage:learn` skill, and automatically right after a chat compaction, so insight is not lost at the context boundary.
+- The **organic path** drafts a short lesson the moment something worth remembering happens — when you trigger it deliberately with the `/mage:learn` skill, and automatically right after a chat compaction, so insight is not lost at the context boundary.
 - The **recurrence path** waits for a pattern to recur across several stretches of work before proposing a new note, and for a proven procedure to recur further before graduating it into its own skill.
 
 Both end the same way: a proposal you review, accept, and commit. See [The grooming loop](loop/overview.md) for the whole picture.

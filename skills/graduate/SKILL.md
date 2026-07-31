@@ -12,7 +12,7 @@ description: |
 allowed-tools: Read, Grep, Glob, Bash
 ---
 
-# mage:graduate — note → Procedure skill
+# /mage:graduate — note → Procedure skill
 
 A **proven procedural note** — a playbook or gotcha that was read across **≥ M
 distinct chapters** — earns its own loadable **Procedure skill**
@@ -25,7 +25,7 @@ notes carry knowledge, not a method to run, so they stay notes (ADR-0019 §5).
 Note-read usage — not context-match — gates graduation: a not-yet-graduated note emits
 no `skill_load`, so there is no context-match data to gate on. Context-match only
 exists *after* graduation, where it governs **reword / demote** (driven by
-`mage:optimize`). The reverse of graduation — a skill that stops earning its keep
+`/mage:optimize`). The reverse of graduation — a skill that stops earning its keep
 — is **demote** (skill → note; the skill is archived, the note kept).
 
 This skill is judgment over a deterministic fold: the reader counts note-reads and
@@ -102,7 +102,7 @@ write through the single applier.
 
 ## Worked example — a proven gotcha graduates
 
-`mage:groom` surfaced, and you ran `mage promote --json`, which returned:
+`/mage:groom` surfaced, and you ran `mage promote --json`, which returned:
 
 ```jsonc
 {
@@ -161,10 +161,10 @@ stay a note.
 
 ## See also
 
-- **mage:groom** (`skills/groom/SKILL.md`) — surfaces the `action: "graduate"`
+- **/mage:groom** (`skills/groom/SKILL.md`) — surfaces the `action: "graduate"`
   proposals this skill applies. The `action: "note"` rung it used to exclude is gone
   (ADR-0038) — recurrence no longer proposes notes at all.
-- **mage:optimize** (`skills/optimize/SKILL.md`) — the post-graduation half:
+- **/mage:optimize** (`skills/optimize/SKILL.md`) — the post-graduation half:
   reword a mis-firing trigger, or **demote** a skill that stops earning its keep
   (skill → note, the reverse of graduation).
 - **ADR-0013** (`mage/decisions/0013-procedure-skills-self-grooming-loop.md`) §1 —

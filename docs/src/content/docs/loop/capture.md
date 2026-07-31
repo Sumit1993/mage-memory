@@ -7,7 +7,7 @@ sidebar:
 
 Capture is the first stage of the loop. It is how mage builds up the raw material that everything else distills, promotes, and grooms. It is passive: you never type a capture command. Your coding host fires hooks as you work, and each one runs `mage observe`, which appends a single event to a git-ignored scratch directory.
 
-This passive seam is distinct from the *deliberate* capture you trigger on the spot: the `mage:learn` skill, which drafts a finished note for you (insight, procedure, pointers) and writes it after you confirm. See [Install and Quickstart](../start/quickstart.md) for `mage:learn`; the rest of this page is the passive `mage observe` seam that feeds the loop.
+This passive seam is distinct from the *deliberate* capture you trigger on the spot: the `/mage:learn` skill, which drafts a finished note for you (insight, procedure, pointers) and writes it after you confirm. See [Install and Quickstart](../start/quickstart.md) for `/mage:learn`; the rest of this page is the passive `mage observe` seam that feeds the loop.
 
 ## What `mage observe` is
 

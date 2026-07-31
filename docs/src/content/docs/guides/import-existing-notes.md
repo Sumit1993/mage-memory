@@ -12,11 +12,11 @@ means *distilling* it, one source at a time, into notes you confirm — see
 
 ## The one move
 
-Inside Claude Code, run the [`mage:learn`](../reference/commands.mdx) skill
+Inside Claude Code, run the [`/mage:learn`](../reference/commands.mdx) skill
 pointed at the folder:
 
 ```text
-mage:learn --from ./docs
+/mage:learn --from ./docs
 ```
 
 The `--from <path>` argument can be a directory or a single file. The skill walks
@@ -28,7 +28,7 @@ before it can touch disk, and **you** commit.
 
 ## Preview what would be ingested
 
-`mage:learn --from` is driven by a deterministic manifest you can inspect first.
+`/mage:learn --from` is driven by a deterministic manifest you can inspect first.
 The read-only `mage ingest` plumbing verb enumerates and classifies the sources
 under a folder without writing anything:
 
@@ -40,15 +40,15 @@ mage ingest ./docs
 mage ingest ./docs --json
 ```
 
-Nothing is created until you run `mage:learn --from` and accept the drafts.
+Nothing is created until you run `/mage:learn --from` and accept the drafts.
 
 ## Onboarding agent memories instead of a folder
 
-`mage:learn --from` is for *files you point it at*. If instead you have
+`/mage:learn --from` is for *files you point it at*. If instead you have
 pre-existing **Claude Code memories** that you want to fold into mage, that is a
 different entry point: [`mage adopt`](../reference/commands.mdx) collects in-shape
 captures into the capture inbox and reports the out-of-shape ones for you to run
-through `mage:learn --from`. It is plan-first and never commits.
+through `/mage:learn --from`. It is plan-first and never commits.
 
 ```bash
 mage adopt --dry-run     # show the plan; write nothing

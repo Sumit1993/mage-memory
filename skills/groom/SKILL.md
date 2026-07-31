@@ -13,11 +13,11 @@ description: |
 allowed-tools: Read, Grep, Glob, Write, Edit, Bash
 ---
 
-# mage:groom — mine the observed scratch into notes
+# /mage:groom — mine the observed scratch into notes
 
 `mage observe` writes a scratch record of every session to mage's own
 `.mage/learnings/*.jsonl` (the ADR-0015 schema). **groom turns that scratch into
-durable notes.** It is the back half of the loop `mage:learn` serves, fired once
+durable notes.** It is the back half of the loop `/mage:learn` serves, fired once
 a stretch of work has closed: `learn` captures *this one finding now*; `groom`
 mines *the accumulated record*.
 
@@ -29,8 +29,8 @@ complementary gates:
 - **Phase 1 — first sight (`mage distill`)** — a single vivid finding earns a
   note the *first* time it is seen.
 - **Phase 2 — graduation routing (`mage promote`)** — a note already proven by
-  recurrence is routed to `mage:graduate`. It does **not** propose new notes
-  (ADR-0038); Phase 1 and `mage:learn` are the only paths into the note base.
+  recurrence is routed to `/mage:graduate`. It does **not** propose new notes
+  (ADR-0038); Phase 1 and `/mage:learn` are the only paths into the note base.
 
 **Phase 0 — pending inline drafts (`mage groom`, 0.0.12).** Before the two mining
 phases, dispose of lessons captured INLINE during work. `mage stage` parks short,
@@ -46,7 +46,7 @@ distills forgotten ones there too); your job is the batch human-confirm:
 These drafts are the freshest, highest-signal material (the agent chose to stage
 them) — clear them first, THEN run the mining phases below for what inline capture
 missed. (`mage groom` the COMMAND manages `.mage/staging/`; the two phases below are the
-deeper `.mage/learnings/` mining that the `mage:groom` SKILL also runs.)
+deeper `.mage/learnings/` mining that the `/mage:groom` SKILL also runs.)
 
 Notes are the reusable **insight + procedure + pointers**, never a copy of the
 source (see `CONVENTIONS.md`). groom mines **only mage's own** `.mage/learnings/` —
@@ -91,7 +91,7 @@ a later human pass; run `mage index`. Do **not** graduate.
 **Overseer** — everything Approver does, **plus** dispose the borderline tier
 (write or `--reject` it rather than leaving it staged), merge lessons into existing
 notes, and **graduate** eligible notes — route every `action: "graduate"` proposal
-through **`mage:graduate`** as always (recurrence-gated ≥ M, commit-gated). Never
+through **`/mage:graduate`** as always (recurrence-gated ≥ M, commit-gated). Never
 graduate inline here; the routing is unchanged, only the per-note pause is waived.
 
 Watermarks still advance only after the batch is dispositioned (Step 4 / Step 8) —
@@ -170,7 +170,7 @@ groom just the hub root and skip the fan-out.
    (ADR-0038 deleted it), so a lesson skipped here is a lesson lost.
 
 3. **For each kept insight, run the SHARED CAPTURE PIPELINE** (the same back half
-   `mage:learn` defines — see that skill's **Steps**; do not re-derive it):
+   `/mage:learn` defines — see that skill's **Steps**; do not re-derive it):
    classify (`type` + wing + room → `#<wing>/<room>`), overlap-check vs `INDEX.md`
    (UPDATE / NEW / supersede; dedup within the batch), **redaction Gate 2**
    (`mage redact <draft-file>` — a LIVE secret, non-zero exit, STOPS that one
@@ -200,7 +200,7 @@ deleted the note-proposal rung: recurrence no longer proposes NEW notes. Proposi
 a note from a keyword fold is the deterministic-selection pattern two pre-registered
 replay gates killed (Faultline 0/62, prose-keyed 0/55), and the field evidence agreed
 — a groom across four roots produced ~115 buckets and 0 durable proposals. **If a
-lesson is worth keeping, capture it in Phase 1 or inline with `mage:learn`.** Do not
+lesson is worth keeping, capture it in Phase 1 or inline with `/mage:learn`.** Do not
 go looking for missed lessons in recurrence counts; there is nothing there.
 
 5. **Run the deterministic reader.**
@@ -224,7 +224,7 @@ go looking for missed lessons in recurrence counts; there is nothing there.
    procedural (only playbook/gotcha graduate), or when the human already rejected it.
    Report it neutrally and stop; it is never a signal to go hunting.
 
-6. **Route graduations to `mage:graduate`.** Point at that skill — never graduate
+6. **Route graduations to `/mage:graduate`.** Point at that skill — never graduate
    here, and never re-implement its confirmation flow.
 
 7. **Do not disposition anything else.** There are no `note` candidates to judge,
@@ -247,18 +247,18 @@ mage never commits for you — it suggests, you run.
 - Phase 1 leads with **user corrections** and standing intent, not error-fix volume.
 - Phase 2 drafts nothing. An empty `proposals` list is the healthy result — never
   treat it as a prompt to mine recurrence for missed lessons (ADR-0038).
-- Every **Phase 1** draft passes the same capture pipeline as `mage:learn` — classify,
+- Every **Phase 1** draft passes the same capture pipeline as `/mage:learn` — classify,
   overlap-check, **Gate 2**, human confirm. (Phase 2 drafts nothing, so it never enters
-  that pipeline; it routes to `mage:graduate`.) Captures *insight + procedure +
+  that pipeline; it routes to `/mage:graduate`.) Captures *insight + procedure +
   pointers*; points to canonical sources, never mirrors them.
-- Routes `graduate` proposals to `mage:graduate`; never graduates here.
+- Routes `graduate` proposals to `/mage:graduate`; never graduates here.
 - Watermarks advance **only** on explicit disposition; re-runs are safe.
 
 ## See also
 
-- **mage:learn** (`skills/learn/SKILL.md`) — the shared capture pipeline
+- **/mage:learn** (`skills/learn/SKILL.md`) — the shared capture pipeline
   (classify → overlap-check → Gate 2 → confirm → write) both phases funnel into.
-- **mage:graduate** (`skills/graduate/SKILL.md`) — where Phase 2 hands
+- **/mage:graduate** (`skills/graduate/SKILL.md`) — where Phase 2 hands
   `action: "graduate"` proposals (note → Procedure skill).
 - **ADR-0018** (`mage/decisions/0018-mage-distill-observed-scratch-reader.md`) —
   distill as deterministic reader + judgment skill; first-sight capture; CLOSED-only

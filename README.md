@@ -101,7 +101,7 @@ mage's skills install **two user-driven ways — pick one** (`mage init` prints 
 it never runs them for you):
 
 ```text
-# Claude Code plugin — namespaced mage:learn / mage:groom, one install for that agent
+# Claude Code plugin — namespaced /mage:learn / /mage:groom, one install for that agent
 /plugin marketplace add Sumit1993/mage-memory
 /plugin install mage@mage
 
@@ -110,11 +110,11 @@ npx skills add Sumit1993/mage-memory
 npx skills add Sumit1993/mage-memory --global
 ```
 
-You get `mage:guide` (how to use the base), `mage:learn` (capture a note), and
-the self-grooming skills `mage:groom`, `mage:graduate`, and `mage:optimize`.
+You get `/mage:guide` (how to use the base), `/mage:learn` (capture a note), and
+the self-grooming skills `/mage:groom`, `/mage:graduate`, and `/mage:optimize`.
 Per-wing `mage-wing-*` skills are **generated** into `.claude/skills/` +
 `.agents/skills/` by `mage skills`. Backfill existing docs with
-`mage:learn --from <dir>`.
+`/mage:learn --from <dir>`.
 
 > The `mage:` namespace is a Claude Code feature. Other agents that read
 > `.agents/skills/` directly will see bare skill names.
@@ -133,7 +133,7 @@ mage index
 mage skills
 ```
 
-You rarely hand-write notes: in Claude Code, say **`mage:learn`** (or "remember
+You rarely hand-write notes: in Claude Code, say **`/mage:learn`** (or "remember
 this") right after you figure something out, and mage drafts the note — insight
 + procedure + pointers — and writes it only once you confirm. You can also author
 one by hand — `mage/notes/billing/payments.md`:
@@ -194,7 +194,7 @@ per-command flags from your installed version.
 mage **never** runs git for you. It only **suggests** the exact `git` commands
 in its output and lets you run them. Captured scratch and metrics are git-ignored
 by design, so they never land in history — only the human-committed notes they
-motivate do. The `mage:guide` skill teaches agents the same rule.
+motivate do. The `/mage:guide` skill teaches agents the same rule.
 
 ## Reporting issues
 
