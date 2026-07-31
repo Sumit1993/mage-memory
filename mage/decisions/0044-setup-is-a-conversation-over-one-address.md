@@ -222,16 +222,16 @@ model the operator must understand the first time anything breaks.
   the same pair as the top-level fields and inherits the same fix; hybrid mode
   gains the portability property external mode got in 0043. Treated as a
   consequence of §2, not a separate decision.
-- **Existing local-only hubs need a one-time migration.** Their `hub_repo` holds a
-  filesystem path that now throws on canonicalization. This is a real upgrade
-  step, not a no-op, and belongs in the same release as the `local://` scheme.
+- **Existing local-only hubs need a one-time migration.** The migration mechanics are
+  specified in [#123](https://github.com/Sumit1993/mage-memory/issues/123), which
+  blocks the removal of `hub_path`.
 - **The implementation lands in two passes, deliberately.**
-  [#117](https://github.com/Sumit1993/mage-memory/pull/117) implements ADR-0043 as
-  written — allowlist `ssh/https/http/git`, no `local` scheme — and lands as-is.
-  The scheme, the `link` argument change, the confirmation step, and the
-  `hub_refs` shape follow as this ADR's own implementation. Widening #117 would
-  make its body claim an ADR it no longer matches, and #113's docs checklist is
-  already scoped to it.
+  [#121](https://github.com/Sumit1993/mage-memory/pull/121) (superseding #117)
+  implements ADR-0043 as written — allowlist `ssh/https/http/git`, no `local`
+  scheme — and lands as-is. The scheme, the `link` argument change, the
+  confirmation step, and the `hub_refs` shape follow as this ADR's own
+  implementation. Widening #121 would make its body claim an ADR it no longer
+  matches, and #113's docs checklist is already scoped to it.
 - **Setup gains exactly one keypress** in the interactive path (§5) and loses none
   elsewhere. `-y` behaviour is unchanged.
 

@@ -3,8 +3,8 @@ type: plan
 tags:
   - mage/roadmap
 created: "2026-07-28"
-updated: 2026-07-28
-last_reviewed: 2026-07-28
+updated: 2026-07-31
+last_reviewed: 2026-07-31
 status: active
 provenance:
   repo: mage-memory
@@ -78,7 +78,7 @@ Wave 3: C — connect/external layers (needs B's fallback rooms to exist)
 | Plugin packaging allowlist (kills the 556MB plugin cache) | **not built** — filed as [#96](https://github.com/Sumit1993/mage-memory/issues/96) |
 | `noteSizeCap`: wire or delete | **done** — wired in #94; `src/doctor/genre-tells.ts` is its first importer |
 | ADR-B draft | **done** — became [ADR-0041](../decisions/0041-genre-decides-the-recall-rung.md) |
-| ADR-C draft | **done 2026-07-31** — became [ADR-0044](../decisions/0044-setup-is-a-conversation-over-one-address.md) |
+| ADR-C draft | **done 2026-07-31** — became [ADR-0044](../decisions/0044-setup-is-a-conversation-over-one-address.md) (PR #118) |
 
 ## Wave A — curation + the better-home ladder
 
@@ -114,8 +114,8 @@ Soak curation PRs, applied row-for-row against approved manifests:
 ## Wave C — connect / external layers
 
 **Grilled 2026-07-31; ADR drafted.** Became
-[ADR-0044](../decisions/0044-setup-is-a-conversation-over-one-address.md), closing
-[#104](https://github.com/Sumit1993/mage-memory/issues/104).
+[ADR-0044](../decisions/0044-setup-is-a-conversation-over-one-address.md) (open as PR #118),
+closing [#104](https://github.com/Sumit1993/mage-memory/issues/104).
 
 Scope as designed: the grilled **config format + question flow** for
 `connect`/external layers — the one part of ADR-0041 that is genuinely
@@ -203,7 +203,6 @@ small top-level `INDEX.md` is *not* evidence the filter landed.
 | central hub by derivation (`~/.mage/hubs/<slug>`) | FT-26 |
 | plugin cache bloat | [#96](https://github.com/Sumit1993/mage-memory/issues/96) |
 | worktree propagation research | [#103](https://github.com/Sumit1993/mage-memory/issues/103) |
-| Wave C grill + ADR-C | [#104](https://github.com/Sumit1993/mage-memory/issues/104) |
 | `HarnessAdapter` seam | [ADR-0036](../decisions/0036-defer-harness-adapter-seam.md) revisit trigger |
 
 ## What is left, in order
@@ -218,7 +217,8 @@ small top-level `INDEX.md` is *not* evidence the filter landed.
    [ADR-0042](../decisions/0042-reach-tier-harness-grants.md) is **not** covered by
    that gate — it is a separate decision with its own revisit trigger, and is
    evaluated on its own terms.
-5. Grill Wave C in a fresh session ([#104](https://github.com/Sumit1993/mage-memory/issues/104)).
+5. Ratify and implement [ADR-0044](../decisions/0044-setup-is-a-conversation-over-one-address.md)
+   (drafted in PR #118, closing [#104](https://github.com/Sumit1993/mage-memory/issues/104)).
 
 ## Relations
 
