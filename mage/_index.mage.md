@@ -2,7 +2,7 @@
 
 # mage
 
-> 31 notes. Part of the [index](INDEX.md).
+> 32 notes. Part of the [index](INDEX.md).
 
 ## build
 
@@ -55,3 +55,7 @@
 - `reference` [Field notes — first external migrations (v0.1 dogfood)](notes/migration-field-notes.md) — field-test, bulk-import, byte-safe, onboarding, v0.2
 - `note` [0.1.0's last build gate: ADR-0031 Phase 2 — the reject-ledger reconciler (built; bake pending)](notes/phase2-reject-ledger-0.1.0-gate.md) — keep-rate, provenance-source, capture-vs-adopt, a1-bake, autonomy, crown-threshold
 - `pointer` [mage soak — the external dogfood targets + the read-only monitor](notes/soak-targets.md) — prismalens, sreforge, lesson-path, digest
+
+## soak
+
+- `gotcha` [The soak monitor reports "absent" and "healthy" the same way — two blind spots that cost an observation window](notes/soak-monitor-blind-spots.md) — blind-spot, dark-unit, keep-rate, capture-vs-adopt, baseline-flag, code-repo-path, absolute-path, evidence-pipeline, ratification-gate
