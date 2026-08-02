@@ -1,0 +1,55 @@
+# Applies the `review-ready` admission label to a pull request.
+#
+# WHY IT IS DISPATCH-ONLY FOR NOW
+# ------------------------------
+# This is the mechanism the drip cron will eventually use, but its core premise
+# is UNVERIFIED: does a label applied by a workflow start a CodeRabbit review?
+# CodeRabbit is an external app receiving its own webhooks, so GitHub's
+# anti-recursion rule — events created with GITHUB_TOKEN do not trigger other
+# *workflows* — should not apply to it. "Should not" is exactly the kind of
+# assumption that has already been wrong once here (see prismalens#301 §6).
+#
+# So this ships as manual dispatch only. On the day the CLI-first valve flips,
+# dispatch it once and observe whether a review actually starts. If it does not,
+# the fix is to label with a PAT — a credential swap, not a redesign.
+#
+# It has to live on the DEFAULT branch to be dispatchable at all: workflow_dispatch
+# only lists workflows present on the default branch. A previous probe failed
+# entirely because the file existed only on a feature branch.
+name: Admit PR to review
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: PR number to admit
+        required: true
+      label:
+        description: Label to apply
+        required: true
+        default: review-ready
+
+permissions:
+  pull-requests: write
+
+jobs:
+  admit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Apply admission label
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR: ${{ inputs.pr }}
+          LABEL: ${{ inputs.label }}
+        run: |
+          gh pr edit "$PR" --repo "$REPO" --add-label "$LABEL"
+          echo "Applied '$LABEL' to #$PR using GITHUB_TOKEN."
+          echo
+          echo "OBSERVE NOW — this is the measurement, not the action:"
+          echo "  1. Does CodeRabbit start a review on #$PR within ~5 minutes?"
+          echo "     yes -> the drip can use GITHUB_TOKEN. no -> switch to a PAT."
+          echo "  2. If it is rate-limited instead, does the blocked admission"
+          echo "     consume a review? The documented free-retry guarantee covers"
+          echo "     blocked PUSHES only. Backpressure assumes it generalises."
+          echo "  Record findings on prismalens/prismalens#301."
