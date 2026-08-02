@@ -1,0 +1,89 @@
+# Publishes the `review-evidence` commit status. See .github/scripts/review-evidence.sh
+# for the policy and reasoning. Tracked in prismalens/prismalens#301.
+#
+# WHY pull_request_target AND NOT pull_request
+# --------------------------------------------
+# For `pull_request`, GitHub runs the workflow — and any script it checks out —
+# AS DEFINED IN THE PR HEAD. This job holds `statuses: write`, so under
+# `pull_request` any PR could rewrite the evaluator to publish success for itself.
+# That defeats the entire gate. Caught by CodeRabbit CLI review before merge.
+#
+# `pull_request_target` runs the workflow from the BASE branch and checks out the
+# base by default. The usual danger with it — checking out and executing PR-head
+# code with a write token — does not apply here: this job never checks out PR
+# content and never executes anything from the PR. It reads the GitHub API only.
+# The ref is pinned explicitly below rather than relying on that default.
+#
+# Every other trigger (pull_request_review, issue_comment, schedule, dispatch)
+# already runs from the default branch, so only this one needed changing.
+#
+# RE-TRIGGER is the real engineering problem: evidence arrives MINUTES AFTER the
+# push that needs it, so a check running only on `synchronize` would sit red
+# forever. Hence the review/comment triggers, plus a sweeper catching anything the
+# event path missed — including labels applied by a workflow using GITHUB_TOKEN,
+# which by GitHub's anti-recursion rule do not trigger other workflows.
+name: Review evidence
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, ready_for_review, labeled, unlabeled]
+  pull_request_review:
+    types: [submitted, dismissed]
+  issue_comment:
+    # `deleted` matters: removing the CLI evidence comment must put the gate back
+    # to red rather than leaving a stale success standing.
+    types: [created, edited, deleted]
+  schedule:
+    # Off the top of the hour: scheduled runs are delayed or dropped under load.
+    - cron: '13,43 * * * *'
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: PR number to evaluate (blank = all open)
+        required: false
+
+permissions:
+  contents: read
+  pull-requests: read
+  statuses: write
+
+concurrency:
+  # Serialise per PR so two events cannot race to publish conflicting statuses.
+  # The sweeper gets its own lane; it re-reads state immediately before each
+  # publish, so the residual window is one API round-trip and self-corrects on the
+  # next event or sweep. Per-PR locking for the sweeper was considered and skipped
+  # as disproportionate — noted rather than silently omitted.
+  group: review-evidence-${{ github.event.pull_request.number || github.event.issue.number || inputs.pr || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  evaluate:
+    # issue_comment fires for issues too; only pull requests are relevant.
+    if: >-
+      github.event_name != 'issue_comment' ||
+      github.event.issue.pull_request != null
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # Explicit: never the PR head. This job holds statuses:write.
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+          sparse-checkout-cone-mode: false
+
+      - name: Evaluate review evidence
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          PR_FROM_EVENT: ${{ github.event.pull_request.number || github.event.issue.number }}
+          PR_FROM_INPUT: ${{ inputs.pr }}
+        run: |
+          chmod +x .github/scripts/review-evidence.sh
+          target="${PR_FROM_INPUT:-$PR_FROM_EVENT}"
+          if [ "$EVENT" = "schedule" ] || [ -z "$target" ]; then
+            ./.github/scripts/review-evidence.sh --all-open
+          else
+            ./.github/scripts/review-evidence.sh "$target"
+          fi
