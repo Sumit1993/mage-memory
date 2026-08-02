@@ -95,6 +95,11 @@ merged_ids=$(jq -r --arg d "$yday" '.[]|select(.merged_at != null and .merged_at
 merged_total=$(jq --arg d "$yday" '[.[]|select(.merged_at != null and .merged_at >= $d)]|length' <<<"$scope")
 
 # --- classify each merge by the evidence that let it through ---------------
+#
+# `direct` vs `exemption` is the coverage claim: exemption-path merges (bot,
+# release) were never reviewed by anything, by design. If most merges arrive that
+# way, the lane is not actually reviewing much and the headline benefit is not
+# being delivered — which volume counts alone would never show.
 by_cli=0; by_review=0; by_bot=0; by_none=0; none_list=""
 for n in $merged_ids; do
   sha=$(jq -r --argjson n "$n" '.[]|select(.number==$n)|.head.sha' <<<"$scope")
@@ -107,6 +112,40 @@ for n in $merged_ids; do
     *)                         by_none=$((by_none+1)); none_list="$none_list #$n" ;;
   esac
 done
+direct=$(( by_cli + by_review ))
+if [ "$merged_total" -gt 0 ]; then
+  coverage=$(( direct * 100 / merged_total ))
+else
+  coverage="n/a"
+fi
+
+# --- ROUNDS PER MERGED PR — the unit of spend -------------------------------
+#
+# The core unknown. A review vouches for one SHA, so fixing what a review found
+# invalidates it and costs another. That multiplier is imposed by the GATE and
+# applies in every lane, which is why it must be measured as a distribution
+# rather than assumed to be 2.
+#
+# Proxy: count of evidence markers posted on the PR. cr-evidence.sh posts one per
+# reviewed SHA, so the marker count is the number of CLI rounds that PR consumed.
+# Online rounds are counted separately as formal reviews.
+rounds_detail=""; rounds_total=0; rounds_prs=0; rounds_max=0
+for n in $merged_ids; do
+  cm=$(api_array "repos/$REPO/issues/$n/comments?per_page=100") || continue
+  cli_rounds=$(jq '[.[]|select(.body|test("<!-- cr-cli-review: "))]|length' <<<"$cm")
+  rv=$(api_array "repos/$REPO/pulls/$n/reviews?per_page=100") || rv='[]'
+  on_rounds=$(jq '[.[]|select(.user.login=="coderabbitai[bot]")]|length' <<<"$rv")
+  r=$(( ${cli_rounds:-0} + ${on_rounds:-0} ))
+  [ "$r" -eq 0 ] && continue
+  rounds_total=$(( rounds_total + r )); rounds_prs=$(( rounds_prs + 1 ))
+  [ "$r" -gt "$rounds_max" ] && rounds_max=$r
+  rounds_detail="$rounds_detail #$n:$r"
+done
+if [ "$rounds_prs" -gt 0 ]; then
+  rounds_avg=$(awk -v t="$rounds_total" -v p="$rounds_prs" 'BEGIN{printf "%.1f", t/p}')
+else
+  rounds_avg="n/a"
+fi
 
 # --- the escalation rate: how often an online review was actually wanted ---
 escalated=0
@@ -131,6 +170,25 @@ for n in $(jq -r '.[].number' <<<"$scope"); do
       --jq '[.statuses[]?|select(.context=="review-evidence" and .state=="error")]|length' 2>/dev/null)
   errors=$(( errors + ${e:-0} ))
 done
+
+# --- STALL MINUTES — the felt cost --------------------------------------
+# Not PRs/hour. What actually hurts is waiting for counter capacity while a PR
+# sits un-mergeable. Proxy: for each merged PR, minutes between the first
+# review-evidence failure and the evidence marker that cleared it.
+stall_total=0; stall_n=0; stall_max=0
+for n in $merged_ids; do
+  sha=$(jq -r --argjson n "$n" '.[]|select(.number==$n)|.head.sha' <<<"$scope")
+  first_fail=$(gh api "repos/$REPO/commits/$sha/statuses?per_page=100" \
+    --jq '[.[]|select(.context=="review-evidence" and .state=="failure")]|if length>0 then (.[-1].created_at) else empty end' 2>/dev/null)
+  cleared=$(gh api "repos/$REPO/commits/$sha/statuses?per_page=100" \
+    --jq '[.[]|select(.context=="review-evidence" and .state=="success")]|if length>0 then (.[0].created_at) else empty end' 2>/dev/null)
+  [ -n "$first_fail" ] && [ -n "$cleared" ] || continue
+  m=$(( ( $(date -u -d "$cleared" +%s) - $(date -u -d "$first_fail" +%s) ) / 60 ))
+  [ "$m" -lt 0 ] && continue
+  stall_total=$(( stall_total + m )); stall_n=$(( stall_n + 1 ))
+  [ "$m" -gt "$stall_max" ] && stall_max=$m
+done
+if [ "$stall_n" -gt 0 ]; then stall_avg=$(( stall_total / stall_n )); else stall_avg="n/a"; fi
 
 rl_json=$(api_array "repos/$REPO/issues/comments?per_page=100&since=$yday") || rl_json='[]'
 ratelimited=$(jq '[.[]|select(.user.login=="coderabbitai[bot]" and (.body|test("rate limited by coderabbit")))]|length' <<<"$rl_json")
@@ -175,10 +233,23 @@ $hdr
 | └ **with NO evidence** | **$by_none** | **must stay 0 — non-zero means the gate has a hole** |
 | \`review-ready\` escalations | $escalated | if this approaches "PRs opened", the valve buys nothing |
 | Online reviews consumed | $online | pressure on the scarce counter |
+| **Rounds per merged PR** | **$rounds_avg** (max $rounds_max) | **the unit of spend — is the multiplier 2, or worse?** |
+| Merged-head coverage | ${coverage}% | share reviewed directly vs waved through by exemption |
+| Stall minutes (avg / max) | $stall_avg / $stall_max | the felt cost — waiting on capacity, not PRs/hour |
 | Gate \`error\` states | $errors | false reds blocking legitimate work |
 | Rate-limit events | ${ratelimited:-0} | did starvation just move rather than resolve? |
 
 $verdict
+
+<details><summary>Rounds per PR — raw</summary>
+
+\`\`\`
+${rounds_detail:- (none)}
+\`\`\`
+A round is one review that vouched for one SHA. Fixing what a review finds
+invalidates it, so a PR with findings costs at least two. That multiplier is
+imposed by the gate and applies in every lane — measured here rather than assumed.
+</details>
 $clip_note
 <sub>Window: $yday → now. Auto-generated. Decision this serves: promote the CLI-first lane to \`prismalens\` and \`sreforge\`, or land \`ci/cli-first-valve-REVERT\`. Context: prismalens/prismalens#301</sub>
 EOF
