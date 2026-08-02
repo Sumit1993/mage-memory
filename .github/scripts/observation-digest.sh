@@ -25,13 +25,24 @@ WINDOW_DAYS=8   # how far back to scan PRs; the week plus a day of margin
 
 say () { echo "$@" >&2; }
 
+# Fetch a paginated REST array as ONE json array.
+#
+# `gh api --paginate` may emit one array per page; `-s add` normalises that to a
+# single array whether it emitted one document or many. review-evidence.sh does
+# the same thing — this is deliberately the identical shape so the two scripts do
+# not drift on the one detail that silently truncates results to page 1.
+#   rc 0 = json array on stdout, rc 1 = could not fetch
+api_array () { # api_array <path>
+  local raw
+  raw=$(gh api --paginate "$1" 2>/dev/null) || return 1
+  jq -s 'add // []' <<<"$raw" 2>/dev/null || return 1
+}
+
 # --- read prior digests once, failing loudly ------------------------------
 # A 404 here (wrong issue, wrong repo) must not be mistaken for "no prior
 # digests" — that would silently restart the day counter and post duplicates.
-comments=$(gh api "repos/$REPO/issues/$ISSUE/comments?per_page=100" --paginate 2>/dev/null) || {
+comments=$(api_array "repos/$REPO/issues/$ISSUE/comments?per_page=100") || {
   say "ERROR: cannot read comments on $REPO#$ISSUE — is ISSUE correct and in THIS repo?"; exit 1; }
-jq -e 'type == "array"' >/dev/null 2>&1 <<<"$comments" || {
-  say "ERROR: unexpected response reading $REPO#$ISSUE (not an array) — refusing to guess"; exit 1; }
 
 # --- idempotency -----------------------------------------------------------
 # schedule events are delayed or dropped under load, so this may fire late or
@@ -66,8 +77,15 @@ if [ -z "$floor" ]; then floor=$(date -u +%FT%TZ); CLIPPED=1; else CLIPPED=0; fi
 # Never look further back than the floor, however wide the 24h window is.
 [[ "$yday" < "$floor" ]] && yday="$floor"
 
-prs=$(gh api "repos/$REPO/pulls?state=all&sort=updated&direction=desc&per_page=100" --paginate 2>/dev/null) \
+# Deliberately NOT paginated: sorted by updated desc, so the first 100 cover any
+# window this repo can fill in WINDOW_DAYS. Paginating would walk every PR ever
+# opened on each daily run and grow without bound. If the page turns out not to
+# reach back past `since`, the window is truncated and the digest says so.
+prs=$(gh api "repos/$REPO/pulls?state=all&sort=updated&direction=desc&per_page=100" 2>/dev/null) \
   || { say "ERROR: cannot list PRs"; exit 1; }
+oldest=$(jq -r 'if length>0 then (.[-1].updated_at) else "" end' <<<"$prs")
+TRUNCATED=0
+[ -n "$oldest" ] && [[ "$oldest" > "$since" ]] && TRUNCATED=1
 
 # Narrow to the window once; every count below derives from this set.
 scope=$(jq --arg since "$since" '[ .[] | select(.updated_at >= $since) ]' <<<"$prs")
@@ -102,8 +120,11 @@ done
 # --- online reviews actually consumed, and gate health --------------------
 online=0; errors=0
 for n in $(jq -r '.[].number' <<<"$scope"); do
-  c=$(gh api "repos/$REPO/pulls/$n/reviews?per_page=100" --paginate \
-      --jq --arg d "$yday" '[.[]|select(.user.login=="coderabbitai[bot]" and .submitted_at >= $d)]|length' 2>/dev/null)
+  # `gh api --jq` takes exactly one filter and does NOT accept jq's --arg, so the
+  # interpolation has to happen in a separate jq. The previous form was silently
+  # invalid and reported 0 for every PR.
+  revs=$(api_array "repos/$REPO/pulls/$n/reviews?per_page=100") || continue
+  c=$(jq --arg d "$yday" '[.[]|select(.user.login=="coderabbitai[bot]" and .submitted_at >= $d)]|length' <<<"$revs")
   online=$(( online + ${c:-0} ))
   sha=$(jq -r --argjson n "$n" '.[]|select(.number==$n)|.head.sha' <<<"$scope")
   e=$(gh api "repos/$REPO/commits/$sha/status" \
@@ -111,8 +132,8 @@ for n in $(jq -r '.[].number' <<<"$scope"); do
   errors=$(( errors + ${e:-0} ))
 done
 
-ratelimited=$(gh api "repos/$REPO/issues/comments?per_page=100&since=$yday" --paginate \
-              --jq '[.[]|select(.user.login=="coderabbitai[bot]" and (.body|test("rate limited by coderabbit")))]|length' 2>/dev/null)
+rl_json=$(api_array "repos/$REPO/issues/comments?per_page=100&since=$yday") || rl_json='[]'
+ratelimited=$(jq '[.[]|select(.user.login=="coderabbitai[bot]" and (.body|test("rate limited by coderabbit")))]|length' <<<"$rl_json")
 
 # --- verdict line ----------------------------------------------------------
 if [ "$by_none" -gt 0 ]; then
@@ -129,7 +150,11 @@ hdr="### Day $DAY — $TODAY"
 [ "$DAY" -ge 7 ] && hdr="### Day $DAY — $TODAY · ⏰ DECISION DUE"
 
 clip_note=""
-[ "$CLIPPED" = "1" ] && clip_note="
+[ "$TRUNCATED" = "1" ] && clip_note="
+> ⚠️ The PR listing did not reach back past the ${WINDOW_DAYS}-day window, so counts
+> may be incomplete. Raise \`per_page\` or narrow \`WINDOW_DAYS\` in the script.
+"
+[ "$CLIPPED" = "1" ] && clip_note="$clip_note
 > First digest: the window starts here, so counts are near-zero by construction.
 > Merges from before the gate existed are deliberately excluded — #127 introduced
 > the gate and merged without a status because \`pull_request_target\` cannot run
