@@ -1,0 +1,65 @@
+# Publishes the `review-evidence` commit status. See .github/scripts/review-evidence.sh
+# for the policy and the reasoning. Tracked in prismalens/prismalens#301.
+#
+# Re-trigger is the whole engineering problem here: evidence arrives MINUTES AFTER
+# the push that needs it, so a check that only ran on `synchronize` would sit red
+# forever. Hence the review/comment triggers, plus a sweeper that catches anything
+# the event path missed — including labels applied by a workflow using GITHUB_TOKEN,
+# which by GitHub's anti-recursion rule do not trigger other workflows.
+name: Review evidence
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review, labeled, unlabeled]
+  pull_request_review:
+    types: [submitted, dismissed]
+  issue_comment:
+    types: [created, edited]
+  schedule:
+    # Off the top of the hour: scheduled runs are delayed or dropped under load.
+    - cron: '13,43 * * * *'
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: PR number to evaluate (blank = all open)
+        required: false
+
+permissions:
+  contents: read
+  pull-requests: read
+  statuses: write
+
+concurrency:
+  # Serialise per PR so two events cannot race to publish conflicting statuses.
+  # Sweeper and dispatch get their own lane.
+  group: review-evidence-${{ github.event.pull_request.number || github.event.issue.number || inputs.pr || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  evaluate:
+    # issue_comment fires for issues too; only pull requests are relevant.
+    if: >-
+      github.event_name != 'issue_comment' ||
+      github.event.issue.pull_request != null
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github/scripts
+          sparse-checkout-cone-mode: false
+
+      - name: Evaluate review evidence
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          PR_FROM_EVENT: ${{ github.event.pull_request.number || github.event.issue.number }}
+          PR_FROM_INPUT: ${{ inputs.pr }}
+        run: |
+          chmod +x .github/scripts/review-evidence.sh
+          target="${PR_FROM_INPUT:-$PR_FROM_EVENT}"
+          if [ "$EVENT" = "schedule" ] || [ -z "$target" ]; then
+            ./.github/scripts/review-evidence.sh --all-open
+          else
+            ./.github/scripts/review-evidence.sh "$target"
+          fi
