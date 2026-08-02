@@ -64,7 +64,7 @@ jobs:
       github.event.issue.pull_request != null
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           # Explicit: never the PR head. This job holds statuses:write.
           ref: ${{ github.event.repository.default_branch }}

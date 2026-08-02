@@ -30,9 +30,13 @@ DRY_RUN="${DRY_RUN:-0}"
 # across repos is an API commitment that has not been earned yet (#301).
 # ---------------------------------------------------------------------------
 
-# Whose formal review counts as evidence. Matched case-insensitively as a substring
-# of the reviewer's login.
-REVIEWER_PATTERN="${REVIEWER_PATTERN:-coderabbit}"
+# Whose formal review counts as evidence. EXACT logins, never a substring match.
+#
+# This was `contains("coderabbit")`. On a public repo anyone can register an
+# account whose name contains that string — `coderabbit-fan` — and a review from
+# it would have satisfied the gate. An allowlist of exact bot logins closes that.
+# `coderabbitai[bot]` is the real login, confirmed from live review payloads.
+REVIEWER_LOGINS="${REVIEWER_LOGINS:-coderabbitai[bot]}"
 
 # PR authors exempt from needing review evidence.
 #
@@ -101,7 +105,13 @@ publish () { # publish <sha> <state> <description>
 api_query () { # api_query <path> <jq filter> [jq args...]
   local path="$1" filter="$2"; shift 2
   local body
-  body=$(gh api "$path" 2>/dev/null) || return 2
+  # --paginate matters: a single page caps at 100. A long-lived PR accumulates
+  # more than 100 comments, and the CLI evidence marker could fall off page one —
+  # which would publish a false `failure` on a genuinely reviewed PR.
+  body=$(gh api --paginate "$path" 2>/dev/null) || return 2
+  # --paginate emits one array per page on older gh and a single merged array on
+  # newer; `-s add` normalises both to one array.
+  body=$(jq -s 'add // []' <<<"$body" 2>/dev/null) || return 2
   jq -r "$@" "$filter" <<<"$body" 2>/dev/null || return 2
 }
 
@@ -145,11 +155,12 @@ evaluate_pr () { # evaluate_pr <number>
   # exact: a review of an earlier commit does not satisfy a later head.
   local reviewer q_rc
   reviewer=$(api_query "repos/$REPO/pulls/$n/reviews?per_page=100" '
-        [ .[]
-          | select(.user.login | ascii_downcase | contains($pat))
-          | select(.commit_id == $sha)
-        ] | if length > 0 then .[-1].user.login else empty end' \
-      --arg sha "$sha" --arg pat "$(printf '%s' "$REVIEWER_PATTERN" | tr '[:upper:]' '[:lower:]')")
+        ($logins | split(" ")) as $allowed
+        | [ .[]
+            | select(.user.login as $u | $allowed | index($u))
+            | select(.commit_id == $sha)
+          ] | if length > 0 then .[-1].user.login else empty end' \
+      --arg sha "$sha" --arg logins "$REVIEWER_LOGINS")
   q_rc=$?
   if [ $q_rc -eq 2 ]; then
     publish "$sha" error "Cannot determine review evidence for ${sha:0:8} — GitHub API error"
@@ -192,7 +203,7 @@ main () {
     # `mapfile < <(...)` hides the producer's exit status, so an API failure would
     # yield an empty list and report a clean "nothing to do". Capture separately.
     local listing
-    listing=$(gh api "repos/$REPO/pulls?state=open&per_page=100" --jq '.[].number' 2>/dev/null) || {
+    listing=$(gh api --paginate "repos/$REPO/pulls?state=open&per_page=100" --jq '.[].number' 2>/dev/null) || {
       echo "ERROR: cannot list open PRs — sweeper evaluated nothing" >&2; return 1; }
     [ -n "$listing" ] && mapfile -t targets <<<"$listing"
   else
