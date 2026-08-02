@@ -1,0 +1,33 @@
+# PROBE ONLY. Exists on the `chore/cr-valve-probe` branch and is deleted with it.
+# Manual dispatch applies `review-ready` using the default GITHUB_TOKEN, so we can observe
+# whether a bot-applied label starts a CodeRabbit review — the assumption the drip cron
+# depends on, and one GitHub's anti-recursion rule makes non-obvious.
+name: CR valve probe (label as bot)
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: PR number to label
+        required: true
+      label:
+        description: Label to apply
+        required: true
+        default: review-ready
+
+permissions:
+  pull-requests: write
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Apply label with GITHUB_TOKEN
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ inputs.pr }}
+          LABEL: ${{ inputs.label }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh pr edit "$PR" --repo "$REPO" --add-label "$LABEL"
+          echo "applied '$LABEL' to #$PR via GITHUB_TOKEN"

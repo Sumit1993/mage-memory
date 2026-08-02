@@ -7,6 +7,14 @@ reviews:
   # Pausing after 1 reviewed commit means one review per PR; push your fixes as a batch,
   # then re-request explicitly with an `@coderabbitai review` comment.
   auto_review:
+    # PROBE (chore/cr-valve-probe): label-gated admission. With `enabled: false` and a
+    # positive `labels` match, CodeRabbit reviews ONLY PRs carrying `review-ready`.
+    # Being measured here: (1) does the valve suppress on open, (2) does a label applied
+    # by a workflow using GITHUB_TOKEN start a review, (3) does a second push to an
+    # already-admitted PR spend another review or does auto_pause hold at 1.
+    enabled: false
+    labels:
+      - "review-ready"
     auto_pause_after_reviewed_commits: 1
     ignore_title_keywords:
       - "WIP"
