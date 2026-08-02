@@ -49,7 +49,11 @@ comments=$(api_array "repos/$REPO/issues/$ISSUE/comments?per_page=100") || {
 # counter and the observation floor. review-evidence.sh author-checks its evidence
 # comments for the same reason — this is the same rule, applied to the same class
 # of forgeable input.
-DIGEST_AUTHORS="${DIGEST_AUTHORS:-github-actions[bot] Sumit1993}"
+# Only github-actions[bot] — the account the workflow posts as. The repo owner is
+# deliberately NOT trusted by default: including a human account means an ordinary
+# comment could seed digest state, which is the hole this filter exists to close.
+# Override only for local dry runs.
+DIGEST_AUTHORS="${DIGEST_AUTHORS:-github-actions[bot]}"
 comments=$(jq --arg a "$DIGEST_AUTHORS" '($a|split(" ")) as $ok | [ .[] | select(.user.login as $u | $ok | index($u)) ]' <<<"$comments")
 
 # --- idempotency -----------------------------------------------------------
