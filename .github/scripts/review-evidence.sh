@@ -59,9 +59,10 @@ GENERATED_PR_BRANCH_RE="${GENERATED_PR_BRANCH_RE:-^release-please--}"
 
 # Marker left by a local CodeRabbit CLI review.
 #
-# STUBBED. Nothing writes this yet — `cr-preview.sh` must be taught to post it
-# before the CLI-first valve is flipped, or every CLI-only PR is permanently red.
-# That ordering is tracked as a blocking step in #301.
+# Written by claude-kit's `cr-evidence.sh`, which `cr-preview.sh` calls after a
+# successful CLI review (Sumit1993/claude-kit#6). Keyed to the head SHA, so
+# evidence vouches for one commit and not for the PR: push again and it stops
+# matching, and this gate goes red until the branch is re-previewed.
 # Format:  <!-- cr-cli-review: <full head sha> -->
 CLI_MARKER_PREFIX="${CLI_MARKER_PREFIX:-<!-- cr-cli-review:}"
 
@@ -91,11 +92,26 @@ publish () { # publish <sha> <state> <description>
   printf '    published: %s — %s\n' "$state" "$desc"
 }
 
+# Ask the API a question whose answer is a string, distinguishing THREE outcomes:
+# a match, no match, and "could not tell". Conflating the last two is how a gate
+# starts reporting confident answers it did not actually compute — the failure
+# class this whole gate exists to prevent.
+#   rc 0 = answered (value on stdout, may be empty for "no match")
+#   rc 2 = could not determine
+api_query () { # api_query <path> <jq filter> [jq args...]
+  local path="$1" filter="$2"; shift 2
+  local body
+  body=$(gh api "$path" 2>/dev/null) || return 2
+  jq -r "$@" "$filter" <<<"$body" 2>/dev/null || return 2
+}
+
 evaluate_pr () { # evaluate_pr <number>
   local n="$1" pr sha author state draft head_ref labels
 
+  # A fetch failure is not "nothing to do" — it means we cannot evaluate, and the
+  # caller must learn about it through the exit code rather than see a clean run.
   pr=$(gh api "repos/$REPO/pulls/$n" 2>/dev/null) || {
-    echo "  PR #$n: cannot fetch, skipping" >&2; return 0; }
+    echo "  PR #$n: cannot fetch — NOT evaluated" >&2; return 1; }
 
   sha=$(jq -r '.head.sha'      <<<"$pr")
   author=$(jq -r '.user.login' <<<"$pr")
@@ -114,56 +130,71 @@ evaluate_pr () { # evaluate_pr <number>
   # --- branch B1: bot-authored --------------------------------------------
   if in_list "$author" "$BOT_AUTHORS"; then
     publish "$sha" success "Bot-authored ($author); CI gate applies separately"
-    return 0
+    return $?
   fi
 
   # --- branch B2: machine-generated release PR (label AND branch) ----------
   if [[ "$head_ref" =~ $GENERATED_PR_BRANCH_RE ]] \
      && grep -Fxq -f <(printf '%s\n' "$GENERATED_PR_LABELS") <<<"$labels"; then
     publish "$sha" success "Generated release PR ($head_ref); CI gate applies separately"
-    return 0
+    return $?
   fi
 
   # --- branch A: a formal review AT THE CURRENT HEAD -----------------------
   # `commit_id` is the commit the review was actually made against, so this is
   # exact: a review of an earlier commit does not satisfy a later head.
-  local reviewer
-  reviewer=$(gh api "repos/$REPO/pulls/$n/reviews?per_page=100" 2>/dev/null \
-    | jq -r --arg sha "$sha" --arg pat "$REVIEWER_PATTERN" '
+  local reviewer q_rc
+  reviewer=$(api_query "repos/$REPO/pulls/$n/reviews?per_page=100" '
         [ .[]
           | select(.user.login | ascii_downcase | contains($pat))
           | select(.commit_id == $sha)
-        ] | if length > 0 then .[-1].user.login else empty end')
-
+        ] | if length > 0 then .[-1].user.login else empty end' \
+      --arg sha "$sha" --arg pat "$(printf '%s' "$REVIEWER_PATTERN" | tr '[:upper:]' '[:lower:]')")
+  q_rc=$?
+  if [ $q_rc -eq 2 ]; then
+    publish "$sha" error "Cannot determine review evidence for ${sha:0:8} — GitHub API error"
+    return 1
+  fi
   if [ -n "$reviewer" ]; then
     publish "$sha" success "Reviewed by $reviewer at ${sha:0:8}"
-    return 0
+    return $?
   fi
 
-  # --- branch C: CLI review marker for this head (STUBBED) -----------------
+  # --- branch C: CLI review marker for this head ---------------------------
   local marker_author
-  marker_author=$(gh api "repos/$REPO/issues/$n/comments?per_page=100" 2>/dev/null \
-    | jq -r --arg sha "$sha" --arg pre "$CLI_MARKER_PREFIX" --arg authors "$CLI_MARKER_AUTHORS" '
+  marker_author=$(api_query "repos/$REPO/issues/$n/comments?per_page=100" '
         ($authors | split(" ")) as $allowed
         | [ .[]
             | select(.user.login as $u | $allowed | index($u))
             | select(.body | contains($pre + " " + $sha))
-          ] | if length > 0 then .[-1].user.login else empty end')
-
+          ] | if length > 0 then .[-1].user.login else empty end' \
+      --arg sha "$sha" --arg pre "$CLI_MARKER_PREFIX" --arg authors "$CLI_MARKER_AUTHORS")
+  q_rc=$?
+  if [ $q_rc -eq 2 ]; then
+    publish "$sha" error "Cannot determine review evidence for ${sha:0:8} — GitHub API error"
+    return 1
+  fi
   if [ -n "$marker_author" ]; then
     publish "$sha" success "CLI review evidence from $marker_author at ${sha:0:8}"
-    return 0
+    return $?
   fi
 
   # --- no evidence ---------------------------------------------------------
+  # Reached only when BOTH lookups answered successfully and neither matched.
   publish "$sha" failure "No review evidence for ${sha:0:8} — silence is not a review"
+  return $?
 }
 
 main () {
   local targets=()
   if [ "${1:-}" = "--all-open" ]; then
     echo "Sweeper: evaluating all open PRs in $REPO"
-    mapfile -t targets < <(gh api "repos/$REPO/pulls?state=open&per_page=100" --jq '.[].number')
+    # `mapfile < <(...)` hides the producer's exit status, so an API failure would
+    # yield an empty list and report a clean "nothing to do". Capture separately.
+    local listing
+    listing=$(gh api "repos/$REPO/pulls?state=open&per_page=100" --jq '.[].number' 2>/dev/null) || {
+      echo "ERROR: cannot list open PRs — sweeper evaluated nothing" >&2; return 1; }
+    [ -n "$listing" ] && mapfile -t targets <<<"$listing"
   else
     targets=("$@")
   fi
