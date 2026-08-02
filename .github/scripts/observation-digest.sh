@@ -44,6 +44,14 @@ api_array () { # api_array <path>
 comments=$(api_array "repos/$REPO/issues/$ISSUE/comments?per_page=100") || {
   say "ERROR: cannot read comments on $REPO#$ISSUE — is ISSUE correct and in THIS repo?"; exit 1; }
 
+# Only the workflow's own comments count as digest state. This issue is public;
+# anyone can post a comment containing the marker, which would corrupt the day
+# counter and the observation floor. review-evidence.sh author-checks its evidence
+# comments for the same reason — this is the same rule, applied to the same class
+# of forgeable input.
+DIGEST_AUTHORS="${DIGEST_AUTHORS:-github-actions[bot] Sumit1993}"
+comments=$(jq --arg a "$DIGEST_AUTHORS" '($a|split(" ")) as $ok | [ .[] | select(.user.login as $u | $ok | index($u)) ]' <<<"$comments")
+
 # --- idempotency -----------------------------------------------------------
 # schedule events are delayed or dropped under load, so this may fire late or
 # twice. One digest per calendar day, matched on the marker.
@@ -103,8 +111,11 @@ merged_total=$(jq --arg d "$yday" '[.[]|select(.merged_at != null and .merged_at
 by_cli=0; by_review=0; by_bot=0; by_none=0; none_list=""
 for n in $merged_ids; do
   sha=$(jq -r --argjson n "$n" '.[]|select(.number==$n)|.head.sha' <<<"$scope")
-  desc=$(gh api "repos/$REPO/commits/$sha/status" \
-         --jq '[.statuses[]?|select(.context=="review-evidence")][0].description // ""' 2>/dev/null)
+  # A failed lookup must not be read as "no evidence" — that would count a real
+  # merge as a gate hole and fire the red verdict off an API blip.
+  st=$(gh api "repos/$REPO/commits/$sha/status" 2>/dev/null) || {
+    say "ERROR: cannot read status for #$n ($sha) — refusing to classify"; exit 1; }
+  desc=$(jq -r '[.statuses[]?|select(.context=="review-evidence")][0].description // ""' <<<"$st")
   case "$desc" in
     *"CLI review evidence"*)   by_cli=$((by_cli+1)) ;;
     *"Reviewed by"*)           by_review=$((by_review+1)) ;;
@@ -178,10 +189,9 @@ done
 stall_total=0; stall_n=0; stall_max=0
 for n in $merged_ids; do
   sha=$(jq -r --argjson n "$n" '.[]|select(.number==$n)|.head.sha' <<<"$scope")
-  first_fail=$(gh api "repos/$REPO/commits/$sha/statuses?per_page=100" \
-    --jq '[.[]|select(.context=="review-evidence" and .state=="failure")]|if length>0 then (.[-1].created_at) else empty end' 2>/dev/null)
-  cleared=$(gh api "repos/$REPO/commits/$sha/statuses?per_page=100" \
-    --jq '[.[]|select(.context=="review-evidence" and .state=="success")]|if length>0 then (.[0].created_at) else empty end' 2>/dev/null)
+  hist=$(api_array "repos/$REPO/commits/$sha/statuses?per_page=100") || continue
+  first_fail=$(jq -r '[.[]|select(.context=="review-evidence" and .state=="failure")]|if length>0 then (.[-1].created_at) else empty end' <<<"$hist")
+  cleared=$(jq -r '[.[]|select(.context=="review-evidence" and .state=="success")]|if length>0 then (.[0].created_at) else empty end' <<<"$hist")
   [ -n "$first_fail" ] && [ -n "$cleared" ] || continue
   m=$(( ( $(date -u -d "$cleared" +%s) - $(date -u -d "$first_fail" +%s) ) / 60 ))
   [ "$m" -lt 0 ] && continue
@@ -233,7 +243,7 @@ $hdr
 | └ **with NO evidence** | **$by_none** | **must stay 0 — non-zero means the gate has a hole** |
 | \`review-ready\` escalations | $escalated | if this approaches "PRs opened", the valve buys nothing |
 | Online reviews consumed | $online | pressure on the scarce counter |
-| **Rounds per merged PR** | **$rounds_avg** (max $rounds_max) | **the unit of spend — is the multiplier 2, or worse?** |
+| **Rounds per *reviewed* PR** | **$rounds_avg** (max $rounds_max) over $rounds_prs of $merged_total | **the unit of spend — is the multiplier 2, or worse?** |
 | Merged-head coverage | ${coverage}% | share reviewed directly vs waved through by exemption |
 | Stall minutes (avg / max) | $stall_avg / $stall_max | the felt cost — waiting on capacity, not PRs/hour |
 | Gate \`error\` states | $errors | false reds blocking legitimate work |

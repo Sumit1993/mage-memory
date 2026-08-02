@@ -25,6 +25,10 @@ permissions:
   contents: read
   pull-requests: read
   issues: write
+  # Required: the digest reads review-evidence commit statuses. With an explicit
+  # permissions block, unlisted scopes default to none — and local dry runs use a
+  # personal token with full scope, so this cannot be caught by testing outside CI.
+  statuses: read
 
 concurrency:
   group: observation-digest
