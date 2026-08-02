@@ -13,3 +13,5 @@ design depends on and that are not documented:
    does `auto_pause_after_reviewed_commits: 1` hold?
 
 Delete this branch once the three observations are recorded.
+
+<!-- probe: second push, testing incremental re-review cost -->
