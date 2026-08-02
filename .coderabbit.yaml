@@ -7,30 +7,6 @@ reviews:
   # Pausing after 1 reviewed commit means one review per PR; push your fixes as a batch,
   # then re-request explicitly with an `@coderabbitai review` comment.
   auto_review:
-    # CLI-FIRST LANE. Online review is opt-in, not automatic.
-    #
-    # The rate limit is per DEVELOPER, not per repo — all three repos draw one
-    # counter. Measured over 180 merged PRs: 7.5/day, worst hour 8 opens, and at
-    # 1 review/hr 61% of PRs arrived with the counter already empty. Reviewing
-    # everything automatically means the reviews land where they happen to fall,
-    # not where they are worth spending.
-    #
-    # So: the CodeRabbit CLI (a separate, larger counter) reviews every push via
-    # the kit's pre-push gate, and this scarce online counter is spent only on PRs
-    # explicitly labelled `review-ready`.
-    #
-    # This is NOT a reduction in review. `review-evidence` is a required check
-    # (ruleset 17441632): a PR with neither a CodeRabbit review nor a CLI review
-    # marker at its head SHA cannot merge. Removing automatic review without that
-    # gate in place would have made "unreviewed" the silent default — which is why
-    # the gate shipped first (prismalens/prismalens#301).
-    #
-    # No dry run exists for this setting: CodeRabbit applies base-branch config
-    # only for open-source repos, so it takes effect the moment it lands on main.
-    # The revert is one commit — see ci/cli-first-valve-REVERT.
-    enabled: false
-    labels:
-      - "review-ready"
     auto_pause_after_reviewed_commits: 1
     ignore_title_keywords:
       - "WIP"
