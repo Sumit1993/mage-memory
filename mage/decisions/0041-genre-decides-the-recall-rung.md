@@ -30,7 +30,6 @@ keywords:
   - migration-manifest
 modified: 2026-07-27T07:41:55.456Z
 ---
-
 # 0041 — Genre decides the recall rung: one store, three recall paths (amends ADR-0035)
 
 > **Status: proposed (grilled 2026-07-27; ratification rides the Wave-B release).**
@@ -166,7 +165,7 @@ displaced bodies must stay committed notes).
   issue-ref density, lifecycle violations); `noteSizeCap` becomes doctor's imported
   size threshold — its first real consumer (matching Decision §5).
 - Three KBs migrate via approved manifests (home first, soaks after the A-window).
-- Deferred to [future-thoughts](../notes/future-thoughts.md): falsify-on-commit,
+- Deferred to [future-thoughts](../work/future-thoughts.md): falsify-on-commit,
   path-collision nudge, template wings (FT-04) as the delivery vehicle for
   per-work-style type maps.
 

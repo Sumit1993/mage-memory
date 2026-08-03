@@ -4,6 +4,16 @@
 
 > 38 accepted decisions govern this repo — read `decisions/` before architectural or scope changes.
 
+- `feedback` [Agent-maintained files carry standing rules only — no decision history, no trivial negatives](notes/agent-maintained-files-carry-standing-rules-only.md) — claude-md, skills, trim, context-cost
+- `gotcha` [Gotcha — context-mode refuses any file outside the project root, and the scratchpad always is](notes/context-mode-blocks-files-outside-project-root.md) — ctx-execute-file, ai-context, file-access-blocked, allow-rule, sandbox
+- `feedback` [Dogfood before release](notes/dogfood-before-release.md) — mage
+- `gotcha` [Gotcha — the harness memory layer rewrites mage frontmatter on every Write/Edit under mage/](notes/harness-memory-layer-rewrites-mage-frontmatter.md) — auto-memory, cc-schema, node-type, write-tool, edit-tool, contamination, repair
+- `note` [Mage integration test framework](notes/mage-integration-test-framework.md) — build
+- `note` [Mage main branch protected](notes/mage-main-branch-protected.md) — build
+- `note` [Mage no biome 2space](notes/mage-no-biome-2space.md) — build
+- `feedback` [No emojis in releases](notes/no-emojis-in-releases.md) — mage, release
+- `principle` [Route a memory to the store that matches its scope, not the KB you happen to be in](notes/route-memories-to-the-matching-store.md) — memory-routing, user-level, repo-kb, hub, capture, ft-20
+- `gotcha` [Gotcha — a stopped background workflow leaves no transcript marker, so absence proves nothing](notes/stopped-background-workflows-leave-no-record.md) — taskstop, compaction, resume, absence-of-evidence, anti-stall, sentinel
 - `gotcha` [The soak monitor reports "absent" and "healthy" the same way — two blind spots that cost an observation window](notes/soak-monitor-blind-spots.md) — blind-spot, dark-unit, keep-rate, capture-vs-adopt, baseline-flag, code-repo-path, absolute-path, evidence-pipeline, ratification-gate
 - `gotcha` [Gotcha — bare `mage` runs your WORKING TREE, so the soaks never exercise a release](notes/bare-mage-runs-the-working-tree.md) — npm-link, global-install, soak, release-gating, dogfood, version-lies, stale-index, symlink, verification
 - `gotcha` [Gotcha — a directory-source plugin marketplace copies your UNTRACKED tree, then serves it stale](notes/plugin-directory-source-copies-untracked-tree.md) — plugin-cache, github-source, node-modules, snapshot, dogfood, disk-bloat
@@ -25,11 +35,6 @@
 - `note` [0.1.0's last build gate: ADR-0031 Phase 2 — the reject-ledger reconciler (built; bake pending)](notes/phase2-reject-ledger-0.1.0-gate.md) — keep-rate, provenance-source, capture-vs-adopt, a1-bake, autonomy, crown-threshold
 - `principle` [mage is one durable memory — of hard-earned knowledge](notes/mage-is-durable-memory.md) — charter, identity, unified-memory, portable, notes-are-memories, insight, procedure, gotcha, pointer
 - `pointer` [mage soak — the external dogfood targets + the read-only monitor](notes/soak-targets.md) — prismalens, sreforge, lesson-path, digest
-- `feedback` [Dogfood before release](notes/dogfood-before-release.md) — mage
-- `note` [Mage integration test framework](notes/mage-integration-test-framework.md) — build
-- `note` [Mage main branch protected](notes/mage-main-branch-protected.md) — build
-- `note` [Mage no biome 2space](notes/mage-no-biome-2space.md) — build
-- `feedback` [No emojis in releases](notes/no-emojis-in-releases.md) — mage, release
 - `gotcha` [Gotcha — a Gate-2 false positive can stall an autonomous groom; never disable the hook to unblock](notes/gate2-fp-blocks-autonomy.md) — redaction, overseer, approver, capture, soak
 - `gotcha` [A release bump touches MORE than package.json — release-please now owns it](notes/release-bump-touches-many-artifacts.md) — version, changelog, readme, badge, plugin, marketplace, consistency, hygiene, pat
 - `gotcha` [Test files were never type-checked (tsconfig excluded them)](notes/test-files-were-excluded-from-typecheck.md) — tsc, tests, exclude, vitest, tsup, esbuild, ci, fixture
@@ -37,4 +42,4 @@
 - `gotcha` [Gotcha — scope Gate-2 to the knowledge base, not the whole repo](notes/gate2-blocks-own-redaction-fixtures.md) — pre-commit, hook, docs-root, connect, dogfood
 - `gotcha` [Gotcha — key bodies with `-`/`_` partially leak past the high-entropy detector](notes/redaction-anthropic-key-detector.md) — mage
 
-> 32 memory notes total (32 shown). Read INDEX.md before non-trivial work.
+> 37 memory notes total (37 shown). Read INDEX.md before non-trivial work.

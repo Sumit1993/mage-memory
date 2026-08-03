@@ -2,6 +2,7 @@
 type: note
 tags: [mage/build]
 created: "2026-06-27"
+last_reviewed: "2026-08-03"
 sources:
   - cc-session:98ba2843-dcf0-4188-ad62-87a15b8eab12
 provenance:
