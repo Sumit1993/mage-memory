@@ -17,7 +17,6 @@ sources:
   - src/claude-settings.ts
   - ~/ai-context/mage-soak/2026-06-14.md
 ---
-
 # 0.0.11 — "signal quality + autonomous capture"
 
 **Release framing (decided 2026-06-14).** These are **general** grooming/capture
@@ -40,7 +39,7 @@ The recurrence tally keys distinct work on `session_id`. `tally.ts` `foldSession
 dedupes a signature **once per session_id, ever** (line 206 `seen = new Set(prevFold.sigs)`;
 `mergeStat` bumps `sessions` only when new-for-session). Claude Code keeps the SAME
 `session_id` across compaction, so a user in one long compacted chat
-([[single-chat-compaction-workflow]]) produces ~1 session id → M=5 (`thresholds.ts:52`)
+(the single-chat compaction workflow) produces ~1 session id → M=5 (`thresholds.ts:52`)
 is unreachable by construction.
 
 **This must NOT assume one usage pattern** — other users run many short sessions.
