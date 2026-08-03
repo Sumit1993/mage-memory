@@ -20,13 +20,12 @@ keywords:
   - recall
 modified: 2026-07-27T09:11:03.882Z
 ---
-
 # Gotcha — a link-graph harvest must genre-filter its SOURCES, not just its targets
 
 Wave-B's "Governing decisions" section filtered harvest *targets* to decision genre but iterated
 ALL wing notes as *sources*. Decision notes carry the wing tag and cross-link each other densely,
 so the ADR-to-ADR graph pulled every accepted ADR into the auto-loaded wing skill — 38 lines,
-recreating the exact always-on ADR dump ADR-0041 §4 exists to retire. Memory-genre sources alone
+recreating the exact always-on ADR dump [ADR-0041 §4](../decisions/0041-genre-decides-the-recall-rung.md) exists to retire. Memory-genre sources alone
 yield 18; the delta was pure decision-to-decision linkage.
 
 **Rule:** in any dense-cross-linked corpus, one unfiltered side of a link harvest lets the

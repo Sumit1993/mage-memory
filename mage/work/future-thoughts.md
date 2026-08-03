@@ -33,7 +33,6 @@ keywords:
   - use-cases
 modified: 2026-07-28T08:54:21.449Z
 ---
-
 # mage — future thoughts (the standing idea inbox)
 
 The **one durable home for raw ideas and open questions** about where mage goes
@@ -417,7 +416,7 @@ Soak evidence (sreforge, 2026-07-27): `all-seats-route-to-agy` was re-captured t
 **Touches:** [ADR-0043](../decisions/0043-hub-addressed-by-remote-located-by-derivation.md) (decided here), [ADR-0042](../decisions/0042-reach-tier-harness-grants.md) (its revisit trigger, verbatim), [ADR-0011](../decisions/0011-recursive-scan-hub-projects.md), [ADR-0012](../decisions/0012-wings-optional-convention-standalone-hubs.md), FT-20
 **Sequence:** unsequenced (blocks git-tracked project-scope grants)
 Every `metadata.json` already records `hub_repo`, and **nothing reads it**. If the local hub path were *derived* from that remote — a deterministic location such as `~/.mage/hubs/<slug>`, cloned on demand — rather than recorded as an absolute `hub_path`, then one path would be identical on every machine and from every worktree. That single change unlocks git-tracked project-scope grants, portable clones, and hub-absent machines in one move, and retires the absolute-`hub_path` smell. It also gives external hubs a single conventional home instead of scattering them wherever each was first cloned.
-**mage angle:** the open question a grill must settle is **derived-path determinism vs. reusing the local clone you already edit** — preferring an existing clone destroys the determinism that makes the whole thing work. A symlink at the derived path is the candidate synthesis, unverified on both Claude Code symlink-following and WSL. Distinct from [[FT-20]], which is a *global user-level hub* as a personal memory tier; this one is about **where all hubs live**, not about adding a new one. Directly relevant to the worktree-propagation research ([#103](https://github.com/Sumit1993/mage-memory/issues/103)).
+**mage angle:** the open question a grill must settle is **derived-path determinism vs. reusing the local clone you already edit** — preferring an existing clone destroys the determinism that makes the whole thing work. A symlink at the derived path is the candidate synthesis, unverified on both Claude Code symlink-following and WSL. Distinct from [FT-20](#ft-20--a-global-user-level-hub-personal-cross-system-memory----soak-raw-author-note-3), which is a *global user-level hub* as a personal memory tier; this one is about **where all hubs live**, not about adding a new one. Directly relevant to the worktree-propagation research ([#103](https://github.com/Sumit1993/mage-memory/issues/103)).
 
 ---
 

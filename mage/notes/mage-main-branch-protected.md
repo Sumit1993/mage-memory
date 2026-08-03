@@ -2,6 +2,7 @@
 type: note
 tags: [mage/build]
 created: "2026-06-27"
+last_reviewed: "2026-08-03"
 sources:
   - cc-session:0c762176-4434-4798-8bb2-abd402eed957
 provenance:
@@ -28,5 +29,4 @@ tarball smoke on Node 18/20) → `gh pr merge --squash --delete-branch`. Release
 still go: merge to main → tag `vX.Y.Z` → GitHub release → user runs `npm publish`.
 
 CI lives at `.github/workflows/ci.yml`; the `CI gate` job aggregates the matrix
-so it's the single stable required context. Related: [mage-008-staged-build](mage-008-staged-build.md),
-[no-emojis-in-releases](no-emojis-in-releases.md), [dogfood-before-release](dogfood-before-release.md).
+so it's the single stable required context. Related: [no-emojis-in-releases](no-emojis-in-releases.md), [dogfood-before-release](dogfood-before-release.md).

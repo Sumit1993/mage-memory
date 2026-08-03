@@ -26,12 +26,11 @@ keywords:
   - additionalContext
   - offer-first
 ---
-
 # The boundary nudge — internals + where each piece lives
 
 `mage nudge` is one command wired to the Claude Code **SessionStart** hook
 (`settings.ts` → `MAGE_HOOKS`, id `mage:nudge:SessionStart`). It is the safety-net for the
-[organic grooming loop](decisions/0024-organic-grooming-loop.md): the human's inline capture is
+[organic grooming loop](../decisions/0024-organic-grooming-loop.md): the human's inline capture is
 primary; the nudge only catches what the agent forgot. Never throws (fail-open, exit 0).
 
 ## The moving parts (by file)
