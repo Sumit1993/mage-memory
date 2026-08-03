@@ -22,7 +22,7 @@ keywords:
   - allow-rule
   - sandbox
 ---
-# Gotcha — context-mode refuses any file outside the project root, and the scratchpad always is
+# Gotcha — ctx_execute_file refuses any path outside the project root, and the scratchpad always is
 
 `ctx_execute_file` hard-fails with
 *"File access blocked: … resolves outside the project root"* for any path not under the
