@@ -181,8 +181,12 @@ for n in $(jq -r '.[].number' <<<"$scope"); do
   c=$(jq --arg d "$yday" '[.[]|select(.user.login=="coderabbitai[bot]" and .submitted_at >= $d)]|length' <<<"$revs")
   online=$(( online + ${c:-0} ))
   sha=$(jq -r --argjson n "$n" '.[]|select(.number==$n)|.head.sha' <<<"$scope")
-  e=$(gh api "repos/$REPO/commits/$sha/status" \
-      --jq '[.statuses[]?|select(.context=="review-evidence" and .state=="error")]|length' 2>/dev/null)
+  # Same rule as the classify loop above: a failed lookup is "could not
+  # determine", not "no error". Collapsing them would hide exactly the false-reds
+  # this count exists to surface.
+  est=$(gh api "repos/$REPO/commits/$sha/status" 2>/dev/null) || {
+    say "ERROR: cannot read status for #$n ($sha) while counting gate errors"; exit 1; }
+  e=$(jq '[.statuses[]?|select(.context=="review-evidence" and .state=="error")]|length' <<<"$est")
   errors=$(( errors + ${e:-0} ))
 done
 
@@ -196,7 +200,9 @@ for n in $merged_ids; do
   hist=$(api_array "repos/$REPO/commits/$sha/statuses?per_page=100") || continue
   first_fail=$(jq -r '[.[]|select(.context=="review-evidence" and .state=="failure")]|if length>0 then (.[-1].created_at) else empty end' <<<"$hist")
   cleared=$(jq -r '[.[]|select(.context=="review-evidence" and .state=="success")]|if length>0 then (.[0].created_at) else empty end' <<<"$hist")
-  [ -n "$first_fail" ] && [ -n "$cleared" ] || continue
+  # Explicit `if` rather than `A && B || continue`: in that form C also runs when
+  # A fails, which is only harmless here by coincidence.
+  if [ -z "$first_fail" ] || [ -z "$cleared" ]; then continue; fi
   m=$(( ( $(date -u -d "$cleared" +%s) - $(date -u -d "$first_fail" +%s) ) / 60 ))
   [ "$m" -lt 0 ] && continue
   stall_total=$(( stall_total + m )); stall_n=$(( stall_n + 1 ))
@@ -270,6 +276,9 @@ EOF
 )
 
 if [ "$DRY" = "--dry-run" ]; then printf '%s\n' "$body"; exit 0; fi
-gh api -X POST "repos/$REPO/issues/$ISSUE/comments" -f body="$body" --silent \
-  && say "posted day $DAY digest to $REPO#$ISSUE" \
-  || { say "ERROR: failed to post digest"; exit 1; }
+if gh api -X POST "repos/$REPO/issues/$ISSUE/comments" -f body="$body" --silent; then
+  say "posted day $DAY digest to $REPO#$ISSUE"
+else
+  say "ERROR: failed to post digest"
+  exit 1
+fi
