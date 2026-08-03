@@ -42,10 +42,20 @@ The `mage observe` seam above records the *trail*; the lesson and recurrence sta
 
 Claude Code writes memories on its own. `mage connect` points its `autoMemoryDirectory` at the knowledge base and wires a **Gate-0** `PreToolUse` hook on `Write`/`Edit`. When the host saves a memory, Gate-0 fires before the file touches disk and:
 
-- **scrubs** secrets and PII out of the content (the same redactor the rest of the pipeline uses) and **maps** it into mage's note schema, so it lands as a well-formed, redacted note; or
+- **scrubs** secrets and PII out of the content before it touches disk (the same redactor the rest of the pipeline uses), so the write lands redacted — the frontmatter is deliberately left alone, since normalization to mage's schema happens later, at the durable boundary; or
 - **denies** the write outright if it targets a generated index (`INDEX.md`, `MEMORY.md`, a wing index) — mage owns those and regenerates them.
 
 The result lands flat at the docs-root top as a **capture inbox** file. It is not committed knowledge yet: the next `mage groom` ingests the inbox into `.mage/staging/` and routes it through the same human-confirm gate as every other draft. See [Stage and groom](./stage-groom.md).
+
+```mermaid Gate-0 on Claude Code: a native-memory write is intercepted before disk — a generated-index target is denied, a flat topic note is scrubbed in-flight and lands as a capture-inbox note, and the next groom ingests it into staging. Anything else passes untouched.
+flowchart TD
+  w["host native-memory Write / Edit"] --> g0{"Gate-0 · PreToolUse intercept"}
+  g0 -->|"targets a generated index<br/>(INDEX.md · MEMORY.md · _index.*.md)"| d["deny — mage owns it;<br/>mage index regenerates it"]
+  g0 -->|"a flat .md note at the docs root"| s["scrub secrets in-flight —<br/>redacted before any byte hits disk"]
+  g0 -->|"anything else"| p["pass untouched"]
+  s --> i["capture-inbox note at the docs-root top"]
+  i --> gr["mage groom ingests it into .mage/staging/ —<br/>the same human-confirm gate as every draft"]
+```
 
 Like `mage observe`, Gate-0 is **fail-open**: any stdin/parse/redact/filesystem error emits nothing and exits clean, so a capture gate can never block the host's write. It is adapter-specific and active only when Claude Code's `autoMemoryEnabled` is on; on other harnesses the volitional directive (write a mage note to the inbox) is the capture path.
 

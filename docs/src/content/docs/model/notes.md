@@ -32,6 +32,17 @@ A note carries an optional `type` in its frontmatter. Per ADR-0041, `type` maps 
 
 Any string is legal; unrecognized types are unclassified and sit at rung 3 (on-demand only). Custom types can be mapped to one of the four standard genres (`memory`, `decision`, `work`, `doc`) via the optional `genres` map in `metadata.json` (e.g. `"genres": { "runbook": "memory" }`). Legacy strings (`playbook`, `interface`, `tooling`, `topology`, `relationship`, `trail`) remain legal but map to **unclassified** (rung 3).
 
+The whole resolution in one table. A **rung** is how a note reaches the agent: rung 1 is a skill auto-loaded on its trigger, rung 2 is an always-loaded index line, rung 3 is the note body read on demand (every note has rung 3). The map is the `TYPE_TO_GENRE` constant in `src/scanner/genre-map.ts`; the rungs are ADR-0041's:
+
+| `type:` | genre | rung | which surface it reaches |
+| --- | --- | --- | --- |
+| `gotcha` `procedure` `pointer` `principle` `feedback` `reference` `note` | memory | 2 — and 1 once graduated | a line in `INDEX.md`, eligible for the `MEMORY.md` roster; a graduated note adds its own auto-loaded skill |
+| `decision` | decision | 3 | on demand only, plus the one standing governance line both surfaces carry |
+| `plan` `tasks` | work | 3 | on demand only |
+| `spec` `doc` | doc | 3 | on demand only |
+| `runbook` — custom, mapped with `"genres": { "runbook": "memory" }` | memory | 2 | exactly as a built-in memory type |
+| `playbook` — a legacy string, no mapping | unclassified | 3 | on demand only; `mage doctor` annotates, never rejects |
+
 Non-memory types (`plan`, `spec`, `tasks`, `decision`) remain legal note types for storage and linking, but are non-memory genres (`work`, `doc`, `decision` per ADR-0041) that are excluded from always-loaded recall — authored deliberately rather than as default destinations for captured knowledge:
 - **decision** — an ADR: a choice, the reasoning, and what it rules out (stored in `mage/decisions/`).
 - **spec** / **plan** / **tasks** — specifications, forward work plans, and checklists (stored in `mage/work/` or repo docs).
