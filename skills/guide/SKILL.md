@@ -111,6 +111,15 @@ See `CONVENTIONS.md` for the full spec. Essentials:
   (`- depends_on [x](x.md)`).
 - **Genre & recall rungs (ADR-0041):** Note `type` maps to a genre that determines its recall rung — see `mage/decisions/0041-genre-decides-the-recall-rung.md`. Memory-genre notes (`gotcha`, `procedure`, `pointer`, `principle`, `feedback`, `reference`, `note`) form the recall-bearing set: every one of them lands in `INDEX.md`, and passing the genre filter makes a note *eligible* for the `MEMORY.md` roster rather than guaranteeing a slot — that roster carries only the top-K by rank (usage-proven first where local metrics exist, else recency). Non-memory genres (`decision`, `plan`, `tasks`, `spec`) are legal for storage and linking but are excluded from recall entirely — `mage/work/` is the home for plans/specs/task lists, while `mage/decisions/` holds decision records.
 
+| `type:` | genre | rung |
+|---|---|---|
+| `gotcha` `procedure` `pointer` `principle` `feedback` `reference` `note` | memory | 2 — `INDEX.md` line, `MEMORY.md`-eligible (1 once graduated) |
+| `decision` | decision | 3 — on demand |
+| `plan` `tasks` | work | 3 — on demand |
+| `spec` `doc` | doc | 3 — on demand |
+| custom, mapped via `metadata.json` `genres` (e.g. `"runbook": "memory"`) | as mapped | that genre's rung |
+| anything else (incl. legacy `playbook`, `interface`, …) | unclassified | 3 — on demand |
+
 After editing notes, run `mage index` — it regenerates **both** recall surfaces
 (`INDEX.md` and `MEMORY.md`) in one pass; never hand-edit either. At a hub root
 it also fans out to regenerate each `projects/<name>/`'s own pair. If a new wing
