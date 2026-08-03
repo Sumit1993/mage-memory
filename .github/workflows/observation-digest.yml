@@ -1,0 +1,63 @@
+# Daily digest for the CLI-first observation week. See
+# .github/scripts/observation-digest.sh for what it measures and why.
+#
+# Posts to an issue in THIS repo, not to the cross-repo tracker: GITHUB_TOKEN is
+# scoped to its own repository, so commenting on prismalens/prismalens#301 would
+# need a PAT. The data belongs with the repo it describes anyway; #301 links here.
+#
+# Delete this workflow when the observation week is over and the decision is made.
+name: Observation digest
+
+on:
+  schedule:
+    # 08:20 UTC. Off the top of the hour — scheduled runs are delayed or dropped
+    # under load, and the script is idempotent per calendar day so a late or
+    # doubled firing is harmless.
+    - cron: '20 8 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Print the digest instead of posting it
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: write
+  # Required: the digest reads review-evidence commit statuses. With an explicit
+  # permissions block, unlisted scopes default to none — and local dry runs use a
+  # personal token with full scope, so this cannot be caught by testing outside CI.
+  statuses: read
+
+concurrency:
+  group: observation-digest
+  cancel-in-progress: false
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+          sparse-checkout-cone-mode: false
+
+      - name: Post digest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          ISSUE: ${{ vars.OBSERVATION_ISSUE }}
+        run: |
+          if [ -z "${ISSUE:-}" ]; then
+            echo "::error::Repository variable OBSERVATION_ISSUE is not set."
+            echo "Set it to the digest target issue number: gh variable set OBSERVATION_ISSUE --body <n>"
+            exit 1
+          fi
+          chmod +x .github/scripts/observation-digest.sh
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            ./.github/scripts/observation-digest.sh --dry-run | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            ./.github/scripts/observation-digest.sh
+          fi
