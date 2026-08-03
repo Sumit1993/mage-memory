@@ -96,8 +96,11 @@ if [ -z "$floor" ]; then floor=$(date -u +%FT%TZ); CLIPPED=1; else CLIPPED=0; fi
 prs=$(gh api "repos/$REPO/pulls?state=all&sort=updated&direction=desc&per_page=100" 2>/dev/null) \
   || { say "ERROR: cannot list PRs"; exit 1; }
 oldest=$(jq -r 'if length>0 then (.[-1].updated_at) else "" end' <<<"$prs")
+pr_count=$(jq 'length' <<<"$prs")
+# Truncation needs a FULL page: a short page holds every PR there is, so an
+# oldest-inside-the-window means recency, not a cut-off.
 TRUNCATED=0
-[ -n "$oldest" ] && [[ "$oldest" > "$since" ]] && TRUNCATED=1
+[ "$pr_count" -eq 100 ] && [ -n "$oldest" ] && [[ "$oldest" > "$since" ]] && TRUNCATED=1
 
 # Narrow to the window once; every count below derives from this set.
 scope=$(jq --arg since "$since" '[ .[] | select(.updated_at >= $since) ]' <<<"$prs")
@@ -146,9 +149,14 @@ fi
 # Online rounds are counted separately as formal reviews.
 rounds_detail=""; rounds_total=0; rounds_prs=0; rounds_max=0
 for n in $merged_ids; do
-  cm=$(api_array "repos/$REPO/issues/$n/comments?per_page=100") || continue
+  # Same fail-loud rule as the classify loop: a failed lookup is "could not
+  # determine", and folding it into the average as a skip or a zero would skew
+  # the one number this digest exists to measure.
+  cm=$(api_array "repos/$REPO/issues/$n/comments?per_page=100") || {
+    say "ERROR: cannot read comments for #$n while counting rounds"; exit 1; }
   cli_rounds=$(jq '[.[]|select(.body|test("<!-- cr-cli-review: "))]|length' <<<"$cm")
-  rv=$(api_array "repos/$REPO/pulls/$n/reviews?per_page=100") || rv='[]'
+  rv=$(api_array "repos/$REPO/pulls/$n/reviews?per_page=100") || {
+    say "ERROR: cannot read reviews for #$n while counting rounds"; exit 1; }
   on_rounds=$(jq '[.[]|select(.user.login=="coderabbitai[bot]")]|length' <<<"$rv")
   r=$(( ${cli_rounds:-0} + ${on_rounds:-0} ))
   [ "$r" -eq 0 ] && continue
