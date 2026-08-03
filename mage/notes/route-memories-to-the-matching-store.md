@@ -33,7 +33,7 @@ in every repo. It then never surfaces anywhere else.
   this repo's `mage/notes/`.
 - **Future agents in ANY repo** (user preference, environment constraint, tool behavior,
   delegation doctrine) → the user-level store: global `~/.claude/CLAUDE.md` or a
-  [claude-kit](https://github.com/Sumit1993/claude-kit) skill. Until
+  [claude-kit](https://github.com/Sumit1993/claude-kit) skill (private repo). Until
   [FT-20 — a global user-level hub](../work/future-thoughts.md#ft-20--a-global-user-level-hub-personal-cross-system-memory----soak-raw-author-note-3)
   exists, those two are the user tier.
   Interim contract: the harness autoMemoryDirectory currently points at this repo's
