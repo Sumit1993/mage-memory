@@ -37,6 +37,7 @@ there the hub root itself is the knowledge base.
 | `mode` | Docs root |
 |--------|-----------|
 | `in-repo`  | `<code-repo>/mage/` |
+| `hybrid`   | `<code-repo>/mage/` (plus hub registrations in `hub_refs[]`) |
 | `external` | `<hub root>/projects/<project>/` |
 
 The hub root itself (ADR-0043) is **derived from `hub_repo`** — one deterministic
@@ -44,8 +45,9 @@ location per remote, at `~/.mage/hubs/<host>/<owner>/<repo>` (`$MAGE_HOME/hubs`
 when set) — never read off a recorded path. `hub_path` is a deprecated fallback,
 used only when `hub_repo` is absent or doesn't resolve.
 
-Hybrid (mode=in-repo with non-empty `hub_refs[]`): docs root is the in-repo
-`mage/`; each `hub_ref` is a cross-cutting registration with a hub.
+Hybrid is its own mode value (`"hybrid"`): docs root is the in-repo `mage/`;
+each `hub_ref` is a cross-cutting registration with a hub. (A schema-v1 file
+recorded as mode=in-repo with non-empty `hub_refs[]` is read as hybrid.)
 
 Inside a docs root:
 
@@ -147,7 +149,7 @@ Code-repo side (`<repo>/mage/metadata.json`):
 ```jsonc
 {
   "schema": "mage.v1",
-  "mode": "in-repo",                 // or "external"
+  "mode": "in-repo",                 // "in-repo" | "hybrid" | "external"
   "project": "my-api",
   "hub_repo": null,                  // set when external OR hub_refs non-empty — the AUTHORITATIVE address (ADR-0043)
   "hub_path": null,                  // deprecated fallback, read only when hub_repo is absent/unresolved
