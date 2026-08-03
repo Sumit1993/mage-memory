@@ -28,9 +28,12 @@ stopped, or it was still running when the session died. Diagnosed 2026-07-30 on 
 prismalens `docs-site-review-reuse` workflow — the post-compact session could not
 reconstruct what had happened, because there was nothing to read.
 
-**Do not diagnose from absence.** Check durable side-effects instead: the task's output
-file under the session scratchpad (`…/tasks/<task-id>.output`), the artifact the workflow
-was supposed to produce, a branch/commit it would have pushed.
+**Do not diagnose from absence.** Check durable side-effects instead — in this order,
+because the first two stay readable from anywhere: the artifact the workflow was supposed
+to produce, a branch/commit it would have pushed, and the task's output file under the
+session scratchpad (`…/tasks/<task-id>.output`). The scratchpad sits outside the project
+root, so context-mode tools cannot read it directly — copy it in or use plain shell (see
+[context-mode-blocks-files-outside-project-root](context-mode-blocks-files-outside-project-root.md)).
 
 **Prevention is the anti-stall doctrine:** any work expected to outlive a turn must key on
 durable evidence it writes itself — a log file plus an exit sentinel, an artifact, a commit —

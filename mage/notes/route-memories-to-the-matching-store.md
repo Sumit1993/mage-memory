@@ -34,11 +34,14 @@ in every repo. It then never surfaces anywhere else.
 - **Future agents in ANY repo** (user preference, environment constraint, tool behavior,
   delegation doctrine) → the user-level store: global `~/.claude/CLAUDE.md` or a
   [claude-kit](https://github.com/Sumit1993/claude-kit) skill. Until
-  [FT-20 — a global user-level hub](../work/future-thoughts.md#ft-20--a-global-user-level-hub-personal-cross-system-memory)
+  [FT-20 — a global user-level hub](../work/future-thoughts.md#ft-20--a-global-user-level-hub-personal-cross-system-memory----soak-raw-author-note-3)
   exists, those two are the user tier.
+  Interim contract: the harness autoMemoryDirectory currently points at this repo's
+  `mage/`, so this KB actively doubles as that user store — user-level notes MAY live
+  here until FT-20 lands, each carrying a scope note that links this principle.
 - **mage the product** (a design idea the tool should absorb) → an FT entry in
   [future-thoughts](../work/future-thoughts.md), not a note.
 
-**The tell:** the draft's subject is "the user", "agy", "Claude Code", or "my machine"
+**The tell:** the draft's subject is "the user", the user's tooling (agy, Claude Code), or "my machine"
 rather than this repo's code or KB — that's a user-level memory wearing a repo note's
 clothes.
