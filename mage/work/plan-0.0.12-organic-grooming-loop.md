@@ -442,7 +442,7 @@ candidate is ripe — never auto-grooms, never commits.
   (the same channel context-mode uses). E.g. *"mage: the 'rollup' workflow recurred 5× —
   capture it as a playbook? (`mage:groom`)"*.
 - **Single-chat fit:** SessionStart fires on every compact (`source: "compact"`), so this
-  surfaces at each chapter boundary — exactly the single-chat-compaction-workflow user's
+  surfaces at each chapter boundary — exactly the single-chat compaction workflow user's
   reflection moment. SessionEnd covers multi-session users.
 - **Anti-nag:** throttle via a tiny state file (nudge at most once per N hours, and only on a
   NEW threshold crossing since the last nudge).
