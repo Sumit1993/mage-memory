@@ -91,8 +91,13 @@ The claimed-name registry is the `_local/` directory itself plus each hub's
 self-address (below). For candidate `<name>`:
 
 - `~/.mage/hubs/_local/<name>` absent → claim it.
-- Present and its `metadata.json` self-address records THIS hub (same realpath
-  identity) → already migrated; the run is an idempotent no-op for that hub.
+- Present and provably THIS hub, already migrated → idempotent no-op. Proof is
+  the journal-recorded `migrated_from` (the pre-move realpath, also written
+  into the hub-side metadata at step 2): it must equal the source being
+  migrated AND that source directory must now be absent. A matching name with
+  a different or missing `migrated_from`, or a still-present source, is a
+  CONFLICT, never a no-op — after the move the original path cannot be
+  re-derived, so the recorded anchor is the only honest identity.
 - Present but a DIFFERENT hub → fallback chain, first free wins:
   `<parent-segment>-<basename>` (both folded), then `<basename>-2`, `-3`, …
   The chain is deterministic given the same `_local/` contents, and the chosen
@@ -100,8 +105,10 @@ self-address (below). For candidate `<name>`:
 - `--name <n>` overrides the chain entirely (grammar-checked, conflict-checked,
   refuses a taken name rather than chaining).
 
-Two distinct hubs sharing a basename migrate in path-sorted order, so which one
-gets the bare name is reproducible.
+Hubs migrate in realpath-sorted order GLOBALLY, and collisions are detected on
+FOLDED candidates, not raw basenames — `My Hub` and `my-hub` are different
+basenames but one folded name. Which hub gets the bare name is therefore
+reproducible for any starting set.
 
 **The claim is the rename itself — no lockfile.** `rename(2)` into
 `~/.mage/hubs/_local/<name>` fails (`ENOTEMPTY`/`EEXIST`) if the destination
@@ -122,8 +129,17 @@ mid-hub is visibly incomplete rather than silently half-done):
    printed for the user instead. The ADR's identity check requires the hub AT
    the derived path, so registering-in-place is not an option.
 2. **Hub-side self-address**: the hub's own `metadata.json` records
-   `local://<name>` — this is the arrival-verification anchor that replaces
-   origin-match for local hubs (ADR-0044 amends §2).
+   `local://<name>` plus `migrated_from` (the pre-move realpath), and takes the
+   same `schema` bump. Invariant, stated rather than assumed: hub-side metadata
+   is hub-shaped — it never carries top-level `hub_path` or `hub_refs[]`
+   (those are referrer fields); if a hand-edited hub file carries them anyway,
+   migrate refuses and names the file rather than guess. The self-address is
+   the arrival-verification anchor that replaces origin-match for local hubs
+   (ADR-0044 amends §2). On the claim primitive: a pre-existing EMPTY
+   destination directory is treated as a stale placeholder and taken over
+   (`rename(2)` semantics); anything non-empty fails the claim — which is the
+   property the race depends on, so no stronger no-replace primitive is
+   required.
 3. **Each referring code repo's `mage/metadata.json`**:
    - top-level: `hub_repo` → `local://<name>`; `hub_path` →
      `~/.mage/hubs/_local/<name>` (kept POINTING AT THE NEW LOCATION — see
@@ -134,12 +150,14 @@ mid-hub is visibly incomplete rather than silently half-done):
 4. `schema` bumps (`mage.v2` → `mage.v3`) so the EXISTING doctor drift check
    flags un-migrated files with zero new wiring.
 
-**Re-runs resume.** `mage migrate` reads the newest journal before normal
-detection; an incomplete hub (some phases recorded, some not) is finished
-first — every step is idempotent, so replaying a completed one is a no-op —
+**Re-runs resume.** `mage migrate` scans the journal directory before normal
+detection — not just the newest file — and selects every journal with an
+incomplete hub (some phases recorded, some not). One incomplete hub is
+finished first — every step is idempotent, so replaying a completed one is a no-op —
 or, when resumption is unsafe (the journal's recorded state no longer matches
-disk), the run refuses and points at `--rollback`. Only then does normal
-detection proceed.
+disk), the run refuses and points at `--rollback`. More than one incomplete
+journal is itself a refusal — resolve or roll back explicitly before any new
+migration. Only then does normal detection proceed.
 
 A single `mage migrate` run only rewrites metadata files it can see (the current
 repo/walk-up, per existing migrate scope). Other machines/repos referencing the
@@ -158,7 +176,11 @@ and why (basename + fold), the move (`src → dst`), and every field rewrite
 
 - **New mage, old metadata** (fs-path `hub_repo`): canonicalization fails →
   `chosenHubRoot` falls back to `hub_path` exactly as today → works; doctor
-  nags with the migrate advisory. No breakage.
+  nags with the migrate advisory. No breakage. The degenerate shape — local
+  `hub_repo` with NO `hub_path` (the link.ts remote-fallback bug that
+  motivated ADR-0044) — resolves in no version today; migration is strictly
+  additive for it, and writing `hub_path` at step 3 gives old mage a fallback
+  that shape never had.
 - **Old mage, migrated metadata**: `local://` fails the OLD canonicalizer →
   falls back to `hub_path` — which the migration deliberately rewrote to the
   hub's NEW location. Old mage follows the plain path and works. This is the
@@ -185,9 +207,10 @@ surface). Then `mage migrate --rollback <journal>`:
   values, never `git checkout` of the whole file, so an unrelated edit made
   after migration survives rollback.
 - **Refuses on divergence rather than guess**: a metadata file whose relevant
-  fields no longer match the migrated values, or a moved hub with commits made
-  after the journal (`git log` count check), stops the rollback with both
-  states named. Git remains the deeper restore for tracked files; the journal
+  fields no longer match the migrated values, or a moved hub whose `HEAD`
+  commit id differs from the one recorded in the journal at migration time
+  (identity, not a commit-count heuristic — counts miss amend/rebase), stops
+  the rollback with both states named. Git remains the deeper restore for tracked files; the journal
   prints the exact paths involved.
 - **Reverses the move** by `rename(2)`ing the hub back, only after the field
   checks pass.
