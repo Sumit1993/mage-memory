@@ -22,7 +22,7 @@ keywords:
   - allow-rule
   - sandbox
 ---
-# Gotcha — ctx_execute_file refuses any path outside the project root, and the scratchpad always is
+# Gotcha — ctx_execute_file refuses paths outside the project root, and the scratchpad is always outside it
 
 `ctx_execute_file` hard-fails with
 *"File access blocked: … resolves outside the project root"* for any path not under the
@@ -41,7 +41,8 @@ outside-root path succeeds — so its safety rests on host-level sandboxing, not
 **Procedure (pick one, in order of preference):**
 
 1. **Read the file with inline code in `ctx_execute`** (`fs.readFileSync(path)`) instead of
-   `ctx_execute_file` — same Think-in-Code effect, no confinement.
+   `ctx_execute_file` — same Think-in-Code effect, without the
+   `ctx_execute_file` project-root check; host-level sandboxing still applies.
 2. **Generate the artifact inside the repo** in a throwaway dir (e.g. `.mage/tmp/`), process
    it, and `rm -rf` the dir before any commit — check `git check-ignore` first; `.mage/tmp/`
    is NOT gitignored.
