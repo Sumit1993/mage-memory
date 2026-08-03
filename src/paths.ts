@@ -453,7 +453,8 @@ export async function findCodeRepoRoot(startDir: string): Promise<string | null>
  *  - repo KB:  the nearest ancestor with `mage/metadata.json` (mode=in-repo or
  *              mode=hybrid) → that repo's `mage/`. Reported as kind "repo".
  *  - external: that metadata is mode=external → the HUB project it points to
- *              (`<hub_path>/projects/<project>/`), so captures/grooming land in the
+ *              (`<derived hub root>/projects/<project>/`, resolved via the shared
+ *              {@link chosenHubRoot} — ADR-0043), so captures/grooming land in the
  *              hub, not the code repo. Reported as kind "hub" (a hub-owned project
  *              is a flat docs root living inside the hub's repo); `repo` is the hub.
  *  - hub:      `startDir` is a hub root, or sits inside one. Inside a hub-owned
@@ -470,7 +471,7 @@ export async function resolveDocsRoot(
   // Walk up looking for a code-repo `mage/metadata.json` (in-repo/hybrid/external).
   const codeRepo = await findCodeRepoRoot(abs);
   if (codeRepo) {
-    // Honor mode=external by following hub_path; a bad read degrades to repo KB.
+    // Honor mode=external by resolving its hub (chosenHubRoot); a bad read degrades to repo KB.
     const external = await externalDocsRoot(codeRepo).catch(() => null);
     return (
       external ?? { root: codeRepoDocsRoot(codeRepo), kind: "repo", repo: codeRepo }

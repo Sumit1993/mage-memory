@@ -6,9 +6,10 @@ Contributions of all sizes are welcome.
 
 ## Ground rules
 
-- **`main` is protected.** Every change lands through a pull request with green
-  CI. Direct pushes to `main` are not allowed (for anyone, including the
-  maintainer).
+- **`main` is protected.** Every change lands through a pull request that
+  passes CI and carries review evidence (see
+  [Making a change](#making-a-change)). Direct pushes to `main` are not allowed
+  (for anyone, including the maintainer).
 - **mage never runs git for you, and never commits secrets.** Capture *insight,
   procedure, and pointers* — never copies of sources. Redaction gates exist for
   a reason; do not weaken them.
@@ -45,11 +46,24 @@ node dist/cli.js --help
 3. Make sure `pnpm typecheck`, `pnpm build`, and `pnpm test` all pass.
 4. **Commit** using [Conventional Commits](https://www.conventionalcommits.org/):
    `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`, `ci:`, `perf:`.
-5. **Open a PR** against `main`. CI must be green before it can merge. It runs
-   two matrices (`.github/workflows/ci.yml`): **build & test** — typecheck,
-   build, and test on Node **22 and 24** — and **cli smoke** — install the
-   packed tarball and run the CLI on Node **20 and 22**. Node 20 is the floor
-   the package declares, so the smoke job is what holds that promise.
+5. **Open a PR** against `main`. Two required checks gate the merge:
+   - **CI** (`.github/workflows/ci.yml`) runs two matrices: **build & test** —
+     typecheck, build, and test on Node **22 and 24** — and **cli smoke** —
+     install the packed tarball and run the CLI on Node **20 and 22**. Node 20
+     is the floor the package declares, so the smoke job is what holds that
+     promise.
+   - **`review-evidence`** (`.github/scripts/review-evidence.sh`) is a commit
+     status keyed to the PR's **head SHA** — every push invalidates prior
+     evidence until the new head is reviewed. It is satisfied by either a
+     **formal CodeRabbit review at the current head** (auto-review is opt-in:
+     add the `review-ready` label, or comment `@coderabbitai review`) or a
+     **local CodeRabbit CLI review** whose marker comment
+     (`<!-- cr-cli-review: <head sha> -->`) is posted by a maintainer.
+     Bot-authored PRs (dependabot, github-actions) and release-please release
+     PRs are exempt — the CI gate still applies to them. During the
+     observation week, a temporary workflow
+     (`.github/workflows/observation-digest.yml`) posts daily review-lane
+     metrics to issue #130 (the observation-week digest thread).
 
 ## Working with the mage knowledge base
 
