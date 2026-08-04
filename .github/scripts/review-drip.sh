@@ -100,6 +100,22 @@ PRIORITY_LABEL="${PRIORITY_LABEL:-cr:priority}"
 REVIEWER_LOGINS="${REVIEWER_LOGINS:-coderabbitai[bot]}"
 
 # MIRRORS `.coderabbit.yaml` reviews.auto_review.ignore_title_keywords.
+#
+# Word boundaries, deliberately, and a CLI review argued for plain substring
+# matching to mirror CodeRabbit exactly. Rejected — not because substring is
+# wrong about CodeRabbit, but because of which way the two mistakes fail.
+#
+# Too strict (this version) on a title like "Swipe gesture fix": the PR is
+# promoted, CodeRabbit declines it, the tick records `skipped` and posts a note
+# ON THE PR. Cost: one label edit, which is free, and the failure announces
+# itself exactly where someone will see it.
+#
+# Too loose (substring): the PR is never promoted at all. It sits in `cr:queue`
+# forever, mentioned only in run summaries nobody re-reads, waiting for a human
+# to notice that "swipe" contains "wip".
+#
+# Attempting and being refused is how this whole design is meant to discover
+# things. A silent permanent exclusion is not.
 # A WIP-titled PR is not auto-reviewed even when labelled, so promoting one
 # spends a tick and admits nothing. Excluded here rather than discovered as a
 # `none` outcome — but excluded LOUDLY: every queued-and-excluded PR is named in
@@ -172,6 +188,14 @@ PAUSE_SETTLE_S="${PAUSE_SETTLE_S:-120}"
 # turns an empty override back into the default, so the reachable mistake is
 # `PAT_STARTED=" "` — which is not empty, matches every body containing a space,
 # and therefore matches everything.
+# Both tools are assumed by every function below. Absent, `api_query` fails and
+# the confirm step reports `unknown` — "the GitHub API would not answer us" —
+# when the truth is that this machine has no jq. Naming the real cause here
+# costs two lines and saves that misdiagnosis.
+for _t in gh jq; do
+  command -v "$_t" >/dev/null 2>&1 || { echo "ERROR: $_t is required and not on PATH" >&2; exit 2; }
+done
+
 for _v in CONFIRM_TIMEOUT_S CONFIRM_INTERVAL_S PAUSE_SETTLE_S; do
   case "${!_v}" in
     ''|*[!0-9]*) echo "ERROR: $_v must be a non-negative integer (got '${!_v}')" >&2; exit 2 ;;
@@ -192,6 +216,24 @@ for _v in PAT_RATE_LIMITED PAT_PAUSED PAT_STARTED PAT_SKIPPED IGNORE_TITLE_RE \
     *) echo "ERROR: $_v must not be blank (got '${!_v}')" >&2; exit 2 ;;
   esac
 done
+
+# A pattern that does not COMPILE is worse than one that does not match: grep
+# exits 2 on a bad regex, `grep -q` reports it as "no match", and the tick then
+# records `none` — CodeRabbit ignored us — for a promotion nobody ever
+# classified. Compile each one against empty input, where rc 0/1 mean the regex
+# is valid and rc >1 means it is not.
+for _v in PAT_RATE_LIMITED PAT_PAUSED PAT_STARTED PAT_SKIPPED; do
+  printf '' | grep -qEi -- "${!_v}" 2>/dev/null
+  [ $? -le 1 ] || { echo "ERROR: $_v is not a valid extended regex: '${!_v}'" >&2; exit 2; }
+done
+# IGNORE_TITLE_RE is an Oniguruma regex used inside jq's `test()`, not an ERE,
+# so it needs jq to vouch for it. Invalid, it aborts the whole selection query
+# and the run reports "cannot list open PRs" — true, but not the reason.
+# NOT `jq -e`: with -e the exit status reports the RESULT, so a perfectly valid
+# regex that simply does not match the empty string would be rejected as
+# malformed. Plain jq exits non-zero only when the regex fails to compile.
+jq -n --arg re "$IGNORE_TITLE_RE" '"" | test($re)' >/dev/null 2>&1 \
+  || { echo "ERROR: IGNORE_TITLE_RE is not a valid jq regex: '$IGNORE_TITLE_RE'" >&2; exit 2; }
 
 # ---------------------------------------------------------------------------
 
