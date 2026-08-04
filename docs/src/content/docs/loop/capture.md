@@ -42,7 +42,7 @@ The `mage observe` seam above records the *trail*; the lesson and recurrence sta
 
 Claude Code writes memories on its own. `mage connect` points its `autoMemoryDirectory` at the knowledge base and wires a **Gate-0** `PreToolUse` hook on `Write`/`Edit`. When the host saves a memory, Gate-0 fires before the file touches disk and:
 
-- **scrubs** secrets and PII out of the content before it touches disk (the same redactor the rest of the pipeline uses), so the write lands redacted — the frontmatter is deliberately left alone, since normalization to mage's schema happens later, at the durable boundary; or
+- **scrubs** secrets and PII out of the content before it touches disk (the same redactor the rest of the pipeline uses), so the write lands redacted — the frontmatter is deliberately left alone, since normalization to mage's schema happens later, at the durable boundary. The scrub is a pure-regex rewrite of the raw bytes — no parse step that could fail — and the hook honors the same fail-open contract as `mage observe`: an infrastructure error passes the write through rather than breaking the session (deny exists only for generated-index targets); or
 - **denies** the write outright if it targets a generated index (`INDEX.md`, `MEMORY.md`, a wing index) — mage owns those and regenerates them.
 
 The result lands flat at the docs-root top as a **capture inbox** file. It is not committed knowledge yet: the next `mage groom` ingests the inbox into `.mage/staging/` and routes it through the same human-confirm gate as every other draft. See [Stage and groom](./stage-groom.md).

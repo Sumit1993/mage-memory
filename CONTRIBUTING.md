@@ -7,8 +7,8 @@ Contributions of all sizes are welcome.
 ## Ground rules
 
 - **`main` is protected.** Every change lands through a pull request that
-  passes CI and carries review evidence (see
-  [Making a change](#making-a-change)). Direct pushes to `main` are not allowed
+  passes CI and — unless it is a bot or release-please PR, which are exempt —
+  carries review evidence (see [Making a change](#making-a-change)). Direct pushes to `main` are not allowed
   (for anyone, including the maintainer).
 - **mage never runs git for you, and never commits secrets.** Capture *insight,
   procedure, and pointers* — never copies of sources. Redaction gates exist for
