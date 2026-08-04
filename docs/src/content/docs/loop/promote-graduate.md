@@ -21,7 +21,7 @@ Some notes are not just facts but *procedures* — a playbook or a gotcha with a
 
 Only **procedural** notes graduate. A skill is loaded into the agent's context to *do* something, so it must be an actionable procedure — you auto-load a procedure, not a fact. Principle, reference, and interface notes carry knowledge but no method to run, so they stay notes.
 
-Graduation is driven by the `/mage:graduate` skill. It reads the deterministic engine for graduate candidates, shows you the backing note plus the usage evidence, and on your confirmation mints the `mage-skill-<slug>` (in both `.claude/skills/` and `.agents/skills/`) and re-points the note at it. The note is never deleted.
+Graduation is driven by the `/mage:graduate` skill. It reads the deterministic engine for graduate candidates, shows you the backing note plus the usage evidence, and on your confirmation pipes the proposal to `mage dream --apply` — the single serialized writer — which mints the `mage-skill-<slug>` (in both `.claude/skills/` and `.agents/skills/`) and re-points the note at it. The note is never deleted.
 
 ```bash
 # (Plumbing the /mage:graduate skill runs for you.) Surface graduate candidates:

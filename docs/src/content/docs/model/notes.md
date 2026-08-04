@@ -36,7 +36,8 @@ The whole resolution in one table. A **rung** is how a note reaches the agent: r
 
 | `type:` | genre | rung | which surface it reaches |
 | --- | --- | --- | --- |
-| `gotcha` `procedure` `pointer` `principle` `feedback` `reference` `note` | memory | 2 — and 1 once graduated | a line in `INDEX.md`, eligible for the `MEMORY.md` roster; a graduated note adds its own auto-loaded skill |
+| `gotcha` `procedure` | memory | 2 — and 1 once graduated | a line in `INDEX.md`, eligible for the `MEMORY.md` roster; a graduated procedural note adds its own auto-loaded skill |
+| `pointer` `principle` `feedback` `reference` `note` | memory | 2 | a line in `INDEX.md`, eligible for the `MEMORY.md` roster |
 | `decision` | decision | 3 | on demand only, plus the one standing governance line both surfaces carry |
 | `plan` `tasks` | work | 3 | on demand only |
 | `spec` `doc` | doc | 3 | on demand only |
@@ -49,7 +50,7 @@ Non-memory types (`plan`, `spec`, `tasks`, `decision`) remain legal note types f
 
 Before authoring a memory note, walk the **better home** ladder (code comment → ticket/`mage/work/` → doc beside code → artifact+pointer → skill → decision → memory) to ensure memory is the right home.
 
-The two procedural types — **procedure** and **gotcha** — are special: only procedural notes can later [graduate](../loop/promote-graduate.md) into their own auto-loaded skill, because you push a procedure but you pull a fact.
+The two procedural types — **procedure** and **gotcha** — are special: only procedural notes can later [graduate](../loop/promote-graduate.md) into their own auto-loaded skill, because you push a procedure but you pull a fact. (Known drift: the code's `isProcedural` gate currently accepts the legacy `playbook` in place of `procedure` — tracked in [#137](https://github.com/Sumit1993/mage-memory/issues/137).)
 
 ## Frontmatter and the lifecycle fields
 
