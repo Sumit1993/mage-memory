@@ -60,7 +60,17 @@
 set -uo pipefail
 
 REPO="${REPO:?REPO must be set (owner/name)}"
-DRY_RUN="${DRY_RUN:-0}"
+
+# DRY_RUN is normalised rather than compared against "1", and the asymmetry is
+# deliberate: the two mistakes are not equally expensive. Reading a truthy value
+# as false promotes a PR for real and may spend a review from a scarce counter;
+# reading it as true costs a wasted run. So anything that plausibly means yes
+# means yes. The workflow passes a literal 1/0 and never relies on this — it is
+# here for the human running it by hand, who is the one who will type `true`.
+case "$(printf '%s' "${DRY_RUN:-0}" | tr '[:upper:]' '[:lower:]')" in
+  1|true|yes|on) DRY_RUN=1 ;;
+  *)             DRY_RUN=0 ;;
+esac
 
 # ---------------------------------------------------------------------------
 # Policy constants.
@@ -110,6 +120,15 @@ IGNORE_TITLE_RE="${IGNORE_TITLE_RE:-(^|[^a-z])wip([^a-z]|$)}"
 # about this attempt, and both can arrive AFTER a "processing" notice (measured:
 # #139 started at 08:51:30Z and paused 32s later). So a later terminal signal
 # must beat an earlier optimistic one, not the other way round.
+#
+# `started` deliberately sits ABOVE `skipped`, and a CLI review argued for the
+# reverse. Rejected, because of how the skip comment actually behaves here: on a
+# valve-gated repo every PR opens with "Review skipped — required labels:
+# review-ready", and on admission CodeRabbit EDITS THAT SAME COMMENT into the
+# processing notice (measured, #139). A body carrying both strings is therefore
+# a comment caught mid-transition into a review that IS starting. Ranking
+# skipped higher would report the single most common healthy promotion on this
+# repo as a refusal.
 # ---------------------------------------------------------------------------
 
 # "Review rate limit exceeded" / "Please wait N minutes ... before requesting
@@ -139,6 +158,33 @@ CONFIRM_INTERVAL_S="${CONFIRM_INTERVAL_S:-20}"
 # Once `started` is seen, keep watching this much longer before calling it:
 # the pause arrived 32s after the start on the one case ever observed.
 PAUSE_SETTLE_S="${PAUSE_SETTLE_S:-120}"
+
+# Every constant above is overridable, which means every one of them is a way to
+# break this script from the environment — and the two failure modes are silent.
+# A CONFIRM_INTERVAL_S of 0 never advances `waited`, so the confirm loop spins
+# until the job timeout kills it mid-flight, which is the one state this design
+# most wants to avoid. An empty PAT_* makes `grep -qEi ""` match every body, so
+# the first empty pattern in precedence order swallows every promotion — an
+# blank PAT_RATE_LIMITED would requeue healthy PRs forever. Refuse both at the
+# door, where the message can still say which knob is wrong.
+#
+# The blank test is for WHITESPACE, not just emptiness: `${VAR:-default}` already
+# turns an empty override back into the default, so the reachable mistake is
+# `PAT_STARTED=" "` — which is not empty, matches every body containing a space,
+# and therefore matches everything.
+for _v in CONFIRM_TIMEOUT_S CONFIRM_INTERVAL_S PAUSE_SETTLE_S; do
+  case "${!_v}" in
+    ''|*[!0-9]*) echo "ERROR: $_v must be a non-negative integer (got '${!_v}')" >&2; exit 2 ;;
+  esac
+done
+[ "$CONFIRM_INTERVAL_S" -gt 0 ] || { echo "ERROR: CONFIRM_INTERVAL_S must be > 0" >&2; exit 2; }
+for _v in PAT_RATE_LIMITED PAT_PAUSED PAT_STARTED PAT_SKIPPED IGNORE_TITLE_RE \
+          QUEUE_LABEL ADMIT_LABEL PRIORITY_LABEL REVIEWER_LOGINS; do
+  case "${!_v}" in
+    ''|*[!$' \t']*) : ;;   # empty is impossible (see above); non-blank is fine
+    *) echo "ERROR: $_v must not be blank (got '${!_v}')" >&2; exit 2 ;;
+  esac
+done
 
 # ---------------------------------------------------------------------------
 
@@ -233,12 +279,18 @@ classify () { # classify <pr> <sha> <since-iso>
   # merely admitted, actually delivered. DISMISSED/PENDING excluded for the same
   # reason the gate excludes them — a withdrawn or unsubmitted review is not a
   # verdict.
+  #
+  # BOTH conditions, not either. A PR can be reviewed, then requeued at the same
+  # head (a reviewer asks for another pass), and an `or` would let that earlier
+  # review answer for THIS promotion — reporting `started` without CodeRabbit
+  # having done anything, which is exactly the "confident answer nobody computed"
+  # failure this lane exists to prevent. A genuinely new review satisfies both.
   delivered=$(api_query "repos/$REPO/pulls/$n/reviews?per_page=100" '
         ($logins | split(" ")) as $allowed
         | [ .[]
             | select(.user.login as $u | $allowed | index($u))
             | select(.state != "DISMISSED" and .state != "PENDING")
-            | select(.commit_id == $sha or .submitted_at >= $since)
+            | select(.commit_id == $sha and .submitted_at >= $since)
           ] | if length > 0 then "yes" else empty end' \
       --arg sha "$sha" --arg since "$since" --arg logins "$REVIEWER_LOGINS")
   rc=$?; [ $rc -eq 2 ] && return 2
