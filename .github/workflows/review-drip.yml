@@ -1,0 +1,120 @@
+# Promotes one queued pull request into CodeRabbit's online review lane per tick.
+# See .github/scripts/review-drip.sh for the policy and reasoning.
+#
+# ⚠️ SHIPPED DISABLED — dispatch only. The `schedule:` block below is written and
+# commented out, not absent, so enabling is a one-line uncomment rather than a
+# design decision made again from scratch six weeks from now.
+#
+# WHAT ENABLES IT
+# ---------------
+# Not a date, and not "the code looks right". The drip's whole job is to spend a
+# scarce, undocumented, per-DEVELOPER counter on someone's behalf, and exactly
+# one thing about that counter has ever been measured: a bot-applied label can
+# start a review (#301, step-5). What a BLOCKED admission costs — whether it is
+# free and retryable, or whether it burns a review — is still unobserved, and
+# this workflow's backpressure loop retries blocked admissions. Turning it on
+# before that is known means an automated retry loop pointed at a cost nobody
+# has measured.
+#
+# So the enable condition is an observation, not a schedule:
+#   1. `prismalens` runs the CLI-first lane long enough to show real admission
+#      behaviour, including at least one rate-limited admission, and what it
+#      cost is recorded on prismalens/prismalens#301.
+#   2. Someone dispatches this workflow here with DRY_RUN off, on a real queued
+#      PR, and reads the outcome the run summary reports.
+# Then uncomment the schedule and tick the drip checkbox on #301 — the box
+# belongs to the observation, not to this commit.
+#
+# WHERE THE OUTCOME IS RECORDED — run summary, not a PR comment
+# -------------------------------------------------------------
+# The tick is the unit of work: one promotion, one confirmation, one record.
+# A run summary is per-tick and holds the whole picture — who was selected, who
+# was queued behind them, who was excluded and why — which a PR comment
+# structurally cannot, since it only ever sees its own PR.
+#
+# It also keeps the drip out of the channel it is trying to protect. PR comments
+# are CodeRabbit's input surface AND the human's review thread; `review-evidence`
+# additionally triggers on `issue_comment`, so a comment per tick would fire an
+# extra gate evaluation on every promoted PR forever, to say something the labels
+# already say.
+#
+# The two exceptions are `paused` and `skipped`: outcomes that cannot resolve
+# themselves and need a person. Those get one PR comment, idempotent per head
+# SHA, because that is where a person will actually be looking.
+name: Review drip
+
+on:
+  # ENABLE CONDITION IS IN THE HEADER ABOVE — do not uncomment on a hunch.
+  #
+  # Hourly, off the top of the hour (scheduled runs are delayed or dropped under
+  # load, and the whole script is one bounded promotion so a late firing is
+  # harmless). Deliberately hourly and not more often: the OSS ceiling sits near
+  # 1 review/hour on a young repo, and a faster tick would spend most of its
+  # attempts discovering a limit it already knows about.
+  # schedule:
+  #   - cron: '27 * * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Report the would-be promotion without changing any labels
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  # Covers both halves of a tick: the label swap and the follow-up note on a
+  # paused or skipped PR. Nothing else — with an explicit block, unlisted scopes
+  # default to none, and a local dry run with a full-scope personal token cannot
+  # catch what CI is missing.
+  pull-requests: write
+
+concurrency:
+  # ONE PROMOTION PER TICK is the entire backpressure design, so two ticks must
+  # never overlap: a run holds a runner for minutes while it confirms an outcome,
+  # and a second run starting inside that window would promote a second PR
+  # against a counter the first has not finished measuring.
+  #
+  # cancel-in-progress: false — cancelling mid-confirm is the worst case. The
+  # label is already applied, the counter may already be spent, and killing the
+  # run destroys the only record of what it bought.
+  group: review-drip
+  cancel-in-progress: false
+
+jobs:
+  drip:
+    runs-on: ubuntu-latest
+    # The confirm loop is bounded in the script; this is the outer stop so a
+    # hung API call cannot hold the runner for the default six hours.
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # Explicit: never the dispatch ref. `workflow_dispatch` accepts a
+          # `ref` argument, and checkout defaults to it — so without this line
+          # anyone able to dispatch could point the run at a branch carrying a
+          # rewritten review-drip.sh and have it executed with
+          # `pull-requests: write`. The workflow file itself must live on the
+          # default branch to be dispatchable at all, which makes it easy to
+          # assume the SCRIPT comes from there too. It does not.
+          #
+          # `review-evidence.yml` pins its ref for exactly this reason. The cost
+          # is the same one it accepted: a change to the script cannot be tested
+          # by dispatching a feature branch, only after it lands on main.
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+          sparse-checkout-cone-mode: false
+
+      - name: Promote one queued PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          # GITHUB_TOKEN is sufficient — measured, not assumed. A `review-ready`
+          # label applied by github-actions[bot] was observed to start a review
+          # on #139 (prismalens/prismalens#301, step 5). No PAT is needed, and
+          # GitHub's anti-recursion rule does not apply: CodeRabbit is an
+          # external app receiving its own webhooks, not a workflow.
+          DRY_RUN: ${{ inputs.dry_run && '1' || '0' }}
+        run: |
+          chmod +x .github/scripts/review-drip.sh
+          ./.github/scripts/review-drip.sh
