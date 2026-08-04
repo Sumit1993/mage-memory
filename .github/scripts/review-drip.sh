@@ -178,6 +178,13 @@ for _v in CONFIRM_TIMEOUT_S CONFIRM_INTERVAL_S PAUSE_SETTLE_S; do
   esac
 done
 [ "$CONFIRM_INTERVAL_S" -gt 0 ] || { echo "ERROR: CONFIRM_INTERVAL_S must be > 0" >&2; exit 2; }
+# A timeout shorter than one interval means the confirm loop never runs a single
+# check, and every promotion reports `none` having waited zero seconds — a lie
+# that looks exactly like CodeRabbit ignoring us, on a PR that was really never
+# given a chance to answer.
+[ "$CONFIRM_TIMEOUT_S" -ge "$CONFIRM_INTERVAL_S" ] || {
+  echo "ERROR: CONFIRM_TIMEOUT_S ($CONFIRM_TIMEOUT_S) must be >= CONFIRM_INTERVAL_S ($CONFIRM_INTERVAL_S)" >&2
+  exit 2; }
 for _v in PAT_RATE_LIMITED PAT_PAUSED PAT_STARTED PAT_SKIPPED IGNORE_TITLE_RE \
           QUEUE_LABEL ADMIT_LABEL PRIORITY_LABEL REVIEWER_LOGINS; do
   case "${!_v}" in
