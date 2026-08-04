@@ -89,6 +89,18 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          # Explicit: never the dispatch ref. `workflow_dispatch` accepts a
+          # `ref` argument, and checkout defaults to it — so without this line
+          # anyone able to dispatch could point the run at a branch carrying a
+          # rewritten review-drip.sh and have it executed with
+          # `pull-requests: write`. The workflow file itself must live on the
+          # default branch to be dispatchable at all, which makes it easy to
+          # assume the SCRIPT comes from there too. It does not.
+          #
+          # `review-evidence.yml` pins its ref for exactly this reason. The cost
+          # is the same one it accepted: a change to the script cannot be tested
+          # by dispatching a feature branch, only after it lands on main.
+          ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
           sparse-checkout: .github/scripts
           sparse-checkout-cone-mode: false
