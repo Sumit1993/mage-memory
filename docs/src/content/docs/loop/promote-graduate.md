@@ -21,12 +21,44 @@ Some notes are not just facts but *procedures* — a playbook or a gotcha with a
 
 Only **procedural** notes graduate. A skill is loaded into the agent's context to *do* something, so it must be an actionable procedure — you auto-load a procedure, not a fact. Principle, reference, and interface notes carry knowledge but no method to run, so they stay notes.
 
-Graduation is driven by the `/mage:graduate` skill. It reads the deterministic engine for graduate candidates, shows you the backing note plus the usage evidence, and on your confirmation mints the `mage-skill-<slug>` (in both `.claude/skills/` and `.agents/skills/`) and re-points the note at it. The note is never deleted.
+Graduation is driven by the `/mage:graduate` skill. It reads the deterministic engine for graduate candidates, shows you the backing note plus the usage evidence, and on your confirmation pipes the proposal to `mage dream --apply` — the single serialized writer — which mints the `mage-skill-<slug>` (in both `.claude/skills/` and `.agents/skills/`) and re-points the note at it. The note is never deleted.
 
 ```bash
 # (Plumbing the /mage:graduate skill runs for you.) Surface graduate candidates:
 mage promote --json
 ```
+
+### A worked example
+
+A `gotcha` note has been read across 5 distinct chapters — M at the default `normal` sensitivity. The manifest carries one proposal:
+
+```jsonc
+{
+  "proposals": [
+    {
+      "action": "graduate",
+      "target": "notes/svc-api/migration-lock.md",
+      "payload": { "note": "notes/svc-api/migration-lock.md", "wing": "svc-api", "type": "gotcha" },
+      "evidence": "note read in 5 distinct chapter(s) — a proven gotcha, ready to graduate to a skill"
+    }
+  ],
+  "cursors": { "<session-id>": 42 },  // suggested per-session watermark offsets
+  "climbing": 2,                      // notes being used but still below M — info only
+  "deferred": 0                       // eligible but held back by the per-pass promotion budget
+}
+```
+
+On your confirmation, `/mage:graduate` pipes the proposal to `mage dream --apply` — the single writer — and the diff it leaves is exactly three files:
+
+```text
+$ git diff --stat
+ .agents/skills/mage-skill-migration-lock/SKILL.md | 24 ++++++++++++++++++
+ .claude/skills/mage-skill-migration-lock/SKILL.md | 24 ++++++++++++++++++
+ mage/notes/svc-api/migration-lock.md              |  3 ++-
+ 3 files changed, 50 insertions(+), 1 deletion(-)
+```
+
+The two `SKILL.md` files are the minted skill, written into both skill directories; the note change is the re-point — a `graduated_skill: mage-skill-migration-lock` frontmatter line plus a bumped `updated` stamp. The note itself is never deleted.
 
 ## Note-read usage gates graduation
 

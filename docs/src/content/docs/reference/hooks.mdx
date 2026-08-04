@@ -62,13 +62,14 @@ The one capture-adjacent hook that does more than append is
 host summarizes a long conversation and starts a fresh chapter; the detail of the
 chapter that just closed is exactly what is most at risk of being forgotten.
 
-The nudge runs on `SessionStart` and **writes nothing itself** — it hands the
+The nudge runs on `SessionStart` and **writes no note or draft itself** (its
+only writes are its own throttle-watermark state) — it hands the
 host agent a read-only digest as additional context, and the agent decides what
-to stage. It has two halves with different triggers: the **fresh-chapter digest**
-renders only when the host reports `source === "compact"` (the one boundary where
-a chapter just closed), while the **autonomy-scaled backlog mandate** can fire on
-`compact`, `startup`, or `resume`. Only `/clear` is a fast no-op — there is
-nothing to reflect on.
+to stage. It has two halves — the **fresh-chapter digest** and the
+**autonomy-scaled backlog mandate** — each firing on `compact`, `startup`, or
+`resume` under its own conditions; only `/clear` is a fast no-op. The full
+source-by-source firing matrix is in
+[The boundary nudge](../loop/nudge.md#when-it-fires).
 
 It lives on `SessionStart`, not `PreCompact` or `SessionEnd`, for two concrete
 reasons baked into the code:
