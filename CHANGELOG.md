@@ -11,6 +11,19 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.18](https://github.com/Sumit1993/mage-memory/compare/v0.0.17...v0.0.18) (2026-08-04)
+
+
+### Features
+
+* **paths:** derive an external hub's location from its remote (ADR-0043) ([#121](https://github.com/Sumit1993/mage-memory/issues/121)) ([e2527be](https://github.com/Sumit1993/mage-memory/commit/e2527be8d9fa1ae0631eb9aae7af7687dab3add1))
+
+
+### Bug Fixes
+
+* **docs:** dedupe js-yaml to 4.3.0, clearing the high-severity advisory ([#119](https://github.com/Sumit1993/mage-memory/issues/119)) ([47bef79](https://github.com/Sumit1993/mage-memory/commit/47bef7932baab325a61ca479bd8fd7120682fd6c))
+* **nudge:** slash-prefix skill invocations in nudge output ([#120](https://github.com/Sumit1993/mage-memory/issues/120)) ([396db9b](https://github.com/Sumit1993/mage-memory/commit/396db9b4df681038601da83096277dcf3bfcd445))
+
 ## [0.0.17](https://github.com/Sumit1993/mage-memory/compare/v0.0.16...v0.0.17) (2026-07-29)
 
 
