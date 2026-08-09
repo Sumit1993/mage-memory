@@ -61,19 +61,6 @@ GENERATED_PR_LABELS="${GENERATED_PR_LABELS:-autorelease: pending
 autorelease: tagged}"
 GENERATED_PR_BRANCH_RE="${GENERATED_PR_BRANCH_RE:-^release-please--}"
 
-# Marker left by a local CodeRabbit CLI review.
-#
-# Written by claude-kit's `cr-evidence.sh`, which `cr-preview.sh` calls after a
-# successful CLI review (Sumit1993/claude-kit#6). Keyed to the head SHA, so
-# evidence vouches for one commit and not for the PR: push again and it stops
-# matching, and this gate goes red until the branch is re-previewed.
-# Format:  <!-- cr-cli-review: <full head sha> -->
-CLI_MARKER_PREFIX="${CLI_MARKER_PREFIX:-<!-- cr-cli-review:}"
-
-# Comment authors whose CLI marker is trusted. An unauthenticated "evidence"
-# comment from an arbitrary account must not satisfy the gate.
-CLI_MARKER_AUTHORS="${CLI_MARKER_AUTHORS:-Sumit1993}"
-
 # ---------------------------------------------------------------------------
 
 in_list () { # in_list <needle> <space-separated haystack>
@@ -207,25 +194,6 @@ evaluate_pr () { # evaluate_pr <number>
   fi
   if [ -n "$reviewer" ]; then
     publish "$sha" success "Reviewed by $reviewer at ${sha:0:8}"
-    return $?
-  fi
-
-  # --- branch C: CLI review marker for this head ---------------------------
-  local marker_author
-  marker_author=$(api_query "repos/$REPO/issues/$n/comments?per_page=100" '
-        ($authors | split(" ")) as $allowed
-        | [ .[]
-            | select(.user.login as $u | $allowed | index($u))
-            | select(.body | contains($pre + " " + $sha))
-          ] | if length > 0 then .[-1].user.login else empty end' \
-      --arg sha "$sha" --arg pre "$CLI_MARKER_PREFIX" --arg authors "$CLI_MARKER_AUTHORS")
-  q_rc=$?
-  if [ $q_rc -eq 2 ]; then
-    publish "$sha" error "Cannot determine review evidence for ${sha:0:8} — GitHub API error"
-    return 1
-  fi
-  if [ -n "$marker_author" ]; then
-    publish "$sha" success "CLI review evidence from $marker_author at ${sha:0:8}"
     return $?
   fi
 
