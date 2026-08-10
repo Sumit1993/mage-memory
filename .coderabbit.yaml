@@ -7,7 +7,9 @@ reviews:
   # Pausing after 1 reviewed commit means one review per PR; push your fixes as a batch,
   # then re-request explicitly with an `@coderabbitai review` comment.
   auto_review:
-    # CLI-FIRST LANE. Online review is opt-in, not automatic.
+    # LABEL-ADMITTED, NOT AUTOMATIC. Online review is opt-in: `enabled: false`
+    # turns off unconditional review, `labels` re-admits exactly the PRs carrying
+    # `review-ready`.
     #
     # The rate limit is per DEVELOPER, not per repo — all three repos draw one
     # counter. Measured over 180 merged PRs: 7.5/day, worst hour 8 opens, and at
@@ -15,28 +17,37 @@ reviews:
     # everything automatically means the reviews land where they happen to fall,
     # not where they are worth spending.
     #
-    # So: the CodeRabbit CLI (a separate, larger counter) reviews every push via
-    # the kit's pre-push gate, and this scarce online counter is no longer spent
-    # automatically — only on PRs explicitly labelled `review-ready`.
-    #
     # SCOPE, precisely: `labels` gates AUTOMATIC review only. Manual triggers —
     # `@coderabbitai review` and `@coderabbitai full review` — run regardless of
     # these settings and still spend the online counter, on a labelled PR or not.
     # That is deliberate and wanted: it is the escape hatch for re-requesting a
     # review after `auto_pause_after_reviewed_commits` stops incremental ones.
-    # But it means this is a DEFAULT, not a hard cap. The cap is discipline, plus
-    # the fact that a manual trigger is an explicit act rather than a side effect
-    # of opening a PR — which is exactly the 61%-empty-counter problem above.
     #
-    # This is NOT a reduction in review. `review-evidence` is a required check
-    # (ruleset 17441632): a PR with neither a CodeRabbit review nor a CLI review
-    # marker at its head SHA cannot merge. Removing automatic review without that
-    # gate in place would have made "unreviewed" the silent default — which is why
-    # the gate shipped first (prismalens/prismalens#301).
+    # ⚠️ THE JUSTIFICATION THIS SETTING SHIPPED WITH IS GONE. It read: "safe
+    # because `review-evidence` is a required check — a PR with neither a
+    # CodeRabbit review nor a CLI review marker at its head SHA cannot merge."
+    # That gate was retired (the whole thing was deleted, not repaired: it tried
+    # to derive "a competent reviewer read this exact code" from a third-party
+    # reviewer's incidental artifacts, and its intended happy path never once
+    # completed end to end). Its replacement is GitHub's native
+    # `required_review_thread_resolution`: reviewers are advisory, their inline
+    # findings become review threads, and an unresolved thread blocks the merge.
+    # Findings block; silence does not.
+    #
+    # That replacement needs a reviewer who actually posts. On
+    # `prismalens/prismalens` the always-on poster is a Claude Code review
+    # workflow, so keeping this label-gated there costs nothing. THIS REPO HAS NO
+    # SUCH LANE, and the CLI marker producer (claude-kit's `cr-preview.sh` /
+    # `cr-evidence.sh`) has been deleted too. So as configured, no reviewer runs
+    # automatically on an unlabelled PR here — review is whatever a human
+    # remembers to ask for. That is a deliberate open decision, not an oversight;
+    # it is recorded on the retirement PR. Making review automatic again is a
+    # two-line change: `enabled: true` and drop the `labels` key below. The cost
+    # of doing so is that automatic spends here crowd out the deliberate
+    # `review-ready` spends on the other two repos, which share this counter.
     #
     # No dry run exists for this setting: CodeRabbit applies base-branch config
     # only for open-source repos, so it takes effect the moment it lands on main.
-    # The revert is one commit — see ci/cli-first-valve-REVERT.
     enabled: false
     labels:
       - "review-ready"
