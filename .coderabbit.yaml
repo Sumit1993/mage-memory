@@ -34,17 +34,18 @@ reviews:
     # findings become review threads, and an unresolved thread blocks the merge.
     # Findings block; silence does not.
     #
-    # That replacement needs a reviewer who actually posts. On
-    # `prismalens/prismalens` the always-on poster is a Claude Code review
-    # workflow, so keeping this label-gated there costs nothing. THIS REPO HAS NO
-    # SUCH LANE, and the CLI marker producer (claude-kit's `cr-preview.sh` /
-    # `cr-evidence.sh`) has been deleted too. So as configured, no reviewer runs
-    # automatically on an unlabelled PR here — review is whatever a human
-    # remembers to ask for. That is a deliberate open decision, not an oversight;
-    # it is recorded on the retirement PR. Making review automatic again is a
-    # two-line change: `enabled: true` and drop the `labels` key below. The cost
-    # of doing so is that automatic spends here crowd out the deliberate
-    # `review-ready` spends on the other two repos, which share this counter.
+    # That replacement needs a reviewer who actually posts, and this PR supplies
+    # one: `.github/workflows/claude-code-review.yml` reviews EVERY PR on this
+    # repo and posts its findings inline. That is the same posture
+    # `prismalens/prismalens` runs, and it is why keeping CodeRabbit label-gated
+    # here costs nothing — the always-on lane is Claude, and an online CodeRabbit
+    # review is the deliberate second opinion on top of it, spent by applying
+    # `review-ready`. (The CLI marker producer — claude-kit's `cr-preview.sh` /
+    # `cr-evidence.sh` — is deleted and not replaced; nothing keys on it now.)
+    #
+    # Do NOT "fix" this by flipping `enabled: true` and dropping `labels`:
+    # automatic spends here crowd out the deliberate `review-ready` spends on the
+    # other two repos, which share this one counter.
     #
     # No dry run exists for this setting: CodeRabbit applies base-branch config
     # only for open-source repos, so it takes effect the moment it lands on main.
