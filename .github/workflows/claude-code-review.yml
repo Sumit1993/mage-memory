@@ -14,8 +14,10 @@ concurrency:
 
 jobs:
   review:
-    # TEMPORARY canary pin — testing gh-workflows#6 (verification mode); revert to @main after.
-    uses: prismalens/gh-workflows/.github/workflows/claude-code-review.yml@incremental-verify
+    # Caller-side draft guard: skip before the reusable workflow is even invoked
+    # (the callee carries a backstop guard; GitHub cannot filter drafts at the trigger).
+    if: github.event.pull_request.draft != true
+    uses: prismalens/gh-workflows/.github/workflows/claude-code-review.yml@main
     # inherit does not cross ownership boundaries (this repo -> prismalens org);
     # the callee's required secret must be mapped explicitly.
     secrets:
