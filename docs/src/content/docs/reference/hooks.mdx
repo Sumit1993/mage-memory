@@ -71,6 +71,34 @@ to stage. It has two halves — the **fresh-chapter digest** and the
 source-by-source firing matrix is in
 [The boundary nudge](../loop/nudge.md#when-it-fires).
 
+One worked case, because "two halves, three sources, each under its own
+conditions" is easy to read as one switch. Here the host resumes a session,
+new scratch has accumulated, and the last closed chapter has not been surfaced
+yet — so **both** halves fire, into **different channels**:
+
+```text
+in   { "hook_event_name": "SessionStart", "source": "resume", "cwd": "~/sources/mage-memory" }
+
+     scratch fingerprint changed since last run  → re-scan, do not serve cache
+     last closed chapter ts > lastChapterTs      → digest half FIRES
+     backlog 4, last backlog line > 4h ago       → backlog line FIRES
+     grooming.autonomy = operator                → mandate half templates HITL
+
+out  systemMessage                    (USER sees this, in the terminal)
+     │ mage: 0 staged · 4 chapters unmined · up to 0 eligible to graduate → mage:groom
+
+     hookSpecificOutput.additionalContext   (MODEL sees this, user never does)
+     │ <chapter digest: the closed chapter's salient signals, unranked>
+     │ <autonomy mandate: operator — draft, show the human, write only after a yes>
+```
+
+Two things this makes concrete. The **channels are not interchangeable**: the
+deterministic teaser goes to the user, the full digest and mandate go only to the
+model — mage narrows, the agent judges. And the halves are **independently
+gated**: the same `resume` with no new scratch is a cache hit that surfaces
+nothing at all, while a `resume` whose chapter was already seen still prints the
+backlog line alone.
+
 It lives on `SessionStart`, not `PreCompact` or `SessionEnd`, for two concrete
 reasons baked into the code:
 
