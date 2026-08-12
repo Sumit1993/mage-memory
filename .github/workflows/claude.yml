@@ -21,7 +21,10 @@ concurrency:
 jobs:
   claude:
     uses: prismalens/gh-workflows/.github/workflows/claude.yml@main
-    secrets: inherit
+    # inherit does not cross ownership boundaries (this repo -> prismalens org);
+    # the callee's required secret must be mapped explicitly.
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
     permissions:
       contents: read
       pull-requests: read
