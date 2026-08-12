@@ -2,7 +2,7 @@
 
 # mage
 
-> 37 notes. Part of the [index](INDEX.md).
+> 38 notes. Part of the [index](INDEX.md).
 
 ## build
 
@@ -13,6 +13,7 @@
 - `gotcha` [Gotcha — a delegate sent after a command that does not exist will find the one you forbade](notes/delegation-prompts-must-name-real-commands.md) — agy, prompt, verification-commands, nonexistent-script, house-rules
 - `gotcha` [Gotcha — Gemini re-indents entire files with tabs; diff-stat inflation is the tell](notes/gemini-reindents-whole-files-with-tabs.md) — agy, indentation, diff-churn, delegation
 - `gotcha` [Gotcha — the harness memory layer rewrites mage frontmatter on every Write/Edit under mage/](notes/harness-memory-layer-rewrites-mage-frontmatter.md) — auto-memory, cc-schema, node-type, write-tool, edit-tool, contamination, repair
+- `gotcha` [Gotcha — distill's corrections lens counts harness notifications as user corrections](notes/harness-notifications-pollute-the-corrections-lens.md) — task-notification, monitor-event, user-prompt, capture-schema, signal-to-noise, background-agents, groom
 - `gotcha` [Gotcha — a link-graph harvest must genre-filter its SOURCES, not just its targets](notes/link-harvests-must-genre-filter-sources.md) — cross-links, recall
 - `note` [Mage integration test framework](notes/mage-integration-test-framework.md) — build
 - `note` [Mage main branch protected](notes/mage-main-branch-protected.md) — build
@@ -63,4 +64,4 @@
 
 ## soak
 
-- `gotcha` [The soak monitor reports "absent" and "healthy" the same way — two blind spots that cost an observation window](notes/soak-monitor-blind-spots.md) — blind-spot, dark-unit, keep-rate, capture-vs-adopt, baseline-flag, code-repo-path, absolute-path, evidence-pipeline, ratification-gate
+- `gotcha` [The soak monitor reports "absent" and "healthy" the same way — three blind spots that cost an observation window](notes/soak-monitor-blind-spots.md) — blind-spot, dark-unit, keep-rate, capture-vs-adopt, baseline-flag, code-repo-path, absolute-path, evidence-pipeline, ratification-gate, cron
