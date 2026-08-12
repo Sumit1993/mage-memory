@@ -14,7 +14,8 @@ concurrency:
 
 jobs:
   review:
-    uses: prismalens/gh-workflows/.github/workflows/claude-code-review.yml@main
+    # TEMPORARY canary pin — testing gh-workflows#6 (verification mode); revert to @main after.
+    uses: prismalens/gh-workflows/.github/workflows/claude-code-review.yml@incremental-verify
     # inherit does not cross ownership boundaries (this repo -> prismalens org);
     # the callee's required secret must be mapped explicitly.
     secrets:
