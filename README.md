@@ -219,3 +219,4 @@ model. Expect refinement.
 MIT
 
 <!-- review-lane canary: verifies the Claude review lane posts on this repo (prismalens/prismalens#403). Safe to remove. -->
+<!-- canary bump: re-fire after workflow sync -->
