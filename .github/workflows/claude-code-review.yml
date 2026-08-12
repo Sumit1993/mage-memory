@@ -1,0 +1,25 @@
+name: Claude Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
+
+# This is a managed caller stub.
+# The lane logic lives in prismalens/gh-workflows/.github/workflows/claude-code-review.yml.
+# Do not add logic here.
+
+concurrency:
+  group: claude-code-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    uses: prismalens/gh-workflows/.github/workflows/claude-code-review.yml@main
+    secrets: inherit
+    permissions:
+      contents: read
+      # write is the ceiling for the callee's `announce` liveness job;
+      # the callee's `review` job self-restricts to read.
+      pull-requests: write
+      issues: read
+      id-token: write
