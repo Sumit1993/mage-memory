@@ -153,6 +153,41 @@ export function hasCommandeerHooks(settings: ClaudeSettings | null): boolean {
   return groups.some((g) => typeof g?.id === "string" && g.id.startsWith("mage:memory:"));
 }
 
+// ─── helpers ───────────────────────────────────────────────────────────────
+/** True iff `cmd` is a mage CLI command (e.g. `mage observe`, `mage nudge`). */
+export function isMageCommand(cmd: unknown): boolean {
+  return typeof cmd === "string" && (cmd === "mage" || cmd.startsWith("mage ") || cmd.startsWith("mage:"));
+}
+
+/**
+ * True iff a group belongs to mage. A group is mage-owned if its `id` starts with
+ * `mage:` OR any command in its `hooks` array is a `mage` command.
+ */
+export function isMageGroup(g: HookGroup | null | undefined): boolean {
+  if (!g || typeof g !== "object") return false;
+  if (typeof g.id === "string" && g.id.startsWith(MAGE_ID_PREFIX)) return true;
+  if (Array.isArray(g.hooks)) {
+    return g.hooks.some((h) => h && isMageCommand(h.command));
+  }
+  return false;
+}
+
+/**
+ * True iff group `g` is equivalent to the given `MAGE_HOOKS` entry.
+ * Equivalent means matching `id` OR (for a mage group) matching `command` and `matcher`.
+ */
+export function isEquivalentGroup(g: HookGroup, entry: typeof MAGE_HOOKS[number]): boolean {
+  if (!g || typeof g !== "object") return false;
+  if (g.id === entry.id) return true;
+  if (isMageGroup(g)) {
+    const firstCmd = g.hooks?.[0]?.command;
+    const sameCommand = firstCmd === entry.command;
+    const sameMatcher = (g.matcher ?? undefined) === (entry.matcher ?? undefined);
+    if (sameCommand && sameMatcher) return true;
+  }
+  return false;
+}
+
 // ─── drift diff (doctor) ─────────────────────────────────────────────────────
 /**
  * Compare the mage groups installed in `settings` against {@link MAGE_HOOKS},
@@ -179,17 +214,46 @@ export function diffMageHooks(
   matches: boolean;
   missingIds: string[];
   staleIds: string[];
+  duplicates: number;
 } {
   // Map every installed mage:* group by id → its first command (last wins on dupes).
   const installed = new Map<string, string | undefined>();
-  const groups = settings?.hooks ? Object.values(settings.hooks).flat() : [];
-  for (const g of groups) {
-    // Skip non-object array entries (a hand-edited file can carry `null`/scalars in
-    // a hooks-event array): `g.id` on a null would throw. diffMageHooks is on the
-    // `mage doctor` hot path, which must be total over any parseable settings JSON.
-    if (!g || typeof g !== "object") continue;
-    if (typeof g.id === "string" && g.id.startsWith(MAGE_ID_PREFIX)) {
-      installed.set(g.id, g.hooks?.[0]?.command);
+  let duplicates = 0;
+
+  if (settings?.hooks) {
+    for (const [event, groups] of Object.entries(settings.hooks)) {
+      if (!Array.isArray(groups)) continue;
+      const seen = new Set<string>();
+      for (const g of groups) {
+        if (!g || typeof g !== "object") continue;
+        if (isMageGroup(g)) {
+          let key: string | undefined;
+          if (typeof g.id === "string" && g.id.startsWith(MAGE_ID_PREFIX)) {
+            key = g.id;
+            installed.set(g.id, g.hooks?.[0]?.command);
+          } else {
+            const firstCmd = g.hooks?.[0]?.command;
+            const match = MAGE_HOOKS.find(
+              (m) =>
+                m.event === event &&
+                m.command === firstCmd &&
+                (m.matcher ?? undefined) === (g.matcher ?? undefined),
+            );
+            key = match ? match.id : `${firstCmd}::${g.matcher ?? ""}`;
+            if (match) {
+              installed.set(match.id, firstCmd);
+            }
+          }
+
+          if (key) {
+            if (seen.has(key)) {
+              duplicates += 1;
+            } else {
+              seen.add(key);
+            }
+          }
+        }
+      }
     }
   }
 
@@ -218,9 +282,13 @@ export function diffMageHooks(
   const hasExtra = [...installed.keys()].some((id) => !expectedIds.has(id));
 
   const matches =
-    connected && missingIds.length === 0 && staleIds.length === 0 && !hasExtra;
+    connected &&
+    missingIds.length === 0 &&
+    staleIds.length === 0 &&
+    !hasExtra &&
+    duplicates === 0;
 
-  return { connected, matches, missingIds, staleIds };
+  return { connected, matches, missingIds, staleIds, duplicates };
 }
 
 // ─── target resolution ───────────────────────────────────────────────────────
@@ -290,7 +358,7 @@ export function upsertMageHooks(
   for (const entry of MAGE_HOOKS) {
     const current = hooks[entry.event];
     const existing = Array.isArray(current) ? current : [];
-    const withoutMine = existing.filter((g) => g.id !== entry.id);
+    const withoutMine = existing.filter((g) => !isEquivalentGroup(g, entry));
     // A commandeer row with the tier gated OFF is removed (drop any prior group),
     // never added — so toggling auto-memory off and re-connecting self-heals.
     const skip = entry.commandeer === true && opts.commandeer !== true;
@@ -330,7 +398,7 @@ export function removeMageHooks(settings: ClaudeSettings | null): {
 
   for (const [event, groups] of Object.entries(base.hooks)) {
     const kept = groups.filter((g) => {
-      const isMage = typeof g.id === "string" && g.id.startsWith(MAGE_ID_PREFIX);
+      const isMage = isMageGroup(g);
       if (isMage) removed += 1;
       return !isMage;
     });

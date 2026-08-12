@@ -452,6 +452,20 @@ describe("doctor env checks still run", () => {
 // ─── link integrity (code-repo <-> hub references; --fix heals a moved repo) ────
 
 describe("doctor — link integrity", () => {
+  let home: string;
+  let origHome: string | undefined;
+
+  beforeEach(async () => {
+    home = await freshDir("mage-home-");
+    origHome = process.env.HOME;
+    process.env.HOME = home;
+  });
+
+  afterEach(() => {
+    if (origHome === undefined) delete process.env.HOME;
+    else process.env.HOME = origHome;
+  });
+
   async function makeHub(
     hub: string,
     projects: Array<{ name: string; code_repo_path: string }>,
@@ -714,7 +728,82 @@ describe("doctor --fix — hook-block drift refresh", () => {
     expect(diffMageHooks(onDisk).matches).toBe(true);
     expect((onDisk as Record<string, unknown>).$schema).toBe("https://example/keep-me");
   });
+
+  it("doctor without --fix reports duplicated mage hooks", async () => {
+    const dir = await freshDir();
+    await makeInRepoKb(dir, { gitignoreSinks: true });
+
+    // Seed 5x duplicated mage hooks
+    const baseSettings = upsertMageHooks(null) as ClaudeSettings;
+    const duplicatedHooks: Record<string, Array<{ hooks: Array<{ type: "command"; command: string }> }>> = {};
+    for (const [event, groups] of Object.entries(baseSettings.hooks ?? {})) {
+      duplicatedHooks[event] = [];
+      for (let i = 0; i < 5; i++) {
+        for (const g of groups) {
+          duplicatedHooks[event].push({
+            hooks: g.hooks.map((h) => ({ type: "command" as const, command: h.command })),
+          });
+        }
+      }
+    }
+    await writeLocalSettings(dir, { hooks: duplicatedHooks });
+
+    const r = await doctor({ cwd: dir });
+    const conn = check(r.checks, "connection");
+    expect(conn?.ok).toBe(false);
+    expect(conn?.detail).toMatch(/duplicate/i);
+  });
+
+  it("doctor --fix on a seeded 5x-duplicated fixture collapses to 1x and leaves foreign hooks alone", async () => {
+    const dir = await freshDir();
+    await makeInRepoKb(dir, { gitignoreSinks: true });
+
+    const baseSettings = upsertMageHooks(null) as ClaudeSettings;
+    const duplicatedHooks: Record<string, Array<{ hooks: Array<{ type: "command"; command: string }> }>> = {};
+    for (const [event, groups] of Object.entries(baseSettings.hooks ?? {})) {
+      duplicatedHooks[event] = [];
+      for (let i = 0; i < 5; i++) {
+        for (const g of groups) {
+          duplicatedHooks[event].push({
+            hooks: g.hooks.map((h) => ({ type: "command" as const, command: h.command })),
+          });
+        }
+      }
+    }
+    // Add foreign hooks to SessionStart
+    (duplicatedHooks.SessionStart ??= []).unshift(
+      { hooks: [{ type: "command" as const, command: "context-mode observe" }] },
+      { hooks: [{ type: "command" as const, command: "block-no-verify check" }] },
+    );
+
+    await writeLocalSettings(dir, { hooks: duplicatedHooks });
+
+    const r = await doctor({ cwd: dir, fix: true });
+    const conn = check(r.checks, "connection");
+    expect(conn?.ok).toBe(true);
+
+    const updated = JSON.parse(await readFile(join(dir, ".claude", "settings.local.json"), "utf8")) as {
+      hooks: Record<string, Array<{ id?: string; hooks: Array<{ command: string }> }>>;
+    };
+
+    // Foreign hooks preserved at the beginning of SessionStart
+    const sessionStart = updated.hooks.SessionStart ?? [];
+    expect(sessionStart[0]).toEqual({
+      hooks: [{ type: "command", command: "context-mode observe" }],
+    });
+    expect(sessionStart[1]).toEqual({
+      hooks: [{ type: "command", command: "block-no-verify check" }],
+    });
+
+    // All mage hooks collapsed to 1x
+    for (const groups of Object.values(updated.hooks)) {
+      const mageGroups = groups.filter((g) => g.id?.startsWith("mage:"));
+      const commands = mageGroups.flatMap((g) => g.hooks.map((h) => h.command));
+      expect(commands.length).toBe(new Set(commands).size);
+    }
+  });
 });
+
 
 describe("doctor — redact pre-commit hook (detect+nudge)", () => {
   let home: string;

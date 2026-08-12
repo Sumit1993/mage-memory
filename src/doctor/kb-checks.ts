@@ -538,6 +538,14 @@ async function pushConnectionCheck(
 
     const missing = diff.missingIds.length > 0 ? diff.missingIds.join(",") : "none";
     const stale = diff.staleIds.length > 0 ? diff.staleIds.join(",") : "none";
+    if (diff.duplicates > 0 && diff.missingIds.length === 0 && diff.staleIds.length === 0) {
+      checks.push({
+        name: "connection",
+        ok: false,
+        detail: `${scope}: ${diff.duplicates} duplicate mage hook registration(s) present; run \`mage doctor --fix\` to collapse`,
+      });
+      return;
+    }
     checks.push({
       name: "connection",
       ok: false,
