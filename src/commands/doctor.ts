@@ -5,9 +5,10 @@ import { buildReport, renderReport } from "../doctor/report.js";
 import { evaluateGenreTells, renderGenreTells } from "../doctor/genre-tells.js";
 import { pushKbChecks } from "../doctor/kb-checks.js";
 import { pushLinkChecks } from "../doctor/link-checks.js";
+import { analyzeDream } from "../dream.js";
 import { hasGh, hasGit } from "../git.js";
 import { logger } from "../logger.js";
-import { absolutePath, exists, looksLikeHub, resolveDocsRoot } from "../paths.js";
+import { absolutePath, exists, looksLikeHub, readHubMetadata, resolveDocsRoot } from "../paths.js";
 import { which } from "../shell.js";
 
 export interface DoctorOptions {
@@ -72,6 +73,34 @@ export async function doctor(opts: DoctorOptions = {}): Promise<DoctorResult> {
   // Link integrity (two-way code-repo<->hub references; `--fix` heals a stale
   // back-reference after a move). Only meaningful inside a KB.
   if (kb) await pushLinkChecks(checks, opts);
+
+  // Merge-candidate annotations (annotate-never-reject, info-tier). Signal A annotates
+  // directly; Signal B only above threshold, worded as a candidate, not a verdict.
+  if (kb) {
+    try {
+      const hubMeta = kb.kind === "hub" ? await readHubMetadata(kb.root) : null;
+      const report = await analyzeDream(kb.root, { hubMeta });
+      const { signalA, signalB } = report.mergeCandidates;
+      for (const p of signalA) {
+        checks.push({
+          name: "merge candidate",
+          ok: true,
+          optional: true,
+          detail: `note pair answers-one-question? \u2014 ${p.noteA} \u2194 ${p.noteB} ${p.reason}; merge candidates`,
+        });
+      }
+      for (const p of signalB) {
+        checks.push({
+          name: "merge candidate",
+          ok: true,
+          optional: true,
+          detail: `note pair merge candidate \u2014 ${p.noteA} \u2194 ${p.noteB} (${p.reason}; review suggested)`,
+        });
+      }
+    } catch {
+      // Fail-open: merge-candidate detection must never break doctor.
+    }
+  }
 
   const passed = checks.every((c) => c.ok || c.optional);
 

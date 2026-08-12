@@ -176,7 +176,7 @@ async function digestNudge(resolved: ResolvedDocsRoot, source: string, force: bo
   if (chapter.chapterTs.length > 0) await markChapterShown(root, chapter.chapterTs);
 
   // The weekly dream-health tick — a read-only rot summary on its own slow clock.
-  const health = await healthTick(root, force);
+  const { health, mergeLine } = await healthTick(root, force);
 
   // The autonomy reject-ledger reconcile (ADR-0031 P2) — deterministic, cheap, idempotent, so it
   // runs every firing (no slow-clock gate). Fail-open: a failed reconcile returns null (the ledger
@@ -193,7 +193,7 @@ async function digestNudge(resolved: ResolvedDocsRoot, source: string, force: bo
       ? `${chapter.rendered}\n\n${ENTRY_DIGEST_NOTE}`
       : chapter.rendered;
   const nudge = composeContext(digestContext, mandate, healthContext(health));
-  const notice = noticeLine(tally, showBacklog, health, chapter.teaser, keepRateLine(keepRate, crownThreshold));
+  const notice = noticeLine(tally, showBacklog, health, chapter.teaser, keepRateLine(keepRate, crownThreshold), mergeLine);
   return { ran: true, drafted: 0, pending, nudge, notice };
 }
 
@@ -299,11 +299,13 @@ function composeContext(...parts: string[]): string | null {
  * ONLY when there is failure-tier rot. Fail-open — a scan error surfaces no health line, never
  * breaks the nudge. The scan is gated to ~once/week so it never costs a normal session start.
  */
-async function healthTick(root: string, force: boolean): Promise<string> {
-  if (!force && !(await elapsedSinceDream(root, DREAM_WINDOW_MS))) return "";
+async function healthTick(root: string, force: boolean): Promise<{ health: string; mergeLine: string }> {
+  if (!force && !(await elapsedSinceDream(root, DREAM_WINDOW_MS))) return { health: "", mergeLine: "" };
   const report = await analyzeDream(root).catch(() => null);
   await markDreamShown(root);
-  return report && !report.clean ? healthLine(report) : "";
+  const health = report && !report.clean ? healthLine(report) : "";
+  const mergeLine = report ? mergeNudgeLine(report) : "";
+  return { health, mergeLine };
 }
 
 /**
@@ -319,6 +321,7 @@ function noticeLine(
   health: string,
   teaser: string,
   keepRate: string,
+  mergeLine: string,
 ): string | null {
   const lines: string[] = [];
   if (teaser.length > 0) lines.push(teaser);
@@ -330,6 +333,7 @@ function noticeLine(
     );
   }
   if (health.length > 0) lines.push(health);
+  if (mergeLine.length > 0) lines.push(mergeLine);
   if (keepRate.length > 0) lines.push(keepRate);
   return lines.length > 0 ? lines.join("\n") : null;
 }
@@ -374,6 +378,16 @@ function healthLine(r: DreamReport): string {
     parts.push(`${r.supersededButActive.length} superseded-but-active`);
   }
   return parts.length > 0 ? `mage health · ${parts.join(" · ")} → \`mage dream\`` : "";
+}
+
+/**
+ * The merge-candidate nudge line: emitted only when Signal A (structural mutual links
+ * in a shared room) count > 0. One line, respects the nudge budget.
+ */
+function mergeNudgeLine(r: DreamReport): string {
+  const count = r.mergeCandidates.signalA.length;
+  if (count === 0) return "";
+  return `mage · ${count} mutually-linked note pair${count === 1 ? "" : "s"} look${count === 1 ? "s" : ""} like one note each — run \`mage doctor\``;
 }
 
 /** Events of the MOST-recently-closed chapter across all streams (latest terminator ts wins). */
