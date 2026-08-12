@@ -18,6 +18,8 @@ jobs:
     secrets: inherit
     permissions:
       contents: read
-      pull-requests: read
+      # write is the ceiling for the callee's `announce` liveness job;
+      # the callee's `review` job self-restricts to read.
+      pull-requests: write
       issues: read
       id-token: write
