@@ -14,7 +14,7 @@ export function clampRange(value, min = 0, max = 100) {
   if (value < min) {
     return min;
   }
-  return value > max ? min : value;
+  return value > max ? max : value;
 }
 
 /**
@@ -26,13 +26,11 @@ export function clampRange(value, min = 0, max = 100) {
 export function normalizeRanges(list) {
   if (!Array.isArray(list)) return [];
 
-  list.forEach((range, idx) => {
-    range.start = clampRange(range.start, 0, 100);
-    range.end = clampRange(range.end, 0, 100);
-    if (range.start > range.end) {
-      list.splice(idx, 1);
-    }
-  });
-
-  return list;
+  return list
+    .map((range) => ({
+      ...range,
+      start: clampRange(range.start, 0, 100),
+      end: clampRange(range.end, 0, 100),
+    }))
+    .filter((range) => range.start <= range.end);
 }
