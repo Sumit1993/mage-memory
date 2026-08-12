@@ -50,7 +50,19 @@ Non-memory types (`plan`, `spec`, `tasks`, `decision`) remain legal note types f
 
 Before authoring a memory note, walk the **better home** ladder (code comment → ticket/`mage/work/` → doc beside code → artifact+pointer → skill → decision → memory) to ensure memory is the right home.
 
-The two procedural types — **procedure** and **gotcha** — are special: only procedural notes can later [graduate](../loop/promote-graduate.md) into their own auto-loaded skill, because you push a procedure but you pull a fact. (Known drift: the code's `isProcedural` gate currently accepts the legacy `playbook` in place of `procedure` — tracked in [#137](https://github.com/Sumit1993/mage-memory/issues/137).)
+### Graduation eligibility is a separate contract
+
+The table above answers one question only: **how does a note come back to you?** It does not decide which notes can [graduate](../loop/promote-graduate.md) into their own auto-loaded skill. That is a second, independent contract, and reading rung text as if it implied graduation is a mistake the two tables invite:
+
+| `type:` | eligible to graduate? | why |
+| --- | --- | --- |
+| `procedure` `gotcha` | yes | procedural — you *push* a procedure at the agent; a fact it *pulls* when needed |
+| every other memory type | no | recall-bearing but not procedural; rung 2 is the whole of their reach |
+| non-memory genres (`decision` `plan` `tasks` `spec` `doc`) | no | not recall-bearing at all |
+
+The two contracts are genuinely orthogonal. A note can sit at rung 2 and never be graduation-eligible (`principle`, `reference`), and — as the drift below shows — a type can currently be graduation-eligible while sitting at rung 3, which is incoherent and is the reason the drift is tracked rather than tolerated.
+
+**The intended contract is `procedure`/`gotcha`.** `playbook` is a legacy string: unclassified for recall (rung 3) *and* not part of the intended graduation contract. The code has not caught up — `src/grooming/promote.ts` still gates on `type === "playbook" || type === "gotcha"`, so a `playbook` note is today accepted by the graduation gate despite being invisible to rung-2 recall. Tracked in [#137](https://github.com/Sumit1993/mage-memory/issues/137), whose resolution is to emit `procedure` from groom's lens table and accept `procedure` at the gate — **not** to give `playbook` a genre mapping, which would leave one of six legacy strings arbitrarily rescued.
 
 ## Frontmatter and the lifecycle fields
 
