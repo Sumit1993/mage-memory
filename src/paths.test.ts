@@ -21,6 +21,7 @@ import {
   normalizeMetadata,
   ownedDocsRoots,
   readHubMetadata,
+  externalDocsRoot,
   readMetadata,
   resolveDocsRoot,
   writeHubMetadata,
@@ -217,7 +218,7 @@ describe("paths", () => {
     }
   });
 
-  it("resolveDocsRoot degrades to the repo KB on a malformed hub_repo — never throws", async () => {
+  it("resolveDocsRoot returns null on a malformed hub_repo (mode: external) — never degrades to repo KB", async () => {
     const code = await tmpDir("mage-derive-malformed-");
     await mkdir(join(code, "mage"), { recursive: true });
     await writeFile(
@@ -233,12 +234,11 @@ describe("paths", () => {
       }),
     );
     const r = await resolveDocsRoot(code);
-    expect(r?.kind).toBe("repo");
-    expect(r?.root).toBe(join(code, "mage"));
+    expect(r).toBeNull();
   });
 
-  it("resolveDocsRoot falls back to repo KB when external metadata is malformed", async () => {
-    // mode=external but no hub_path → degrade to the code repo's own mage/ (never null).
+  it("resolveDocsRoot returns null when external metadata is malformed", async () => {
+    // mode=external but no hub_path → returns null (never degrades to repo KB).
     const code = await tmpDir("mage-extbad-");
     await mkdir(join(code, "mage"), { recursive: true });
     await writeFile(
@@ -246,8 +246,79 @@ describe("paths", () => {
       JSON.stringify({ schema: METADATA_SCHEMA, mode: "external", project: "x", hub_path: null }),
     );
     const r = await resolveDocsRoot(code);
-    expect(r?.kind).toBe("repo");
-    expect(r?.root).toBe(join(code, "mage"));
+    expect(r).toBeNull();
+  });
+
+  describe("externalDocsRoot discriminated results (issue #158)", () => {
+    it("returns not-external when mode is in-repo or hybrid or metadata absent", async () => {
+      const code = await tmpDir("mage-inrepo-");
+      await mkdir(join(code, "mage"), { recursive: true });
+      await writeFile(
+        join(code, "mage", "metadata.json"),
+        JSON.stringify({ schema: METADATA_SCHEMA, mode: "in-repo", project: "x" }),
+      );
+      expect(await externalDocsRoot(code)).toEqual({ kind: "not-external" });
+
+      const noMeta = await tmpDir("mage-nometa-");
+      expect(await externalDocsRoot(noMeta)).toEqual({ kind: "not-external" });
+    });
+
+    it("returns hub-unreachable (malformed-config) when mode is external but project is missing", async () => {
+      const code = await tmpDir("mage-noproject-");
+      await mkdir(join(code, "mage"), { recursive: true });
+      await writeFile(
+        join(code, "mage", "metadata.json"),
+        JSON.stringify({ schema: METADATA_SCHEMA, mode: "external", hub_path: "/some/path" }),
+      );
+      const res = await externalDocsRoot(code);
+      expect(res).toEqual({
+        kind: "hub-unreachable",
+        reason: "malformed-config",
+        expected: "/some/path",
+      });
+    });
+
+    it("returns hub-unreachable (no-hub-target) when mode is external but hub_repo and hub_path are absent/null", async () => {
+      const code = await tmpDir("mage-notarget-");
+      await mkdir(join(code, "mage"), { recursive: true });
+      await writeFile(
+        join(code, "mage", "metadata.json"),
+        JSON.stringify({ schema: METADATA_SCHEMA, mode: "external", project: "engine", hub_path: null, hub_repo: null }),
+      );
+      const res = await externalDocsRoot(code);
+      expect(res).toEqual({
+        kind: "hub-unreachable",
+        reason: "no-hub-target",
+        expected: undefined,
+      });
+    });
+
+    it("returns hub-unreachable (hub-corrupted) when hub_path does not look like a hub", async () => {
+      const code = await tmpDir("mage-badpath-");
+      await mkdir(join(code, "mage"), { recursive: true });
+      const nonHub = await tmpDir("not-a-hub-");
+      await writeFile(
+        join(code, "mage", "metadata.json"),
+        JSON.stringify({ schema: METADATA_SCHEMA, mode: "external", project: "engine", hub_path: nonHub }),
+      );
+      const res = await externalDocsRoot(code);
+      expect(res).toEqual({
+        kind: "hub-unreachable",
+        reason: "hub-corrupted",
+        expected: nonHub,
+      });
+    });
+
+    it("returns hub-unreachable (unknown-failure) on read error", async () => {
+      const code = await tmpDir("mage-corruptmeta-");
+      await mkdir(join(code, "mage"), { recursive: true });
+      await writeFile(join(code, "mage", "metadata.json"), "invalid json{");
+      const res = await externalDocsRoot(code);
+      expect(res).toEqual({
+        kind: "hub-unreachable",
+        reason: "unknown-failure",
+      });
+    });
   });
 
   it("returns null when no knowledge base is found", async () => {

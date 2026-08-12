@@ -549,9 +549,9 @@ describe("reach tier — connect grants out-of-repo KB access (ADR-0042)", () =>
     const { code } = await externalRepo({ hubExists: false });
     const r = await connect({ cwd: code, yes: true, gitHook: false });
 
-    // 13 = 10 base + 3 commandeer: resolveDocsRoot does not stat hub_path, so the
-    // commandeer tier still gates on. The point is that connect COMPLETES.
-    expect(r.wired).toBe(13);
+    // 10 base hooks: resolveDocsRoot returns null when hub is absent, so commandeer
+    // tier does not gate on (autoMemoryDirectory not set to repo mage/). The point is that connect COMPLETES.
+    expect(r.wired).toBe(10);
     const s = JSON.parse(await readFile(r.path, "utf8"));
     expect(s.hooks?.SessionStart?.some((g: { id?: string }) => g.id === "mage:observe:SessionStart")).toBe(
       true,

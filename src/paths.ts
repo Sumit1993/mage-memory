@@ -448,6 +448,22 @@ export async function findCodeRepoRoot(startDir: string): Promise<string | null>
   }
 }
 
+export type HubUnreachableReason =
+  | "malformed-config"
+  | "no-hub-target"
+  | "hub-absent"
+  | "hub-corrupted"
+  | "unknown-failure";
+
+export type ExternalDocsRootResult =
+  | { kind: "resolved"; value: ResolvedDocsRoot }
+  | { kind: "not-external" }
+  | {
+      kind: "hub-unreachable";
+      reason: HubUnreachableReason;
+      expected?: string;
+    };
+
 /**
  * Resolve the mage docs root to operate on, starting from `startDir` (default cwd):
  *  - repo KB:  the nearest ancestor with `mage/metadata.json` (mode=in-repo or
@@ -459,8 +475,8 @@ export async function findCodeRepoRoot(startDir: string): Promise<string | null>
  *  - hub:      `startDir` is a hub root, or sits inside one. Inside a hub-owned
  *              project dir (`<hub>/projects/<name>/…`) → that project's flat docs
  *              root; the hub root or elsewhere under it → the hub root. Kind "hub".
- * Returns null if none is found. A malformed/unreadable metadata degrades to the
- * repo KB root (never throws — this is on the capture hot path).
+ * Returns null if none is found, or if external mode hub is unreachable (never degrades
+ * an unreachable external hub to repo KB). Never throws — this is on the capture hot path.
  */
 export async function resolveDocsRoot(
   startDir: string,
@@ -470,11 +486,12 @@ export async function resolveDocsRoot(
   // Walk up looking for a code-repo `mage/metadata.json` (in-repo/hybrid/external).
   const codeRepo = await findCodeRepoRoot(abs);
   if (codeRepo) {
-    // Honor mode=external by following hub_path; a bad read degrades to repo KB.
-    const external = await externalDocsRoot(codeRepo).catch(() => null);
-    return (
-      external ?? { root: codeRepoDocsRoot(codeRepo), kind: "repo", repo: codeRepo }
-    );
+    // Honor mode=external by following hub_path/hub_repo.
+    // If external metadata exists but hub is unreachable, return null (do NOT fall back to repo KB).
+    const external = await externalDocsRoot(codeRepo);
+    if (external.kind === "resolved") return external.value;
+    if (external.kind === "hub-unreachable") return null;
+    return { root: codeRepoDocsRoot(codeRepo), kind: "repo", repo: codeRepo };
   }
 
   // Otherwise, walk up looking for a hub root. `startDir` may BE the hub, or sit
@@ -529,8 +546,9 @@ function hubDocsRoot(hub: string, abs: string): ResolvedDocsRoot {
 }
 
 /**
- * If the code repo at `dir` is linked in external mode, the hub project docs
- * root it points to; otherwise null (caller falls back to repo-KB handling).
+ * If the code repo at `dir` is linked in external mode, returns the resolved hub project
+ * docs root or a hub-unreachable result explaining why it cannot be resolved; otherwise
+ * returns not-external (caller falls back to repo-KB handling).
  * ADR-0043 resolution order, via the ONE shared {@link chosenHubRoot}:
  *
  *   1. `hub_repo` present → derive its path, and use it only if BOTH arrival
@@ -538,42 +556,53 @@ function hubDocsRoot(hub: string, abs: string): ResolvedDocsRoot {
  *   2. Else (absent, wrong shape, unreadable origin, OR a hard origin
  *      MISMATCH) fall back to `hub_path`, gated on the same shape check —
  *      the deprecated transition path (ADR-0043 §6).
- *   3. Else null — the hub-absent state; {@link resolveDocsRoot} degrades to
- *      the repo KB. This function must never throw for that case (the hot-path
- *      contract): a mismatch here is silently absorbed, NOT surfaced as an
- *      error — `doctor`/`connect` re-run the same resolution to report it
- *      loudly (see {@link outOfRepoKbTargets} + connect.ts).
- *
- * May still throw on an unknown/foreign metadata schema or unsafe project
- * name — {@link resolveDocsRoot} catches it.
+ *   3. Else hub-unreachable — returns `{ kind: "hub-unreachable", reason, expected }`;
+ *      {@link resolveDocsRoot} returns null (does NOT degrade to repo KB).
+ *      This function must never throw for any case (the hot-path contract).
  */
-async function externalDocsRoot(dir: string): Promise<ResolvedDocsRoot | null> {
-  const meta = await readMetadata(dir);
-  if (!meta || meta.mode !== "external" || !meta.project) return null;
+export async function externalDocsRoot(dir: string): Promise<ExternalDocsRootResult> {
+  try {
+    const meta = await readMetadata(dir);
+    if (!meta || meta.mode !== "external") return { kind: "not-external" };
 
-  const chosen = chosenHubRoot(meta.hub_repo, meta.hub_path);
-  if (!chosen) return null;
-
-  let hubRoot: string;
-  if (chosen.source === "derived") {
-    const arrival = await verifyHubArrival(chosen.root, meta.hub_repo as string);
-    if (arrival.ok) {
-      hubRoot = chosen.root;
-    } else if (meta.hub_path && (await looksLikeHub(meta.hub_path))) {
-      hubRoot = meta.hub_path; // fall back to the deprecated hub_path (incl. on a mismatch)
-    } else {
-      return null; // hub-absent state
+    const expected = meta.hub_repo ?? meta.hub_path ?? undefined;
+    if (!meta.project) {
+      return { kind: "hub-unreachable", reason: "malformed-config", expected };
     }
-  } else {
-    if (!(await looksLikeHub(chosen.root))) return null;
-    hubRoot = chosen.root;
-  }
 
-  return {
-    root: hubProjectDocsRoot(hubRoot, meta.project),
-    kind: "hub",
-    repo: hubRoot,
-  };
+    const chosen = chosenHubRoot(meta.hub_repo, meta.hub_path);
+    if (!chosen) {
+      return { kind: "hub-unreachable", reason: "no-hub-target", expected };
+    }
+
+    let hubRoot: string;
+    if (chosen.source === "derived") {
+      const arrival = await verifyHubArrival(chosen.root, meta.hub_repo as string);
+      if (arrival.ok) {
+        hubRoot = chosen.root;
+      } else if (meta.hub_path && (await looksLikeHub(meta.hub_path))) {
+        hubRoot = meta.hub_path; // fall back to the deprecated hub_path (incl. on a mismatch)
+      } else {
+        return { kind: "hub-unreachable", reason: "hub-absent", expected: chosen.root };
+      }
+    } else {
+      if (!(await looksLikeHub(chosen.root))) {
+        return { kind: "hub-unreachable", reason: "hub-corrupted", expected: chosen.root };
+      }
+      hubRoot = chosen.root;
+    }
+
+    return {
+      kind: "resolved",
+      value: {
+        root: hubProjectDocsRoot(hubRoot, meta.project),
+        kind: "hub",
+        repo: hubRoot,
+      },
+    };
+  } catch {
+    return { kind: "hub-unreachable", reason: "unknown-failure" };
+  }
 }
 
 /**
