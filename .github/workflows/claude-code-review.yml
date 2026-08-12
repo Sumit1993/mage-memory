@@ -65,8 +65,16 @@ jobs:
       pull-requests: read
       issues: read
       id-token: write
+    # Consumed by the `announce` job below: comments created at or after this
+    # instant are this run's output, anything earlier is a previous run's.
+    outputs:
+      started_at: ${{ steps.clock.outputs.started_at }}
 
     steps:
+      - name: Record review start time
+        id: clock
+        run: echo "started_at=$(date -u +%FT%TZ)" >> "$GITHUB_OUTPUT"
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -78,10 +86,50 @@ jobs:
       - name: Run Claude Code Review
         id: claude-review
         uses: anthropics/claude-code-action@v1
+        # SYNCHRONOUS SUBAGENTS, PINNED BY BEHAVIOR — THE ASYNC REGRESSION
+        # (#403, root-caused 2026-08-12).
+        #
+        # Recent Claude Code CLIs launch Task/Agent subagents in the BACKGROUND
+        # by default (documented default since 2.1.198): the tool result is
+        # "Async agent launched successfully... you will be notified when it
+        # completes", and that notification arrives on a LATER turn. The action
+        # runs the CLI in one-shot print mode, where ending the turn ends the
+        # process — so a reviewer that launches the plugin's step-1 eligibility
+        # subagent and yields to wait exits `success` having reviewed nothing.
+        # Observed end-to-end in run 31570506278 (full transcript in that log,
+        # courtesy of `show_full_output` below): the last assistant message is
+        # "I'll continue once that comes back", and nothing ever came back to a
+        # process that had already exited. Every review from 2026-08-11 onward
+        # (CLI 2.1.227/228) posted nothing; the 2026-08-10 runs (2.1.226)
+        # posted normally.
+        #
+        # CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1 (code.claude.com/docs/en/
+        # env-vars) disables all background-task machinery, including the
+        # `run_in_background` parameter on subagent tools — every subagent
+        # blocks and returns its result inline, which is the only shape that
+        # can work in print mode. Verified on 2.1.228 before adopting. The CLI
+        # itself stays unpinned and tracks latest; step-level `env` reaches the
+        # CLI because the action spawns it as a child process.
+        #
+        # REMOVE once upstream makes print mode survive the launch→notification
+        # gap (the 2.1.228 changelog's self-hosted-runner fix is the same bug
+        # class, so it is on their radar). Then VERIFY on a real PR that a
+        # review actually posts — a green job proves nothing; read the liveness
+        # comment the `announce` job leaves on the PR.
+        env:
+          CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '1'
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
           plugins: 'code-review@claude-code-plugins'
+          # The transcript is the only place a silent run is diagnosable. The
+          # 2026-08-11 failure on #418 — 34 turns, 30 permission denials, nothing
+          # posted, green job — was undiagnosable from the default log, which
+          # prints init and result and hides every message in between (a debug
+          # rerun does not reveal them either). This repo is public: the diff,
+          # the PR, and the findings are already public, so the transcript adds
+          # no exposure the PR itself doesn't have.
+          show_full_output: true
           # ` --comment` ON THE NEXT LINE IS THE SINGLE LOAD-BEARING ELEMENT OF THE
           # WHOLE REVIEW ARRANGEMENT. Do not remove it, and do not "simplify" the
           # prompt past it.
@@ -173,3 +221,97 @@ jobs:
             echo "::warning::The reviewer ran at ${HEAD_SHA:0:8} and concluded '$CONCLUSION', not success." \
                  "A stale --allowed-tools list is the usual cause — see the comment on that input."
           fi
+
+  # LIVENESS, ON THE PR — STILL NOT ENFORCED.
+  #
+  # The log-only warning above proved invisible in practice: on 2026-08-11 the
+  # reviewer ran a full 34-turn review of #418, posted nothing, and the job
+  # stayed green — nobody saw a thing until the operator went digging days
+  # later. This job puts the same fact where the operator already looks, the PR
+  # timeline: one comment per PR, updated in place per run, saying whether
+  # claude[bot] actually published anything for the head that was reviewed.
+  #
+  # Three properties are load-bearing:
+  #   - ADVISORY ONLY. Nothing gates on this comment (#415 retired that whole
+  #     idea); it exists so silence stops looking like approval.
+  #   - A SEPARATE JOB, not a step. The review job's token must stay read-only
+  #     because the agent executes inside that job; this job runs no agent, so
+  #     it can hold the one `pull-requests: write` safely.
+  #   - GITHUB_TOKEN AUTHORSHIP. Comments created with the workflow token do
+  #     not fire `issue_comment` triggers (GitHub's anti-recursion rule — the
+  #     same rule that killed #301's marker chain, working FOR us this time),
+  #     so this comment can never summon the @claude mention lane or loop.
+  announce:
+    name: Announce reviewer liveness
+    needs: review
+    # Skipped fork PRs post nothing: the review lane never looked, and the
+    # fork lane's story (CodeRabbit via `review-ready`) is documented above.
+    if: always() && needs.review.result != 'skipped'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Upsert liveness comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REVIEW_RESULT: ${{ needs.review.result }}
+          STARTED_AT: ${{ needs.review.outputs.started_at }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          short=${HEAD_SHA:0:8}
+          # If review died before its clock step, STARTED_AT is empty and the
+          # `>=` filter below would count every claude[bot] comment ever made.
+          # An impossible timestamp keeps the count honest (zero).
+          [ -n "$STARTED_AT" ] || STARTED_AT="9999-01-01T00:00:00Z"
+
+          # Inline review comments claude[bot] left against the reviewed head —
+          # strictly this head. No `original_commit_id` fallback: a comment that
+          # only matches after GitHub rewrote it for a newer push is a previous
+          # head's comment, and counting it would report stale work as this
+          # run's.
+          inline=$(gh api "repos/$REPO/pulls/$PR/comments" --paginate --jq \
+            "[.[] | select(.user.login==\"claude[bot]\")
+                  | select(.commit_id==\"$HEAD_SHA\")] | length")
+
+          # Summary comments (the plugin's no-issues path posts one). Three
+          # filters, each necessary: author, because only claude[bot] posts
+          # them; created >= run start, because issue comments carry no SHA;
+          # and the plugin's fixed '## Code review' heading, because the
+          # @claude MENTION lane shares the claude[bot] identity and a mention
+          # reply landing mid-review must not be counted as review output.
+          # This stays an advisory display, not evidence (#415): it reports
+          # what was posted, it does not certify who read what.
+          summary=$(gh api "repos/$REPO/issues/$PR/comments" --paginate --jq \
+            "[.[] | select(.user.login==\"claude[bot]\")
+                  | select(.created_at >= \"$STARTED_AT\")
+                  | select(.body | startswith(\"## Code review\"))] | length")
+
+          if [ "$((inline + summary))" -gt 0 ]; then
+            verdict="reviewed \`$short\` and posted ${inline} inline / ${summary} summary comment(s)."
+          else
+            verdict="finished on \`$short\` (job result: ${REVIEW_RESULT}) but posted **nothing**. \
+          Silence is not approval: this head has no machine review on record. \
+          Read the [run log]($RUN_URL) (full transcript is enabled) and consider the \`review-ready\` label."
+          fi
+
+          marker='<!-- claude-review-liveness -->'
+          body="$marker
+          **Claude review lane** — [run]($RUN_URL): $verdict"
+
+          # Only this workflow's own comment qualifies for the upsert: without
+          # the author filter, any participant could pre-create a marker
+          # comment and this job would PATCH — and thereby keep republishing
+          # into — a comment it does not own.
+          existing=$(gh api "repos/$REPO/issues/$PR/comments" --paginate --jq \
+            "[.[] | select(.user.login==\"github-actions[bot]\")
+                  | select(.body | startswith(\"$marker\"))][0].id // empty")
+          if [ -n "$existing" ]; then
+            gh api -X PATCH "repos/$REPO/issues/comments/$existing" -f body="$body" >/dev/null
+          else
+            gh api -X POST "repos/$REPO/issues/$PR/comments" -f body="$body" >/dev/null
+          fi
+          echo "liveness: $verdict"
