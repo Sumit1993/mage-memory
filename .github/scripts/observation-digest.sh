@@ -174,7 +174,7 @@ fi
 escalated=0
 for n in $(jq -r --arg d "$yday" '.[]|select(.created_at >= $d)|.number' <<<"$scope"); do
   if gh api "repos/$REPO/issues/$n/events?per_page=100" --paginate \
-       --jq '.[]|select(.event=="labeled")|.label.name' 2>/dev/null | grep -qx 'review-ready'; then
+       --jq '.[]|select(.event=="labeled")|.label.name' 2>/dev/null | grep -qx 'coderabbit_review'; then
     escalated=$((escalated+1))
   fi
 done
@@ -227,7 +227,7 @@ if [ "$by_none" -gt 0 ]; then
 elif [ "$errors" -gt 0 ]; then
   verdict="🟠 **$errors gate error state(s)** — the gate could not determine evidence. False reds block legitimate work."
 elif [ "$opened" -gt 0 ] && [ "$escalated" -eq "$opened" ]; then
-  verdict="🟠 Every PR opened was escalated to \`review-ready\`. If this holds, the valve is buying nothing and should be reverted."
+  verdict="🟠 Every PR opened was escalated to \`coderabbit_review\`. If this holds, the valve is buying nothing and should be reverted."
 else
   verdict="🟢 Nothing anomalous."
 fi
@@ -259,7 +259,7 @@ $hdr
 | ├ via CodeRabbit review | $by_review | how often the scarce counter was spent |
 | ├ via bot/release exemption | $by_bot | noise floor |
 | └ **with NO evidence** | **$by_none** | **must stay 0 — non-zero means the gate has a hole** |
-| \`review-ready\` escalations | $escalated | if this approaches "PRs opened", the valve buys nothing |
+| \`coderabbit_review\` escalations | $escalated | if this approaches "PRs opened", the valve buys nothing |
 | Online reviews consumed | $online | pressure on the scarce counter |
 | **Rounds per *reviewed* PR** | **$rounds_avg** (max $rounds_max) over $rounds_prs of $merged_total | **the unit of spend — is the multiplier 2, or worse?** |
 | Merged-head coverage | ${coverage}% | share reviewed directly vs waved through by exemption |
