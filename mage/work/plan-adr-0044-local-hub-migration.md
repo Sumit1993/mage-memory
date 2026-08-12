@@ -3,7 +3,7 @@ type: plan
 tags:
   - mage/roadmap
 created: "2026-08-03"
-last_reviewed: "2026-08-03"
+last_reviewed: "2026-08-12"
 status: active
 provenance:
   repo: mage-memory
@@ -54,11 +54,18 @@ Any of, in a `mage/metadata.json`:
    or by old-shape refs.
 
 Case 4 is IN scope, deliberately: the migration's unit is "old-shape metadata
-file", not "local hub". For remote-backed files the plan is field-only — drop
-the dead `hub_path`, reshape refs, bump `schema` — with no move, no name
-derivation, and the same confirmation/journal/rollback path as every other
-rewrite. One detection rule, one flow; local hubs are the subset that also
-needs an address minted.
+file", not "local hub". One detection rule, **two disjoint branches**, selected
+per file by whether its `hub_repo` canonicalizes as a remote:
+
+- **Remote-backed → field-only.** RETAIN the remote `hub_repo` unchanged; drop
+  the dead `hub_path`; reshape refs; bump `schema`. **No name derivation, no
+  `_local/` claim, no directory move** — a remote hub is never converted to a
+  local one. The branch is selected before any name is derived, so the
+  derivation and move machinery below is unreachable for these files.
+- **Local-only → field rewrite plus an address minted**, per the full sequence
+  in Rewrite surface.
+
+Both branches share the same confirmation, journal, and rollback path.
 
 ## Name derivation — deterministic, from the hub directory
 
@@ -87,10 +94,18 @@ spellings (symlink, `..`) are the SAME hub and must derive the same name.
 
 ## Conflict resolution — identity check, then a fallback chain
 
+The destination root is **`hubsRoot()`** (`src/hub-url.ts:246`) — `$MAGE_HOME/hubs`
+when that variable is set, else `~/.mage/hubs`. The plan writes `hubsRoot()/_local/<name>`
+throughout; it must never hard-code the home-relative form, or a `MAGE_HOME` install
+migrates into the wrong tree. Every `hub_path` this migration writes is serialized
+as an **expanded absolute path**, never a `~`-prefixed string: Node's `path`
+functions do not expand `~`, so a stored `~/...` value would not resolve on the
+next read.
+
 The claimed-name registry is the `_local/` directory itself plus each hub's
 self-address (below). For candidate `<name>`:
 
-- `~/.mage/hubs/_local/<name>` absent → claim it.
+- `hubsRoot()/_local/<name>` absent → claim it.
 - Present and provably THIS hub, already migrated → idempotent no-op. Proof is
   the journal-recorded `migrated_from` (the pre-move realpath, also written
   into the hub-side metadata at step 2): it must equal the source being
@@ -107,16 +122,40 @@ self-address (below). For candidate `<name>`:
 
 Hubs migrate in realpath-sorted order GLOBALLY, and collisions are detected on
 FOLDED candidates, not raw basenames — `My Hub` and `my-hub` are different
-basenames but one folded name. Which hub gets the bare name is therefore
-reproducible for any starting set.
+basenames but one folded name.
 
-**The claim is the rename itself — no lockfile.** `rename(2)` into
-`~/.mage/hubs/_local/<name>` fails (`ENOTEMPTY`/`EEXIST`) if the destination
-appeared after the plan was shown, so the atomic conflict check happens at the
-only moment that matters. On that failure the run re-derives against the now-
-current `_local/` contents and re-confirms; it never overwrites. A lockfile
-would be the wrong mechanism here (house precedent: prefer the lock-free
-convention; see notes/prefer-the-repos-lock-free-convention.md).
+**Assignment is order-independent WITHIN a run, first-claim-wins ACROSS runs.**
+Before any hub is moved, the run derives and **reserves** (claims, per the
+primitive below) the destination for every hub it can see, then moves them. So a
+single invocation cannot produce different names for the same visible set.
+
+Across separate invocations the guarantee is weaker, and the plan states it
+rather than implying more: migrate's scope is the current repo and its walk-up,
+so a later run may meet a name an earlier run already claimed, and will chain
+past it. A set of hubs never visible together therefore has no
+invocation-order-independent assignment — which no design can provide without a
+global registry mage deliberately does not keep (ADR-0010). `--name <n>` is the
+deterministic override when a specific hub must hold a specific name.
+
+**The claim is `mkdir` — no lockfile.** The claim primitive is
+`mkdir(hubsRoot()/_local/<name>)` with `recursive: false`: atomic, and it fails
+`EEXIST` if **anything** is already at that path. The move is then
+`rename(2)` into the empty directory the run just created and therefore owns.
+
+`rename(2)` alone is NOT sufficient as the claim, and the earlier draft of this
+plan was wrong to say so: POSIX permits `rename()` to **replace an existing
+empty directory**, so a destination created by another run after the plan was
+shown would be silently overwritten — contradicting the never-overwrites
+property this design depends on. Hence the separate no-replace claim.
+
+An existing destination is therefore always a CONFLICT, never a takeover —
+including an empty one. A stale empty directory left by a crash between the
+`mkdir` and the `rename` is precisely what the journal-scan resume detects and
+finishes (see Re-runs resume); it is never inferred from emptiness alone.
+
+On `EEXIST` the run re-derives against the now-current `_local/` contents and
+re-confirms. A lockfile would be the wrong mechanism here (house precedent:
+prefer the lock-free convention; see notes/prefer-the-repos-lock-free-convention.md).
 
 ## Rewrite surface — hub-side first, then every referrer
 
@@ -124,27 +163,30 @@ Per hub, in this order (each step idempotent, and each step's completion
 recorded in the journal as it lands — see Restore/rollback — so a run that dies
 mid-hub is visibly incomplete rather than silently half-done):
 
-1. **Move** the hub directory to `~/.mage/hubs/_local/<name>` — `rename(2)`
+0. **Preflight — validate BEFORE anything moves.** Every check that can refuse a
+   hub runs here, while the hub is still at its original path: the hub-side
+   metadata is hub-shaped (no top-level `hub_path`, no `hub_refs[]` — those are
+   referrer fields; a hand-edited file carrying them is named and refused), the
+   directory is a real mage hub, and the repository identity matches what the
+   journal will record. A validation that can only fail *after* step 1 would
+   leave the hub stranded at a new location with the migration incomplete, so no
+   refusal may be deferred past this point. The same checks re-run as **arrival
+   verification** after the move.
+
+1. **Move** the hub directory to `hubsRoot()/_local/<name>` — `rename(2)`
    only; a cross-device move (EXDEV) is refused with the exact `mv` command
    printed for the user instead. The ADR's identity check requires the hub AT
    the derived path, so registering-in-place is not an option.
 2. **Hub-side self-address**: the hub's own `metadata.json` records
    `local://<name>` plus `migrated_from` (the pre-move realpath), and takes the
-   same `schema` bump. Invariant, stated rather than assumed: hub-side metadata
-   is hub-shaped — it never carries top-level `hub_path` or `hub_refs[]`
-   (those are referrer fields); if a hand-edited hub file carries them anyway,
-   migrate refuses and names the file rather than guess. The self-address is
-   the arrival-verification anchor that replaces origin-match for local hubs
-   (ADR-0044 amends §2). On the claim primitive: a pre-existing EMPTY
-   destination directory is treated as a stale placeholder and taken over
-   (`rename(2)` semantics); anything non-empty fails the claim — which is the
-   property the race depends on, so no stronger no-replace primitive is
-   required.
+   same `schema` bump. The hub-shaped invariant this relies on is enforced in
+   preflight (step 0), not here. The self-address is the arrival-verification
+   anchor that replaces origin-match for local hubs (ADR-0044 amends §2).
 3. **Each referring code repo's `mage/metadata.json`**:
-   - top-level: `hub_repo` → `local://<name>`; `hub_path` →
-     `~/.mage/hubs/_local/<name>` (kept POINTING AT THE NEW LOCATION — see
-     mixed-version reads; removed entirely only in the follow-up release that
-     deletes the field),
+   - top-level: `hub_repo` → `local://<name>`; `hub_path` → the expanded
+     absolute `hubsRoot()/_local/<name>` (kept POINTING AT THE NEW LOCATION —
+     see mixed-version reads; removed entirely only in the follow-up release
+     that deletes the field),
    - every `hub_refs[]` entry: reshape to `{ hub_repo, project }`, local-path
      entries getting their hub's `local://<name>` address.
 4. `schema` bumps (`mage.v2` → `mage.v3`) so the EXISTING doctor drift check
@@ -159,9 +201,31 @@ disk), the run refuses and points at `--rollback`. More than one incomplete
 journal is itself a refusal — resolve or roll back explicitly before any new
 migration. Only then does normal detection proceed.
 
+## Unvisited referrers — the move leaves a redirect
+
 A single `mage migrate` run only rewrites metadata files it can see (the current
-repo/walk-up, per existing migrate scope). Other machines/repos referencing the
-same hub are caught by the doctor advisory when they next run anything.
+repo/walk-up, per existing migrate scope). A repository that was not visited
+keeps its old `hub_repo`/`hub_path`, and after the move that path no longer
+exists — `chosenHubRoot`'s fallback resolves to nothing
+(`src/doctor/link-checks.ts`). A doctor advisory alone cannot fix this: by then
+the evidence is gone.
+
+So the move is not a bare `rename`. It **leaves a redirect stub at the old
+path**: a directory containing only `.mage-moved.json` —
+
+```json
+{ "moved_to": "local://<name>", "path": "<expanded absolute destination>", "at": "<ISO>" }
+```
+
+Resolution consults the stub whenever a stored `hub_path` resolves to a
+directory carrying that file, so an unvisited repo keeps working and doctor can
+name the exact one-line fix. The stub is journaled like every other write and is
+removed by `--rollback` (which restores the hub to the old path) and by the
+follow-up release that deletes `hub_path`.
+
+Confirmation names this explicitly when any referrer cannot be seen: the run
+states that unvisited repositories will resolve through the stub until they are
+migrated.
 
 ## Confirmation — one plan, one yes, per hub
 
@@ -198,16 +262,27 @@ migration, closes ADR-0043 §6.
 ## Restore / rollback
 
 Before any write, the run journals to
-`~/.mage/state/migrations/local-hub-<ISO timestamp>.json`: every metadata
-file's prior field values plus a content hash of the file at journal time, the
-directory move (`src`, `dst`), and per-phase completion flags (see Rewrite
-surface). Then `mage migrate --rollback <journal>`:
+`<state root>/migrations/local-hub-<ISO timestamp>.json`: every metadata file's
+prior field values plus a content hash of the file at journal time, the
+directory move (`src`, `dst`), the redirect stub, and per-phase completion
+flags (see Rewrite surface).
+
+**Each phase also records its POST-state before being marked complete** — the
+exact field values written and a content hash taken after the write. Rollback
+needs both halves: the PRE values say what to restore, and the POST values are
+the only way to tell "still as this migration left it" from "edited by someone
+afterwards". A journal holding only the prior state cannot distinguish those,
+and would silently revert a later edit. A phase whose POST-state is missing is
+by definition incomplete, which is what the resume scan keys on.
+
+Then `mage migrate --rollback <journal>`:
 
 - **Restores journaled FIELDS only** — a surgical rewrite of the recorded
   values, never `git checkout` of the whole file, so an unrelated edit made
   after migration survives rollback.
 - **Refuses on divergence rather than guess**: a metadata file whose relevant
-  fields no longer match the migrated values, or a moved hub whose `HEAD`
+  fields no longer match the journaled POST values (or whose content hash no
+  longer matches the POST hash), or a moved hub whose `HEAD`
   commit id differs from the one recorded in the journal at migration time
   (identity, not a commit-count heuristic — counts miss amend/rebase), stops
   the rollback with both states named. Git remains the deeper restore for tracked files; the journal
@@ -226,8 +301,8 @@ surface). Then `mage migrate --rollback <journal>`:
 
 - `docs/src/content/docs/model/modes.md` + `reference/commands.mdx` — replace
   the ADR-0043 forward-marker asides with real behavior; the mixed-version
-  resolution precedence (hub_repo → derived, local:// → derived _local,
-  hub_path fallback) is 3+ moving parts and carries the worked-example table
+  resolution precedence (`hub_repo` → derived, `local://` → derived `_local`,
+  `hub_path` fallback) is 3+ moving parts and carries the worked-example table
   from this plan plus a `mage migrate` terminal transcript. Invalidation
   triggers, stated with the artifacts: regenerate both whenever the
   canonicalization precedence, the metadata `schema` version, migrate's
@@ -238,5 +313,5 @@ surface). Then `mage migrate --rollback <journal>`:
   form (issue #113's checklist).
 - `src/paths.ts` mode doc comment; `src/cli-program.ts` migrate/doctor help
   strings.
-- README quickstart: unaffected (local hubs are not the quickstart path) —
+- `README.md` — no update required (local hubs are not the quickstart path);
   stated per the docs-surfaces rule rather than omitted.
