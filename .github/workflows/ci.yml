@@ -5,6 +5,12 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # Merge-queue support (#403): the queue builds a speculative merge of the
+  # queued PR(s) onto main and requires `CI gate` to pass on THAT commit, which
+  # is what lets the ruleset drop "branch must be up to date" without letting
+  # two individually-green PRs break main together. Every job in this file is
+  # event-agnostic, so no job-level changes are needed — the trigger is enough.
+  merge_group:
 
 permissions:
   contents: read
