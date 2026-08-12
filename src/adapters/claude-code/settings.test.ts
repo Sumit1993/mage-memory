@@ -309,6 +309,21 @@ describe("removeMageHooks", () => {
     expect(removed).toBe(0);
     expect(settings.hooks?.SessionStart?.length).toBe(2);
   });
+
+  it("removes mage groups even if missing id property (issue #151)", () => {
+    const original: ClaudeSettings = {
+      hooks: {
+        SessionStart: [
+          { hooks: [{ type: "command", command: "mage observe" }] },
+          { hooks: [{ type: "command", command: "other-tool" }] },
+        ],
+      },
+    };
+    const { settings, removed } = removeMageHooks(original);
+    expect(removed).toBe(1);
+    expect(settings.hooks?.SessionStart?.length).toBe(1);
+    expect(settings.hooks?.SessionStart?.[0]?.hooks[0]?.command).toBe("other-tool");
+  });
 });
 
 describe("round-trip", () => {

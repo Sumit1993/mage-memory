@@ -165,6 +165,44 @@ describe("diffMageHooks", () => {
     expect(() => diffMageHooks(settings)).not.toThrow();
     expect(diffMageHooks(settings).connected).toBe(false);
   });
+
+  it("recognizes minimal mage hook blocks without id as connected and matching (issue #151)", () => {
+    const settings: ClaudeSettings = {
+      hooks: {
+        SessionStart: [
+          { hooks: [{ type: "command", command: "mage observe" }] },
+          { hooks: [{ type: "command", command: "mage nudge" }] },
+        ],
+        UserPromptSubmit: [
+          { hooks: [{ type: "command", command: "mage observe" }] },
+        ],
+        PostToolUse: [
+          { hooks: [{ type: "command", command: "mage observe" }] },
+        ],
+        PostToolUseFailure: [
+          { hooks: [{ type: "command", command: "mage observe" }] },
+        ],
+        PreCompact: [
+          { hooks: [{ type: "command", command: "mage observe" }] },
+        ],
+        SessionEnd: [
+          { hooks: [{ type: "command", command: "mage observe" }] },
+        ],
+        Stop: [
+          { hooks: [{ type: "command", command: "mage skills --metrics --quiet" }] },
+          { hooks: [{ type: "command", command: "mage observe" }] },
+        ],
+        SubagentStop: [
+          { hooks: [{ type: "command", command: "mage observe" }] },
+        ],
+      },
+    };
+    const d = diffMageHooks(settings);
+    expect(d.connected).toBe(true);
+    expect(d.matches).toBe(true);
+    expect(d.missingIds).toEqual([]);
+    expect(d.staleIds).toEqual([]);
+  });
 });
 
 describe("doctor — recall budget (ADR-0039)", () => {
@@ -327,6 +365,55 @@ describe("doctor KB health", () => {
     const conn = check(r.checks, "connection");
     expect(conn?.ok).toBe(true);
     expect(conn?.detail).toMatch(/mage hooks current/);
+  });
+
+  it("minimal mage hooks without id in user settings → reports connected (issue #151)", async () => {
+    const dir = await freshDir();
+    await makeInRepoKb(dir, { gitignoreSinks: true });
+    await mkdir(join(dir, "mage", ".mage", "learnings"), { recursive: true });
+    await writeFile(join(dir, "mage", ".mage", "learnings", "s1.jsonl"), '{"v":1,"type":"session_start"}\n');
+
+    const userSettings = {
+      hooks: {
+        SessionStart: [
+          { hooks: [{ type: "command", command: "mage observe" }] },
+          { hooks: [{ type: "command", command: "mage nudge" }] },
+        ],
+        UserPromptSubmit: [
+          { hooks: [{ type: "command", command: "mage observe" }] },
+        ],
+        PostToolUse: [
+          { hooks: [{ type: "command", command: "mage observe" }] },
+        ],
+        PostToolUseFailure: [
+          { hooks: [{ type: "command", command: "mage observe" }] },
+        ],
+        PreCompact: [
+          { hooks: [{ type: "command", command: "mage observe" }] },
+        ],
+        SessionEnd: [
+          { hooks: [{ type: "command", command: "mage observe" }] },
+        ],
+        Stop: [
+          { hooks: [{ type: "command", command: "mage skills --metrics --quiet" }] },
+          { hooks: [{ type: "command", command: "mage observe" }] },
+        ],
+        SubagentStop: [
+          { hooks: [{ type: "command", command: "mage observe" }] },
+        ],
+      },
+    };
+
+    await mkdir(join(home, ".claude"), { recursive: true });
+    await writeFile(
+      join(home, ".claude", "settings.json"),
+      `${JSON.stringify(userSettings, null, 2)}\n`,
+    );
+
+    const r = await doctor({ cwd: dir });
+    const conn = check(r.checks, "connection");
+    expect(conn?.ok).toBe(true);
+    expect(conn?.detail).toMatch(/user: mage hooks current/);
   });
 
   it("missing INDEX.md → advisory (optional) check, not a hard failure", async () => {

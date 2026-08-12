@@ -150,7 +150,12 @@ export function isAutoMemoryEnabled(
 /** True iff any installed group belongs to the commandeer tier (the mage:memory:* id family). */
 export function hasCommandeerHooks(settings: ClaudeSettings | null): boolean {
   const groups = settings?.hooks ? Object.values(settings.hooks).flat() : [];
-  return groups.some((g) => typeof g?.id === "string" && g.id.startsWith("mage:memory:"));
+  return groups.some((g) => {
+    if (!g || typeof g !== "object") return false;
+    if (typeof g.id === "string" && g.id.startsWith("mage:memory:")) return true;
+    const cmd = g.hooks?.[0]?.command;
+    return typeof cmd === "string" && cmd.includes("mage memory-hook");
+  });
 }
 
 // ─── drift diff (doctor) ─────────────────────────────────────────────────────
@@ -160,7 +165,7 @@ export function hasCommandeerHooks(settings: ClaudeSettings | null): boolean {
  * only). Drives `doctor`'s "connection health / hook drift" check — the
  * version-bump nudge from the setup-integrity gotcha.
  *
- *  - `connected`  — at least one installed group carries a `mage:*` id.
+ *  - `connected`  — at least one installed group carries a `mage:*` id or command.
  *  - `missingIds` — every MAGE_HOOKS id with no installed group of that id.
  *  - `staleIds`   — an installed group of that id exists but its command differs
  *                   from the expected command (a drifted/old hook block).
@@ -180,16 +185,37 @@ export function diffMageHooks(
   missingIds: string[];
   staleIds: string[];
 } {
-  // Map every installed mage:* group by id → its first command (last wins on dupes).
+  // Map every installed mage group by id → its first command (last wins on dupes).
   const installed = new Map<string, string | undefined>();
-  const groups = settings?.hooks ? Object.values(settings.hooks).flat() : [];
-  for (const g of groups) {
-    // Skip non-object array entries (a hand-edited file can carry `null`/scalars in
-    // a hooks-event array): `g.id` on a null would throw. diffMageHooks is on the
-    // `mage doctor` hot path, which must be total over any parseable settings JSON.
-    if (!g || typeof g !== "object") continue;
-    if (typeof g.id === "string" && g.id.startsWith(MAGE_ID_PREFIX)) {
-      installed.set(g.id, g.hooks?.[0]?.command);
+  if (settings?.hooks) {
+    for (const [event, groupList] of Object.entries(settings.hooks)) {
+      if (!Array.isArray(groupList)) continue;
+      for (const g of groupList) {
+        // Skip non-object array entries (a hand-edited file can carry `null`/scalars in
+        // a hooks-event array): `g.id` on a null would throw. diffMageHooks is on the
+        // `mage doctor` hot path, which must be total over any parseable settings JSON.
+        if (!g || typeof g !== "object") continue;
+        if (typeof g.id === "string" && g.id.startsWith(MAGE_ID_PREFIX)) {
+          installed.set(g.id, g.hooks?.[0]?.command);
+        } else {
+          const firstCmd = g.hooks?.[0]?.command;
+          if (typeof firstCmd === "string" && /\bmage\b/.test(firstCmd)) {
+            const matchedEntry = MAGE_HOOKS.find(
+              (entry) =>
+                entry.event === event &&
+                (entry.matcher ?? undefined) === (g.matcher ?? undefined) &&
+                entry.command === firstCmd,
+            ) ?? MAGE_HOOKS.find(
+              (entry) =>
+                entry.event === event &&
+                (entry.matcher ?? undefined) === (g.matcher ?? undefined),
+            );
+
+            const id = matchedEntry ? matchedEntry.id : `mage:unmatched:${event}:${firstCmd}`;
+            installed.set(id, firstCmd);
+          }
+        }
+      }
     }
   }
 
@@ -329,8 +355,13 @@ export function removeMageHooks(settings: ClaudeSettings | null): {
   const nextHooks: Record<string, HookGroup[]> = {};
 
   for (const [event, groups] of Object.entries(base.hooks)) {
+    if (!Array.isArray(groups)) continue;
     const kept = groups.filter((g) => {
-      const isMage = typeof g.id === "string" && g.id.startsWith(MAGE_ID_PREFIX);
+      if (!g || typeof g !== "object") return true;
+      const isMageId = typeof g.id === "string" && g.id.startsWith(MAGE_ID_PREFIX);
+      const firstCmd = g.hooks?.[0]?.command;
+      const isMageCmd = typeof firstCmd === "string" && /\bmage\b/.test(firstCmd);
+      const isMage = isMageId || isMageCmd;
       if (isMage) removed += 1;
       return !isMage;
     });
