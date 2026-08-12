@@ -22,10 +22,10 @@ import {
 import type { MutationPlan } from "./types.js";
 
 /** Note types that graduate — a skill auto-loads a PROCEDURE, not a fact (ADR-0019 §5). */
-const GRADUATABLE_TYPES: ReadonlySet<string> = new Set(["playbook", "gotcha"]);
+const GRADUATABLE_TYPES: ReadonlySet<string> = new Set(["procedure", "gotcha", "playbook"]);
 
 /**
- * Render a Procedure SKILL.md from a playbook/gotcha note. Mirrors `renderWingSkill`
+ * Render a Procedure SKILL.md from a procedure/gotcha note. Mirrors `renderWingSkill`
  * (skills-cmd.ts) for shape: `---`/`name:`/`description:`/`wing:`/`---`, blank,
  * GEN_MARKER, blank, `# <title>`, the procedure body, the backing-note pointer.
  *
@@ -35,7 +35,7 @@ const GRADUATABLE_TYPES: ReadonlySet<string> = new Set(["playbook", "gotcha"]);
  *   - a `description:` "Load when…" trigger (the optimize target, ADR-0016 §1).
  *   - `wing: <wing>` so snapshotSkillMatch reads the wing from frontmatter.
  *
- * THROWS if `note.frontmatter.type` is not "playbook" or "gotcha" (structural gate).
+ * THROWS if `note.frontmatter.type` is not a PROCEDURE (procedure/gotcha; legacy tail: playbook) (structural gate).
  */
 export function renderProcedureSkill(
   slug: string,
@@ -46,7 +46,7 @@ export function renderProcedureSkill(
   const type = typeof note.frontmatter.type === "string" ? note.frontmatter.type.trim() : "";
   if (!GRADUATABLE_TYPES.has(type)) {
     throw new Error(
-      `mage graduate: only playbook/gotcha notes graduate to a skill (got type "${type || "(none)"}"). ` +
+      `mage graduate: only procedure/gotcha notes (legacy tail: playbook) graduate to a skill (got type "${type || "(none)"}"). ` +
         `A skill is auto-loaded — you auto-load a procedure, not a fact (ADR-0019 §5).`,
     );
   }
