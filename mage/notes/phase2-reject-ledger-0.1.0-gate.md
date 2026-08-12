@@ -1,9 +1,9 @@
 ---
-type: note
+type: plan
 tags:
   - mage/roadmap
 created: "2026-07-12"
-last_reviewed: 2026-07-12
+last_reviewed: 2026-08-12
 status: active
 provenance:
   repo: mage-memory
