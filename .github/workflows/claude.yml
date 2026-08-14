@@ -20,6 +20,17 @@ concurrency:
 
 jobs:
   claude:
+    # Verb exclusion: the review and fixer lanes own these three phrasings.
+    # `@claude full review` does not contain `@claude review` as a substring,
+    # so all three checks are needed. `contains()` on a null body is false, so
+    # `issues` and `pull_request_review` events pass through untouched.
+    # Review bodies stay with the mention lane: no other lane subscribes to pull_request_review.
+    if: >-
+      !(
+        contains(github.event.comment.body, '@claude fix') ||
+        contains(github.event.comment.body, '@claude review') ||
+        contains(github.event.comment.body, '@claude full review')
+      )
     uses: prismalens/gh-workflows/.github/workflows/claude.yml@main
     # inherit does not cross ownership boundaries (this repo -> prismalens org);
     # the callee's required secret must be mapped explicitly.
