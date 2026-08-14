@@ -3,14 +3,22 @@ name: Claude Code Review
 on:
   pull_request:
     types: [opened, synchronize, ready_for_review, reopened]
+  # Comment triggers carry the `@claude review` summon; the callee decides
+  # admission (org member + explicit verb).
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
 
 # This is a managed caller stub.
 # The lane logic lives in prismalens/gh-workflows/.github/workflows/claude-code-review.yml.
 # Do not add logic here.
 
 concurrency:
-  group: claude-code-review-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  group: claude-code-review-${{ github.event.pull_request.number || github.event.issue.number }}
+  # A summon never cancels an in-flight automatic round; it queues behind it.
+  # A push still supersedes anything in the group, including a summon.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   review:
