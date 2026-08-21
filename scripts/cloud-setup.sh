@@ -6,14 +6,23 @@ if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
   exit 0
 fi
 
+# Root containers often ship without sudo; non-root sessions need it. With neither, the apt
+# install below cannot succeed — skip it rather than warn and then fail loudly anyway. #176.
 SUDO=""
+CAN_INSTALL=yes
 if [ "$(id -u)" -ne 0 ]; then
-  command -v sudo >/dev/null 2>&1 && SUDO="sudo" || { echo "cloud-setup: need root or sudo to install gh — skipping" >&2; }
+  if command -v sudo >/dev/null 2>&1; then
+    SUDO="sudo"
+  else
+    CAN_INSTALL=no
+  fi
 fi
 
 # gh is not in Ubuntu's default apt sources; install via GitHub's official repo
 # (https://github.com/cli/cli/blob/trunk/docs/install_linux.md#debian).
-if ! command -v gh >/dev/null 2>&1; then
+if [ "$CAN_INSTALL" = no ]; then
+  echo "cloud-setup: need root or sudo to install gh — skipping" >&2
+elif ! command -v gh >/dev/null 2>&1; then
   (
     (type -p wget >/dev/null || ($SUDO apt update && $SUDO apt install wget -y)) \
       && $SUDO mkdir -p -m 755 /etc/apt/keyrings \
