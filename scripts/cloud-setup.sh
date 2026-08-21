@@ -35,5 +35,11 @@ elif ! command -v gh >/dev/null 2>&1; then
       && $SUDO apt install gh -y
   ) || echo "cloud-setup: gh install FAILED — GitHub CLI unavailable this session" >&2
 fi
-command -v mage >/dev/null 2>&1 || npm install -g mage-memory@latest >/dev/null 2>&1 || true
+# Needs $SUDO like the gh path: a root-owned global npm prefix (the usual apt-Node layout)
+# fails EACCES for a non-root session. Attempted even without sudo — a user-owned prefix
+# succeeds — but never silently: this is the tool the hook exists to install. #176.
+if ! command -v mage >/dev/null 2>&1; then
+  $SUDO npm install -g mage-memory@latest >/dev/null 2>&1 \
+    || echo "cloud-setup: mage install FAILED — mage-memory unavailable this session" >&2
+fi
 exit 0
