@@ -21,8 +21,10 @@ import {
   normalizeMetadata,
   ownedDocsRoots,
   readHubMetadata,
+  explainNoDocsRoot,
   externalDocsRoot,
   readMetadata,
+  requireDocsRoot,
   resolveDocsRoot,
   writeHubMetadata,
   writeMetadata,
@@ -274,7 +276,8 @@ describe("paths", () => {
       expect(res).toEqual({
         kind: "hub-unreachable",
         reason: "malformed-config",
-        expected: "/some/path",
+        expectedAddress: undefined,
+        expectedPath: "/some/path",
       });
     });
 
@@ -289,7 +292,8 @@ describe("paths", () => {
       expect(res).toEqual({
         kind: "hub-unreachable",
         reason: "no-hub-target",
-        expected: undefined,
+        expectedAddress: undefined,
+        expectedPath: undefined,
       });
     });
 
@@ -305,7 +309,8 @@ describe("paths", () => {
       expect(res).toEqual({
         kind: "hub-unreachable",
         reason: "hub-corrupted",
-        expected: nonHub,
+        expectedAddress: undefined,
+        expectedPath: nonHub,
       });
     });
 
@@ -318,6 +323,115 @@ describe("paths", () => {
         kind: "hub-unreachable",
         reason: "unknown-failure",
       });
+    });
+  });
+
+  // Issue #158's second half: `resolveDocsRoot` collapses the 5-reason union back to
+  // `null`, so `null` means BOTH "no KB anywhere" and "your hub is unreachable".
+  // These pin the ONE place that tells them apart and the MESSAGE a human sees.
+  describe("explainNoDocsRoot — the user-visible half of issue #158", () => {
+    async function externalRepo(meta: Record<string, unknown>): Promise<string> {
+      const code = await tmpDir("mage-explain-");
+      await mkdir(join(code, "mage"), { recursive: true });
+      await writeFile(
+        join(code, "mage", "metadata.json"),
+        JSON.stringify({ schema: METADATA_SCHEMA, mode: "external", ...meta }),
+      );
+      return code;
+    }
+
+    it("no KB at all → the init/link message, and NOT flagged hub-unreachable", async () => {
+      const dir = await tmpDir("mage-explain-none-");
+      const why = await explainNoDocsRoot(dir);
+      expect(why.hubUnreachable).toBe(false);
+      expect(why.message).toContain("No mage knowledge base found");
+      expect(why.message).toMatch(/mage init/);
+    });
+
+    it("hub-absent (hub_path points nowhere) → names the path, points at `mage connect`", async () => {
+      const missing = join(await tmpDir("mage-explain-abs-"), "not-cloned");
+      const code = await externalRepo({ project: "engine", hub_path: missing });
+      const why = await explainNoDocsRoot(code);
+      expect(why.hubUnreachable).toBe(true);
+      expect(why.reason).toBe("hub-absent");
+      expect(why.expectedPath).toBe(missing);
+      expect(why.message).toContain(missing);
+      expect(why.message).toMatch(/mage connect/);
+      // The wrong-remedy trap: `mage init` here mints a SECOND KB.
+      expect(why.message).toMatch(/Do NOT run `mage init`/);
+    });
+
+    it("hub-absent (hub_repo derives, nothing cloned there) → names the derived path", async () => {
+      const saved = process.env.MAGE_HOME;
+      process.env.MAGE_HOME = await tmpDir("mage-explain-home-");
+      try {
+        const code = await externalRepo({
+          project: "engine",
+          hub_repo: "https://example.com/acme/hub.git",
+        });
+        const why = await explainNoDocsRoot(code);
+        expect(why.hubUnreachable).toBe(true);
+        expect(why.reason).toBe("hub-absent");
+        expect(why.expectedPath).toContain(join("hubs", "example.com", "acme", "hub"));
+        expect(why.expectedAddress).toBe("https://example.com/acme/hub.git");
+        expect(why.message).toMatch(/mage connect/);
+        expect(why.message).toMatch(/Do NOT run `mage init`/);
+      } finally {
+        if (saved === undefined) delete process.env.MAGE_HOME;
+        else process.env.MAGE_HOME = saved;
+      }
+    });
+
+    it("no-hub-target → points at `mage link <address>`", async () => {
+      const code = await externalRepo({ project: "engine", hub_path: null, hub_repo: null });
+      const why = await explainNoDocsRoot(code);
+      expect(why.hubUnreachable).toBe(true);
+      expect(why.reason).toBe("no-hub-target");
+      expect(why.message).toMatch(/mage link <address>/);
+    });
+
+    it("malformed-config (no project) → points at `mage link <address>`", async () => {
+      const code = await externalRepo({ hub_path: "/some/path" });
+      const why = await explainNoDocsRoot(code);
+      expect(why.reason).toBe("malformed-config");
+      expect(why.message).toMatch(/names no project/);
+    });
+
+    it("unknown-failure (unreadable metadata) → points at repair / `mage link`", async () => {
+      const code = await tmpDir("mage-explain-bad-");
+      await mkdir(join(code, "mage"), { recursive: true });
+      await writeFile(join(code, "mage", "metadata.json"), "invalid json{");
+      const why = await explainNoDocsRoot(code);
+      expect(why.reason).toBe("unknown-failure");
+      expect(why.message).toMatch(/mage link <address>/);
+    });
+
+    it("REDACTS credentials in a hub_repo address before printing it", async () => {
+      const code = await externalRepo({
+        project: "engine",
+        hub_repo: "https://x-access-token:ghp_SECRETVALUE@example.com/acme/hub.git",
+      });
+      const why = await explainNoDocsRoot(code);
+      expect(why.hubUnreachable).toBe(true);
+      expect(why.message).not.toContain("ghp_SECRETVALUE");
+      expect(why.expectedAddress).not.toContain("ghp_SECRETVALUE");
+    });
+
+    it("hub-corrupted (something IS there, but is not a hub) is told apart from absent", async () => {
+      const notAHub = await tmpDir("mage-explain-nothub-");
+      const code = await externalRepo({ project: "engine", hub_path: notAHub });
+      const why = await explainNoDocsRoot(code);
+      expect(why.reason).toBe("hub-corrupted");
+      // The message must not claim a non-existent directory "exists" — and must not
+      // claim an existing one is missing.
+      expect(why.message).toMatch(/something exists at/);
+    });
+
+    it("requireDocsRoot THROWS the hub-unreachable message, not the generic no-KB one", async () => {
+      const missing = join(await tmpDir("mage-explain-req-"), "not-cloned");
+      const code = await externalRepo({ project: "engine", hub_path: missing });
+      await expect(requireDocsRoot(code)).rejects.toThrow(/external mode/);
+      await expect(requireDocsRoot(code)).rejects.toThrow(/mage connect/);
     });
   });
 
