@@ -217,6 +217,25 @@ Before creating a memory note, check whether a better home wins (in order):
 | Settled architectural choice & rationale | **Decision record** | Author ADR in `mage/decisions/` (`type: decision`). |
 | Non-completing, recallable insight/gotcha | **Memory note** ✅ | Author a memory-genre note (`mage/notes/`). |
 
+### Merging notes
+
+Two memory notes that answer the same reader question are one note. Type is
+never a barrier — all seven memory types are one genre. Mechanics:
+
+- **Survivor:** the note whose title best states the shared question — retitle
+  it if neither does. Tie-break: the one with more inbound links.
+- **Body:** integrate, don't staple. The merged note must read as one answer.
+  (The `mage dream --apply` merge op appends a dated `## Update` section
+  mechanically; a hand merge should do better.)
+- **Frontmatter:** keep the **earlier** `created` (the memory's identity
+  anchor); union `keywords`, `tags`, and `sources`; bump `updated` and
+  `last_reviewed` to today.
+- **Inbound links:** grep the KB for the absorbed file's name and repoint every
+  link to the survivor **before** deleting it. A merge that breaks links is
+  worse than no merge.
+- Never merge across genres: a stale `decision` is superseded, never absorbed.
+- Finish with `mage index`.
+
 ---
 
 ## 7. Work units (`work/<slug>/`)

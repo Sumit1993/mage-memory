@@ -45,32 +45,67 @@ to avoid), and **pointers** to canonical sources — never a copy of the source
 
    If a better home wins, route the content there (`mage/work/` for plans/specs/tasks, `mage/decisions/` for decisions, a repo doc for current truth, a skill for instructions) instead of authoring a note. This is **guidance, not a gate** — never phrase it as a hard block (ADR-0035 §4 forbids write-time tollbooths; if the user still requests a note, author it).
 
-3. **Classify the finding.** Pick a `type` (see `CONVENTIONS.md`). Memory genre —
-   recall-bearing: `gotcha`, `procedure`, `pointer`, `principle`, `feedback`,
-   `reference`, `note`. Non-memory genres: `decision`, `plan`, `tasks`, `spec`.
-   Any other string is legal but lands **unclassified** (rung 3). Pick the **wing**
-   (project / repo / service / person) and **room** (topic) → tag `#<wing>/<room>`.
+3. **Classify the finding.** Pick a `type` (see `CONVENTIONS.md`). The seven
+   memory types — `gotcha`, `procedure`, `pointer`, `principle`, `feedback`,
+   `reference`, `note` — are all **one genre** (memory, rung 2): shelf labels,
+   not walls. Type never decides where a note's boundary is — the one-question
+   test in step 4 does, and memory notes of different types merge freely (pick
+   the merged note's type by what the merged body mostly is). Only the
+   non-memory genres have walls: `decision`, `plan`, `tasks`, `spec` follow
+   their own lifecycles and never merge with memory notes (a wrong decision is
+   superseded, not merged). Any other type string is legal but lands
+   **unclassified** (rung 3). Pick the **wing** (project / repo / service /
+   person) and **room** (topic) → tag `#<wing>/<room>`.
 
-4. **Overlap-check (on-write, ADR-0004).** Read `mage/INDEX.md` (and the
-   per-wing `_index.<wing>.md` if present) for notes on the same topic or
-   keywords. Decide **UPDATE** an existing note vs **NEW** note. If a new claim
-   contradicts an existing note, prefer **supersede**: mark the old note
-   `status: superseded`, link to the new one — never silently overwrite.
+4. **One-question test (on-write, ADR-0004) — answer it aloud before drafting.**
+   Every memory note answers one reader question. State, in one sentence, the
+   question a reader mid-task would ask when they need this finding ("why does
+   X fail when Y?", "what is the fast path to Z?").
 
-5. **Draft the note** (do not write yet). Frontmatter (all optional, but fill
-   what you know):
-   ```yaml
-   ---
-   type: interface
-   tags: [billing/payments]
-   created: <ISO date>
-   last_reviewed: <ISO date>
-   provenance: { repo: <repo>, commit: <sha>, work: <work-slug> }
-   sources:
-     - https://… (canonical doc / ticket / file:line) — when to go here
-   status: active
-   ---
+   Then read `mage/INDEX.md` (and the per-wing `_index.<wing>.md` if present)
+   and name the existing note closest to that question — **closest by question,
+   not by shared keywords, note size, or matching `type`**. Emit this block in
+   your reply before drafting anything:
+
    ```
+   Question:     <the reader's question>
+   Closest note: <title> (<path>) — it answers: <its question>
+   Verdict:      MERGE | SUPERSEDE | NEW
+   ```
+
+   - **MERGE** — an existing note answers the same question, or the two
+     findings are halves of one trap a reader always meets together. Edit that
+     note in place: integrate the finding into its body, union `keywords`,
+     keep its `created`, bump `updated`/`last_reviewed`. No new file.
+     (Mechanics: `CONVENTIONS.md` §"Merging notes".)
+   - **SUPERSEDE** — an existing note answers the same question but its answer
+     is now wrong: mark it `status: superseded`, link it to the new note —
+     never silently overwrite.
+   - **NEW** — no existing note answers the question. NEW must be justified:
+     complete the sentence *"No existing note answers this question because
+     …"*. If you cannot complete it truthfully, the verdict is MERGE — unless an existing note answers the question but its content is now wrong, in which case the verdict is SUPERSEDE.
+
+5. **Draft the note** (do not write yet).
+   - **For NEW / SUPERSEDE:** draft the frontmatter (all optional, but fill
+     what you know):
+     ```yaml
+     ---
+     type: interface
+     tags: [billing/payments]
+     created: <ISO date>
+     last_reviewed: <ISO date>
+     provenance: { repo: <repo>, commit: <sha>, work: <work-slug> }
+     sources:
+       - https://… (canonical doc / ticket / file:line) — when to go here
+     status: active
+     ---
+     ```
+     (For **SUPERSEDE**, also draft the edit to the superseded note: set
+     `status: superseded` and link it to the new note).
+   - **For MERGE:** edit the survivor note in place (`CONVENTIONS.md` §"Merging
+     notes"): keep its existing `created`, bump `updated`/`last_reviewed` to
+     today, and union `tags`, `keywords`, and `sources`.
+
    Body: the verbatim insight (don't oversimplify what you figured out), the
    procedure (steps; bad CLI calls to avoid + why), and a `## Relations`
    section with typed portable links (`- depends_on [x](x.md)`). Use standard
@@ -80,9 +115,10 @@ to avoid), and **pointers** to canonical sources — never a copy of the source
    `sources:`; quote only the reusable distilled insight. Snapshot a source
    into `work/<slug>/artifacts/` ONLY if it's fragile/ephemeral.
 
-7. **Confirm with the user.** Show the draft + the chosen path
-   (`mage/notes/<wing>/<slug>.md`) and whether it's UPDATE or NEW. Wait for a
-   yes. (Human-confirm is the default for v0.1.)
+7. **Confirm with the user.** Show the draft (or diff for MERGE), the target
+   path (`mage/notes/<wing>/<slug>.md` for NEW/SUPERSEDE, or the existing note's
+   path for MERGE), and the step-4 verdict block — including the "No existing
+   note answers this because …" sentence when the verdict is NEW. Wait for a yes.
 
 8. **Redaction gate (ADR-0014 Gate 2, BEFORE write).** Run
    `mage redact <draft-file>` on the draft. If it reports a **LIVE** secret
@@ -116,7 +152,7 @@ adopting an authored skill is *remembering*, not copying a source (ADR-0013 §5)
      capture via the **Steps** above).
 
 2. **For each prose / transcript / note file**, run the normal capture pipeline (classify →
-   overlap-check → draft insight+procedure+pointers → redaction gate → write),
+   one-question test → draft insight+procedure+pointers → redaction gate → write),
    but defer the human confirm to the **bulk confirm** in step 4. Point
    `sources:` at the original file; never paste the source body in.
 
