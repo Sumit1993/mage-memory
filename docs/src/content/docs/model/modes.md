@@ -124,6 +124,18 @@ Most mage commands need to locate the docs root to operate on. They do this by w
      in the hub, where the notes actually are, not in the code repo.
 2. Otherwise, look upward for a **hub root** (a directory with a `projects/` registry and a top-level `metadata.json`). Inside a `projects/<name>/` directory it resolves to that project's flat docs root; anywhere else under the hub it resolves to the hub root itself.
 
+Concretely, with a hub whose derived root is `~/.mage/hubs/github.com/acme/hub`:
+
+| You run `mage` from | The walk-up finds | Resolved docs root |
+| --- | --- | --- |
+| `~/code/api/src/routes/` | `~/code/api/mage/metadata.json`, mode `in-repo` | `~/code/api/mage/` |
+| `~/code/api/` | metadata mode `hybrid` | `~/code/api/mage/` — hub registrations never move the docs root |
+| `~/code/api/` | metadata mode `external`, project `api` | `~/.mage/hubs/github.com/acme/hub/projects/api/` — the hub, derived from `hub_repo` |
+| `~/.mage/hubs/github.com/acme/hub/projects/engine/` | no code-repo metadata above; a hub root is | `…/hub/projects/engine/` — that project's flat docs root |
+| `~/.mage/hubs/github.com/acme/hub/` (or anywhere else under it) | the hub root itself | `…/hub/` |
+
+(And from a directory with neither above it, there is no docs root: interactive commands stop with `No mage knowledge base found at or above …`.)
+
 This is why you can run `mage` commands from anywhere inside a repo or hub and they find the right knowledge base. It is also why an `external`-mode code repo's captures end up in the hub even though you were working in the code repo — the metadata pointer redirects them.
 
 The on-disk schema is stamped as `mage.v2`. Older `mage.v1` metadata is read leniently and upgraded in memory; `mage migrate` rewrites it to the current schema (and, like `init`, never commits).
@@ -155,6 +167,17 @@ clone already sitting somewhere ELSE with a matching origin is detected (a
 scan under the hubs root, sorted and deterministic) and mage prints the exact
 `mv` to relocate it — it never performs the move itself. When nothing is found
 at all, `mage connect` offers to clone `hub_repo` there on the spot.
+
+```mermaid Verify on arrival: at the derived hub path, a hub-shaped clone whose origin matches hub_repo is reused; an origin mismatch is a hard error; with nothing usable there, a displaced clone elsewhere under the hubs root earns a printed mv, and otherwise mage connect offers to clone.
+flowchart TD
+  a["arrive at the derived path<br/>~/.mage/hubs/host/owner/repo"] --> f{"a hub-shaped clone here?"}
+  f -->|yes| o{"its origin matches hub_repo?"}
+  o -->|match| r["reuse it"]
+  o -->|mismatch| e["hard error — both remotes named,<br/>nothing reused, nothing clobbered"]
+  f -->|no| s{"a clone of the same remote<br/>elsewhere under the hubs root?"}
+  s -->|found| m["print the exact mv —<br/>mage never moves it itself"]
+  s -->|none| c["mage connect offers to<br/>clone hub_repo there"]
+```
 
 ## Reaching a hub from the code repo
 

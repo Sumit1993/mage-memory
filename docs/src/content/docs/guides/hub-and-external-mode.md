@@ -100,7 +100,8 @@ mage doctor
 ```
 
 The check to look for is **KB access grant**, in the readiness group. It has
-four outcomes:
+four outcomes (they mirror the verify-on-arrival decision diagrammed in
+[Modes and storage](../model/modes.md#where-a-hub-actually-lives--derived-not-recorded)):
 
 - **granted** — the hub is present and reachable. This is what you want.
 - **failing (ungranted)** — the hub is on this machine but ungranted: "the agent

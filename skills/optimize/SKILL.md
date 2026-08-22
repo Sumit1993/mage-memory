@@ -220,8 +220,10 @@ edits this pass — the learning rate held.
 
 - **/mage:graduate** (`skills/graduate/SKILL.md`) — the forward move (note →
   Procedure skill); demote is its reverse (skill → archived, note kept).
-- **/mage:groom** (`skills/groom/SKILL.md`) — its Phase 2 (recurrence catch-net)
-  feeds new generated skills into the catalog this skill then tunes.
+- **/mage:groom** (`skills/groom/SKILL.md`) — its Phase 2 routes graduate
+  proposals for proven notes (ADR-0038); `/mage:graduate` confirms them and
+  `mage dream --apply` — the single serialized writer — mints the generated
+  skills this skill then tunes.
 - **ADR-0016** (`mage/decisions/0016-context-match-confidence-ladder-applier.md`)
   — context-match as the load-bearing predicate, the confidence ladder, the
   single-writer applier, and the four hard ceilings.

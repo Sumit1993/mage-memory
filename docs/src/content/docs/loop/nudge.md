@@ -13,7 +13,7 @@ The nudge **writes nothing**. It is a read-only artifact injected into your host
 
 The nudge is wired to the **SessionStart** hook, and it acts on three sources: `compact`, `startup`, and `resume`. Only `/clear` is a fast no-op — there is nothing to reflect on. The two halves of the nudge fire differently:
 
-- The **fresh-chapter digest** is rendered only on `compact`, because that is the only source where a chapter just closed. A `startup` or `resume` carries no fresh chapter, so it rides the backlog reminder alone.
+- The **fresh-chapter digest** can render on any of the three. On `compact` it is the chapter that just closed. On `startup` or `resume` it is the *prior session's* final chapter — a chapter is closed by a compact *or* a session end — surfaced only when the scratch has changed, and a per-chapter watermark stops the same chapter from surfacing twice.
 - The **backlog mandate** can fire on any of the three sources (throttled — see below).
 
 Why `SessionStart` and not an earlier hook for the digest?
@@ -24,13 +24,22 @@ Why `SessionStart` and not an earlier hook for the digest?
 
 That is why the nudge lives where it does. (Verified against the Claude Code hook contract and recorded in mage's decision records ADR-0029, ADR-0030, and ADR-0009 §24.)
 
+The whole firing matrix:
+
+| `source` | fresh-chapter digest | backlog mandate | throttle |
+| --- | --- | --- | --- |
+| `compact` | the chapter that just closed (always re-scanned) | yes — at the KB's configured autonomy level | digest deduped once per chapter; backlog **bypasses** the window |
+| `startup` | the prior session's final chapter, if the scratch changed and it wasn't already shown | yes — dropped to Operator (offer-first), whatever the level | backlog at most once per window (default 4 h) |
+| `resume` | same as `startup` | same as `startup` | same as `startup` |
+| `clear` | no — fast no-op | no | — |
+
 ## What it does
 
 On a firing source, `mage nudge` composes up to two parts and emits them as `additionalContext`. It never advances the distill watermark and never writes a draft.
 
-### 1. The fresh-chapter digest (compact only)
+### 1. The fresh-chapter digest
 
-On a `source: "compact"` start, mage reads the just-closed chapter from the captured scratch (`.mage/learnings/`) and renders an **earned-signal inventory** — the failures, external commands, and corrections it observed, in the order they happened. The artifact is explicitly framed as *raw material, not lessons*: mage is not claiming any line is worth keeping, and most are noise. The host agent reads it, recognizes any durable lesson, and captures it with `mage stage`. The digest is never throttled — each compact closes new content.
+On a firing start, mage reads the last-closed chapter from the captured scratch (`.mage/learnings/`) — on `compact` the chapter that just closed; on `startup`/`resume` the prior session's final one, with an offer-first note appended — and renders an **earned-signal inventory** — the failures, external commands, and corrections it observed, in the order they happened. The artifact is explicitly framed as *raw material, not lessons*: mage is not claiming any line is worth keeping, and most are noise. The host agent reads it, recognizes any durable lesson, and captures it with `mage stage`. The digest is never throttled — each compact closes new content.
 
 ### 2. The autonomy-scaled backlog mandate
 

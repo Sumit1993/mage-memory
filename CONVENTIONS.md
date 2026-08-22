@@ -140,8 +140,9 @@ its **first tag, not its file path** — a note can live **anywhere** in the
 knowledge base and still group correctly. `mage index`, `mage skills`, and
 `mage dream` **recurse the whole tree** and index every `.md` except a fixed
 skip-set: `.obsidian/`, `.git/`, `node_modules/`, `artifacts/`, `.mage/` (covers learnings, metrics, staging),
-`archive/`, and mage's own generated/scaffolding files (`INDEX.md`,
-`_index.*.md`, `AGENTS.md`, `CLAUDE.md`, `IDENTITY.md`). So `notes/`,
+`archive/`, `.claude/`, `.agents/`, and mage's own generated/scaffolding files
+(`INDEX.md`, `MEMORY.md`, `Dashboard.md`, `_index.*.md`, `AGENTS.md`,
+`CLAUDE.md`, `IDENTITY.md`). So `notes/`,
 `decisions/`, and `work/` are *recommended* homes, not magic — a note in a
 custom dir, or in a hub's `projects/<name>/`, indexes just the same. `archive/`
 is intentionally skipped (use `status: archived` to retire a note in place); the
