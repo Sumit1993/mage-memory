@@ -22,6 +22,7 @@ import {
   type ResolvedDocsRoot,
   absolutePath,
   exists,
+  explainNoDocsRoot,
   findCodeRepoRoot,
   hubsRoot,
   looksLikeHub,
@@ -124,6 +125,16 @@ export async function connect(opts: ConnectOptions): Promise<ConnectResult> {
   const kb = await resolveDocsRoot(opts.cwd ?? process.cwd());
   const commandeer =
     isAutoMemoryEnabled(r.settings, process.env) && kb !== null && target.scope === "local";
+  // (b) failing is the ONE arm that is invisible otherwise: `resolveDocsRoot`
+  // returns a bare null for both "no KB" and "external hub unreachable" (#158), so
+  // say which, and say what the silent decline costs. The other two arms are the
+  // user's own explicit choices (auto-memory off; `--user`/global scope).
+  if (!commandeer && kb === null && isAutoMemoryEnabled(r.settings, process.env)) {
+    const why = await explainNoDocsRoot(opts.cwd ?? process.cwd());
+    logger.warn(
+      `Skipping the commandeer tier (autoMemoryDirectory stays where it is): ${why.message}`,
+    );
+  }
 
   const { settings: merged, reaped } = upsertMageHooks(r.settings, { commandeer });
   if (commandeer && kb) {

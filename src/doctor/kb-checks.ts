@@ -27,6 +27,8 @@ import {
   METADATA_SCHEMA,
   STATE_DIR,
   exists,
+  explainNoDocsRoot,
+  externalDocsRoot,
   findCodeRepoRoot,
   learningsPath,
   looksLikeHub,
@@ -81,6 +83,10 @@ export async function pushKbChecks(
   // Recall readiness (ADR-0042): when the KB lives OUTSIDE this code repo, the harness
   // needs a filesystem grant or the agent cannot read what it knows. Detect-and-instruct
   // only — doctor never writes host config (ADR-0037 §2); `mage connect` is the writer.
+  // Issue #158's second half: an external-mode repo whose hub is unreachable used to
+  // look IDENTICAL to a healthy one here (the grant check's absent branch is an
+  // optional-ok). Report the unreachable hub in its own right, before the grant story.
+  await pushExternalHubCheck(checks, opts);
   await pushReachGrantCheck(checks, opts);
   // Gate-2 redaction pre-commit hook (detect+nudge; never installed by --fix) and
   // metadata schema drift (advisory; --fix migrates in place). Both fail-open.
@@ -579,6 +585,38 @@ async function refreshHookBlock(conn: Connection): Promise<MageDiff | null> {
 }
 
 /**
+ * Is this repo's EXTERNAL hub reachable at all? The grant check below answers a
+ * different question ("is the harness allowed to read it"), and its hub-absent arm
+ * is a benign optional-ok — correct for a hybrid ref, silent for the state issue
+ * #158 is about, where the repo's ONLY knowledge base is unreachable and every
+ * capture is being dropped. Detect-and-instruct: names the reason, the expected
+ * address/path, and the command that OBTAINS the hub (ADR-0044 §4) — never `mage
+ * init`, which would mint a second KB. Fail-open: no code repo, or in-repo/hybrid
+ * mode, pushes nothing.
+ */
+async function pushExternalHubCheck(checks: DoctorCheck[], opts: DoctorOptions): Promise<void> {
+  const cwd = opts.cwd ?? process.cwd();
+  const codeRepo = await findCodeRepoRoot(cwd).catch(() => null);
+  if (!codeRepo) return;
+  const external = await externalDocsRoot(codeRepo);
+  if (external.kind === "not-external") return;
+  if (external.kind === "resolved") {
+    checks.push({
+      name: "external hub",
+      ok: true,
+      detail: `hub reachable — this repo's notes live at ${external.value.root}`,
+    });
+    return;
+  }
+  const why = await explainNoDocsRoot(codeRepo);
+  checks.push({
+    name: "external hub",
+    ok: false,
+    detail: `unreachable (${external.reason}) — ${why.message}`,
+  });
+}
+
+/**
  * The reach tier's readiness check (ADR-0042): when this code repo's KB lives OUTSIDE
  * the project root (mode external or hybrid), the harness must be granted filesystem
  * access to it or the agent cannot read its own knowledge base — every note read
@@ -609,10 +647,11 @@ async function refreshHookBlock(conn: Connection): Promise<MageDiff | null> {
 async function pushReachGrantCheck(checks: DoctorCheck[], opts: DoctorOptions): Promise<void> {
   const cwd = opts.cwd ?? process.cwd();
   let resolutions: Awaited<ReturnType<typeof resolveHubGrant>>[] = [];
+  let targets: ReturnType<typeof outOfRepoKbTargets> = [];
   try {
     const codeRepo = await findCodeRepoRoot(cwd);
     const meta = codeRepo ? await readMetadata(codeRepo) : null;
-    const targets = meta && codeRepo ? outOfRepoKbTargets(meta, codeRepo) : [];
+    targets = meta && codeRepo ? outOfRepoKbTargets(meta, codeRepo) : [];
     // Mirror connect's gate EXACTLY — resolveHubGrant, the same function connect
     // uses to decide what to grant AND what path it grants (ADR-0043 §5's
     // one-shared-function rule). Reporting a target connect would never grant as
@@ -634,14 +673,14 @@ async function pushReachGrantCheck(checks: DoctorCheck[], opts: DoctorOptions): 
 
   const missing: string[] = [];
   const mismatched: string[] = [];
-  let sawAbsent = false;
-  for (const resolution of resolutions) {
+  const absent: string[] = [];
+  for (const [i, resolution] of resolutions.entries()) {
     if (resolution.reason === "mismatch") {
       mismatched.push(resolution.detail ?? "hub mismatch");
       continue;
     }
     if (resolution.reason === "absent") {
-      sawAbsent = true;
+      absent.push(targets[i]?.root ?? "the derived hub path");
       continue;
     }
     if (!granted.has(resolution.root as string)) missing.push(resolution.root as string);
@@ -665,12 +704,15 @@ async function pushReachGrantCheck(checks: DoctorCheck[], opts: DoctorOptions): 
     });
     return;
   }
-  if (sawAbsent) {
+  if (absent.length > 0) {
+    // Optional-ok is right HERE: a hub that is not cloned yet is recoverable and
+    // `connect` offers to clone it. Whether that absence has ALSO killed this
+    // repo's only KB is the "external hub" check's story, not this one (#158).
     checks.push({
       name: "KB access grant",
       ok: true,
       optional: true,
-      detail: "no mage hub present on this machine yet — nothing to grant yet",
+      detail: `no mage hub at ${absent.join(", ")} on this machine yet — nothing to grant yet`,
     });
     return;
   }
