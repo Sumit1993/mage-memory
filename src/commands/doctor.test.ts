@@ -58,7 +58,7 @@ async function makeInRepoKb(
 
 describe("diffMageHooks", () => {
   it("full installed block → connected + matches, nothing missing/stale", () => {
-    const settings = upsertMageHooks(null);
+    const settings = upsertMageHooks(null).settings;
     const d = diffMageHooks(settings);
     expect(d.connected).toBe(true);
     expect(d.matches).toBe(true);
@@ -67,7 +67,7 @@ describe("diffMageHooks", () => {
   });
 
   it("dropping two ids → those ids are missing and matches is false", () => {
-    const settings = upsertMageHooks(null) as ClaudeSettings;
+    const settings = upsertMageHooks(null).settings as ClaudeSettings;
     // Remove the PostToolUse and PreCompact mage groups.
     const dropped = ["mage:observe:PostToolUse", "mage:observe:PreCompact"];
     for (const ev of Object.keys(settings.hooks ?? {})) {
@@ -84,7 +84,7 @@ describe("diffMageHooks", () => {
   });
 
   it("changing a command → that id is stale and matches is false", () => {
-    const settings = upsertMageHooks(null) as ClaudeSettings;
+    const settings = upsertMageHooks(null).settings as ClaudeSettings;
     const ss = settings.hooks?.SessionStart?.find((g) => g.id === "mage:observe:SessionStart");
     if (ss) ss.hooks = [{ type: "command", command: "mage observe --old" }];
     const d = diffMageHooks(settings);
@@ -95,7 +95,7 @@ describe("diffMageHooks", () => {
   });
 
   it("an extra mage:* id beyond MAGE_HOOKS blocks matches", () => {
-    const settings = upsertMageHooks(null) as ClaudeSettings;
+    const settings = upsertMageHooks(null).settings as ClaudeSettings;
     settings.hooks!.SessionStart!.push({
       id: "mage:legacy:Gone",
       hooks: [{ type: "command", command: "mage observe" }],
@@ -109,14 +109,14 @@ describe("diffMageHooks", () => {
   });
 
   it("ignores commandeer rows by default — a base block still matches", () => {
-    const base = upsertMageHooks(null); // 10 base rows, no commandeer
+    const base = upsertMageHooks(null).settings; // 10 base rows, no commandeer
     const d = diffMageHooks(base); // default: commandeer not expected
     expect(d.matches).toBe(true);
     expect(d.missingIds).toEqual([]);
   });
 
   it("with commandeer:true, a base block reports the commandeer rows missing", () => {
-    const base = upsertMageHooks(null);
+    const base = upsertMageHooks(null).settings;
     const d = diffMageHooks(base, { commandeer: true });
     expect(d.matches).toBe(false);
     expect(new Set(d.missingIds)).toEqual(
@@ -125,7 +125,7 @@ describe("diffMageHooks", () => {
   });
 
   it("with commandeer:true, a full commandeer block matches", () => {
-    const full = upsertMageHooks(null, { commandeer: true });
+    const full = upsertMageHooks(null, { commandeer: true }).settings;
     const d = diffMageHooks(full, { commandeer: true });
     expect(d.matches).toBe(true);
     expect(d.missingIds).toEqual([]);
@@ -134,7 +134,7 @@ describe("diffMageHooks", () => {
   it("a stale commandeer command is detected when the flag is driven off the installed hooks (F9)", () => {
     // doctor's resolveConnection now passes { commandeer: hasCommandeerHooks(settings) }
     // so a drifted mage:memory:* command is caught rather than silently passing.
-    const full = upsertMageHooks(null, { commandeer: true }) as ClaudeSettings & {
+    const full = upsertMageHooks(null, { commandeer: true }).settings as ClaudeSettings & {
       hooks: Record<string, Array<{ id?: string; hooks: Array<{ command: string }> }>>;
     };
     const cmd0 = full.hooks.PreToolUse?.find((g) => g.id === "mage:memory:PreToolUse")?.hooks[0];
@@ -273,7 +273,7 @@ describe("doctor KB health", () => {
     await makeInRepoKb(dir, { gitignoreSinks: true });
 
     // Wire a deliberately partial mage block into local settings (drop two ids).
-    const partial = upsertMageHooks(null) as ClaudeSettings;
+    const partial = upsertMageHooks(null).settings as ClaudeSettings;
     const drop = ["mage:observe:Stop", "mage:metrics:Stop"];
     for (const ev of Object.keys(partial.hooks ?? {})) {
       partial.hooks![ev] = (partial.hooks?.[ev] ?? []).filter((g) => !drop.includes(g.id ?? ""));
@@ -317,7 +317,7 @@ describe("doctor KB health", () => {
   it("fully-connected current block → connection check passes", async () => {
     const dir = await freshDir();
     await makeInRepoKb(dir, { gitignoreSinks: true });
-    const full = upsertMageHooks(null);
+    const full = upsertMageHooks(null).settings;
     await mkdir(join(dir, ".claude"), { recursive: true });
     await writeFile(
       join(dir, ".claude", "settings.local.json"),
@@ -452,6 +452,20 @@ describe("doctor env checks still run", () => {
 // ─── link integrity (code-repo <-> hub references; --fix heals a moved repo) ────
 
 describe("doctor — link integrity", () => {
+  let home: string;
+  let origHome: string | undefined;
+
+  beforeEach(async () => {
+    home = await freshDir("mage-home-");
+    origHome = process.env.HOME;
+    process.env.HOME = home;
+  });
+
+  afterEach(() => {
+    if (origHome === undefined) delete process.env.HOME;
+    else process.env.HOME = origHome;
+  });
+
   async function makeHub(
     hub: string,
     projects: Array<{ name: string; code_repo_path: string }>,
@@ -609,7 +623,7 @@ describe("doctor --fix — hook-block drift refresh", () => {
   it("connected-but-partial block: --fix rewrites the block to current and passes", async () => {
     const dir = await freshDir();
     await makeInRepoKb(dir, { gitignoreSinks: true });
-    const partial = upsertMageHooks(null) as ClaudeSettings;
+    const partial = upsertMageHooks(null).settings as ClaudeSettings;
     const drop = ["mage:observe:Stop", "mage:metrics:Stop"];
     for (const ev of Object.keys(partial.hooks ?? {})) {
       partial.hooks![ev] = (partial.hooks?.[ev] ?? []).filter((g) => !drop.includes(g.id ?? ""));
@@ -627,7 +641,7 @@ describe("doctor --fix — hook-block drift refresh", () => {
   it("--fix clears an EXTRA renamed mage:* id (strip+add, not just upsert)", async () => {
     const dir = await freshDir();
     await makeInRepoKb(dir, { gitignoreSinks: true });
-    const drifted = upsertMageHooks(null) as ClaudeSettings;
+    const drifted = upsertMageHooks(null).settings as ClaudeSettings;
     // A leftover from a renamed hook — upsert-by-id alone would never remove it.
     drifted.hooks!.SessionStart!.push({
       id: "mage:legacy:Gone",
@@ -644,7 +658,7 @@ describe("doctor --fix — hook-block drift refresh", () => {
   it("without --fix, a drifted block stays a required failure (no rewrite)", async () => {
     const dir = await freshDir();
     await makeInRepoKb(dir, { gitignoreSinks: true });
-    const partial = upsertMageHooks(null) as ClaudeSettings;
+    const partial = upsertMageHooks(null).settings as ClaudeSettings;
     partial.hooks!.SessionStart = (partial.hooks?.SessionStart ?? []).filter(
       (g) => g.id !== "mage:observe:SessionStart",
     );
@@ -672,7 +686,7 @@ describe("doctor --fix — hook-block drift refresh", () => {
   it("--fix write failure degrades to the nudge (no throw, no false success, file intact)", async () => {
     const dir = await freshDir();
     await makeInRepoKb(dir, { gitignoreSinks: true });
-    const partial = upsertMageHooks(null) as ClaudeSettings;
+    const partial = upsertMageHooks(null).settings as ClaudeSettings;
     partial.hooks!.SessionStart = (partial.hooks?.SessionStart ?? []).filter(
       (g) => g.id !== "mage:observe:SessionStart",
     );
@@ -696,7 +710,7 @@ describe("doctor --fix — hook-block drift refresh", () => {
     const dir = await freshDir();
     await makeInRepoKb(dir, { gitignoreSinks: true }); // no LOCAL settings → user-scope fallback
     // Drifted mage block in the (isolated) user settings, plus a foreign key.
-    const partial = upsertMageHooks(null) as ClaudeSettings;
+    const partial = upsertMageHooks(null).settings as ClaudeSettings;
     partial.hooks!.SessionStart = (partial.hooks?.SessionStart ?? []).filter(
       (g) => g.id !== "mage:observe:SessionStart",
     );
@@ -713,6 +727,187 @@ describe("doctor --fix — hook-block drift refresh", () => {
     const onDisk = JSON.parse(await readFile(userFile, "utf8")) as ClaudeSettings;
     expect(diffMageHooks(onDisk).matches).toBe(true);
     expect((onDisk as Record<string, unknown>).$schema).toBe("https://example/keep-me");
+  });
+
+  it("doctor without --fix reports duplicated mage hooks", async () => {
+    const dir = await freshDir();
+    await makeInRepoKb(dir, { gitignoreSinks: true });
+
+    // Seed 5x duplicated mage hooks
+    const baseSettings = upsertMageHooks(null).settings as ClaudeSettings;
+    const duplicatedHooks: Record<string, Array<{ hooks: Array<{ type: "command"; command: string }> }>> = {};
+    for (const [event, groups] of Object.entries(baseSettings.hooks ?? {})) {
+      duplicatedHooks[event] = [];
+      for (let i = 0; i < 5; i++) {
+        for (const g of groups) {
+          duplicatedHooks[event].push({
+            hooks: g.hooks.map((h) => ({ type: "command" as const, command: h.command })),
+          });
+        }
+      }
+    }
+    await writeLocalSettings(dir, { hooks: duplicatedHooks });
+
+    const r = await doctor({ cwd: dir });
+    const conn = check(r.checks, "connection");
+    expect(conn?.ok).toBe(false);
+    expect(conn?.detail).toMatch(/duplicate/i);
+  });
+
+  it("doctor --fix on a seeded 5x-duplicated fixture collapses to 1x and leaves foreign hooks alone", async () => {
+    const dir = await freshDir();
+    await makeInRepoKb(dir, { gitignoreSinks: true });
+
+    const baseSettings = upsertMageHooks(null).settings as ClaudeSettings;
+    const duplicatedHooks: Record<string, Array<{ hooks: Array<{ type: "command"; command: string }> }>> = {};
+    for (const [event, groups] of Object.entries(baseSettings.hooks ?? {})) {
+      duplicatedHooks[event] = [];
+      for (let i = 0; i < 5; i++) {
+        for (const g of groups) {
+          duplicatedHooks[event].push({
+            hooks: g.hooks.map((h) => ({ type: "command" as const, command: h.command })),
+          });
+        }
+      }
+    }
+    // Add foreign hooks to SessionStart
+    (duplicatedHooks.SessionStart ??= []).unshift(
+      { hooks: [{ type: "command" as const, command: "context-mode observe" }] },
+      { hooks: [{ type: "command" as const, command: "block-no-verify check" }] },
+    );
+
+    await writeLocalSettings(dir, { hooks: duplicatedHooks });
+
+    const r = await doctor({ cwd: dir, fix: true });
+    const conn = check(r.checks, "connection");
+    expect(conn?.ok).toBe(true);
+
+    const updated = JSON.parse(await readFile(join(dir, ".claude", "settings.local.json"), "utf8")) as {
+      hooks: Record<string, Array<{ id?: string; hooks: Array<{ command: string }> }>>;
+    };
+
+    // Foreign hooks preserved at the beginning of SessionStart
+    const sessionStart = updated.hooks.SessionStart ?? [];
+    expect(sessionStart[0]).toEqual({
+      hooks: [{ type: "command", command: "context-mode observe" }],
+    });
+    expect(sessionStart[1]).toEqual({
+      hooks: [{ type: "command", command: "block-no-verify check" }],
+    });
+
+    // All mage hooks collapsed to 1x
+    for (const groups of Object.values(updated.hooks)) {
+      const mageGroups = groups.filter((g) => g.id?.startsWith("mage:"));
+      const commands = mageGroups.flatMap((g) => g.hooks.map((h) => h.command));
+      expect(commands.length).toBe(new Set(commands).size);
+    }
+  });
+
+  // ─── #150 dark state / #151 regression direction ───────────────────────────
+
+  /** The live 2026-08-22 shape: 3 id-less orphans beside each correctly-tagged group. */
+  function darkState(): ClaudeSettings {
+    const tagged = upsertMageHooks(null).settings;
+    const hooks: NonNullable<ClaudeSettings["hooks"]> = {};
+    for (const [event, groups] of Object.entries(tagged.hooks ?? {})) {
+      const orphans = groups.flatMap((g) =>
+        [0, 1, 2].map(() => ({
+          ...(g.matcher ? { matcher: g.matcher } : {}),
+          hooks: g.hooks.map((h) => ({ ...h })),
+        })),
+      );
+      hooks[event] = [...orphans, ...groups];
+    }
+    return { hooks };
+  }
+
+  it("the live dark state (30 id-less BESIDE 10 tagged) reports red and actionable, not `hooks current`", async () => {
+    const dir = await freshDir();
+    await makeInRepoKb(dir, { gitignoreSinks: true });
+    await writeLocalSettings(dir, darkState());
+
+    const r = await doctor({ cwd: dir });
+    const conn = check(r.checks, "connection");
+    expect(conn?.ok).toBe(false);
+    expect(conn?.detail).not.toMatch(/hooks current/);
+    expect(conn?.detail).toMatch(/duplicate-registrations=30/);
+    expect(conn?.detail).toMatch(/mage connect/); // actionable
+  });
+
+  it("--fix collapses the dark state to exactly 10 tagged groups", async () => {
+    const dir = await freshDir();
+    await makeInRepoKb(dir, { gitignoreSinks: true });
+    await writeLocalSettings(dir, darkState());
+
+    const r = await doctor({ cwd: dir, fix: true });
+    expect(check(r.checks, "connection")?.ok).toBe(true);
+
+    const onDisk = JSON.parse(
+      await readFile(join(dir, ".claude", "settings.local.json"), "utf8"),
+    ) as ClaudeSettings;
+    const groups = Object.values(onDisk.hooks ?? {}).flat();
+    expect(groups).toHaveLength(10);
+    expect(groups.filter((g) => typeof g.id !== "string")).toEqual([]);
+  });
+
+  it("a duplicate coexisting with a MISSING id is still reported (the folded detail, not an early return)", async () => {
+    const dir = await freshDir();
+    await makeInRepoKb(dir, { gitignoreSinks: true });
+    const dark = darkState();
+    // Drop every registration of one id → duplicates AND a missing id together,
+    // the common upgrade shape the old early-return branch could never reach.
+    for (const ev of Object.keys(dark.hooks ?? {})) {
+      dark.hooks![ev] = (dark.hooks?.[ev] ?? []).filter(
+        (g) => g.hooks?.[0]?.command !== "mage nudge",
+      );
+    }
+    await writeLocalSettings(dir, dark);
+
+    const conn = check((await doctor({ cwd: dir })).checks, "connection");
+    expect(conn?.ok).toBe(false);
+    expect(conn?.detail).toMatch(/missing=\[mage:nudge:SessionStart\]/);
+    expect(conn?.detail).toMatch(/duplicate-registrations=27/);
+  });
+
+  it("#151 regression direction: a genuinely disconnected repo still reports DISCONNECTED", async () => {
+    const dir = await freshDir();
+    await makeInRepoKb(dir, { gitignoreSinks: true });
+    // Hooks exist, but not one of them is mage's. Reporting this green is exactly
+    // the failure that retired PR #162.
+    await writeLocalSettings(dir, {
+      hooks: {
+        Stop: [{ hooks: [{ type: "command", command: "foreign-tool stop" }] }],
+        SessionStart: [{ hooks: [{ type: "command", command: "mage learn --auto" }] }],
+      },
+    });
+
+    const conn = check((await doctor({ cwd: dir })).checks, "connection");
+    expect(conn?.ok).toBe(false);
+    expect(conn?.detail).toMatch(/not connected; run `mage connect`/);
+  });
+
+  it("--fix never deletes a two-command group whose first command is foreign", async () => {
+    const dir = await freshDir();
+    await makeInRepoKb(dir, { gitignoreSinks: true });
+    const mixed = {
+      hooks: [
+        { type: "command" as const, command: "foreign-tool stop" },
+        { type: "command" as const, command: "mage observe" },
+      ],
+    };
+    const drifted = upsertMageHooks(null).settings;
+    drifted.hooks!.Stop = [mixed, ...(drifted.hooks?.Stop ?? [])];
+    drifted.hooks!.SessionStart = (drifted.hooks?.SessionStart ?? []).filter(
+      (g) => g.id !== "mage:observe:SessionStart",
+    );
+    await writeLocalSettings(dir, drifted);
+
+    expect(check((await doctor({ cwd: dir, fix: true })).checks, "connection")?.ok).toBe(true);
+
+    const onDisk = JSON.parse(
+      await readFile(join(dir, ".claude", "settings.local.json"), "utf8"),
+    ) as ClaudeSettings;
+    expect(onDisk.hooks?.Stop).toContainEqual(mixed);
   });
 });
 
@@ -965,7 +1160,7 @@ describe("doctor — bare-parent + hub liveness", () => {
     await mkdir(join(alpha, ".claude"), { recursive: true });
     await writeFile(
       join(alpha, ".claude", "settings.local.json"),
-      `${JSON.stringify(upsertMageHooks(null), null, 2)}\n`,
+      `${JSON.stringify(upsertMageHooks(null).settings, null, 2)}\n`,
     );
     const meta = {
       schema: METADATA_SCHEMA,
