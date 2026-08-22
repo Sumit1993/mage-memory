@@ -2,13 +2,13 @@
 type: principle
 tags: [mage/design]
 created: "2026-06-28"
-updated: "2026-06-28"
-last_reviewed: "2026-06-28"
+updated: "2026-08-12"
+last_reviewed: "2026-08-12"
 status: active
 provenance:
   repo: mage-memory
   work: capstone-unified-durable-memory
-keywords: [charter, identity, unified-memory, durable, portable, notes-are-memories, hard-earned-knowledge, insight, procedure, gotcha, decision, pointer, one-store, what-is-mage]
+keywords: [charter, identity, unified-memory, durable, portable, notes-are-memories, hard-earned-knowledge, insight, procedure, gotcha, decision, pointer, one-store, what-is-mage, capture-vs-examination, presence-trigger, session-boundary, no-cron, observation-window]
 ---
 
 # mage is one durable memory — of hard-earned knowledge
@@ -57,9 +57,29 @@ content into real memory by adding the four things it lacks:
 - **Adopt** — pre-existing memories (a foreign tool's, a teammate's notes) are folded into the one store ([0034](../decisions/0034-adopt-preexisting-knowledge.md)).
 - **Format** — the host owns the working-tree shape; mage normalizes to the neutral schema at the durable boundary ([0035](../decisions/0035-decouple-harness-memory-from-notes.md)).
 
+## When each piece runs — capture is mechanical, examination is presence-triggered
+
+The charter has a timing half. **Capture is a byproduct of working and needs no schedule** — the
+agent writes its scratch as the session happens, so evidence accrues whenever there is work and
+never when there isn't. **Examination is the opposite: it needs a human present**, because it ends
+in a judgement (`groom`'s keep / edit / drop) and a commit.
+
+So the trigger for reading is **presence, not a clock**. mage already builds on this — the boundary
+nudge fires at SessionStart, when someone is demonstrably there
+([boundary-nudge-internals](boundary-nudge-internals.md)). A cron-scheduled reader is the
+anti-pattern: on a personal machine it sleeps exactly when its user does, and a skipped run reports
+nothing rather than reporting late — indistinguishable from "nothing to report". That cost mage
+twelve days of an observation window in August 2026
+([soak-monitor-blind-spots](soak-monitor-blind-spots.md), blind spot 3).
+
+The corollary is a measurement rule: **count an observation window in sessions and chapters, never
+in calendar days.** Days measure the reader's schedule; chapters measure the evidence.
+
 ## Relations
 
 - realized_by [0035 — notes are memories: one unified store](../decisions/0035-decouple-harness-memory-from-notes.md)
 - sharpens [0005 — one canonical memory, others are feeders](../decisions/0005-one-canonical-memory-others-are-feeders.md)
+- presence-trigger mechanism: [boundary-nudge-internals](boundary-nudge-internals.md)
+- what a clock-trigger cost: [soak-monitor-blind-spots](soak-monitor-blind-spots.md)
 - grounded_in [0004 — capture insight, procedure, pointers — not copies](../decisions/0004-capture-insight-not-copies.md)
 - see_also [mage — context & glossary](context.md)

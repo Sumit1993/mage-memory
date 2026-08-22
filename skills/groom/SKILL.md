@@ -74,9 +74,7 @@ The floor never moves, at either level:
   waives the *human prompt*, never the redaction gate.
 - **Writes land UNCOMMITTED in the working tree.** mage never commits (ADR-0009).
   The uncommitted diff is the review surface; the commit is the human's "yes".
-- Hold the same **quality bar** as a confirmed write — lead with user corrections,
-  prefer a `merge` over a new file early, keep notes to insight + procedure +
-  pointers. The waived prompt is convenience, not a lowered value-bar.
+- Hold the same **quality bar** as a confirmed write — lead with user corrections, run the one-question test on every draft — NEW costs a justification sentence, MERGE is the default when a note already answers the question; keep notes to insight + procedure + pointers. The waived prompt is convenience, not a lowered value-bar.
 
 **Provenance is stamped for you (ADR-0031) — do not add it by hand.** `mage groom
 --accept` stamps each accepted note's `provenance` deterministically at the write:
@@ -88,11 +86,7 @@ into the working tree (run Phase 1 / Phase 2 below, but write the keepers withou
 the per-note prompt); leave anything **borderline** staged in `.mage/staging/` for
 a later human pass; run `mage index`. Do **not** graduate.
 
-**Overseer** — everything Approver does, **plus** dispose the borderline tier
-(write or `--reject` it rather than leaving it staged), merge lessons into existing
-notes, and **graduate** eligible notes — route every `action: "graduate"` proposal
-through **`/mage:graduate`** as always (recurrence-gated ≥ M, commit-gated). Never
-graduate inline here; the routing is unchanged, only the per-note pause is waived.
+**Overseer** — everything Approver does, **plus** dispose the borderline tier (write or `--reject` it rather than leaving it staged), fold lessons that share a question with an existing note into that note (one-question test, verdict stated in the batch), and **graduate** eligible notes — route every `action: "graduate"` proposal through **`/mage:graduate`** as always (recurrence-gated ≥ M, commit-gated). Never graduate inline here; the routing is unchanged, only the per-note pause is waived.
 
 Watermarks still advance only after the batch is dispositioned (Step 4 / Step 8) —
 in autonomous mode "dispositioned" means written/merged/rejected into the working
@@ -171,8 +165,7 @@ groom just the hub root and skip the fan-out.
 
 3. **For each kept insight, run the SHARED CAPTURE PIPELINE** (the same back half
    `/mage:learn` defines — see that skill's **Steps**; do not re-derive it):
-   classify (`type` + wing + room → `#<wing>/<room>`), overlap-check vs `INDEX.md`
-   (UPDATE / NEW / supersede; dedup within the batch), **redaction Gate 2**
+   classify (`type` + wing + room → `#<wing>/<room>`), one-question test vs INDEX.md (MERGE / SUPERSEDE / NEW — emit the verdict block per draft; dedup within the batch: two drafts answering one question are one note), **redaction Gate 2**
    (`mage redact <draft-file>` — a LIVE secret, non-zero exit, STOPS that one
    note; strip with `mage redact --strip` or remove by hand), show the human, and
    write under `mage/notes/` only after a yes.
@@ -185,7 +178,7 @@ groom just the hub root and skip the fan-out.
    reviewed** — kept notes *and* skipped clusters (advancing past a skip is
    distill's negative memory). The reader is a pure read; **`--seen` is the only
    thing that moves the bookmark.** An interrupted run that never reaches this step
-   does no harm: a re-run safely re-offers, and the overlap-check dedupes. If
+   does no harm: a re-run safely re-offers, and the one-question test dedupes. If
    `manifest.capped` is `true`, tell the user the output was capped and that
    re-running continues from the new watermark to drain the rest.
 
@@ -248,7 +241,7 @@ mage never commits for you — it suggests, you run.
 - Phase 2 drafts nothing. An empty `proposals` list is the healthy result — never
   treat it as a prompt to mine recurrence for missed lessons (ADR-0038).
 - Every **Phase 1** draft passes the same capture pipeline as `/mage:learn` — classify,
-  overlap-check, **Gate 2**, human confirm. (Phase 2 drafts nothing, so it never enters
+  one-question test, **Gate 2**, human confirm. (Phase 2 drafts nothing, so it never enters
   that pipeline; it routes to `/mage:graduate`.) Captures *insight + procedure +
   pointers*; points to canonical sources, never mirrors them.
 - Routes `graduate` proposals to `/mage:graduate`; never graduates here.
@@ -257,7 +250,7 @@ mage never commits for you — it suggests, you run.
 ## See also
 
 - **/mage:learn** (`skills/learn/SKILL.md`) — the shared capture pipeline
-  (classify → overlap-check → Gate 2 → confirm → write) both phases funnel into.
+  (classify → one-question test → Gate 2 → confirm → write) both phases funnel into.
 - **/mage:graduate** (`skills/graduate/SKILL.md`) — where Phase 2 hands
   `action: "graduate"` proposals (note → Procedure skill).
 - **ADR-0018** (`mage/decisions/0018-mage-distill-observed-scratch-reader.md`) —
