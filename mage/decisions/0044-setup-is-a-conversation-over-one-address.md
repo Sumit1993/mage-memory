@@ -3,8 +3,8 @@ type: decision
 tags:
   - mage/decisions
 created: "2026-07-31"
-updated: 2026-07-31
-last_reviewed: 2026-07-31
+updated: 2026-08-22
+last_reviewed: 2026-08-22
 status: proposed
 provenance:
   repo: mage-memory
@@ -139,6 +139,8 @@ path free of network calls.
 > the hub, which contradicted this ADR's own Relations line. Recorded here rather
 > than silently corrected: **`connect` obtains, `link` registers, and neither
 > borrows the other's job.**
+>
+> **Amendment (2026-08-22, [ADR-0045](0045-cross-environment-presence.md) / [ADR-0046](0046-derived-hub-git-and-merge-ratification.md)).** `mage hub ensure` is the obtain plumbing; `connect` remains the human surface that gathers consent and drives it; `link` still registers and still never clones. `mage hub use` joins as registration-of-*location* (distinct from `link`'s registration-of-*address*). Clone-on-demand stays wired to `connect` alone — plus, behind an explicit `--clone` flag, to `mage submit` ([ADR-0046](0046-derived-hub-git-and-merge-ratification.md)), where the committed workflow file that invokes it is the standing consent.
 
 A filesystem path still works as a deprecated shim: mage reads its origin,
 resolves the address, **prints the canonical command**, warns, and — having
@@ -254,3 +256,5 @@ scheme collides with a real-world remote form not anticipated in §3.
 - Sits on [ADR-0042](0042-reach-tier-harness-grants.md) — grants are unchanged
 - Honors [ADR-0009](0009-no-runtime-automation-rides-host-hooks.md): setup asks and
   suggests; it starts no watcher and clones only from `connect`
+- amended_by [ADR-0045 — Cross-environment presence](0045-cross-environment-presence.md) (§4 obtain plumbing vs human surface)
+- amended_by [ADR-0046 — mage runs git only in derived hub clones](0046-derived-hub-git-and-merge-ratification.md) (§4 clone-on-demand for submit)
