@@ -2,7 +2,7 @@
 type: decision
 tags: [mage/decisions]
 created: "2026-06-03"
-updated: "2026-06-03"
+updated: "2026-08-22"
 last_reviewed: "2026-06-03"
 status: active
 provenance:
@@ -30,6 +30,7 @@ mage was framed "for software systems," and its hub mechanics encode that: a "pr
    - `mage init <name>` → a **hub** at that location (bare name → `./<name>`; a path → that path, like `git init`/`npm init`); inside a git repo it *warns* about nesting.
    - `--in-repo` / `--hub` + `-y` are the explicit non-interactive forms (agents/CI). The word `--external` is **retired** (capability = `--hub`; its create-as-sibling magic is dropped). `mage link` is unchanged.
    - **`init` stays suggest-only** — it prints the exact commit command and **never runs git** (the "mage never runs git" invariant stays absolute; an agent must never land a surprise commit).
+     > **Amendment (2026-08-22, [ADR-0046](0046-derived-hub-git-and-merge-ratification.md)).** The invariant is re-scoped: mage never runs git against a repo the user owns — the code repo, an in-repo KB, or any non-derived checkout. Git actions inside a derived hub clone are governed by ADR-0046's policy ladder; nothing mage does lands content on a KB default branch without a human's explicit act — a merge or an invoked verb.
 
 4. **The system is a wing** (hub-level notes). Cross-cutting hub notes — `relationship`s, hub-wide ADRs, the MAP/MOC — tag the **hub's own name** as their wing (`prismalens/relationships`, `prismalens/decisions`). No magic `_hub`/`meta` wing; the whole-system scope is just a wing. "Cross-cutting" remains the fallback for genuinely unscoped notes.
 
@@ -61,5 +62,6 @@ mage was framed "for software systems," and its hub mechanics encode that: a "pr
 - extends [ADR-0011 — recursive scan; hub projects are wings](0011-recursive-scan-hub-projects.md)
 - refines [ADR-0006 — two-layer recall](0006-two-layer-recall-per-wing-skills.md)
 - see_also [ADR-0009 — no runtime; automation rides host hooks](0009-no-runtime-automation-rides-host-hooks.md)
+- amended_by [ADR-0046 — mage runs git only in derived hub clones](0046-derived-hub-git-and-merge-ratification.md) (§3: invariant re-scoped)
 - realizes [migration field notes](../notes/migration-field-notes.md)
 - informs [mage roadmap](../work/roadmap.md)

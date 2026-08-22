@@ -3,8 +3,8 @@ type: decision
 tags:
   - mage/decisions
 created: "2026-07-29"
-updated: 2026-07-31
-last_reviewed: 2026-07-31
+updated: 2026-08-22
+last_reviewed: 2026-08-22
 status: proposed
 provenance:
   repo: mage-memory
@@ -83,6 +83,7 @@ deterministic location per remote, rooted at `~/.mage/hubs/` (`$MAGE_HOME/hubs` 
 an override for tests and non-default homes; the derivation *below* the root is what is
 fixed). The same remote yields the same path on every machine, from every worktree, from
 every harness. A **real directory** — an ordinary clone — lives there.
+> **Amendment (2026-08-22, [ADR-0045](0045-cross-environment-presence.md)).** Hub locations are rooted at `$MAGE_HOME/hubs` (default `~/.mage/hubs`). `MAGE_HOME` is the documented, product-level relocation contract — the single variable that moves all of mage's machine-wide state; the derivation below the root is what is fixed, and no second relocation variable is ever added.
 
 **2. Derivation is canonical and injective.** `git@host:owner/repo.git` and
 `https://host/owner/repo` are the same hub and must derive the same path. The derived path
@@ -125,12 +126,14 @@ question — `mage connect` offering it on a hub-absent machine is the obvious s
 this ADR deliberately does not fix the surface. What it fixes is the principle: **a missing
 hub is a recoverable state with a defined remedy, not an error the user must diagnose.**
 ADR-0042 §7's hub-absent case stops being merely "warn and grant nothing."
+> **Amendment (2026-08-22, [ADR-0045](0045-cross-environment-presence.md)).** `mage hub ensure` is the one obtain implementation; `mage connect` drives it interactively.
 
 **5. An existing clone is MOVED, once — and mage only suggests the move.** A hub already
 cloned somewhere else is relocated to its derived path, and **no symlink is left behind**.
 mage prints the exact `git`/`mv` command; the human runs it (AGENTS.md: mage never commits
 for you). The move preserves uncommitted work, which a delete-and-reclone would destroy —
 that is why it is a move and not a fresh clone.
+> **Amendment (2026-08-22, [ADR-0045](0045-cross-environment-presence.md)).** Where a move is impossible or the clone is owned by another system (a harness-attached repo, a managed worktree), `mage hub use <path>` registers the clone's location in `$MAGE_HOME/redirects.json` after the same arrival verification; the registration is machine-local and never appears in a git-tracked file. `connect`/`doctor` suggest both remedies for a displaced clone: the `mv`, or `mage hub use`. The one-shared-function invariant (`chosenHubRoot`/`resolveHubGrant`) survives and is strengthened: the redirect step is inserted ahead of derivation inside the shared functions, routing `hub ensure`, `hub use`, `hub mandate`, `connect`, `doctor`, and `externalDocsRoot` identically.
 
 **6. `hub_repo` becomes the authoritative address; `hub_path` is deprecated.** `hub_path`
 is read as a **fallback** during a transition window and is slated for removal.
@@ -185,6 +188,7 @@ doctor's RECALL check already reads the effective grant, not the literal string.
 - **Prefer an existing clone wherever it happens to be** — **rejected**: it destroys the
   determinism that makes the whole thing work. The derived path would then be a *hint*, and
   a hint cannot be committed into a project-scope grant.
+  > **Amendment (2026-08-22, [ADR-0045](0045-cross-environment-presence.md)).** The rejection stands for *implicit* preference (scanning); an *explicit, origin-verified, machine-local* registration via `mage hub use` is admitted by amendment.
 - **A user-scope grant in `~/.claude/settings.json`** (issue #103, direction 3) —
   **works, and is the wrong shape.** Claude Code concatenates array-valued settings across
   scopes, so one machine-wide entry genuinely covers the hub from every worktree. But it
@@ -299,4 +303,5 @@ doctor's RECALL check already reads the effective grant, not the literal string.
 - constrained_by [ADR-0012 — a wing is an optional convention; hubs are standalone-first](0012-wings-optional-convention-standalone-hubs.md) (the "mage never runs git" line, and the remote-less hub)
 - constrained_by [ADR-0025 — one transient-state home](0025-one-transient-state-home.md) (`~/.mage/` as the machine-level equivalent)
 - see_also [ADR-0009 — no runtime; automation rides host hooks](0009-no-runtime-automation-rides-host-hooks.md)
+- amended_by [ADR-0045 — Cross-environment presence](0045-cross-environment-presence.md) (§1, §4, §5, resolution order)
 - decides [FT-26 — house every external hub centrally](../work/future-thoughts.md)

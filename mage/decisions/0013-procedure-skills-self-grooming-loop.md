@@ -2,7 +2,7 @@
 type: decision
 tags: [mage/decisions]
 created: "2026-06-05"
-updated: "2026-06-05"
+updated: "2026-08-22"
 last_reviewed: "2026-06-05"
 status: active
 provenance:
@@ -67,6 +67,12 @@ load-bearing invariants — *no runtime of our own* ([ADR-0009](0009-no-runtime-
    "mage never auto-commits" holds. Per-class confidence thresholds may opt low-risk
    skills into auto-*write*, but **never auto-*commit***. mage's KB is git-tracked
    and *shared*, so the commit is the natural human gate (unlike ECC's local YAML).
+   > **Amendment (2026-08-22, [ADR-0046](0046-derived-hub-git-and-merge-ratification.md)).**
+   > The human confirms — and the confirm is a **human git ratification**: the git commit
+   > in the working-tree flow (unchanged), or the **merge of a mage-opened hub proposal PR**
+   > in the pipeline flow ([ADR-0046](0046-derived-hub-git-and-merge-ratification.md)).
+   > "mage never auto-adopts" holds: no mage path lands content on a KB default branch autonomously.
+   > Per-class confidence thresholds may opt low-risk skills into auto-*write*, but **never auto-*adopt***.
 
 5. **Existing skills are adopted in place; auto-memory is a feeder.** `mage learn
    --from <dir>` ingests a user's **own** skills by assigning a wing, adding
@@ -151,6 +157,7 @@ load-bearing invariants — *no runtime of our own* ([ADR-0009](0009-no-runtime-
 - bounded_by [ADR-0010 — durable memory, not a coordination layer](0010-durable-memory-not-coordination-layer.md)
 - realizes [ADR-0004 — capture insight, not copies](0004-capture-insight-not-copies.md)
 - gated_by [ADR-0014 — two-gate redaction](0014-two-gate-redaction.md)
+- amended_by [ADR-0046 — mage runs git only in derived hub clones](0046-derived-hub-git-and-merge-ratification.md) (§4: commit or PR merge ratification)
 - mines microsoft/SkillOpt (text-space skill optimizer) + ECC `continuous-learning-v2`
 - sequenced_by [release sequence](../work/plan-release-sequence.md)
 - informs [mage roadmap](../work/roadmap.md)
