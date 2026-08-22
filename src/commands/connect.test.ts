@@ -4,8 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { tmpDir, withKb } from "../../test/fixtures/kb.js";
 import { gitInit } from "../git.js";
 import { REDACT_HOOK_MARKER, resolveHooksDir } from "../git-hooks.js";
+import { upsertMageHooks } from "../adapters/claude-code/settings.js";
 import { canonicalizeHubRepo } from "../hub-url.js";
 import { connect, connectAllProjects } from "./connect.js";
+import { disconnect } from "./disconnect.js";
 
 async function freshDir(): Promise<string> {
   return tmpDir("mage-connect-");
@@ -604,8 +606,16 @@ describe("reach tier — connect grants out-of-repo KB access (ADR-0042)", () =>
 
   it("--user scope writes no grant (machine-specific paths stay out of the shared file)", async () => {
     const { code } = await externalRepo({ hubExists: true });
-    const r = await connect({ cwd: code, yes: true, user: true, gitHook: false });
-    expect(r.reach).toEqual([]);
+    const home = await tmpDir("mage-home-");
+    const origHome = process.env.HOME;
+    process.env.HOME = home;
+    try {
+      const r = await connect({ cwd: code, yes: true, user: true, gitHook: false });
+      expect(r.reach).toEqual([]);
+    } finally {
+      if (origHome === undefined) delete process.env.HOME;
+      else process.env.HOME = origHome;
+    }
   });
 });
 
@@ -780,5 +790,148 @@ describe("reach tier — hub_repo derivation (ADR-0043)", () => {
 
   it("canonicalizeHubRepo agrees with what connect derived (sanity check on the fixture paths above)", () => {
     expect(canonicalizeHubRepo("https://github.com/acme/docs.git").key).toBe("github.com/acme/docs");
+  });
+
+  // ─── issue #150 idempotency ──────────────────────────────────────────────────
+
+  it("running connect twice produces exactly one registration per hook", async () => {
+    const dir = await freshDir();
+    await connect({ cwd: dir, yes: true });
+    await connect({ cwd: dir, yes: true });
+
+    const settings = JSON.parse(await readFile(localPath(dir), "utf8")) as {
+      hooks: Record<string, Array<{ id?: string; hooks: Array<{ command: string }> }>>;
+    };
+
+    for (const groups of Object.values(settings.hooks)) {
+      const commands = groups.flatMap((g) => g.hooks.map((h) => h.command));
+      expect(commands.length).toBe(new Set(commands).size);
+    }
+  });
+
+  it("running connect on a config with foreign hooks leaves foreign hooks byte-identical and in original order", async () => {
+    const dir = await freshDir();
+    await mkdir(join(dir, ".claude"), { recursive: true });
+    const initialSettings = {
+      hooks: {
+        SessionStart: [
+          { hooks: [{ type: "command", command: "context-mode observe" }] },
+          { hooks: [{ type: "command", command: "block-no-verify check" }] },
+        ],
+        Stop: [
+          { hooks: [{ type: "command", command: "foreign-tool stop" }] },
+        ],
+      },
+    };
+    await writeFile(localPath(dir), `${JSON.stringify(initialSettings, null, 2)}\n`);
+
+    await connect({ cwd: dir, yes: true });
+
+    const updated = JSON.parse(await readFile(localPath(dir), "utf8")) as {
+      hooks: Record<string, Array<{ hooks: Array<{ command: string }> }>>;
+    };
+
+    const sessionStartForeign = (updated.hooks.SessionStart ?? []).slice(0, 2);
+    expect(sessionStartForeign).toEqual(initialSettings.hooks.SessionStart);
+
+    const stopForeign = (updated.hooks.Stop ?? [])[0];
+    expect(stopForeign).toEqual(initialSettings.hooks.Stop[0]);
+  });
+
+  it("running connect on a config with un-id'd or duplicate mage hooks collapses them to 1x", async () => {
+    const dir = await freshDir();
+    await mkdir(join(dir, ".claude"), { recursive: true });
+    const initialSettings = {
+      hooks: {
+        SessionStart: [
+          { hooks: [{ type: "command", command: "mage observe" }] },
+          { hooks: [{ type: "command", command: "mage observe" }] },
+          { hooks: [{ type: "command", command: "mage nudge" }] },
+        ],
+      },
+    };
+    await writeFile(localPath(dir), `${JSON.stringify(initialSettings, null, 2)}\n`);
+
+    await connect({ cwd: dir, yes: true });
+
+    const updated = JSON.parse(await readFile(localPath(dir), "utf8")) as {
+      hooks: Record<string, Array<{ id?: string; hooks: Array<{ command: string }> }>>;
+    };
+
+    const sessionStartCommands = (updated.hooks.SessionStart ?? []).flatMap((g) => g.hooks.map((h) => h.command));
+    expect(sessionStartCommands).toEqual(["mage observe", "mage nudge"]);
+  });
+});
+
+// ─── #150: legacy id-less orphans + closed-list ownership ────────────────────
+
+describe("connect — legacy orphan reaping (#150)", () => {
+  /** Read the local settings back as a hook map. */
+  async function readHooks(dir: string) {
+    const parsed = JSON.parse(await readFile(localPath(dir), "utf8")) as {
+      hooks: Record<string, Array<{ id?: string; matcher?: string; hooks: Array<{ command: string }> }>>;
+    };
+    return parsed.hooks;
+  }
+
+  async function seed(dir: string, settings: unknown): Promise<void> {
+    await mkdir(join(dir, ".claude"), { recursive: true });
+    await writeFile(localPath(dir), `${JSON.stringify(settings, null, 2)}\n`);
+  }
+
+  it("a user's own `mage learn` hook survives connect AND disconnect", async () => {
+    const dir = await freshDir();
+    const mine = { hooks: [{ type: "command", command: "mage learn --auto" }] };
+    await seed(dir, { hooks: { Stop: [mine] } });
+
+    const r = await connect({ cwd: dir, yes: true, gitHook: false });
+    expect(r.reaped).toBe(0);
+    expect(await readHooks(dir).then((h) => h.Stop)).toContainEqual(mine);
+
+    await disconnect({ cwd: dir, yes: true, gitHook: false });
+    expect(await readHooks(dir).then((h) => h.Stop)).toEqual([mine]);
+  });
+
+  it("a two-command group holding one foreign command is never deleted", async () => {
+    const dir = await freshDir();
+    const mixed = {
+      hooks: [
+        { type: "command", command: "foreign-tool stop" },
+        { type: "command", command: "mage observe" },
+      ],
+    };
+    await seed(dir, { hooks: { Stop: [mixed] } });
+
+    await connect({ cwd: dir, yes: true, gitHook: false });
+    expect(await readHooks(dir).then((h) => h.Stop)).toContainEqual(mixed);
+
+    await disconnect({ cwd: dir, yes: true, gitHook: false });
+    expect(await readHooks(dir).then((h) => h.Stop)).toEqual([mixed]);
+  });
+
+  it("the live dark state — 30 id-less orphans BESIDE 10 tagged groups — collapses to exactly 10", async () => {
+    const dir = await freshDir();
+    // Measured shape of ~/.claude/settings.json on 2026-08-22: a pre-id mage's groups
+    // never reaped, so 40 registrations fire where 10 should.
+    const tagged = upsertMageHooks(null).settings;
+    const seeded: Record<string, unknown[]> = {};
+    for (const [event, groups] of Object.entries(tagged.hooks ?? {})) {
+      const orphans = groups.flatMap((g) =>
+        [0, 1, 2].map(() => ({
+          ...(g.matcher ? { matcher: g.matcher } : {}),
+          hooks: g.hooks.map((h) => ({ ...h })),
+        })),
+      );
+      seeded[event] = [...orphans, ...groups];
+    }
+    await seed(dir, { hooks: seeded });
+    expect(Object.values(seeded).flat()).toHaveLength(40);
+
+    const r = await connect({ cwd: dir, yes: true, gitHook: false });
+    expect(r.reaped).toBe(30);
+
+    const after = Object.values(await readHooks(dir)).flat();
+    expect(after).toHaveLength(10);
+    expect(after.filter((g) => !g.id?.startsWith("mage:"))).toEqual([]);
   });
 });
