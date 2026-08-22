@@ -1,9 +1,11 @@
 import { readdir } from "node:fs/promises";
 import { join, posix } from "node:path";
 import { isCcShaped } from "./adapters/claude-code/cc-note.js";
+import { extractLinks, extractWikiLinks } from "./links.js";
 import { type Note, readNote } from "./note.js";
 import { type HubMetadata, PROJECTS_DIR, exists } from "./paths.js";
 import { type ScannedNote, scanNotes } from "./scan.js";
+import { type MergeCandidates, detectMergeCandidates } from "./scanner/overlap.js";
 
 /**
  * `mage dream` — read-only knowledge-base health.
@@ -53,6 +55,8 @@ export interface DreamReport {
   unregisteredProjectDirs: string[];
   /** A gentle suggestion when many notes are untagged (wings are optional). */
   untaggedNudge: string[];
+  /** Merge-candidate pairs: structural (Signal A) and lexical (Signal B). */
+  mergeCandidates: MergeCandidates;
 }
 
 const MS_PER_DAY = 86_400_000;
@@ -70,8 +74,7 @@ function stripCode(body: string): string {
  * NOT captured: `plan.md#the-autonomy-track` addresses a section of a file whose existence
  * is still decided by `plan.md` alone.
  */
-const MD_TARGET = String.raw`([^)\s]+\.md)(?:#[^)\s]*)?`;
-const LINK_RE = new RegExp(String.raw`\]\(${MD_TARGET}\)`, "g");
+const MD_TARGET = String.raw`([^)\s]+\.md)(?:#[^\)\s]*)?`;
 
 /**
  * An external target is not a path on disk. `https://github.com/e2b-dev/infra/blob/main/self-host.md`
@@ -82,15 +85,7 @@ function isExternal(target: string): boolean {
   return /^([a-z][a-z0-9+.-]*:|\/\/)/i.test(target);
 }
 
-/** All *local* markdown links to `.md` targets, fragment stripped. */
-function extractLinks(body: string): string[] {
-  const out: string[] = [];
-  for (const m of body.matchAll(LINK_RE)) {
-    const target = m[1]?.trim();
-    if (target && !isExternal(target)) out.push(target);
-  }
-  return out;
-}
+// extractLinks and extractWikiLinks lifted to src/links.ts (shared with the overlap scanner).
 
 /**
  * An Obsidian wikilink: `[[target]]`, `[[target#heading]]`, `[[target^block]]`,
@@ -98,17 +93,6 @@ function extractLinks(body: string): string[] {
  * (`[[#heading]]`) has an empty target and is deliberately not matched.
  */
 const WIKI_TARGET = String.raw`\[\[([^\]|#^]+)(?:[#^][^\]|]*)?(?:\|[^\]]*)?\]\]`;
-const WIKI_RE = new RegExp(WIKI_TARGET, "g");
-
-/** All wikilink targets, alias + fragment stripped. */
-function extractWikiLinks(body: string): string[] {
-  const out: string[] = [];
-  for (const m of body.matchAll(WIKI_RE)) {
-    const target = m[1]?.trim();
-    if (target) out.push(target);
-  }
-  return out;
-}
 
 /**
  * Typed relation bullets, in either link form:
@@ -319,6 +303,15 @@ export async function analyzeDream(root: string, opts: DreamOptions = {}): Promi
   );
   const untaggedNudge = untaggedNudgeFor(scanned);
 
+  // Merge-candidate detection — rides the same scan, uses bodies already read.
+  const overlapNotes = scanned.map((s) => ({
+    relPath: s.relPath,
+    type: s.type,
+    tags: s.wings.map((w) => w.room ? `${w.wing}/${w.room}` : w.wing),
+    body: bodies.get(s.relPath) ?? "",
+  }));
+  const mergeCandidates = detectMergeCandidates(overlapNotes);
+
   return {
     root,
     noteCount: scanned.length,
@@ -330,6 +323,7 @@ export async function analyzeDream(root: string, opts: DreamOptions = {}): Promi
     emptyProjects,
     unregisteredProjectDirs,
     untaggedNudge,
+    mergeCandidates,
   };
 }
 
