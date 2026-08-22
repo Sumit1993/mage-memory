@@ -538,19 +538,15 @@ async function pushConnectionCheck(
 
     const missing = diff.missingIds.length > 0 ? diff.missingIds.join(",") : "none";
     const stale = diff.staleIds.length > 0 ? diff.staleIds.join(",") : "none";
-    if (diff.duplicates > 0 && diff.missingIds.length === 0 && diff.staleIds.length === 0) {
-      checks.push({
-        name: "connection",
-        ok: false,
-        detail: `${scope}: ${diff.duplicates} duplicate mage hook registration(s) present; run \`mage doctor --fix\` to collapse`,
-      });
-      return;
-    }
+    // Folded into the one detail, never its own early-return branch: the common
+    // upgrade shape is duplicates AND missing/stale together (legacy id-less orphans
+    // beside a current tagged block), and an early return hid the rest of it (#150).
+    const dupes = diff.duplicates > 0 ? ` duplicate-registrations=${diff.duplicates}` : "";
     checks.push({
       name: "connection",
       ok: false,
       detail:
-        `hook block out of date (mage:* drift: missing=[${missing}] stale=[${stale}]); ` +
+        `${scope}: hook block out of date (mage:* drift: missing=[${missing}] stale=[${stale}]${dupes}); ` +
         `re-run \`mage connect\`${opts.fix ? " (auto-fix could not be applied)" : ""}`,
     });
     return;
@@ -574,7 +570,7 @@ async function refreshHookBlock(conn: Connection): Promise<MageDiff | null> {
     // Gate-0. A base-only block stays base.
     const commandeer = hasCommandeerHooks(conn.settings);
     const cleared = removeMageHooks(conn.settings).settings;
-    const refreshed = upsertMageHooks(cleared, { commandeer });
+    const { settings: refreshed } = upsertMageHooks(cleared, { commandeer });
     await writeClaudeSettings(conn.settingsPath, refreshed);
     return diffMageHooks(refreshed, { commandeer });
   } catch {

@@ -4,9 +4,12 @@ import { describe, expect, it } from "vitest";
 import { tmpDir } from "../../../test/fixtures/kb.js";
 import {
   type ClaudeSettings,
+  LEGACY_MAGE_COMMANDS,
   MAGE_HOOKS,
   MAGE_ID_PREFIX,
   isAutoMemoryEnabled,
+  isMageCommand,
+  isMageGroup,
   readClaudeSettings,
   reconcileReachGrants,
   removeMageHooks,
@@ -119,7 +122,7 @@ describe("readClaudeSettings", () => {
 describe("upsertMageHooks", () => {
   it("creates hooks from absent and preserves unknown top-level keys", () => {
     const original: ClaudeSettings = { permissions: { allow: ["Read(/x)"] } };
-    const merged = upsertMageHooks(original, { commandeer: true });
+    const merged = upsertMageHooks(original, { commandeer: true }).settings;
 
     // unknown top-level key survives untouched
     expect(merged.permissions).toEqual({ allow: ["Read(/x)"] });
@@ -137,13 +140,13 @@ describe("upsertMageHooks", () => {
   it("is pure — does not mutate the input", () => {
     const original: ClaudeSettings = { permissions: { allow: ["Read(/x)"] } };
     const snapshot = structuredClone(original);
-    upsertMageHooks(original);
+    upsertMageHooks(original).settings;
     expect(original).toEqual(snapshot);
     expect(original.hooks).toBeUndefined();
   });
 
   it("accepts null and produces a settings object with hooks", () => {
-    const merged = upsertMageHooks(null);
+    const merged = upsertMageHooks(null).settings;
     expect(merged.hooks).toBeDefined();
     expect(merged.hooks?.SessionStart?.[0]?.id).toBe("mage:observe:SessionStart");
   });
@@ -155,7 +158,7 @@ describe("upsertMageHooks", () => {
         UserPromptSubmit: [{ hooks: [{ type: "command", command: "other" }] }],
       },
     };
-    const merged = upsertMageHooks(original);
+    const merged = upsertMageHooks(original).settings;
 
     const ss = merged.hooks?.SessionStart ?? [];
     // the user's non-mage group survives
@@ -167,8 +170,8 @@ describe("upsertMageHooks", () => {
   });
 
   it("is idempotent — re-upsert produces no duplicate mage groups", () => {
-    const once = upsertMageHooks(null, { commandeer: true });
-    const twice = upsertMageHooks(once, { commandeer: true });
+    const once = upsertMageHooks(null, { commandeer: true }).settings;
+    const twice = upsertMageHooks(once, { commandeer: true }).settings;
     for (const h of MAGE_HOOKS) {
       const groups = twice.hooks?.[h.event] ?? [];
       const mine = groups.filter((g) => g.id === h.id);
@@ -189,7 +192,7 @@ describe("upsertMageHooks", () => {
         ],
       },
     };
-    const merged = upsertMageHooks(stale);
+    const merged = upsertMageHooks(stale).settings;
     const groups = merged.hooks?.SessionStart ?? [];
     const mine = groups.filter((g) => g.id === "mage:observe:SessionStart");
     expect(mine.length).toBe(1);
@@ -199,7 +202,7 @@ describe("upsertMageHooks", () => {
 
 describe("commandeer-tier gating (ADR-0032)", () => {
   it("omits the commandeer rows by default (10 groups, no PreToolUse)", () => {
-    const merged = upsertMageHooks(null);
+    const merged = upsertMageHooks(null).settings;
     expect(countMage(merged)).toBe(10);
     expect(merged.hooks?.PreToolUse).toBeUndefined();
     // PostToolUse carries only the observe group, not the memory one.
@@ -209,7 +212,7 @@ describe("commandeer-tier gating (ADR-0032)", () => {
   });
 
   it("adds the commandeer rows with matchers when commandeer:true (13 groups)", () => {
-    const merged = upsertMageHooks(null, { commandeer: true });
+    const merged = upsertMageHooks(null, { commandeer: true }).settings;
     expect(countMage(merged)).toBe(13);
     const pre = merged.hooks?.PreToolUse ?? [];
     expect(pre).toHaveLength(1);
@@ -223,9 +226,9 @@ describe("commandeer-tier gating (ADR-0032)", () => {
   });
 
   it("self-heals: re-upserting with commandeer off removes a prior commandeer group", () => {
-    const on = upsertMageHooks(null, { commandeer: true });
+    const on = upsertMageHooks(null, { commandeer: true }).settings;
     expect(on.hooks?.PreToolUse).toHaveLength(1);
-    const off = upsertMageHooks(on, { commandeer: false });
+    const off = upsertMageHooks(on, { commandeer: false }).settings;
     expect(off.hooks?.PreToolUse).toBeUndefined(); // event pruned
     expect(countMage(off)).toBe(10);
     expect(off.hooks?.PostToolUse?.find((g) => g.id === "mage:memory:PostToolUse")).toBeUndefined();
@@ -261,7 +264,7 @@ describe("removeMageHooks", () => {
         },
       },
       { commandeer: true },
-    );
+    ).settings;
     const { settings, removed } = removeMageHooks(wired);
 
     expect(removed).toBe(MAGE_HOOKS.length);
@@ -275,7 +278,7 @@ describe("removeMageHooks", () => {
   });
 
   it("prunes the hooks{} key entirely when it becomes empty", () => {
-    const wired = upsertMageHooks({ permissions: { allow: ["X"] } }, { commandeer: true });
+    const wired = upsertMageHooks({ permissions: { allow: ["X"] } }, { commandeer: true }).settings;
     const { settings, removed } = removeMageHooks(wired);
     expect(removed).toBe(MAGE_HOOKS.length);
     expect(settings.hooks).toBeUndefined();
@@ -284,7 +287,7 @@ describe("removeMageHooks", () => {
   });
 
   it("is pure — does not mutate the input", () => {
-    const wired = upsertMageHooks(null);
+    const wired = upsertMageHooks(null).settings;
     const snapshot = structuredClone(wired);
     removeMageHooks(wired);
     expect(wired).toEqual(snapshot);
@@ -319,14 +322,14 @@ describe("round-trip", () => {
         SessionStart: [{ matcher: "*", hooks: [{ type: "command", command: "user-tool" }] }],
       },
     };
-    const wired = upsertMageHooks(original);
+    const wired = upsertMageHooks(original).settings;
     const { settings } = removeMageHooks(wired);
     expect(settings).toEqual(original);
   });
 
   it("upsert then remove on a hooks-less settings restores the bare object", () => {
     const original: ClaudeSettings = { permissions: { allow: ["X"] } };
-    const wired = upsertMageHooks(original);
+    const wired = upsertMageHooks(original).settings;
     const { settings } = removeMageHooks(wired);
     expect(settings).toEqual(original);
   });
@@ -373,7 +376,7 @@ describe("integration: wire then unwire a real-shaped file", () => {
 
     const r = await readClaudeSettings(p);
     expect(r.existed).toBe(true);
-    const merged = upsertMageHooks(r.settings);
+    const merged = upsertMageHooks(r.settings).settings;
     await writeClaudeSettings(p, merged);
 
     const after = await readClaudeSettings(p);
@@ -501,5 +504,114 @@ describe("reach tier — removeReachGrants (ADR-0042)", () => {
     const { settings: reverted, removed } = removeReachGrants(granted);
     expect(removed).toBe(1);
     expect(reverted.permissions?.additionalDirectories).toEqual(["/home/u/scratch"]);
+  });
+});
+
+// ─── ownership: the closed command list (#150) ───────────────────────────────
+
+describe("isMageCommand — exact match against a closed list", () => {
+  it("claims every command mage itself writes (legacy + current)", () => {
+    for (const cmd of [...LEGACY_MAGE_COMMANDS, ...MAGE_HOOKS.map((e) => e.command)]) {
+      expect(isMageCommand(cmd)).toBe(true);
+    }
+  });
+
+  it("does NOT claim a user's own mage invocation — the whole point of the closed list", () => {
+    // A `mage ` PREFIX test would claim all of these and reap them on connect/disconnect.
+    for (const cmd of [
+      "mage learn",
+      "mage learn --auto",
+      "mage index && mage verify",
+      "mage observe --debug",
+      "mage",
+      "mage:observe",
+      "npx mage observe",
+    ]) {
+      expect(isMageCommand(cmd)).toBe(false);
+    }
+  });
+
+  it("ignores non-strings", () => {
+    expect(isMageCommand(undefined)).toBe(false);
+    expect(isMageCommand(42)).toBe(false);
+  });
+});
+
+describe("isMageGroup — a group is ours only when ALL its commands are ours", () => {
+  it("claims an id-tagged group and an all-ours id-less group", () => {
+    expect(isMageGroup({ id: "mage:observe:Stop", hooks: [] })).toBe(true);
+    expect(isMageGroup({ hooks: [{ type: "command", command: "mage observe" }] })).toBe(true);
+  });
+
+  it("does NOT claim a two-command group holding one foreign command", () => {
+    const mixed = {
+      hooks: [
+        { type: "command" as const, command: "mage observe" },
+        { type: "command" as const, command: "foreign-tool stop" },
+      ],
+    };
+    expect(isMageGroup(mixed)).toBe(false);
+  });
+
+  it("a mixed group survives removeMageHooks and upsertMageHooks untouched", () => {
+    // Ownership gates deletion but matching reads hooks[0]; when the two disagree,
+    // `doctor --fix` deletes a group whose FIRST command is foreign.
+    const mixed = {
+      hooks: [
+        { type: "command" as const, command: "foreign-tool stop" },
+        { type: "command" as const, command: "mage observe" },
+      ],
+    };
+    const settings: ClaudeSettings = { hooks: { Stop: [mixed] } };
+
+    expect(removeMageHooks(settings).settings.hooks?.Stop).toEqual([mixed]);
+    expect(upsertMageHooks(settings).settings.hooks?.Stop).toContainEqual(mixed);
+  });
+
+  it("an empty hooks array is not ours (vacuous every())", () => {
+    expect(isMageGroup({ hooks: [] })).toBe(false);
+  });
+});
+
+describe("upsertMageHooks — the reaped counter (#150)", () => {
+  /** The live 2026-08-22 dark state: 3 id-less orphans beside each tagged group. */
+  function darkState(): ClaudeSettings {
+    const tagged = upsertMageHooks(null).settings;
+    const hooks: NonNullable<ClaudeSettings["hooks"]> = {};
+    for (const [event, groups] of Object.entries(tagged.hooks ?? {})) {
+      const orphans = groups.flatMap((g) =>
+        [0, 1, 2].map(() => ({
+          ...(g.matcher ? { matcher: g.matcher } : {}),
+          hooks: g.hooks.map((h) => ({ ...h })),
+        })),
+      );
+      hooks[event] = [...orphans, ...groups];
+    }
+    return { hooks };
+  }
+
+  it("a fresh or already-current file reaps nothing", () => {
+    expect(upsertMageHooks(null).reaped).toBe(0);
+    const once = upsertMageHooks(null).settings;
+    expect(upsertMageHooks(once).reaped).toBe(0);
+  });
+
+  it("40 registrations (30 id-less + 10 tagged) collapse to 10, reaping 30", () => {
+    const before = darkState();
+    expect(Object.values(before.hooks ?? {}).flat()).toHaveLength(40);
+
+    const { settings: after, reaped } = upsertMageHooks(before);
+    expect(reaped).toBe(30);
+
+    const groups = Object.values(after.hooks ?? {}).flat();
+    expect(groups).toHaveLength(10);
+    expect(groups.filter((g) => typeof g.id !== "string")).toEqual([]);
+  });
+
+  it("does not count a user's own hook as reaped", () => {
+    const mine = { hooks: [{ type: "command" as const, command: "mage learn" }] };
+    const { settings, reaped } = upsertMageHooks({ hooks: { Stop: [mine] } });
+    expect(reaped).toBe(0);
+    expect(settings.hooks?.Stop).toContainEqual(mine);
   });
 });

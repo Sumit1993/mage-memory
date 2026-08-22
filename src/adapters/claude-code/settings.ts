@@ -154,20 +154,40 @@ export function hasCommandeerHooks(settings: ClaudeSettings | null): boolean {
 }
 
 // ─── helpers ───────────────────────────────────────────────────────────────
-/** True iff `cmd` is a mage CLI command (e.g. `mage observe`, `mage nudge`). */
+/**
+ * Commands a PRE-ID mage wrote into a host's settings — the id-less orphan groups
+ * `connect` must reap. Ownership is EXACT match against this list ∪ the current
+ * MAGE_HOOKS commands, never a `mage ` prefix (that would claim a user's own hook, #150).
+ */
+export const LEGACY_MAGE_COMMANDS: readonly string[] = Object.freeze([
+  "mage observe",
+  "mage nudge",
+  "mage skills --metrics --quiet",
+  "mage memory-hook",
+  "mage flatten --quiet",
+]);
+
+const OWNED_COMMANDS: ReadonlySet<string> = new Set<string>([
+  ...LEGACY_MAGE_COMMANDS,
+  ...MAGE_HOOKS.map((e) => e.command),
+]);
+
+/** True iff `cmd` is a command mage itself wrote (exact match, closed list). */
 export function isMageCommand(cmd: unknown): boolean {
-  return typeof cmd === "string" && (cmd === "mage" || cmd.startsWith("mage ") || cmd.startsWith("mage:"));
+  return typeof cmd === "string" && OWNED_COMMANDS.has(cmd);
 }
 
 /**
- * True iff a group belongs to mage. A group is mage-owned if its `id` starts with
- * `mage:` OR any command in its `hooks` array is a `mage` command.
+ * True iff a group belongs to mage: its `id` starts with `mage:`, or EVERY command in
+ * its `hooks` array is one of ours. All-not-any, because ownership gates deletion and
+ * matching reads `hooks[0]` — a hand-edited group holding one foreign command stays
+ * the host's, so `disconnect`/`doctor --fix` can never reap it (#150).
  */
 export function isMageGroup(g: HookGroup | null | undefined): boolean {
   if (!g || typeof g !== "object") return false;
   if (typeof g.id === "string" && g.id.startsWith(MAGE_ID_PREFIX)) return true;
-  if (Array.isArray(g.hooks)) {
-    return g.hooks.some((h) => h && isMageCommand(h.command));
+  if (Array.isArray(g.hooks) && g.hooks.length > 0) {
+    return g.hooks.every((h) => h && isMageCommand(h.command));
   }
   return false;
 }
@@ -340,28 +360,31 @@ export async function readClaudeSettings(
 
 // ─── upsert ──────────────────────────────────────────────────────────────────
 /**
- * Return a NEW settings object with every mage hook wired in. Pure: the input
- * is never mutated (we deep-clone first). For each MAGE_HOOKS entry we ensure
- * the event array exists, drop any prior group with the same id, then append a
- * fresh mage group. Non-mage groups, other events, and other top-level keys are
- * preserved. Idempotent and self-healing (replace-by-id updates drifted commands).
+ * Return a NEW settings object with every mage hook wired in, plus `reaped` — the
+ * number of registrations that DISAPPEAR (legacy id-less orphans and duplicates
+ * collapsed away; one equivalent group is replaced in place, so a clean re-connect
+ * reaps 0). Pure: the input is never mutated (we deep-clone first). Non-mage groups,
+ * other events, and other top-level keys are preserved.
  */
 export function upsertMageHooks(
   settings: ClaudeSettings | null,
   opts: { commandeer?: boolean } = {},
-): ClaudeSettings {
+): { settings: ClaudeSettings; reaped: number } {
   const base = structuredClone(settings ?? {}) as ClaudeSettings;
   // Detach the hooks map from `base` before mutating it, so this stays a clean
   // immutable construction (we never write through an alias of the clone).
   const hooks: Record<string, HookGroup[]> = base.hooks ? { ...base.hooks } : {};
+  let reaped = 0;
 
   for (const entry of MAGE_HOOKS) {
     const current = hooks[entry.event];
     const existing = Array.isArray(current) ? current : [];
+    const mine = existing.filter((g) => isEquivalentGroup(g, entry));
     const withoutMine = existing.filter((g) => !isEquivalentGroup(g, entry));
     // A commandeer row with the tier gated OFF is removed (drop any prior group),
     // never added — so toggling auto-memory off and re-connecting self-heals.
     const skip = entry.commandeer === true && opts.commandeer !== true;
+    reaped += skip ? mine.length : Math.max(0, mine.length - 1);
     const next = skip
       ? withoutMine
       : [
@@ -376,7 +399,7 @@ export function upsertMageHooks(
     else delete hooks[entry.event]; // prune an event array emptied by a skip
   }
 
-  return { ...base, hooks };
+  return { settings: { ...base, hooks }, reaped };
 }
 
 // ─── remove ──────────────────────────────────────────────────────────────────
