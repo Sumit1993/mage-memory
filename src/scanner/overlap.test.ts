@@ -103,6 +103,122 @@ describe("overlap — Signal A (structural: mutual links + shared room)", () => 
     const result = detectMergeCandidates(notes);
     expect(result.signalA).toEqual([]);
   });
+
+  it("does NOT falsely match notes linking different files with same basenames in different directories", async () => {
+    const kb = await withKb({ kind: "repo" });
+    const root = kb.root;
+    // wing-a/overview.md links to shared/api.md (NOT wing-b/api.md)
+    await note(root, "wing-a/overview.md", [
+      "---",
+      "type: gotcha",
+      "tags: [eng/api]",
+      'last_reviewed: "2026-06-01"',
+      "---",
+      "# Overview",
+      "",
+      "See [API](../shared/api.md) for details.",
+    ].join("\n"));
+    // wing-b/api.md links to wing-a/overview.md (one-way link)
+    await note(root, "wing-b/api.md", [
+      "---",
+      "type: gotcha",
+      "tags: [eng/api]",
+      'last_reviewed: "2026-06-01"',
+      "---",
+      "# API",
+      "",
+      "See [Overview](../wing-a/overview.md).",
+    ].join("\n"));
+    await note(root, "shared/api.md", [
+      "---",
+      "type: gotcha",
+      "tags: [eng/api]",
+      'last_reviewed: "2026-06-01"',
+      "---",
+      "# Shared API",
+      "",
+      "Base definition.",
+    ].join("\n"));
+
+    const notes = await readAllNotes(root, [
+      "notes/wing-a/overview.md",
+      "notes/wing-b/api.md",
+      "notes/shared/api.md",
+    ]);
+    const result = detectMergeCandidates(notes);
+    // wing-a/overview.md and wing-b/api.md must NOT be flagged as mutual links
+    const falsePair = result.signalA.some(
+      (p) =>
+        (p.noteA.includes("wing-a/overview") && p.noteB.includes("wing-b/api")) ||
+        (p.noteA.includes("wing-b/api") && p.noteB.includes("wing-a/overview")),
+    );
+    expect(falsePair).toBe(false);
+  });
+
+  it("detects cross-directory mutual links when resolved paths match", async () => {
+    const kb = await withKb({ kind: "repo" });
+    const root = kb.root;
+    await note(root, "wing-a/overview.md", [
+      "---",
+      "type: gotcha",
+      "tags: [eng/api]",
+      'last_reviewed: "2026-06-01"',
+      "---",
+      "# Overview",
+      "",
+      "See [API](../wing-b/api.md).",
+    ].join("\n"));
+    await note(root, "wing-b/api.md", [
+      "---",
+      "type: gotcha",
+      "tags: [eng/api]",
+      'last_reviewed: "2026-06-01"',
+      "---",
+      "# API",
+      "",
+      "See [Overview](../wing-a/overview.md).",
+    ].join("\n"));
+
+    const notes = await readAllNotes(root, [
+      "notes/wing-a/overview.md",
+      "notes/wing-b/api.md",
+    ]);
+    const result = detectMergeCandidates(notes);
+    expect(result.signalA.length).toBe(1);
+    expect(result.signalA[0]!.noteA).toBe("notes/wing-a/overview.md");
+    expect(result.signalA[0]!.noteB).toBe("notes/wing-b/api.md");
+  });
+
+  it("detects mutual links via Obsidian wikilinks", async () => {
+    const kb = await withKb({ kind: "repo" });
+    const root = kb.root;
+    await note(root, "a.md", [
+      "---",
+      "type: gotcha",
+      "tags: [eng/api]",
+      'last_reviewed: "2026-06-01"',
+      "---",
+      "# Note A",
+      "",
+      "See [[b]] for more.",
+    ].join("\n"));
+    await note(root, "b.md", [
+      "---",
+      "type: gotcha",
+      "tags: [eng/api]",
+      'last_reviewed: "2026-06-01"',
+      "---",
+      "# Note B",
+      "",
+      "See [[a]] for more.",
+    ].join("\n"));
+
+    const notes = await readAllNotes(root, ["notes/a.md", "notes/b.md"]);
+    const result = detectMergeCandidates(notes);
+    expect(result.signalA.length).toBe(1);
+    expect(result.signalA[0]!.noteA).toBe("notes/a.md");
+    expect(result.signalA[0]!.noteB).toBe("notes/b.md");
+  });
 });
 
 describe("overlap — Signal B (lexical: TF-IDF cosine over bodies)", () => {

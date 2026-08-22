@@ -74,21 +74,34 @@ function stripCode(body: string): string {
   return body.replace(/```[\s\S]*?```/g, "").replace(/`[^`]*`/g, "");
 }
 
+/** Resolve a link target (relative to the linking note) to a root-relative posix path. */
+function resolveRel(noteRel: string, target: string): string {
+  return posix.normalize(posix.join(posix.dirname(noteRel), target));
+}
+
+interface NoteLinks {
+  /** Resolved root-relative paths for markdown links. */
+  resolvedMdLinks: Set<string>;
+  /** Basenames (without `.md`) for wikilinks (Obsidian resolves by name). */
+  wikiTargets: Set<string>;
+}
+
 /**
- * Collect all link targets from a note body (both markdown and wikilinks).
- * Returns basenames (without `.md`) for uniform comparison.
+ * Collect all link targets from a note body.
+ * Markdown links are resolved relative to the note's path to root-relative paths.
+ * Wikilinks are collected by basename (without `.md`) since Obsidian resolves them by name across the vault.
  */
-function allLinkTargets(body: string): Set<string> {
+function extractNoteLinks(relPath: string, body: string): NoteLinks {
   const stripped = stripCode(body);
-  const targets = new Set<string>();
+  const resolvedMdLinks = new Set<string>();
   for (const t of extractLinks(stripped)) {
-    // Normalize: take the basename and strip .md
-    targets.add(posix.basename(t, ".md"));
+    resolvedMdLinks.add(resolveRel(relPath, t));
   }
+  const wikiTargets = new Set<string>();
   for (const t of extractWikiLinks(stripped)) {
-    targets.add(posix.basename(t, ".md"));
+    wikiTargets.add(posix.basename(t, ".md"));
   }
-  return targets;
+  return { resolvedMdLinks, wikiTargets };
 }
 
 /**
@@ -107,17 +120,24 @@ function wingRoomTags(tags: string[]): Set<string> {
 function computeSignalA(notes: OverlapNote[]): MergePair[] {
   const pairs: MergePair[] = [];
   // Pre-compute link targets and tags for each note
-  const linkTargets = notes.map((n) => allLinkTargets(n.body));
+  const linkTargets = notes.map((n) => extractNoteLinks(n.relPath, n.body));
   const tagSets = notes.map((n) => wingRoomTags(n.tags));
 
   for (let i = 0; i < notes.length; i++) {
-    const aBase = posix.basename(notes[i]!.relPath, ".md");
+    const aRel = notes[i]!.relPath;
+    const aBase = posix.basename(aRel, ".md");
     for (let j = i + 1; j < notes.length; j++) {
-      const bBase = posix.basename(notes[j]!.relPath, ".md");
+      const bRel = notes[j]!.relPath;
+      const bBase = posix.basename(bRel, ".md");
 
       // Check mutual link: A links B AND B links A
-      const aLinksB = linkTargets[i]!.has(bBase);
-      const bLinksA = linkTargets[j]!.has(aBase);
+      // A links B if A has a markdown link resolving to B's relPath OR a wikilink targeting B's basename
+      const aLinksB =
+        linkTargets[i]!.resolvedMdLinks.has(bRel) ||
+        linkTargets[i]!.wikiTargets.has(bBase);
+      const bLinksA =
+        linkTargets[j]!.resolvedMdLinks.has(aRel) ||
+        linkTargets[j]!.wikiTargets.has(aBase);
       if (!aLinksB || !bLinksA) continue;
 
       // Check shared wing/room tag
@@ -128,15 +148,15 @@ function computeSignalA(notes: OverlapNote[]): MergePair[] {
       if (sharedTags.length === 0) continue;
 
       pairs.push({
-        noteA: notes[i]!.relPath,
-        noteB: notes[j]!.relPath,
+        noteA: aRel,
+        noteB: bRel,
         reason: `link each other and share #${sharedTags[0]}`,
       });
     }
   }
 
   // Deterministic sort by noteA then noteB
-  pairs.sort((a, b) => a.noteA < b.noteA ? -1 : a.noteA > b.noteA ? 1 : a.noteB < b.noteB ? -1 : 1);
+  pairs.sort((a, b) => (a.noteA < b.noteA ? -1 : a.noteA > b.noteA ? 1 : a.noteB < b.noteB ? -1 : 1));
   return pairs;
 }
 
