@@ -12,7 +12,7 @@ provenance:
 sources:
   - decisions/0030-agent-autonomy-ladder.md
   - decisions/0031-programmatic-provenance-stamp.md
-  - notes/phase2-reject-ledger-0.1.0-gate.md
+  - work/phase2-reject-ledger-0.1.0-gate.md
   - cc-session:d8d18f6f-21d4-4679-8b16-531132e1b88d
 keywords:
   - keep-rate
@@ -70,5 +70,5 @@ capture pipeline is broken — on a mature KB it is the expected result. Check
 whether captures are landing on a *young* target before concluding anything about
 capture health.
 
-Related: [[promote-folds-mechanical-tokens]] — the other finding from the same
-soak, and [[phase2-reject-ledger-0.1.0-gate]] for the gate itself.
+Related: [promote-folds-mechanical-tokens](promote-folds-mechanical-tokens.md) — the other finding from the same
+soak, and [phase2-reject-ledger-0.1.0-gate](../work/phase2-reject-ledger-0.1.0-gate.md) for the gate itself.

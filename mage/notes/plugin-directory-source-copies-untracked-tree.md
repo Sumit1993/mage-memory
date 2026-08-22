@@ -85,5 +85,5 @@ whole repo, and the GitHub source already fixes both the size and the staleness.
 ## Relations
 
 - sibling of [which `mage` binary am I actually running?](npx-mage-runs-the-published-release.md) — the CLI half of "what am I actually running?"
-- refines [`npx mage` runs the published release](npx-mage-runs-the-published-release.md)
 - realizes [dogfood before release](dogfood-before-release.md)
+
