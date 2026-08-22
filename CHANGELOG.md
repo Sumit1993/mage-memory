@@ -11,6 +11,24 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.18](https://github.com/Sumit1993/mage-memory/compare/v0.0.17...v0.0.18) (2026-08-22)
+
+
+### Features
+
+* **paths:** derive an external hub's location from its remote (ADR-0043) ([#121](https://github.com/Sumit1993/mage-memory/issues/121)) ([e2527be](https://github.com/Sumit1993/mage-memory/commit/e2527be8d9fa1ae0631eb9aae7af7687dab3add1))
+* review-lane stubs — summon triggers + mention verb exclusion (blocked on gh-workflows[#7](https://github.com/Sumit1993/mage-memory/issues/7)) ([#173](https://github.com/Sumit1993/mage-memory/issues/173)) ([c009ffe](https://github.com/Sumit1993/mage-memory/commit/c009ffe9dfe129b36e50a6c981b358938ee093e7))
+* review-lane stubs — summon triggers, concurrency key, mention verb exclusion (gh-workflows[#7](https://github.com/Sumit1993/mage-memory/issues/7)) ([c009ffe](https://github.com/Sumit1993/mage-memory/commit/c009ffe9dfe129b36e50a6c981b358938ee093e7))
+* **scanner:** deterministic merge-candidate detection in the index scan ([#153](https://github.com/Sumit1993/mage-memory/issues/153)) ([#172](https://github.com/Sumit1993/mage-memory/issues/172)) ([50b8e8b](https://github.com/Sumit1993/mage-memory/commit/50b8e8bf1a82a6e98a1aa738edc75f25502bf737))
+
+
+### Bug Fixes
+
+* **connect:** reap legacy id-less hook groups; close the ownership predicate ([#150](https://github.com/Sumit1993/mage-memory/issues/150)) ([#163](https://github.com/Sumit1993/mage-memory/issues/163)) ([311fe75](https://github.com/Sumit1993/mage-memory/commit/311fe75dda3047324ea6a40db4ee4e925a97241d))
+* **docs:** dedupe js-yaml to 4.3.0, clearing the high-severity advisory ([#119](https://github.com/Sumit1993/mage-memory/issues/119)) ([47bef79](https://github.com/Sumit1993/mage-memory/commit/47bef7932baab325a61ca479bd8fd7120682fd6c))
+* map CLAUDE_CODE_OAUTH_TOKEN explicitly — inherit does not cross owners ([#157](https://github.com/Sumit1993/mage-memory/issues/157)) ([0a97c2f](https://github.com/Sumit1993/mage-memory/commit/0a97c2fad4c47b951af4158923d65dea5fabe9a1))
+* **nudge:** slash-prefix skill invocations in nudge output ([#120](https://github.com/Sumit1993/mage-memory/issues/120)) ([396db9b](https://github.com/Sumit1993/mage-memory/commit/396db9b4df681038601da83096277dcf3bfcd445))
+
 ## [0.0.17](https://github.com/Sumit1993/mage-memory/compare/v0.0.16...v0.0.17) (2026-07-29)
 
 
