@@ -99,8 +99,22 @@ each).
 mage doctor
 ```
 
-The check to look for is **KB access grant**, in the readiness group. It has
-four outcomes:
+Two checks matter here. **external hub** answers "can mage reach the knowledge
+base at all", and **KB access grant** answers "is the agent allowed to read it".
+
+**external hub** appears only for `external`-mode repos:
+
+- **pass** — `hub reachable — this repo's notes live at <hub>/projects/my-service`.
+- **failing** — the hub is unreachable, so mage resolves *nothing* and every
+  capture is dropped. The line names the reason (`hub-absent`, `hub-corrupted`,
+  `no-hub-target`, `malformed-config`, `unknown-failure`), the path or address it
+  expected, and the command that obtains the hub — usually `mage connect`. It
+  will never tell you to run `mage init`: that would mint a **second** knowledge
+  base beside the one you already have. Each reason and its transcript is in
+  [When the hub is
+  unreachable](../model/modes.md#when-the-hub-is-unreachable--the-five-reasons-and-what-you-see).
+
+**KB access grant** has four outcomes:
 
 - **granted** — the hub is present and reachable. This is what you want.
 - **failing (ungranted)** — the hub is on this machine but ungranted: "the agent

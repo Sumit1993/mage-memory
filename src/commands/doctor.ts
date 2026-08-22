@@ -7,7 +7,7 @@ import { pushKbChecks } from "../doctor/kb-checks.js";
 import { pushLinkChecks } from "../doctor/link-checks.js";
 import { hasGh, hasGit } from "../git.js";
 import { logger } from "../logger.js";
-import { absolutePath, exists, looksLikeHub, resolveDocsRoot } from "../paths.js";
+import { absolutePath, codeRepoDocsRoot, exists, findCodeRepoRoot, looksLikeHub, resolveDocsRoot } from "../paths.js";
 import { which } from "../shell.js";
 
 export interface DoctorOptions {
@@ -66,7 +66,10 @@ export async function doctor(opts: DoctorOptions = {}): Promise<DoctorResult> {
   const checks: DoctorCheck[] = [];
 
   await pushEnvChecks(checks, opts);
-  const kb = await resolveDocsRoot(opts.cwd ?? process.cwd());
+  const startDir = absolutePath(opts.cwd ?? process.cwd());
+  const codeRepo = await findCodeRepoRoot(startDir);
+  const resolvedKb = await resolveDocsRoot(startDir);
+  const kb = resolvedKb ?? (codeRepo ? { root: codeRepoDocsRoot(codeRepo), kind: "repo", repo: codeRepo } : null);
   const genreTellsReport = kb ? await evaluateGenreTells(kb) : null;
   await pushKbChecks(checks, kb, opts, genreTellsReport);
   // Link integrity (two-way code-repo<->hub references; `--fix` heals a stale

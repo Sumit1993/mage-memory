@@ -1240,11 +1240,49 @@ describe("doctor — KB access grant, the reach tier (ADR-0042)", () => {
   });
 
   it("hub absent on this machine → SKIP state: optional pass, never a CI failure", async () => {
-    const { code } = await externalRepo({ hubExists: false });
+    const { code, hub } = await externalRepo({ hubExists: false });
     const c = check((await doctor({ cwd: code })).checks, "KB access grant");
     expect(c?.ok).toBe(true);
     expect(c?.optional).toBe(true);
-    expect(c?.detail).toMatch(/no mage hub present on this machine/);
+    // Still the optional "nothing to grant yet" skip — now NAMING the path it
+    // looked at, so the line is actionable rather than a bare reassurance (#158).
+    expect(c?.detail).toMatch(/nothing to grant yet/);
+    expect(c?.detail).toContain(hub);
+  });
+
+  // Issue #158's second half. Before this, doctor's output for an unreachable hub was
+  // byte-identical to a healthy one: the grant check's absent arm is an optional-ok and
+  // nothing else spoke. These pin the USER-VISIBLE line, not the returned union.
+  describe("external hub reachability (issue #158)", () => {
+    it("unreachable hub → a FAILING `external hub` check naming the path and `mage connect`", async () => {
+      const { code, hub } = await externalRepo({ hubExists: false });
+      const r = await doctor({ cwd: code });
+      const c = check(r.checks, "external hub");
+      expect(c?.ok).toBe(false);
+      expect(c?.optional).toBeFalsy();
+      expect(c?.detail).toContain(hub);
+      expect(c?.detail).toMatch(/mage connect/);
+      // The wrong-remedy trap this PR exists to close: `mage init` mints a SECOND KB.
+      expect(c?.detail).toMatch(/Do NOT run `mage init`/);
+      expect(r.passed).toBe(false);
+    });
+
+    it("reachable hub → an `external hub` pass naming the project docs root", async () => {
+      const { code, hub } = await externalRepo({ hubExists: true });
+      const c = check((await doctor({ cwd: code })).checks, "external hub");
+      expect(c?.ok).toBe(true);
+      expect(c?.detail).toContain(join(hub, "projects", "engine"));
+    });
+
+    it("an in-repo KB pushes no `external hub` check at all", async () => {
+      const repo = await freshDir("mage-reachdr-inrepo-");
+      await mkdir(join(repo, "mage", "notes"), { recursive: true });
+      await writeFile(
+        join(repo, "mage", "metadata.json"),
+        JSON.stringify({ schema: METADATA_SCHEMA, mode: "in-repo", project: "x" }),
+      );
+      expect(check((await doctor({ cwd: repo })).checks, "external hub")).toBeUndefined();
+    });
   });
 
   it("a hub_path pointing at a NON-hub is a skip, not a missing-grant failure", async () => {
