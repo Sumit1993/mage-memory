@@ -67,7 +67,7 @@ export interface Proposal {
 /** The manifest `mage promote --json` emits for the `mage:groom` / `mage:graduate` skills. */
 export interface PromoteManifest {
   /**
-   * ONE ladder rung: `"graduate"` proposals only — a PROCEDURAL note (playbook/gotcha)
+   * ONE ladder rung: `"graduate"` proposals only — a PROCEDURAL note (procedure/gotcha; legacy: playbook)
    * READ in ≥ M distinct chapters. The `"note"` rung was deleted by ADR-0038; recurrence
    * never proposes a NEW note. An EMPTY list is the normal result and does not imply
    * "nothing was used": a proposal is also absent when the note is non-procedural, when

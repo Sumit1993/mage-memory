@@ -90,7 +90,7 @@ async function unminedFromStreams(
  * M (dial-scaled). NO re-fold — this reads `.mage/metrics/promote.json` as-is, the
  * purge-surviving global counter (ADR-0019 §1). A note READ in ≥ M chapters is
  * graduation-eligible by usage (ADR-0038 §2); whether it is PROCEDURAL (only
- * playbook/gotcha graduate) and un-rejected needs the note scan we deliberately skip
+ * procedure/gotcha graduate; legacy tail: playbook) and un-rejected needs the note scan we deliberately skip
  * here, so this stays the cheap UPPER-BOUND reminder, not the exact proposal count.
  * readTally fails open to an empty tally.
  */

@@ -216,6 +216,18 @@ describe("promoteCmd — read mode --json", () => {
     expect(res.manifest).toBeDefined();
     expect(res.advanced).toBeUndefined();
   });
+
+  it("logs climbing note guidance with procedure/gotcha in the human path", async () => {
+    const { repo, docsRoot, learnings } = await tmpRepo();
+    await seedNoteRead(learnings, "sess-1", docsRoot);
+    const logs: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logs.push(args.map((a) => String(a)).join(" "));
+    });
+
+    await promoteCmd({ dir: repo });
+    expect(logs.some((l) => l.includes("only procedure/gotcha graduate; legacy: playbook"))).toBe(true);
+  });
 });
 
 // ─── --seen disposition (advance the tally offset) ────────────────────────────
