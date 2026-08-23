@@ -314,15 +314,110 @@ describe("paths", () => {
       });
     });
 
-    it("returns hub-unreachable (unknown-failure) on read error", async () => {
-      const code = await tmpDir("mage-corruptmeta-");
+    it("Finding 1 regression: degrades to not-external (and repo KB) when metadata is unreadable and mode is unknown (#158)", async () => {
+      const code = await tmpDir("mage-corruptmeta-degrade-");
       await mkdir(join(code, "mage"), { recursive: true });
       await writeFile(join(code, "mage", "metadata.json"), "invalid json{");
       const res = await externalDocsRoot(code);
       expect(res).toEqual({
-        kind: "hub-unreachable",
-        reason: "unknown-failure",
+        kind: "not-external",
       });
+      const resolved = await resolveDocsRoot(code);
+      expect(resolved).toEqual({
+        root: join(code, "mage"),
+        kind: "repo",
+        repo: code,
+      });
+    });
+
+    it("Finding 2 regression: returns hub-unreachable (hub-mismatch) when clone origin does not match hub_repo (#158)", async () => {
+      const saved = process.env.MAGE_HOME;
+      const home = await tmpDir("mage-mismatch-home-");
+      process.env.MAGE_HOME = home;
+      try {
+        const code = await tmpDir("mage-mismatch-code-");
+        await mkdir(join(code, "mage"), { recursive: true });
+        await writeFile(
+          join(code, "mage", "metadata.json"),
+          JSON.stringify({
+            schema: METADATA_SCHEMA,
+            mode: "external",
+            project: "engine",
+            hub_repo: "https://example.com/acme/expected-hub.git",
+          }),
+        );
+        const derivedHub = join(home, "hubs", "example.com", "acme", "expected-hub");
+        await mkdir(join(derivedHub, "projects", "engine"), { recursive: true });
+        await writeFile(
+          join(derivedHub, "metadata.json"),
+          JSON.stringify({ schema: METADATA_SCHEMA, projects: [{ name: "engine", storage: "repo-owned" }] }),
+        );
+        await mkdir(join(derivedHub, ".git"), { recursive: true });
+        await writeFile(
+          join(derivedHub, ".git", "config"),
+          `[remote "origin"]\n  url = https://example.com/acme/other-hub.git\n`,
+        );
+
+        const res = await externalDocsRoot(code);
+        expect(res).toEqual({
+          kind: "hub-unreachable",
+          reason: "hub-mismatch",
+          expectedAddress: "https://example.com/acme/expected-hub.git",
+          expectedPath: derivedHub,
+          detail: expect.stringMatching(/does not match the clone's origin/),
+        });
+
+        const why = await explainNoDocsRoot(code);
+        expect(why.hubUnreachable).toBe(true);
+        expect(why.reason).toBe("hub-mismatch");
+        expect(why.message).toMatch(/does not match the clone's origin/);
+        expect(why.message).not.toMatch(/is not a mage hub/);
+      } finally {
+        if (saved === undefined) delete process.env.MAGE_HOME;
+        else process.env.MAGE_HOME = saved;
+      }
+    });
+
+    it("Finding 2 regression: returns hub-unreachable (hub-origin-unreadable) when clone origin cannot be read (#158)", async () => {
+      const saved = process.env.MAGE_HOME;
+      const home = await tmpDir("mage-unreadable-home-");
+      process.env.MAGE_HOME = home;
+      try {
+        const code = await tmpDir("mage-unreadable-code-");
+        await mkdir(join(code, "mage"), { recursive: true });
+        await writeFile(
+          join(code, "mage", "metadata.json"),
+          JSON.stringify({
+            schema: METADATA_SCHEMA,
+            mode: "external",
+            project: "engine",
+            hub_repo: "https://example.com/acme/expected-hub.git",
+          }),
+        );
+        const derivedHub = join(home, "hubs", "example.com", "acme", "expected-hub");
+        await mkdir(join(derivedHub, "projects", "engine"), { recursive: true });
+        await writeFile(
+          join(derivedHub, "metadata.json"),
+          JSON.stringify({ schema: METADATA_SCHEMA, projects: [{ name: "engine", storage: "repo-owned" }] }),
+        );
+        const res = await externalDocsRoot(code);
+        expect(res).toEqual({
+          kind: "hub-unreachable",
+          reason: "hub-origin-unreadable",
+          expectedAddress: "https://example.com/acme/expected-hub.git",
+          expectedPath: derivedHub,
+          detail: expect.stringMatching(/could not read the origin remote/),
+        });
+
+        const why = await explainNoDocsRoot(code);
+        expect(why.hubUnreachable).toBe(true);
+        expect(why.reason).toBe("hub-origin-unreadable");
+        expect(why.message).toMatch(/could not read the origin remote/);
+        expect(why.message).not.toMatch(/is not a mage hub/);
+      } finally {
+        if (saved === undefined) delete process.env.MAGE_HOME;
+        else process.env.MAGE_HOME = saved;
+      }
     });
   });
 
@@ -397,13 +492,13 @@ describe("paths", () => {
       expect(why.message).toMatch(/names no project/);
     });
 
-    it("unknown-failure (unreadable metadata) → points at repair / `mage link`", async () => {
+    it("unreadable metadata in non-external repo is not classified as hub-unreachable", async () => {
       const code = await tmpDir("mage-explain-bad-");
       await mkdir(join(code, "mage"), { recursive: true });
       await writeFile(join(code, "mage", "metadata.json"), "invalid json{");
       const why = await explainNoDocsRoot(code);
-      expect(why.reason).toBe("unknown-failure");
-      expect(why.message).toMatch(/mage link <address>/);
+      expect(why.hubUnreachable).toBe(false);
+      expect(why.message).toMatch(/No mage knowledge base found/);
     });
 
     it("REDACTS credentials in a hub_repo address before printing it", async () => {

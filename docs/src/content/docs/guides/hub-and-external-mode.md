@@ -107,12 +107,13 @@ base at all", and **KB access grant** answers "is the agent allowed to read it".
 - **pass** — `hub reachable — this repo's notes live at <hub>/projects/my-service`.
 - **failing** — the hub is unreachable, so mage resolves *nothing* and every
   capture is dropped. The line names the reason (`hub-absent`, `hub-corrupted`,
-  `no-hub-target`, `malformed-config`, `unknown-failure`), the path or address it
+  `hub-mismatch`, `hub-origin-unreadable`, `no-hub-target`, `malformed-config`,
+  `unknown-failure`), the path or address it
   expected, and the command that obtains the hub — usually `mage connect`. It
   will never tell you to run `mage init`: that would mint a **second** knowledge
   base beside the one you already have. Each reason and its transcript is in
   [When the hub is
-  unreachable](../model/modes.md#when-the-hub-is-unreachable--the-five-reasons-and-what-you-see).
+  unreachable](../model/modes.md#when-the-hub-is-unreachable--reasons-and-what-you-see).
 
 **KB access grant** has four outcomes:
 

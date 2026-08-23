@@ -453,6 +453,8 @@ export type HubUnreachableReason =
   | "no-hub-target"
   | "hub-absent"
   | "hub-corrupted"
+  | "hub-mismatch"
+  | "hub-origin-unreadable"
   | "unknown-failure";
 
 // INVARIANT: this union and {@link HubGrantResolution} answer the same question
@@ -468,6 +470,8 @@ export type ExternalDocsRootResult =
       expectedAddress?: string;
       /** The filesystem path the hub was expected AT (derived, or `hub_path`). */
       expectedPath?: string;
+      /** Diagnostic detail from arrival verification (e.g. mismatch or unreadable origin). */
+      detail?: string;
     };
 
 /**
@@ -529,6 +533,7 @@ export interface UnresolvedDocsRoot {
   /** Already redacted — safe to print. */
   expectedAddress?: string;
   expectedPath?: string;
+  detail?: string;
   /** One printable explanation ending in the command that fixes it. */
   message: string;
 }
@@ -544,6 +549,10 @@ function hubUnreachableMessage(r: ExternalDocsRootResult & { kind: "hub-unreacha
       return `${head}: no hub${at}${addr}. Run \`mage connect\` to clone it there (or \`mage init --local <name>\` for a local-only hub). ${dontInit}`;
     case "hub-corrupted":
       return `${head}: something exists${at}${addr} but is not a mage hub (no projects/ + metadata.json). Move or remove it, then run \`mage connect\`. ${dontInit}`;
+    case "hub-mismatch":
+      return `${head}: ${r.detail ?? `hub origin mismatch${at}`}. ${dontInit}`;
+    case "hub-origin-unreadable":
+      return `${head}: ${r.detail ?? `could not read the origin remote${at}`}. ${dontInit}`;
     case "no-hub-target":
       return `${head}: mage/metadata.json records no usable hub address. Run \`mage link <address>\` to record one, then \`mage connect\`. ${dontInit}`;
     case "malformed-config":
@@ -573,6 +582,7 @@ export async function explainNoDocsRoot(startDir: string): Promise<UnresolvedDoc
         codeRepo,
         expectedAddress: external.expectedAddress ? redactUrl(external.expectedAddress) : undefined,
         expectedPath: external.expectedPath,
+        detail: external.detail,
         message: hubUnreachableMessage(external),
       };
     }
@@ -636,10 +646,17 @@ async function missingHubReason(root: string): Promise<"hub-absent" | "hub-corru
  *      This function must never throw for any case (the hot-path contract).
  */
 export async function externalDocsRoot(dir: string): Promise<ExternalDocsRootResult> {
+  let meta: MageMetadata | null;
   try {
-    const meta = await readMetadata(dir);
-    if (!meta || meta.mode !== "external") return { kind: "not-external" };
+    meta = await readMetadata(dir);
+  } catch {
+    // A metadata read/parse failure for an unknown mode falls back to not-external
+    // (repo-KB handling), matching the degrade-on-bad-read behavior.
+    return { kind: "not-external" };
+  }
+  if (!meta || meta.mode !== "external") return { kind: "not-external" };
 
+  try {
     const expectedAddress = meta.hub_repo ?? undefined;
     const expectedPath = meta.hub_path ?? undefined;
     if (!meta.project) {
@@ -659,11 +676,20 @@ export async function externalDocsRoot(dir: string): Promise<ExternalDocsRootRes
       } else if (meta.hub_path && (await looksLikeHub(meta.hub_path))) {
         hubRoot = meta.hub_path; // fall back to the deprecated hub_path (incl. on a mismatch)
       } else {
+        const reason: HubUnreachableReason =
+          arrival.reason === "origin-mismatch"
+            ? "hub-mismatch"
+            : arrival.reason === "origin-unreadable"
+              ? "hub-origin-unreadable"
+              : arrival.reason === "not-a-hub"
+                ? "hub-corrupted"
+                : "hub-absent";
         return {
           kind: "hub-unreachable",
-          reason: await missingHubReason(chosen.root),
+          reason,
           expectedAddress,
           expectedPath: chosen.root,
+          detail: arrival.detail,
         };
       }
     } else {
@@ -687,7 +713,12 @@ export async function externalDocsRoot(dir: string): Promise<ExternalDocsRootRes
       },
     };
   } catch {
-    return { kind: "hub-unreachable", reason: "unknown-failure" };
+    return {
+      kind: "hub-unreachable",
+      reason: "unknown-failure",
+      expectedAddress: meta.hub_repo ?? undefined,
+      expectedPath: meta.hub_path ?? undefined,
+    };
   }
 }
 

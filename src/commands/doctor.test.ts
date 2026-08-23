@@ -1478,6 +1478,46 @@ describe("doctor — KB access grant, the reach tier (ADR-0042)", () => {
       );
       expect(check((await doctor({ cwd: repo })).checks, "external hub")).toBeUndefined();
     });
+
+    it("origin-mismatch hub → an `external hub` failure naming the mismatch and never suggesting init (#158)", async () => {
+      const saved = process.env.MAGE_HOME;
+      const home = await freshDir("mage-doctor-home-");
+      process.env.MAGE_HOME = home;
+      try {
+        const code = await freshDir("mage-doctor-code-");
+        await mkdir(join(code, "mage"), { recursive: true });
+        await writeFile(
+          join(code, "mage", "metadata.json"),
+          JSON.stringify({
+            schema: METADATA_SCHEMA,
+            mode: "external",
+            project: "engine",
+            hub_repo: "https://example.com/acme/expected-hub.git",
+          }),
+        );
+        const derivedHub = join(home, "hubs", "example.com", "acme", "expected-hub");
+        await mkdir(join(derivedHub, "projects", "engine"), { recursive: true });
+        await writeFile(
+          join(derivedHub, "metadata.json"),
+          JSON.stringify({ schema: METADATA_SCHEMA, projects: [{ name: "engine", storage: "repo-owned" }] }),
+        );
+        await mkdir(join(derivedHub, ".git"), { recursive: true });
+        await writeFile(
+          join(derivedHub, ".git", "config"),
+          `[remote "origin"]\n  url = https://example.com/acme/other-hub.git\n`,
+        );
+
+        const r = await doctor({ cwd: code });
+        const c = check(r.checks, "external hub");
+        expect(c?.ok).toBe(false);
+        expect(c?.detail).toMatch(/unreachable \(hub-mismatch\)/);
+        expect(c?.detail).toMatch(/does not match the clone's origin/);
+        expect(c?.detail).not.toMatch(/is not a mage hub/);
+      } finally {
+        if (saved === undefined) delete process.env.MAGE_HOME;
+        else process.env.MAGE_HOME = saved;
+      }
+    });
   });
 
   it("a hub_path pointing at a NON-hub is a skip, not a missing-grant failure", async () => {

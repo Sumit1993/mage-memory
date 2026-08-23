@@ -579,6 +579,18 @@ describe("reach tier — connect grants out-of-repo KB access (ADR-0042)", () =>
     }
   });
 
+  it("Finding 3 regression: does not warn about skipping commandeer tier when scope is user (#158)", async () => {
+    const dir = await tmpDir("mage-connect-user-noskipwarn-");
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    try {
+      await connect({ cwd: dir, yes: true, user: true, gitHook: false });
+      const said = warn.mock.calls.map((c) => String(c[0])).join("\n");
+      expect(said).not.toMatch(/Skipping the commandeer tier/);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it("refuses to grant a directory that exists but is NOT a hub", async () => {
     // `mage/metadata.json` is git-tracked, so hub_path is untrusted: anyone who can land
     // a commit could point it at ~/.ssh or / and have connect widen harness access to it.

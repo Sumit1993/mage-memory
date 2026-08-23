@@ -159,15 +159,14 @@ scan under the hubs root, sorted and deterministic) and mage prints the exact
 `mv` to relocate it — it never performs the move itself. When nothing is found
 at all, `mage connect` offers to clone `hub_repo` there on the spot.
 
-## When the hub is unreachable — the five reasons, and what you see
+## When the hub is unreachable — reasons and what you see
 
 An `external`-mode repo's knowledge base is somewhere else. When mage cannot get
 to it, it **stops** — it never quietly writes into the code repo's own `mage/`,
 because that would mint a second, divergent knowledge base and silently misfile
 everything you learned into it.
 
-There are five distinct ways the hub can be out of reach. Every interactive
-command reports the reason and **the command that obtains the hub** (ADR-0044
+Every interactive command reports the reason and **the command that obtains the hub** (ADR-0044
 §4) — never `mage init`, which is the one command that would make it worse. Run
 `mage doctor` and read the `external hub` line:
 
@@ -175,9 +174,11 @@ command reports the reason and **the command that obtains the hub** (ADR-0044
 | --- | --- | --- |
 | `hub-absent` | The address resolves, but nothing is cloned at the derived path yet — the normal state on a fresh clone of the code repo. | `mage connect` (it offers to clone it) |
 | `hub-corrupted` | Something *is* at that path, but it is not a mage hub (no `projects/` + `metadata.json`). | Move or remove it, then `mage connect` |
+| `hub-mismatch` | A mage hub exists at that path, but its origin remote does not match `hub_repo`. | Fix the clone's remote, or re-run `mage link <address>` |
+| `hub-origin-unreadable` | A mage hub exists at that path, but its origin remote could not be read from `.git/config`. | Check `.git` permissions and configuration |
 | `no-hub-target` | `mage/metadata.json` is `mode: external` but records no usable `hub_repo`/`hub_path`. | `mage link <address>`, then `mage connect` |
 | `malformed-config` | `mode: external` with no `project` name, so there is no `projects/<name>/` to resolve to. | `mage link <address>` |
-| `unknown-failure` | `mage/metadata.json` could not be read at all — invalid JSON, or no read permission. | Repair the file, or re-register with `mage link <address>` |
+| `unknown-failure` | An unexpected failure occurred while resolving the external hub. | Check permissions, or re-register with `mage link <address>` |
 
 Worked transcript, one repo per reason (paths shortened):
 
@@ -191,6 +192,10 @@ $ cd ~/code/svc-corrupt   # hub_path points at a directory that is not a hub
 $ mage doctor
 ✗ external hub        : unreachable (hub-corrupted) — … something exists at ~/hubs/decoy but is not a mage hub (no projects/ + metadata.json). Move or remove it, then run `mage connect`. Do NOT run `mage init` here: it would mint a SECOND knowledge base.
 
+$ cd ~/code/svc-mismatch  # hub exists at derived path but origin remote points to a different repo
+$ mage doctor
+✗ external hub        : unreachable (hub-mismatch) — This repo is in external mode, so its knowledge base lives in a hub — but the hub is unreachable: hub_repo https://github.com/acme/expected.git does not match the clone's origin https://github.com/acme/other.git found at ~/.mage/hubs/github.com/acme/expected — never reused, never clobbered. Do NOT run `mage init` here: it would mint a SECOND knowledge base.
+
 $ cd ~/code/svc-notarget   # mode: external, but hub_repo and hub_path are both null
 $ mage doctor
 ✗ external hub        : unreachable (no-hub-target) — … mage/metadata.json records no usable hub address. Run `mage link <address>` to record one, then `mage connect`. Do NOT run `mage init` here: it would mint a SECOND knowledge base.
@@ -198,10 +203,6 @@ $ mage doctor
 $ cd ~/code/svc-malformed   # mode: external, but no project name
 $ mage doctor
 ✗ external hub        : unreachable (malformed-config) — … mage/metadata.json is mode=external but names no project. Run `mage link <address>` to re-register this repo. Do NOT run `mage init` here: it would mint a SECOND knowledge base.
-
-$ cd ~/code/svc-unreadable   # mage/metadata.json is not valid JSON
-$ mage doctor
-✗ external hub        : unreachable (unknown-failure) — … mage/metadata.json could not be read (invalid JSON, or no read permission). Repair it, or re-register with `mage link <address>`. Do NOT run `mage init` here: it would mint a SECOND knowledge base.
 ```
 
 Once the hub is reachable, the same check passes and names where the notes

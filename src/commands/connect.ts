@@ -129,7 +129,7 @@ export async function connect(opts: ConnectOptions): Promise<ConnectResult> {
   // returns a bare null for both "no KB" and "external hub unreachable" (#158), so
   // say which, and say what the silent decline costs. The other two arms are the
   // user's own explicit choices (auto-memory off; `--user`/global scope).
-  if (!commandeer && kb === null && isAutoMemoryEnabled(r.settings, process.env)) {
+  if (!commandeer && kb === null && target.scope === "local" && isAutoMemoryEnabled(r.settings, process.env)) {
     const why = await explainNoDocsRoot(opts.cwd ?? process.cwd());
     logger.warn(
       `Skipping the commandeer tier (autoMemoryDirectory stays where it is): ${why.message}`,
