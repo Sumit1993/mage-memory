@@ -13,7 +13,7 @@ sources:
   - decisions/0024-organic-grooming-loop.md
   - decisions/0030-agent-autonomy-ladder.md
   - decisions/0039-context-footprint-measure-and-bound.md
-  - notes/phase2-reject-ledger-0.1.0-gate.md
+  - work/phase2-reject-ledger-0.1.0-gate.md
   - notes/mature-kb-emits-no-capture-terminals.md
   - notes/plan-release-sequence.md
   - release-please-config.json
@@ -129,5 +129,5 @@ announcement"*, not as a version instruction.
   crown signal, which gates autonomy, not releases
 - triggered by [ADR-0039 — measure the context footprint](0039-context-footprint-measure-and-bound.md)'s
   breaking change claiming the minor mechanically
-- context in [phase2-reject-ledger-0.1.0-gate](../notes/phase2-reject-ledger-0.1.0-gate.md) and
+- context in [phase2-reject-ledger-0.1.0-gate](../work/phase2-reject-ledger-0.1.0-gate.md) and
   [mature-kb-emits-no-capture-terminals](../notes/mature-kb-emits-no-capture-terminals.md)

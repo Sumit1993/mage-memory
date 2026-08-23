@@ -1,9 +1,9 @@
 ---
-type: doc
+type: reference
 tags:
   - mage/grooming
 created: "2026-07-10"
-last_reviewed: 2026-07-10
+last_reviewed: 2026-08-12
 sources:
   - src/adapters/claude-code/nudge.ts
   - src/adapters/claude-code/nudge-state.ts
