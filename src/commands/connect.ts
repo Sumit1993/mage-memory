@@ -22,6 +22,7 @@ import {
   type ResolvedDocsRoot,
   absolutePath,
   exists,
+  explainNoDocsRoot,
   findCodeRepoRoot,
   hubsRoot,
   looksLikeHub,
@@ -65,6 +66,11 @@ export interface ConnectResult {
    * `--user` scope, and for a hub that is not present on this machine.
    */
   reach: string[];
+  /**
+   * Legacy id-less / duplicate hook registrations this run collapsed away (#150).
+   * 0 on a fresh or already-current settings file.
+   */
+  reaped: number;
   /** Outcome of the pre-commit redaction hook install (omitted when not attempted). */
   hook?: { installed: boolean; reason?: string };
 }
@@ -107,6 +113,7 @@ export async function connect(opts: ConnectOptions): Promise<ConnectResult> {
       backedUp: false,
       commandeer: false,
       reach: [],
+      reaped: 0,
     };
   }
 
@@ -118,8 +125,18 @@ export async function connect(opts: ConnectOptions): Promise<ConnectResult> {
   const kb = await resolveDocsRoot(opts.cwd ?? process.cwd());
   const commandeer =
     isAutoMemoryEnabled(r.settings, process.env) && kb !== null && target.scope === "local";
+  // (b) failing is the ONE arm that is invisible otherwise: `resolveDocsRoot`
+  // returns a bare null for both "no KB" and "external hub unreachable" (#158), so
+  // say which, and say what the silent decline costs. The other two arms are the
+  // user's own explicit choices (auto-memory off; `--user`/global scope).
+  if (!commandeer && kb === null && target.scope === "local" && isAutoMemoryEnabled(r.settings, process.env)) {
+    const why = await explainNoDocsRoot(opts.cwd ?? process.cwd());
+    logger.warn(
+      `Skipping the commandeer tier (autoMemoryDirectory stays where it is): ${why.message}`,
+    );
+  }
 
-  const merged = upsertMageHooks(r.settings, { commandeer });
+  const { settings: merged, reaped } = upsertMageHooks(r.settings, { commandeer });
   if (commandeer && kb) {
     // Preserve a user's OWN autoMemoryDirectory so disconnect can restore it rather than
     // clobber it. mage owns the value iff it previously commandeered (its commandeer hooks
@@ -187,6 +204,9 @@ export async function connect(opts: ConnectOptions): Promise<ConnectResult> {
   // settings.local.json is itself personal + gitignored by Claude Code; the capture
   // SINKS those hooks feed (.learnings/, .metrics/) are gitignored separately below.
   logger.success(`Wired ${wired} events into ${target.path} (personal settings file).`);
+  if (reaped > 0) {
+    logger.detail(`Reaped ${reaped} legacy/duplicate mage hook registration(s).`);
+  }
   if (commandeer && kb) {
     logger.detail(`Commandeered CC auto-memory → ${kb.root} (writes redirect + scrub into mage; MEMORY.md mage-owned).`);
   }
@@ -218,7 +238,7 @@ export async function connect(opts: ConnectOptions): Promise<ConnectResult> {
     await offerCommandeerCoverage(kb, { cwd: opts.cwd, yes: opts.yes, home: opts.home });
   }
 
-  return { path: target.path, scope: target.scope, wired, backedUp, commandeer, reach, hook };
+  return { path: target.path, scope: target.scope, wired, backedUp, commandeer, reach, reaped, hook };
 }
 
 /**

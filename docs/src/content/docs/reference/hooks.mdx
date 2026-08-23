@@ -32,11 +32,64 @@ Each row is one hook group mage owns:
 - **Hook id** — the stable `mage:<role>:<event>` tag. mage upserts and removes
   groups by this id, so re-running `mage connect` is idempotent and self-healing
   (a drifted command is replaced in place). `mage doctor` compares the installed
-  ids against this list to detect drift.
+  ids against this list to detect drift. Groups written by a pre-id mage carry no
+  tag; see [Who owns a hook group](#who-owns-a-hook-group--write-repair-detect).
 - **Command** — the mage CLI invocation the host runs. Most are
   [`mage observe`](../reference/commands.mdx); these are plumbing you never type
   by hand.
 - **Purpose** — what that capture point records.
+
+## Who owns a hook group — write, repair, detect
+
+Three commands touch the same hook block, and they must agree on one question:
+*which groups are mage's?*
+
+- **write** — `mage connect` upserts one group per row in the table above.
+- **repair** — `mage doctor --fix` strips mage's groups and re-adds them, healing a
+  block that drifted across a version bump.
+- **detect** — `mage doctor` (no `--fix`) compares what is installed against the
+  table and reports missing, stale, or duplicated registrations.
+
+Ownership is decided two ways, in order. A group whose `id` starts with `mage:` is
+mage's. A group with **no** `id` is mage's only if **every** command inside it is one
+mage itself writes — matched exactly against a closed list (the commands in the table,
+plus the ones older mage versions wrote). An exact list, not a `mage ` prefix: your own
+`mage learn` hook, or a group where you added a second command of your own, stays
+yours and is never rewritten or removed.
+
+### Legacy id-less groups
+
+mage versions before hook ids wrote groups with no `id`, and nothing ever reaped them.
+Upgrading added a correctly tagged group *beside* each orphan instead of replacing it,
+so the same command could fire several times per event while `doctor` still called the
+block healthy. `connect` now reaps them, and `doctor` counts them.
+
+### Worked example
+
+A settings file carrying the full legacy shape — 30 id-less orphans, the 10 correctly
+tagged groups, and one `mage learn` hook of the user's own:
+
+```text
+$ jq '[.hooks[][]] | length' .claude/settings.local.json
+41    # 30 id-less orphans + 10 tagged mage:* + 1 of mine
+
+$ mage doctor
+✗ connection          : local: hook block out of date (mage:* drift: missing=[none] stale=[none] duplicate-registrations=30); re-run `mage connect`
+
+$ mage connect --yes
+✓ Wired 10 events into /home/you/project/.claude/settings.local.json (personal settings file).
+  Reaped 30 legacy/duplicate mage hook registration(s).
+  Run `mage disconnect` to remove.
+
+$ mage doctor
+✓ connection          : local: mage hooks current
+
+$ jq '[.hooks[][]] | length' .claude/settings.local.json
+11    # 10 tagged mage:*, plus the `mage learn` hook — untouched
+```
+
+Four registrations per event collapse to one; the user's own hook survives every step.
+`mage doctor --fix` reaches the same end state without a `connect`.
 
 ## The capture family
 

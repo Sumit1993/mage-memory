@@ -10,7 +10,6 @@ provenance:
   repo: mage-memory
   work: issue-96-plugin-cache
 sources:
-  - notes/bare-mage-runs-the-working-tree.md
   - notes/npx-mage-runs-the-published-release.md
   - https://github.com/Sumit1993/mage-memory/issues/96
   - docs/src/content/docs/guides/uninstall-and-pause.md
@@ -48,7 +47,7 @@ lagging." It is the reverse on both counts: the directory source gives you neith
 nor freshness.
 
 Note this is a *different* trap from the binary pair in
-[bare `mage` runs the working tree](bare-mage-runs-the-working-tree.md) — that one is about
+[which `mage` binary am I actually running?](npx-mage-runs-the-published-release.md) — that one is about
 which `dist/cli.js` a command resolves to. This one is about the **skills plugin**, cached
 separately. A session can run tree-fresh CLI code and 27-day-old skills at the same time,
 which is exactly what happened.
@@ -85,6 +84,6 @@ whole repo, and the GitHub source already fixes both the size and the staleness.
 
 ## Relations
 
-- sibling of [bare `mage` runs the working tree](bare-mage-runs-the-working-tree.md) — the CLI half of "what am I actually running?"
-- refines [`npx mage` runs the published release](npx-mage-runs-the-published-release.md)
+- sibling of [which `mage` binary am I actually running?](npx-mage-runs-the-published-release.md) — the CLI half of "what am I actually running?"
 - realizes [dogfood before release](dogfood-before-release.md)
+

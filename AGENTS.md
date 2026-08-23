@@ -23,7 +23,11 @@ procedure, and pointers (not copies of sources) — navigable as an Obsidian gra
 **After you learn something durable** — an interface detail, a gotcha, how two
 services couple, a faster path to a source — capture it with `/mage:learn`, or
 add a note under `mage/notes/` and run `mage index`. Capture the reusable
-*insight + procedure + pointers*, never a copy of the source.
+*insight + procedure + pointers*, never a copy of the source. This rule targets
+the **memory** genre only (`mage/notes/`). `mage/work/` (plans, specs, task
+lists) and `mage/decisions/` (ADRs) are authored deliberately, not destinations
+for captured knowledge; if the artifact has a done-state it belongs in work or
+decisions, not notes (ADR-0041).
 
 **Docs surfaces:** Every implementation spec handed to a coding agent must include a "Docs surfaces" deliverable section naming the specific files to update, or an explicit "none affected because …". Where a named surface explains three or more interacting parts (a resolution order, a topology, a state machine, a pipeline, a precedence rule), the spec must also say which concrete artifact will carry it — a worked example, a terminal transcript, a diagram, or (only if genuinely graphical) a screenshot with a stated invalidation trigger. Prose-only for that kind of surface is an incomplete spec.
 

@@ -47,7 +47,7 @@ describe("renderProcedureSkill", () => {
 
   it("THROWS for a non-procedural note type (interface/principle/etc — ADR-0019 §5)", () => {
     const fact = parseNote("---\ntype: interface\ntags: [billing/x]\n---\n# A fact\n");
-    expect(() => renderProcedureSkill("a-fact", fact, "billing", "notes/x.md")).toThrow(/playbook\/gotcha/);
+    expect(() => renderProcedureSkill("a-fact", fact, "billing", "notes/x.md")).toThrow(/procedure\/gotcha/);
   });
 
   it("THROWS for a typeless note", () => {
@@ -58,6 +58,11 @@ describe("renderProcedureSkill", () => {
   it("accepts a gotcha note (the other graduatable type)", () => {
     const gotcha = parseNote("---\ntype: gotcha\ntags: [a/b]\n---\n# A trap\n\nWatch out.\n");
     expect(() => renderProcedureSkill("a-trap", gotcha, "a", "notes/t.md")).not.toThrow();
+  });
+
+  it("accepts a procedure note proposed by promote (PR #168 regression)", () => {
+    const proc = parseNote("---\ntype: procedure\ntags: [a/b]\n---\n# A procedure\n\n1. Do this.\n");
+    expect(() => renderProcedureSkill("a-procedure", proc, "a", "notes/p.md")).not.toThrow();
   });
 });
 

@@ -3,8 +3,8 @@ type: gotcha
 tags:
   - mage/soak
 created: "2026-07-31"
-updated: 2026-07-31
-last_reviewed: 2026-07-31
+updated: 2026-08-12
+last_reviewed: 2026-08-12
 status: active
 provenance:
   repo: mage-memory
@@ -27,15 +27,21 @@ keywords:
   - absolute-path
   - evidence-pipeline
   - ratification-gate
+  - cron
+  - scheduler
+  - session-boundary
+  - presence-trigger
+  - capture-vs-examination
 ---
 
-# The soak monitor reports "absent" and "healthy" the same way — two blind spots that cost an observation window
+# The soak monitor reports "absent" and "healthy" the same way — three blind spots that cost an observation window
 
 **A soak that silently drops a unit looks exactly like a soak that is passing.**
-Both were true of mage's monitor on 2026-07-31, and together they made
+Two were true of mage's monitor on 2026-07-31, and a third surfaced on
+2026-08-12; together the first two made
 [ADR-0041](../decisions/0041-genre-decides-the-recall-rung.md)'s ratification gate
 unjudgeable for an entire observation window that everyone believed was running.
-Check for both before trusting any soak-derived evidence.
+Check all three before trusting any soak-derived evidence.
 
 ## Blind spot 1 — a unit goes dark on a stale absolute path, and only whispers
 
@@ -79,9 +85,34 @@ cohort. That flag *is* the split the footer said was missing — no
 `provenance.source` work was ever needed.
 
 **The tell:** a "not yet built" note that names a specific artifact is cheap to
-falsify — `find` for the artifact before believing the note. Both blind spots here
-were single `find`/`grep` commands away from disproof and neither was run for
+falsify — `find` for the artifact before believing the note. Each of those two
+was a single `find`/`grep` command away from disproof and neither was run for
 weeks, because a stale claim reads as current fact.
+
+## Blind spot 3 — the digest is scheduled on a clock; the evidence is not
+
+Blind spots 1 and 2 were bugs in the monitor. This one is a mismatch between how the
+evidence *arrives* and how it is *read*.
+
+**Capture is mechanical and needs no schedule.** It is a byproduct of working: on
+2026-08-12 this repo's `mage/.mage/learnings/` held 71 session streams, 15 of them
+written since the observation window restarted on 07-31, the newest written minutes
+before the groom that produced this note. Nothing was missing.
+
+**Examination is what stopped.** `soak-digest.sh` is documented as cron-driven;
+`crontab -l` is empty and its `cron.log` was last written 2026-06-10. Every digest
+since was hand-run — 06-14, 06-18, 07-01, 07-10, 07-31 — and none at all in the twelve
+days after the window restarted. The window was never *empty*; it was **unexamined**.
+
+**Cron is the wrong trigger on a personal machine.** A laptop that is off, or a week
+with no work on this repo, silently skips a scheduled run and reports nothing — the same
+failure shape as blind spots 1 and 2. The reliable trigger is **presence**: mage already
+fires a boundary nudge at session start (`0 staged · N chapters unmined`). A digest read
+when someone is actually there to read it belongs on that boundary, not on a clock.
+
+**The tell:** do not measure an observation window in calendar days. Count what accrued —
+sessions captured, chapters unmined — and check when a human last *looked*. "No digest for
+twelve days" says nothing about the evidence; it says the reader was never run.
 
 ## Computing a keep-rate that means something
 

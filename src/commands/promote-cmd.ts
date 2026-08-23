@@ -182,7 +182,7 @@ function reportHuman(manifest: PromoteManifest): void {
   if (proposals.length === 0) {
     if (manifest.climbing > 0) {
       logger.info(
-        `No notes ready to graduate — ${manifest.climbing} note(s) being used but below the threshold. A used note also yields no proposal when it is not procedural (only playbook/gotcha graduate) or the proposal was rejected.`,
+        `No notes ready to graduate — ${manifest.climbing} note(s) being used but below the threshold. A used note also yields no proposal when it is not procedural (only procedure/gotcha graduate; legacy: playbook) or the proposal was rejected.`,
       );
     } else {
       logger.info("No note reads recorded yet.");

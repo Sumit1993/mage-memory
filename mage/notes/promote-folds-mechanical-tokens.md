@@ -102,5 +102,5 @@ produces high volume and zero value, check whether it is being asked to *decide*
 something semantic. If so, the fix is to reposition it as a narrower/annotator and
 route the judgment to the agent — never to make it a better decider.
 
-Related: [[phase2-reject-ledger-0.1.0-gate]] — the same soak showed a mature KB
+Related: [phase2-reject-ledger-0.1.0-gate](../work/phase2-reject-ledger-0.1.0-gate.md) — the same soak showed a mature KB
 emits no capture terminals, so the keep-rate gate cannot calibrate there either.
