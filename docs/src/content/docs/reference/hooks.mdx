@@ -138,7 +138,7 @@ in   { "hook_event_name": "SessionStart", "source": "resume", "cwd": "~/sources/
      grooming.autonomy = operator                → mandate half templates HITL
 
 out  systemMessage                    (USER sees this, in the terminal)
-     │ mage: 0 staged · 4 chapters unmined · up to 0 eligible to graduate → mage:groom
+     │ mage: 0 staged · 4 chapters unmined · up to 0 eligible to graduate → /mage:groom
 
      hookSpecificOutput.additionalContext   (MODEL sees this, user never does)
      │ <chapter digest: the closed chapter's salient signals, unranked>
@@ -148,9 +148,9 @@ out  systemMessage                    (USER sees this, in the terminal)
 Two things this makes concrete. The **channels are not interchangeable**: the
 deterministic teaser goes to the user, the full digest and mandate go only to the
 model — mage narrows, the agent judges. And the halves are **independently
-gated**: the same `resume` with no new scratch is a cache hit that surfaces
-nothing at all, while a `resume` whose chapter was already seen still prints the
-backlog line alone.
+gated**: the same `resume` with no new scratch is a cache hit that surfaces no
+digest — only the backlog line, if the throttle window has elapsed — while a
+`resume` whose chapter was already seen still prints the backlog line alone.
 
 It lives on `SessionStart`, not `PreCompact` or `SessionEnd`, for two concrete
 reasons baked into the code:
