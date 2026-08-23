@@ -158,7 +158,7 @@ Code-repo side (`<repo>/mage/metadata.json`):
 
 ```jsonc
 {
-  "schema": "mage.v1",
+  "schema": "mage.v2",
   "mode": "in-repo",                 // "in-repo" | "hybrid" | "external"
   "project": "my-api",
   "hub_repo": null,                  // set when external OR hub_refs non-empty — the AUTHORITATIVE address (ADR-0043)

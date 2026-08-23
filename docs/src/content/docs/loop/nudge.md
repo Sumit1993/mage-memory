@@ -39,7 +39,7 @@ On a firing source, `mage nudge` composes up to two parts and emits them as `add
 
 ### 1. The fresh-chapter digest
 
-On a firing start, mage reads the last-closed chapter from the captured scratch (`.mage/learnings/`) — on `compact` the chapter that just closed; on `startup`/`resume` the prior session's final one, with an offer-first note appended — and renders an **earned-signal inventory** — the failures, external commands, and corrections it observed, in the order they happened. The artifact is explicitly framed as *raw material, not lessons*: mage is not claiming any line is worth keeping, and most are noise. The host agent reads it, recognizes any durable lesson, and captures it with `mage stage`. The digest is never throttled — each compact closes new content.
+On a firing start, mage reads the last-closed chapter from the captured scratch (`.mage/learnings/`) — on `compact` the chapter that just closed; on `startup`/`resume` the prior session's final one, with an offer-first note appended — and renders an **earned-signal inventory** — the failures, external commands, and corrections it observed, in the order they happened. The artifact is explicitly framed as *raw material, not lessons*: mage is not claiming any line is worth keeping, and most are noise. The host agent reads it, recognizes any durable lesson, and captures it with `mage stage`. The digest carries no time window — it is deduped once per chapter, so a chapter already surfaced never surfaces again.
 
 ### 2. The autonomy-scaled backlog mandate
 
@@ -61,7 +61,7 @@ See [Autonomy levels](./autonomy.md) for the exact mandate wording at each level
 
 The command is **fail-open**: any error is swallowed and it exits cleanly. A boundary nudge must never break your session start.
 
-The backlog reminder is **throttled** — it surfaces at most once per window (default 4 hours; set `grooming.nudgeThrottleHours` in `metadata.json` to change it). The backlog scan is also mtime-gated: a no-new-scratch startup reuses the cached counts, so it stays near-instant. The fresh-chapter digest is *not* throttled — there is new content to inventory after every compaction.
+The backlog reminder is **throttled** — it surfaces at most once per window (default 4 hours; set `grooming.nudgeThrottleHours` in `metadata.json` to change it). The backlog scan is also mtime-gated: a no-new-scratch startup reuses the cached counts, so it stays near-instant. The fresh-chapter digest carries no time window — it is deduped once per chapter, so a chapter already surfaced never surfaces again.
 
 When there is no fresh chapter and no backlog to report, the nudge stays silent.
 
