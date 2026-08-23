@@ -276,10 +276,11 @@ describe("computeDistillClusters — salience cap + spill", () => {
 // ─── the hint (deterministic note-type nudge) ─────────────────────────────────
 
 describe("computeDistillClusters — deterministic hint", () => {
-  it("repeated tool name (>=2) hints a playbook", () => {
+  it("repeated tool name (>=2) hints a procedure", () => {
     const events = [tool({ tool: "Bash", detail: "a" }), tool({ tool: "Bash", detail: "b" }), sessionEnd()];
     const r = computeDistillClusters(SESSION, events, 0, null);
     expect(r.clusters[0]?.hint).toContain("repeated workflow");
+    expect(r.clusters[0]?.hint).toContain("procedure");
   });
 
   it("falls back to 'tool activity' when only single salient tools are present", () => {

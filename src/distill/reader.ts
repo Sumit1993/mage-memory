@@ -174,7 +174,7 @@ function hintFor(signals: DistillCluster["signals"]): string {
   const parts: string[] = [];
   if (signals.corrections.length > 0) parts.push("a user correction (likely a preference/principle)");
   if (signals.failures.length > 0) parts.push("a failure (likely a gotcha)");
-  if (hasRepeatedTool(signals.tools)) parts.push("a repeated workflow (likely a playbook)");
+  if (hasRepeatedTool(signals.tools)) parts.push("a repeated workflow (likely a procedure)");
   if (parts.length > 0) return parts.join(" + ");
   // No correction/failure/repeat fired. A prompts-only chapter is still intent the
   // skill may distill (e.g. a stated preference with no tool follow-up) — don't
