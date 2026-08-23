@@ -79,9 +79,6 @@ Cloning a hub is something `connect` already does, after asking. No separate obt
 Consent is the human answering, or `-y` standing in for that answer where a human has decided in
 advance.
 
-`link` continues to register an address and never clones, per
-[ADR-0044](0044-setup-is-a-conversation-over-one-address.md) §4.
-
 ### 4. mage never handles credentials
 
 mage accepts no token flag and reads no token variable. It runs git; git resolves credentials from
