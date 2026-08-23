@@ -109,7 +109,8 @@ This is independent of everything else `connect` wires: turning off your harness
 own auto-memory does not revoke it. mage records exactly which entries it added, so
 `mage disconnect` removes those and leaves any you added yourself untouched.
 
-Four cases worth knowing:
+Four cases worth knowing (the arrival decision itself is diagrammed in
+[Modes and storage](../model/modes.md#where-a-hub-actually-lives--derived-not-recorded)):
 
 - **The hub isn't on this machine yet.** No grant is written (there is nothing
   to grant yet). `mage connect` offers to clone `hub_repo` to its derived

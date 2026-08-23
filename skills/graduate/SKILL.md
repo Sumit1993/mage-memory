@@ -116,7 +116,8 @@ write through the single applier.
     }
   ],
   "cursors": { "…": 0 },
-  "covered": 8
+  "climbing": 3,
+  "deferred": 0
 }
 ```
 

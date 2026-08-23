@@ -32,13 +32,37 @@ A note carries an optional `type` in its frontmatter. Per ADR-0041, `type` maps 
 
 Any string is legal; unrecognized types are unclassified and sit at rung 3 (on-demand only). Custom types can be mapped to one of the four standard genres (`memory`, `decision`, `work`, `doc`) via the optional `genres` map in `metadata.json` (e.g. `"genres": { "runbook": "memory" }`). Legacy strings (`playbook`, `interface`, `tooling`, `topology`, `relationship`, `trail`) remain legal but map to **unclassified** (rung 3).
 
+The whole resolution in one table. A **rung** is how a note reaches the agent: rung 1 is a skill auto-loaded on its trigger, rung 2 is an always-loaded index line, rung 3 is the note body read on demand (every note has rung 3). The map is the `TYPE_TO_GENRE` constant in `src/scanner/genre-map.ts`; the rungs are ADR-0041's:
+
+| `type:` | genre | rung | which surface it reaches |
+| --- | --- | --- | --- |
+| `gotcha` `procedure` | memory | 2 — and 1 once graduated | a line in `INDEX.md`, eligible for the `MEMORY.md` roster; a graduated procedural note adds its own auto-loaded skill |
+| `pointer` `principle` `feedback` `reference` `note` | memory | 2 | a line in `INDEX.md`, eligible for the `MEMORY.md` roster |
+| `decision` | decision | 3 | on demand only, plus the one standing governance line both surfaces carry |
+| `plan` `tasks` | work | 3 | on demand only |
+| `spec` `doc` | doc | 3 | on demand only |
+| `runbook` — custom, mapped with `"genres": { "runbook": "memory" }` | memory | 2 | exactly as a built-in memory type |
+| `playbook` — a legacy string, no mapping | unclassified | 3 | on demand only; `mage doctor` annotates, never rejects |
+
 Non-memory types (`plan`, `spec`, `tasks`, `decision`) remain legal note types for storage and linking, but are non-memory genres (`work`, `doc`, `decision` per ADR-0041) that are excluded from always-loaded recall — authored deliberately rather than as default destinations for captured knowledge:
 - **decision** — an ADR: a choice, the reasoning, and what it rules out (stored in `mage/decisions/`).
 - **spec** / **plan** / **tasks** — specifications, forward work plans, and checklists (stored in `mage/work/` or repo docs).
 
 Before authoring a memory note, walk the **better home** ladder (code comment → ticket/`mage/work/` → doc beside code → artifact+pointer → skill → decision → memory) to ensure memory is the right home.
 
-The two procedural types — **procedure** and **gotcha** — are special: only procedural notes can later [graduate](../loop/promote-graduate.md) into their own auto-loaded skill, because you push a procedure but you pull a fact.
+### Graduation eligibility is a separate contract
+
+The table above answers one question only: **how does a note come back to you?** It does not decide which notes can [graduate](../loop/promote-graduate.md) into their own auto-loaded skill. That is a second, independent contract, and reading rung text as if it implied graduation is a mistake the two tables invite:
+
+| `type:` | eligible to graduate? | why |
+| --- | --- | --- |
+| `procedure` `gotcha` | yes | procedural — you *push* a procedure at the agent; a fact it *pulls* when needed |
+| every other memory type | no | recall-bearing but not procedural; rung 2 is the whole of their reach |
+| non-memory genres (`decision` `plan` `tasks` `spec` `doc`) | no | not recall-bearing at all |
+
+The two contracts are genuinely orthogonal. A note can sit at rung 2 and never be graduation-eligible (`principle`, `reference`), and — as the drift below shows — a type can currently be graduation-eligible while sitting at rung 3, which is incoherent and is the reason the drift is tracked rather than tolerated.
+
+**The intended contract is `procedure`/`gotcha`.** `playbook` is a legacy string: unclassified for recall (rung 3) *and* not part of the intended graduation contract. The code has not caught up — `src/grooming/promote.ts` still gates on `type === "procedure" || type === "gotcha" || type === "playbook"`, so a `playbook` note is today accepted by the graduation gate despite being invisible to rung-2 recall. Tracked in [#137](https://github.com/Sumit1993/mage-memory/issues/137), whose resolution is to emit `procedure` from groom's lens table (it already recommends `playbook`) and drop `playbook` from the gate — **not** to give `playbook` a genre mapping, which would leave one of six legacy strings arbitrarily rescued.
 
 ## Frontmatter and the lifecycle fields
 

@@ -126,7 +126,7 @@ Per-wing `mage-wing-*` skills are **generated** into `.claude/skills/` +
 #    capture hooks + the redaction pre-commit gate (pass --no-connect to skip).
 mage init --in-repo
 
-# 2. Regenerate the always-loaded index
+# 2. Regenerate both recall surfaces: INDEX.md + the auto-loaded MEMORY.md roster
 mage index
 
 # 3. (Re)generate the per-wing skills so agents discover this knowledge base
@@ -199,10 +199,11 @@ motivate do. The `/mage:guide` skill teaches agents the same rule.
 ## Reporting issues
 
 Hit a bug? Run **`mage doctor --report`** and attach the redacted bundle. It's a
-**content-free** support snapshot — mage / Node / OS versions, KB + connection
-health (including capture-sink ignore coverage), and metrics **summary numbers
-only** — run through the redaction boundary, so it **never** carries note
-content, keywords, paths, or secrets
+**content-free** support snapshot — mage / Node / OS versions, the doctor checks
+(env + KB, connection, and recall readiness, including capture-sink ignore
+coverage), metrics **summary numbers only**, and a recent-error count — run
+through the redaction boundary, so it **never** carries note content, keywords,
+paths, or secrets
 ([ADR-0021](mage/decisions/0021-offline-no-telemetry-local-signal.md)). Open
 issues at [github.com/Sumit1993/mage-memory/issues](https://github.com/Sumit1993/mage-memory/issues).
 

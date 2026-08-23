@@ -6,9 +6,10 @@ Contributions of all sizes are welcome.
 
 ## Ground rules
 
-- **`main` is protected.** Every change lands through a pull request with green
-  CI. Direct pushes to `main` are not allowed (for anyone, including the
-  maintainer).
+- **`main` is protected.** Every change lands through a pull request that
+  passes CI, has a valid conventional-commit title, and has no unresolved
+  review threads (see [Making a change](#making-a-change)). Direct pushes to
+  `main` are not allowed (for anyone, including the maintainer).
 - **mage never runs git for you, and never commits secrets.** Capture *insight,
   procedure, and pointers* — never copies of sources. Redaction gates exist for
   a reason; do not weaken them.
@@ -45,11 +46,58 @@ node dist/cli.js --help
 3. Make sure `pnpm typecheck`, `pnpm build`, and `pnpm test` all pass.
 4. **Commit** using [Conventional Commits](https://www.conventionalcommits.org/):
    `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`, `ci:`, `perf:`.
-5. **Open a PR** against `main`. CI must be green before it can merge. It runs
-   two matrices (`.github/workflows/ci.yml`): **build & test** — typecheck,
-   build, and test on Node **22 and 24** — and **cli smoke** — install the
-   packed tarball and run the CLI on Node **20 and 22**. Node 20 is the floor
-   the package declares, so the smoke job is what holds that promise.
+5. **Open a PR** against `main`. The merge contract is exactly three things —
+   two required status checks and one ruleset condition:
+   - **`CI gate`** (`.github/workflows/ci.yml`) aggregates two matrices:
+     **build & test** — typecheck, build, and test on Node **22 and 24** — and
+     **cli smoke** — install the packed tarball and run the CLI on Node **20 and
+     22**. Node 20 is the floor the package declares, so the smoke job is what
+     holds that promise. The aggregating job is the single stable required
+     context, so adding a matrix leg never changes the ruleset.
+   - **`Validate PR title (conventional commits)`** — the PR *title* becomes the
+     squash-merge commit subject, so the title is linted rather than the
+     branch's individual commits.
+   - **`required_review_thread_resolution`** — one unresolved review thread
+     blocks the merge. This is the only mechanism that enforces a finding: a
+     finding matters exactly as much as the thread it lives in.
+
+   **Reviewers are advisory, and no check waits on them.** `claude[bot]` reviews
+   every same-repo PR automatically; CodeRabbit is admitted by hand (add the
+   `review-ready` label, or comment `@coderabbitai review`) because its quota is
+   shared org-wide. Neither blocks the merge directly — but every thread they
+   open does.
+
+   > **A green job is never evidence of review.** A reviewing workflow can report
+   > `success` having posted nothing, and one did for two weeks. Read for posted
+   > comments; never read a check's colour as a review.
+
+   The lifecycle end to end, including what a push does and does not invalidate:
+
+   ```text
+   push abc1234                     CI gate ............. pending → success
+                                    Validate PR title ... success
+                                    claude[bot] ......... 3 inline comments
+                                    → merge BLOCKED (3 unresolved threads)
+
+   fix + push def5678               CI gate re-runs against the new head.
+                                    The 3 threads PERSIST — pushing a fix does
+                                    not clear a thread; only a reply plus
+                                    resolution does.
+
+   reply in each thread             reviewer verifies 2 and resolves them;
+                                    you resolve the 3rd yourself as declined,
+                                    with the reason stated in-thread
+                                    → merge ALLOWED
+
+   gh pr merge --squash             PR title becomes the commit subject
+   ```
+
+   Bot-authored PRs (dependabot, github-actions) and release-please release PRs
+   attract no review threads, so the two status checks are their whole contract.
+
+   > **Superseded machinery.** A `review-evidence` commit status keyed to the head
+   > SHA, and its `.github/scripts/review-evidence.sh`, were retired in #146.
+   > A document still describing them is stale.
 
 ## Working with the mage knowledge base
 
