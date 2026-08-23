@@ -152,8 +152,8 @@ groom just the hub root and skip the fan-out.
    |---|---|---|
    | **① User corrections & nudges** *(first-class — look here first)* | a `user_prompt` right after an agent action: "no, do it this way", "actually I meant…", a steer or a standing rule | `principle` / `gotcha` |
    | **② Error → fix** | a `tool_use` with `ok:false` followed by the fix that worked | `gotcha` |
-   | **③ Repeated workflow** | the same tool sequence run several times | `playbook` |
-   | **④ Tool / approach preference** | a consistent tool or approach choice | `playbook` / `principle` |
+   | **③ Repeated workflow** | the same tool sequence run several times | `procedure` |
+   | **④ Tool / approach preference** | a consistent tool or approach choice | `procedure` / `principle` |
 
    **Direct human feedback is the highest-signal durable knowledge** — a user
    correction is a standing intent the agent should never relearn, so it outranks
@@ -214,7 +214,7 @@ go looking for missed lessons in recurrence counts; there is nothing there.
    **Every proposal is `action: "graduate"`.** An empty `proposals` list is the
    normal, healthy result — and it does **not** mean "nothing recurred". A covered
    signature yields no proposal when it is below M, when its covering note is not
-   procedural (only playbook/gotcha graduate), or when the human already rejected it.
+   procedural (only procedure/gotcha graduate; legacy: playbook), or when the human already rejected it.
    Report it neutrally and stop; it is never a signal to go hunting.
 
 6. **Route graduations to `/mage:graduate`.** Point at that skill — never graduate

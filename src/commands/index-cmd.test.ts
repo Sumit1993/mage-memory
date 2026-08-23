@@ -1124,6 +1124,14 @@ describe("mage index — recall surface filtering & metadata genre overrides (AD
     );
   });
 
+  it("a note typed procedure actually reaches INDEX.md as a memory-genre note", async () => {
+    const dir = await vault();
+    await note(dir, "proc-test.md", "---\ntype: procedure\n---\n# Procedure Note Test\n");
+    await index({ dir });
+    const idx = await readFile(join(dir, "mage", "INDEX.md"), "utf8");
+    expect(idx).toContain("[Procedure Note Test]");
+  });
+
   it("omits the governance line when N=0 accepted decisions exist", async () => {
     const dir = await vault();
     await note(dir, "gotcha.md", "---\ntype: gotcha\n---\n# Gotcha Note\n");
