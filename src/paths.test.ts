@@ -522,6 +522,22 @@ describe("paths", () => {
       expect(why.message).toMatch(/something exists at/);
     });
 
+    it("unknown-failure → explains unexpected failure without blaming metadata.json", async () => {
+      const hub = await tmpDir("mage-explain-hub-");
+      await mkdir(join(hub, "projects"), { recursive: true });
+      await writeFile(
+        join(hub, "metadata.json"),
+        JSON.stringify({ schema: METADATA_SCHEMA, projects: [] }),
+      );
+      const code = await externalRepo({ project: "../unsafe", hub_path: hub });
+      const why = await explainNoDocsRoot(code);
+      expect(why.hubUnreachable).toBe(true);
+      expect(why.reason).toBe("unknown-failure");
+      expect(why.message).toMatch(/an unexpected failure occurred while resolving the external hub/);
+      expect(why.message).toMatch(/Check permissions, or re-register with `mage link <address>`/);
+      expect(why.message).not.toMatch(/metadata\.json could not be read/);
+    });
+
     it("requireDocsRoot THROWS the hub-unreachable message, not the generic no-KB one", async () => {
       const missing = join(await tmpDir("mage-explain-req-"), "not-cloned");
       const code = await externalRepo({ project: "engine", hub_path: missing });

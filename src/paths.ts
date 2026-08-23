@@ -558,7 +558,7 @@ function hubUnreachableMessage(r: ExternalDocsRootResult & { kind: "hub-unreacha
     case "malformed-config":
       return `${head}: mage/metadata.json is mode=external but names no project. Run \`mage link <address>\` to re-register this repo. ${dontInit}`;
     default:
-      return `${head}: mage/metadata.json could not be read (invalid JSON, or no read permission). Repair it, or re-register with \`mage link <address>\`. ${dontInit}`;
+      return `${head}: an unexpected failure occurred while resolving the external hub. Check permissions, or re-register with \`mage link <address>\`. ${dontInit}`;
   }
 }
 

@@ -124,7 +124,7 @@ Most mage commands need to locate the docs root to operate on. They do this by w
      in the hub, where the notes actually are, not in the code repo. If the hub
      cannot be reached, mage resolves **nothing** rather than falling back to the
      code repo's own `mage/` — see [When the hub is
-     unreachable](#when-the-hub-is-unreachable--the-five-reasons-and-what-you-see).
+     unreachable](#when-the-hub-is-unreachable--reasons-and-what-you-see).
 2. Otherwise, look upward for a **hub root** (a directory with a `projects/` registry and a top-level `metadata.json`). Inside a `projects/<name>/` directory it resolves to that project's flat docs root; anywhere else under the hub it resolves to the hub root itself.
 
 This is why you can run `mage` commands from anywhere inside a repo or hub and they find the right knowledge base. It is also why an `external`-mode code repo's captures end up in the hub even though you were working in the code repo — the metadata pointer redirects them.
