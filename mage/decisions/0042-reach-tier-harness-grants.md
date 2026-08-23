@@ -5,7 +5,7 @@ tags:
 created: "2026-07-27"
 updated: 2026-07-27
 last_reviewed: 2026-07-27
-status: proposed
+status: accepted
 provenance:
   repo: mage-memory
   work: adr-0042-reach-tier

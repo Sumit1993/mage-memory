@@ -12,135 +12,170 @@ provenance:
 sources:
   - decisions/0043-hub-addressed-by-remote-located-by-derivation.md
   - decisions/0044-setup-is-a-conversation-over-one-address.md
-  - decisions/0042-reach-tier-harness-grants.md
   - decisions/0025-one-transient-state-home.md
   - decisions/0009-no-runtime-automation-rides-host-hooks.md
-  - decisions/0032-capture-redirect-native-memory.md
   - src/hub-url.ts
   - src/paths.ts
   - src/commands/connect.ts
 keywords:
   - cross-environment
   - mage-home
-  - hub-ensure
-  - hub-use
-  - hub-mandate
-  - redirects
-  - project-scope-grant
-  - setup-mage
-  - detection-line
-  - cloud-sandbox
+  - derived-path
+  - no-substitute
+  - bare-clone
+  - environment-detection
+  - github-actions
+  - example-workflow
 ---
 
-# 0045 — Cross-environment presence: one root variable, one obtain verb, explicit location registration, and the cloud mandate
+# 0045 — Cross-environment presence: one state root, one place a hub can be, and no silent substitute
 
-> **Status: proposed (ruling 2026-08-22).** Settles the mechanism for hub state presence and correctness across environments (developer machine, CI runners, and cloud VM sandboxes) and defines the shipped setup surface. Amends [ADR-0043](0043-hub-addressed-by-remote-located-by-derivation.md) and [ADR-0044](0044-setup-is-a-conversation-over-one-address.md). Paired with [ADR-0046](0046-derived-hub-git-and-merge-ratification.md).
+> **Status: proposed (2026-08-22).** Settles how mage finds and obtains an external hub on any
+> machine — laptop, CI runner, or cloud sandbox — and what it does when it cannot. Amends
+> [ADR-0043](0043-hub-addressed-by-remote-located-by-derivation.md) and
+> [ADR-0044](0044-setup-is-a-conversation-over-one-address.md). Paired with
+> [ADR-0046](0046-derived-hub-git-and-merge-ratification.md).
 
 ## Context
 
-[ADR-0043](0043-hub-addressed-by-remote-located-by-derivation.md) decided that external hubs are located by derivation from their remote URL under a machine root, and [ADR-0044](0044-setup-is-a-conversation-over-one-address.md) unified setup around addresses. However, running across ephemeral environments (GitHub Actions runners, cloud VM sandboxes such as Claude Code web/VM) surfaced four operational requirements:
+[ADR-0043](0043-hub-addressed-by-remote-located-by-derivation.md) settled that a hub is addressed
+by its remote and located by derivation. [ADR-0044](0044-setup-is-a-conversation-over-one-address.md)
+settled that setup is a conversation over that one address. Running the same knowledge base from a
+CI runner and a cloud sandbox exposed what those two left open: how a hub arrives on a machine
+nobody is sitting at, and what mage does when it has not arrived.
 
-1. **State relocation:** Tools with a single semantic class of machine-level state (e.g. Cargo, gh) succeed with a single root variable; tools adopting XDG config/data/cache splits (e.g. uv, Terraform) suffer multi-variable relocation friction. Because per-KB state lives at `<docsRoot>/.mage/` ([ADR-0025](0025-one-transient-state-home.md)), `~/.mage/` holds only machine-level, remote-backed state.
-2. **Obtainment and auth:** Private hubs in CI runners require automated obtainment without storing credentials or branching on environment identity.
-3. **Cloud sandboxes:** Harness-managed cloud environments attach repositories as out-of-tree siblings (e.g. `/home/user/<hub>` alongside `/home/user/<project>`) where moving or symlinking is prohibited, requiring explicit location registration and proactive agent context.
-4. **Environment detection discipline:** Fragile heuristics (`GITHUB_ACTIONS`, container markers, hostname checks) must be replaced by uniform correctness mechanisms and an enforceable detection line.
+The second question turned out to be the urgent one. In external mode with the hub unreachable,
+`resolveDocsRoot` today returns the code repo's own `mage/` directory. Capture then writes notes
+into the repo under review, which is the one outcome external mode exists to prevent, and nothing
+distinguishes "this project has no hub" from "this project's hub is missing right now".
 
 ## Decision
 
-### 1. State-directory contract: one variable, `MAGE_HOME`, default `~/.mage`
+### 1. One machine state root
 
-Everything mage keeps machine-wide lives under `$MAGE_HOME` (default `~/.mage`). No XDG split is adopted. The derivation below that root stays fixed (`<root>/hubs/<host>/<segments...>/<repo>`, per [ADR-0043](0043-hub-addressed-by-remote-located-by-derivation.md) §2), and no second relocation variable will ever be added. `MAGE_HOME` is promoted from a test override to the documented product contract.
+Everything mage keeps machine-wide lives under `$MAGE_HOME`, default `~/.mage`. No XDG split, and
+no second relocation variable. The derivation below that root is fixed by
+[ADR-0043](0043-hub-addressed-by-remote-located-by-derivation.md) §2.
 
-### 2. Hub materialisation: three ways, one shared resolution
+`MAGE_HOME` is a supported public contract, not a test hook, and CI depends on it: a runner points
+it inside the workspace so an ordinary checkout can place the hub where derivation expects.
 
-Hubs materialize in exactly three ways, all routing through the one shared resolution:
+### 2. A hub lives at its derived path, and nowhere else
 
-1. **`mage hub ensure` (plumbing verb):** Idempotent obtainment verb (`terraform init` analog). For each hub pair in metadata (external: one; hybrid: every `hub_refs[]` entry), it runs `resolveHubGrant`. If absent with a remote, it runs `git clone -- <hub_repo> <derived path>`. If present, it verifies arrival. It never prompts and never touches settings files.
-   - Flags: `--check` resolves and reports without cloning; `--update` executes `git fetch` and `git merge --ff-only` (refusing on dirty tree or non-fast-forward).
-   - Exit codes: `0` (present, cloned, or updated), `2` (origin mismatch), `3` (absent with no usable remote, including `local://` hubs), `4` (clone/update failed), `1` (any other error).
-   - `mage connect` serves as the interactive human surface that gathers consent and calls the same obtain engine.
-2. **`mage hub use <path>` (explicit registration):** Registers an existing clone that cannot be moved to the derived path (e.g. a cloud-attached sibling or harness-managed worktree). It verifies arrival at `<path>` (`looksLikeHub` plus canonical origin match against `hub_repo`) and records `{ "<canonical key>": "<absolute path>" }` in `$MAGE_HOME/redirects.json` (schema: `mage.redirects.v1`). Refuses on mismatch. `--clear` removes the entry. The redirect is machine-local, outside git tracking, and verified on every read.
-3. **Human clone at the derived path:** Cloned directly to the derived path, verified identically on arrival.
+There is exactly one place a hub clone can be. mage does not consult a registry, follow a redirect,
+or accept a pointer to a clone that lives somewhere else. A clone that cannot be at the derived
+path is not reachable, and mage says so rather than adapting.
 
-**Resolution order (amends ADR-0043):**
-`redirect` (if registered for the canonical key AND passes arrival verification) → `derived path` under `hubsRoot()` (with arrival check) → deprecated `hub_path` (shape check) → `absent`.
+The consequence is deliberate and stated rather than hidden: in an environment that attaches
+repositories at fixed paths of its own choosing and forbids moving them, mage works only if
+`MAGE_HOME` can be set such that the attached path *is* the derived path, or if the hub can be
+cloned again. Where neither holds, mage does not run there.
 
-A registered redirect that fails arrival is skipped with a warning and reported by `doctor` as stale. Committed project-scope grants record only the home-relative derived form (`~/.mage/hubs/...`, [ADR-0043](0043-hub-addressed-by-remote-located-by-derivation.md) §8); redirects never appear in git-tracked files.
+This completes the retirement of `hub_path` as a location of record.
 
-**Shared-function invariant survives and is strengthened:**
-`chosenHubRoot` and `resolveHubGrant` remain the single resolution engine (with redirect maps injected by a shared loader). All entry points (`hub ensure`, `hub use`, `hub mandate`, `connect`, `doctor`, and `externalDocsRoot`) route strictly through this shared path without bespoke lookups.
+### 3. Obtaining stays inside `connect`, with consent
 
-### 3. Auth delegation to git
+Cloning a hub is something `connect` already does, after asking. No separate obtain verb exists.
+Consent is the human answering, or `-y` standing in for that answer where a human has decided in
+advance.
 
-mage accepts no token flags, reads no token environment variables, and stores no credentials. `git clone` and `git fetch` resolve credentials entirely through git's native machinery (credential helper, `gh auth`, `GIT_ASKPASS`, or runner configuration).
+`link` continues to register an address and never clones, per
+[ADR-0044](0044-setup-is-a-conversation-over-one-address.md) §4.
 
-The documented CI recipe is GitHub App authentication via `actions/create-github-app-token` scoped to the hub repository (with PAT-as-secret as documented fallback). The `setup-mage` action configures git credentials prior to invoking `mage hub ensure`.
+### 4. mage never handles credentials
 
-### 4. Shipped setup surfaces
+mage accepts no token flag and reads no token variable. It runs git; git resolves credentials from
+whatever the machine already has — a credential helper, an authenticated CLI, or a checkout that
+persisted them. Whoever prepares an environment is responsible for git being able to clone there,
+which every CI recipe already knows how to do.
 
-1. **CLI / npm package:** `npm install -g mage` / `npx mage`. Primary CLI surface with `mage hub ensure` and `mage connect --project`. No exported setup script is shipped.
-2. **`setup-mage` marketplace action (`Sumit1993/setup-mage`):** Public GitHub Actions entry point. Inputs: `version` (default: latest), `token` (optional), `check` (boolean), `update` (boolean). It pins the CLI installation, configures git credentials when a token is provided, and invokes `mage hub ensure`. It is forbidden from parsing `metadata.json`, deriving paths, or implementing custom resolution logic.
-3. **Committed `.claude/settings.json` (`mage connect --project`):** Writes project-scope settings at `<cwd>/.claude/settings.json`. Carries capture hooks, the home-relative reach grant `~/.mage/hubs/<host>/<owner>/<repo>`, and the SessionStart mandate hook. Forbidden from writing absolute paths, machine-specific values, or `autoMemoryDirectory` (the [ADR-0032](0032-capture-redirect-native-memory.md) commandeer tier remains local-scope only).
-4. **Deferred:** Devcontainer feature and `mage init --ci` workflow scaffolder are deferred.
+### 5. An unreachable hub is never substituted
 
-### 5. Cloud-sandbox arm and SessionStart mandate
+Resolution reports three distinct states: no knowledge base, a knowledge base, and a hub that
+should be reachable but is not. The third never silently becomes the second.
 
-In cloud sandboxes where repos are attached via harness primitives (`add_repo`), the hub arrives via the agent in response to a deterministic mandate:
+- Where a human can answer, the command says the hub is unreachable and offers to clone it.
+- The capture hook cannot ask, because its input arrives on stdin and it must not block a tool
+  call. It drops the observation and exits clean.
+- `doctor` reports an unreachable hub as failing.
 
-- **Mandate emission:** The committed `.claude/settings.json` includes a SessionStart hook running `mage hub mandate`. This read-only verb resolves all hub pairs. When all hubs are verified present, it outputs nothing and exits 0. When any hub is absent, it prints the mandate block to stdout (delivered to the agent as session context) and exits 0 without network access or clone attempts.
-- **Mandate format:**
-  ```
-  [mage hub mandate] External knowledge base ABSENT in this environment.
-    hub:      <redacted address>            (from mage/metadata.json hub_repo)
-    expected: <derived path under $MAGE_HOME/hubs>
-    To make it available in this session:
-      1. Attach the hub repo to the session: add_repo <owner>/<repo>
-         (reason: "mage external knowledge base for project <project>")
-      2. Register the attached clone: mage hub use <path where it was attached>
-      3. Verify: mage doctor
-    Until then, mage commands that write knowledge will refuse to run.
-  ```
-- **Absence handling (no silent degradation):**
-  - Interactive KB-writing verbs in external mode with unresolved hubs fail fast (`requireDocsRoot` throws) with the mandate remedy and non-zero exit.
-  - The hook capture path (`mage observe`) drops observations and exits 0 in this state rather than misfiling into code repo scratch.
-  - `mage doctor` reports hub-absent as a failing check (non-zero) and flags stale redirects.
-  - The mandate re-emits on every session start until resolved.
+What never happens is writing knowledge into the code repo because the hub was missing.
 
-### 6. The detection line and process.env rule
+### 6. The session-start message carries it
 
-Environment detection is partitioned into four strict categories:
+An agent starting work in an environment where the hub never arrived learns this from the existing
+session-start nudge, which already runs on startup and resume and already addresses the agent on
+its own channel. This message is exempt from the backlog throttle: a missing hub is a state, not a
+periodic reminder.
 
-- **A. Mechanism inputs (allowed, uniform everywhere):** `MAGE_HOME` (read only in `src/hub-url.ts`), CLI flags, `mage/metadata.json`, `$MAGE_HOME/redirects.json`, and git's credential machinery.
-- **B. Cosmetic inputs (allowed, confined to `src/interactive.ts` and `src/logger.ts`):** `stdin/stdout.isTTY`, `CI`, `NO_COLOR`, `FORCE_COLOR`, `TERM`. Detecting CI may suppress a prompt, never alter the underlying answer.
-- **C. Harness-adapter config reads (allowed, confined to `src/adapters/**`):** Reading host harness settings or harness-defined configuration variables.
-- **D. Forbidden everywhere:** Branching on `GITHUB_ACTIONS`, `CODESPACES`, `CLAUDECODE`/sandbox markers, hostname, container heuristics, or vendor detection to select resolution order, clone behavior, auth, write targets, or settings scopes.
+No new verb and no new hook registration is introduced for this.
 
-**Enforcement:** `process.env` access is restricted to `{src/hub-url.ts (MAGE_HOME only), src/interactive.ts, src/logger.ts, src/adapters/**}` and enforced by automated tests.
+### 7. No correctness path branches on environment identity
+
+Nothing that decides where a file goes, what gets written, or whether an action is permitted may
+branch on which environment it is running in. Vendor markers, CI flags, container tells and
+hostnames are all excluded from those paths.
+
+Reading the environment to pass it to a child process, or to record which harness produced a
+capture, is not branching and is unaffected. Presentation — colour, prompting, progress output —
+may adapt, provided the underlying answer does not change.
+
+Mechanism reaches mage through arguments, configuration and `MAGE_HOME`, which is a knob any
+machine can set; CI is simply a machine that sets it. How this is enforced is an implementation
+concern and may change without reopening this decision.
+
+### 8. A bare clone is the whole of "connected"
+
+mage requires no machine-local state beyond the repositories themselves. Everything needed to
+resolve, read and write a knowledge base lives inside the repos. Hooks and settings written by
+`connect` serve capture; they are never prerequisites for resolution or for writing notes.
+
+This is what lets a runner check out a hub and use it immediately, and it is why §2 can be absolute.
+
+### 9. What ships
+
+The npm package is the product. Alongside it, this repository carries an example GitHub Actions
+workflow and a guide page showing how `MAGE_HOME` and the derived path fit together, and mage's own
+CI exercises that same recipe against a fixture hub so the example cannot rot unnoticed.
+
+No marketplace action and no separate action repository. mage is a Node CLI; the runtime that
+installs it is already standard, and the remaining steps compose from maintained actions. A wrapper
+would be a versioned support surface with no functional gain.
 
 ## Considered options
 
-- **XDG split / multiple relocation variables:** Rejected. mage's machine-level state is a single semantic class; splitting creates multiple variables for zero benefit.
-- **In-repo composite action as GHA surface:** Rejected. Field survey demonstrates external composite actions are dogfood-only; public distribution requires a standalone action repository.
-- **`actions/cache` for the hub:** Rejected. Caches are evictable tarballs unable to perform git fetch/push operations.
-- **`actions/checkout` + `mv` in CI:** Rejected. Forces arbitrary path moves; `mage hub ensure` maintains parity with local mechanisms.
-- **Symlink at derived path for cloud siblings:** Rejected per [ADR-0043](0043-hub-addressed-by-remote-located-by-derivation.md) §3 due to unverified VM realpath semantics.
-- **Moving attached siblings to `~/.mage/hubs/`:** Rejected. Breaks harness clone tracking and push wiring.
-- **Per-hub environment variable overrides (`MAGE_HUB_PATH_<x>`):** Rejected. Unbounded namespace, invisible to doctor, and dies with the shell.
-- **Mage-side token flag / token env var:** Rejected. Makes mage a credential handler; git natively manages credentials.
-- **Blanket "no environment detection anywhere":** Rejected in favor of the enforceable narrow line that permits standard cosmetic adaptations (TTY, color) while keeping correctness paths invariant.
+- **A registry or redirect file mapping a hub to wherever it actually is.** Rejected. It buys one
+  environment at the cost of a second resolution path that every consumer must honour, and machine
+  state that §8 exists to forbid.
+- **A dedicated obtain verb.** Rejected. `connect` already clones, and a second entry point for the
+  same act is surface without capability.
+- **A marketplace action.** Rejected. The pattern across comparable tools is that compiled binaries
+  needing platform-specific installation ship setup actions, while npm-distributed CLIs document a
+  recipe. A solo-maintained action repository is a liability, as pre-commit's own retreat to
+  maintenance-only shows.
+- **XDG split.** Rejected. mage's machine state is one class; splitting it costs three variables to
+  relocate one directory.
+- **A token flag or token variable.** Rejected. It makes mage a credential handler and duplicates
+  what git already does.
+- **Blanket "no environment detection anywhere".** Rejected as unenforceable and wrong at the edges:
+  it convicts passing the environment to a subprocess and recording which harness ran, neither of
+  which changes an answer.
+- **Degrading to the code repo when the hub is missing.** Rejected. It is today's behaviour and it
+  misfiles knowledge silently.
 
 ## Consequences
 
-- Machine-wide state is strictly confined under `$MAGE_HOME`.
-- Hub obtainment is standardized across local, CI, and cloud environments via `mage hub ensure` and `mage hub use`.
-- Silent degradation on unresolved external hubs is eliminated.
-- Automated tests enforce the `process.env` restriction.
+- Machine-wide state stays under one root, and relocating it stays a one-variable operation.
+- One resolution path, with no environment ever taking a different route through it.
+- Environments that cannot host a clone at the derived path are unsupported, explicitly.
+- The silent substitution of the code repo's knowledge base ends; capture drops rather than misfiles.
+- Whoever prepares an environment owns git credentials there.
+- Setup instructions for CI are documentation plus an example, and mage's own CI keeps them honest.
 
 ## Relations
 
-- amends [ADR-0043 — A hub is addressed by its remote, located by derivation](0043-hub-addressed-by-remote-located-by-derivation.md) (§1, §4, §5, and resolution order)
-- amends [ADR-0044 — Setup is a conversation over one address](0044-setup-is-a-conversation-over-one-address.md) (§4 obtainment plumbing vs human interaction)
-- honors [ADR-0009 — no runtime; automation rides host hooks](0009-no-runtime-automation-rides-host-hooks.md) (mandate runs on host hooks without daemons or network)
-- bounded_by [ADR-0032 — capture-redirect into native memory](0032-capture-redirect-native-memory.md) (`autoMemoryDirectory` commandeer tier stays local-scope only)
-- extends [ADR-0025 — one transient-state home](0025-one-transient-state-home.md) (`$MAGE_HOME/redirects.json` as transient machine state)
-- paired_with [ADR-0046 — mage runs git only in derived hub clones; adoption is ratified by a human git action](0046-derived-hub-git-and-merge-ratification.md)
+- amends [ADR-0043 — A hub is addressed by its remote, located by derivation](0043-hub-addressed-by-remote-located-by-derivation.md) (`MAGE_HOME` as public contract; derived path as the only location)
+- amends [ADR-0044 — Setup is a conversation over one address](0044-setup-is-a-conversation-over-one-address.md) (§4: `connect` obtains, `link` registers, no obtain verb)
+- honors [ADR-0009 — no runtime; automation rides host hooks](0009-no-runtime-automation-rides-host-hooks.md) (the session-start message rides an existing hook and makes no network call)
+- extends [ADR-0025 — one transient-state home](0025-one-transient-state-home.md)
+- paired_with [ADR-0046 — a branch and a pull request are the only way knowledge lands](0046-derived-hub-git-and-merge-ratification.md)

@@ -85,8 +85,8 @@ direct tooling precedent of **Claude Code's own permission modes** (`default` �
    - **mage never commits → the git commit is the human's confirm** (ADR-0013). Autonomous writes land
      in the working tree *uncommitted*; reviewing the diff is the review, the commit is the "yes".
      > **Amendment (2026-08-22, [ADR-0046](0046-derived-hub-git-and-merge-ratification.md)).** In the
-     > ADR-0046 pipeline lane the same floor takes its second form: autonomous writes land on a `mage/`
-     > branch of the hub, un-merged; the merge is the confirm. Both forms keep the human on the loop —
+     > ADR-0046 pipeline lane the same floor takes its second form: autonomous writes land on a reserved
+     > branch of the KB's own repo, un-merged; the merge is the confirm. Both forms keep the human on the loop —
      > the HOOTL impossibility claim stands. The Operator/Approver/Overseer ladder itself is untouched:
      > it governs grooming judgment in a session; ADR-0046 governs transport. The two dials are
      > independent by design.

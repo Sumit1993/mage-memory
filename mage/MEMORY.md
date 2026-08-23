@@ -2,7 +2,7 @@
 
 # Index
 
-> 38 accepted decisions govern this repo — read `decisions/` before architectural or scope changes.
+> 41 accepted decisions govern this repo — read `decisions/` before architectural or scope changes.
 
 - `feedback` [Agent-maintained files carry standing rules only — no decision history, no trivial negatives](notes/agent-maintained-files-carry-standing-rules-only.md) — claude-md, skills, trim, context-cost
 - `gotcha` [Gotcha — ctx_execute_file refuses paths outside the project root, and the scratchpad is always outside it](notes/context-mode-blocks-files-outside-project-root.md) — ai-context, file-access-blocked, allow-rule, sandbox

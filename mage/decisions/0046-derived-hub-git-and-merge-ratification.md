@@ -8,162 +8,166 @@ last_reviewed: 2026-08-22
 status: proposed
 provenance:
   repo: mage-memory
-  work: adr-0046-hub-git-autonomy
+  work: adr-0046-git-and-ratification
 sources:
   - decisions/0012-wings-optional-convention-standalone-hubs.md
   - decisions/0013-procedure-skills-self-grooming-loop.md
   - decisions/0030-agent-autonomy-ladder.md
   - decisions/0031-programmatic-provenance-stamp.md
   - decisions/0014-two-gate-redaction.md
-  - decisions/0042-reach-tier-harness-grants.md
-  - decisions/0043-hub-addressed-by-remote-located-by-derivation.md
-  - decisions/0044-setup-is-a-conversation-over-one-address.md
   - decisions/0045-cross-environment-presence.md
+  - src/grooming/config.ts
+  - src/provenance.ts
 keywords:
-  - memory-autonomy
-  - refuse-git-action
-  - mage-submit
-  - mage-sync
-  - git-autonomy
-  - hub-pr-ratification
-  - memory-poisoning
-  - provenance-channel
+  - branch-and-pr
+  - merge-ratification
   - pipeline-memory
+  - provenance-channel
+  - grooming-config
+  - memory-poisoning
+  - no-attendance-detection
 ---
 
-# 0046 — mage runs git only in derived hub clones; adoption is ratified by a human git action
+# 0046 — A branch and a pull request are the only way knowledge lands
 
-> **Status: proposed (ruling 2026-08-22).** Defines the git execution policy, safety boundaries, and ratification model for unattended CI review memory and attended session synchronization. Amends [ADR-0012](0012-wings-optional-convention-standalone-hubs.md), [ADR-0013](0013-procedure-skills-self-grooming-loop.md), [ADR-0030](0030-agent-autonomy-ladder.md), and [ADR-0044](0044-setup-is-a-conversation-over-one-address.md). Paired with [ADR-0045](0045-cross-environment-presence.md).
+> **Status: proposed (2026-08-22).** Defines what mage may do with git, how knowledge captured by
+> an automated pipeline reaches a knowledge base, and who ratifies it. Amends
+> [ADR-0012](0012-wings-optional-convention-standalone-hubs.md),
+> [ADR-0013](0013-procedure-skills-self-grooming-loop.md) and
+> [ADR-0030](0030-agent-autonomy-ladder.md). Paired with
+> [ADR-0045](0045-cross-environment-presence.md).
 
 ## Context
 
-Enabling AI coding agents to capture knowledge during automated workflows (e.g. GitHub Actions code review) and synchronizing session notes across machines surfaced three architectural questions:
+An agent reviewing code in an automated workflow learns things worth keeping. Nothing today lets
+that reach a knowledge base, because mage's stated invariant was that it never runs git.
 
-1. **Memory landing site and ratification:** Where should CI-learned knowledge land, and who ratifies it? Writing directly to a code repository under review expands write scope and blurs repo ownership. Writing unratified notes to a knowledge base's default branch creates memory poisoning risks from untrusted PR diffs.
-2. **Re-scoping the git invariant:** [ADR-0012](0012-wings-optional-convention-standalone-hubs.md) §3 established "mage never runs git" and [ADR-0013](0013-procedure-skills-self-grooming-loop.md) §4 established "the commit is the confirm" to prevent surprise mutations in user-owned code repos. Unattended CI workflows require git automation (creating branches, pushing, opening PRs) without risking arbitrary user repos.
-3. **Environment-invariant safety without attendance detection:** Detecting whether a human is "attached" via TTY inspection or environment variables is unreliable: hook-invoked tools lack TTYs even when human-attended, while CI wrappers can allocate PTYs. Safety must come from structural constraints, not attendance heuristics.
+That invariant was already inaccurate. `connect` clones a hub when a human says yes, the pre-commit
+gate re-stages files during a commit a human started, and mage reads git constantly. None of those
+is the thing the invariant existed to prevent, which is an agent landing a commit nobody asked for.
+Restating the rule accurately is a precondition for extending it.
+
+Two further questions follow. Knowledge proposed by a pipeline that read an untrusted diff cannot be
+trusted the way a human's note is, so something must stand between proposal and adoption. And
+whatever that something is, it has to work identically whether or not a person is watching, because
+attendance cannot be detected: a hook-invoked command has no terminal even with a human present.
 
 ## Decision
 
-### 1. Destination: CI-learned memory lands in the external hub on a branch, ratified by human PR merge
+### 1. Branch and pull request, always
 
-CI-learned knowledge lands exclusively in the external hub (`~/.mage/hubs/<derived>`), never in the reviewed code repository.
+mage may run git in the repository that holds the knowledge base it is working on. What it may
+produce is bounded instead: **a branch and a pull request, and nothing else.**
 
-- **Staging and promotion:** The CI review agent stages candidates via `mage stage` (`.mage/staging/`). At job end, **`mage submit`** promotes staged drafts through `promoteDraft` (Gate-2 redaction + provenance stamping) onto a dedicated branch `mage/submit-<slug>` in the derived hub clone, commits, pushes, and opens a hub PR.
-- **Ratification boundary:** The hub PR diff is the ratification surface. The default branch gains notes only through an explicit human merge. Because recall reads only the checked-out default branch of the hub clone, unmerged proposals are completely invisible to future runs.
-- **In-repo KBs:** In `mode: in-repo`, `mage submit` refuses and suggests linking an external hub.
+- It never commits to a default branch.
+- It never pushes except as part of that branch.
+- It acts only when explicitly invoked, never as a side effect of capture, grooming or a hook.
 
-### 2. Memory poisoning defenses
+This replaces "mage never runs git", which was false, and "mage never runs git against a repo you
+own", which is also false while the pre-commit gate stages files. The rule now keys on what mage
+produces, which is what anyone actually cares about, and it holds in every repository without
+carve-outs.
 
-To defend against prompt-injected or low-quality rules from untrusted PR diffs:
+### 2. Both kinds of knowledge base get this
 
-1. **Structural quarantine:** Proposed notes exist only on unmerged hub branches. Human merge is the required security boundary.
-2. **Provenance stamping:** `mage submit --context <url>` stamps `provenance.channel: "pipeline"` and `provenance.review: <url>` (with no `autonomy` field) into note frontmatter and lists them in the hub PR body.
-3. **Trigger discipline:** Documented workflows run memory extraction on `pull_request: closed` where `merged == true`.
-4. **Blast-radius caps:** At most one hub PR per workflow run and at most 5 notes per submit. Hub tokens are scoped strictly to the hub repo (`contents: write`, `pull-requests: write`), never reusing the code repository's token.
-5. **Gate-2 redaction:** [ADR-0014](0014-two-gate-redaction.md) Gate-2 secret scanning runs over all submitted content before commit.
+A pipeline proposes into whichever knowledge base the project actually has: an external hub, or the
+project's own `mage/` directory in in-repo mode. The mechanism is identical because the safety comes
+from the shape of the write, not from which repository it lands in.
 
-### 3. Permitted git actions and the two verbs
+In-repo is in fact the cheaper case, since a workflow can already write to its own repository
+without any additional credential.
 
-mage may run git **only** inside a hub clone derived from `hub_repo` under `$MAGE_HOME/hubs/` ([ADR-0043](0043-hub-addressed-by-remote-located-by-derivation.md)), verified by `looksLikeHub` and origin matching. It is strictly forbidden from executing git in the code repo, in an in-repo KB, in a `hub_path` fallback directory, or in any repository outside `$MAGE_HOME/hubs/`.
+Nothing here weakens [ADR-0045](0045-cross-environment-presence.md) §5: an external-mode project
+whose hub is unreachable still refuses, and never redirects its proposals into the code repo.
 
-Two verbs provide git capabilities across workflows:
+### 3. Publishing is a flag, not a verb
 
-- **`mage submit` (unattended-safe):** Operates in a temporary linked worktree branched from `origin/<default>`, writes promoted notes, commits, pushes `mage/submit-<slug>`, and opens a PR (`gh pr create` with compare URL fallback). It never touches the default branch or main checkout.
-- **`mage sync` (attended convenience):** Operates in the hub clone's main checkout. Commits KB-path changes with a templated message, runs `git pull --rebase`, and pushes to the default branch. Consent is established by explicit CLI invocation. It refuses if dirty paths contain any files outside documented KB paths (`notes/`, `decisions/`, `_index*`, `INDEX.md`, `MEMORY.md`, `skills/`, `metadata.json`, `CONVENTIONS.md`). It is never wired into automated hooks or nudge mandates.
+Turning staged drafts into a pull request is an option on the command that already promotes drafts
+into notes. It is the same promotion — through redaction and provenance stamping — with a different
+terminal state: instead of leaving notes in the working tree for a human to commit, it puts them on
+a branch and opens the pull request.
 
-### 4. Hub-tracked policy ladder in `metadata.json`
+No new command is introduced. In particular there is no separate verb for committing to a default
+branch, because §1 forbids that outcome.
 
-Git write capabilities are governed by a fail-closed field in the **hub's own** `metadata.json`:
+### 4. A merge is the adoption, and the mark stays
 
-```json
-{
-  "git": {
-    "autonomy": "suggest"
-  }
-}
-```
+The pull request is where a human decides. Merging it is the act of adoption; nothing reaches a
+default branch any other way.
 
-- Allowed values: `"suggest"` (default) | `"submit"` | `"sync"`.
-- Ordered ladder: `"sync"` implies `"submit"`.
-- Absent, unrecognized, or invalid values evaluate to `"suggest"` (today's print-commands behavior).
-- The policy is committed into the hub repository; environment variables cannot grant write posture.
+This also answers poisoning structurally rather than by inspection. Recall reads the checked-out
+default branch, so an unmerged proposal is not merely untrusted, it is invisible. A rule injected
+through a malicious diff cannot influence anything until a person merges it.
 
-### 5. Attendance and environment detection are banned as inputs
+A note that arrived this way keeps a permanent mark naming the channel it came from and the review
+that produced it, written by the deterministic stamper that already records repo and commit at
+creation ([ADR-0031](0031-programmatic-provenance-stamp.md)). Pipeline notes carry no authorship
+level, so the reject-ledger cohorts are untouched.
 
-Attendance (TTY presence, human attachment) is explicitly banned as an input to git operations. Safety is enforced by structural invariants (branch-only writes for `submit`, KB-path restrictions for `sync`) and the asynchronous human merge gate.
+### 5. The switch lives with the other knowledge-base settings
 
-### 6. The safety boundary: `refuseGitAction` pure predicate
+Whether mage may open pull requests for a knowledge base is one more field in that knowledge base's
+existing grooming configuration, alongside autonomy and sensitivity, read by the same reader that
+narrows junk to a safe default. Absent means off.
 
-All git write operations are gated by a pure predicate in `src/git-policy.ts`:
+It is deliberately **not** a rung on the autonomy ladder. The ladder measures how much judgement an
+agent may exercise unattended. A pull request adds a human check rather than removing one, so
+permitting it is compatible with the strictest rung, and folding it in would force raising an
+agent's licence in order to enable a mechanism that increases oversight.
 
-```ts
-/** Hub-tracked git posture (metadata.json → git.autonomy). Fail-closed. */
-export type GitAutonomy = "suggest" | "submit" | "sync";
+Committing the setting is what lets the owner of a shared hub decline proposals from a project they
+do not control.
 
-export type GitIntent =
-  | { verb: "submit"; branch: string } // must match /^mage\/[a-z0-9][a-z0-9/-]*$/, must not be default branch
-  | { verb: "sync" };                  // default branch of hub clone, main checkout
+### 6. Attendance is not an input
 
-export interface GitActionInputs {
-  /** paths.ts resolution of the KB. Must be mode "external" (or one hybrid ref). */
-  resolved: ResolvedDocsRoot;
-  /** The git repo root the action targets, and HOW it was resolved. */
-  hub: HubResolution;
-  /** verifyHubArrival(hub.root, meta.hub_repo): looksLikeHub + canonical origin === hub_repo. */
-  arrival: { ok: boolean; reason?: string };
-  /** readGitAutonomy(resolved) — junk-narrowed, absent ⇒ "suggest". */
-  policy: GitAutonomy;
-  /** `origin/HEAD` short name, e.g. "main". */
-  defaultBranch: string;
-  /** Gate-2 (`redact --check`) over the exact bytes to be committed. */
-  redaction: { blocked: boolean; findings: string[] };
-  /** For "sync" only: repo-relative dirty paths from `git status --porcelain`. */
-  dirtyPaths: string[];
-}
+Nothing consults a terminal, a CI variable or any environment marker to decide whether a git action
+is permitted. This follows from [ADR-0045](0045-cross-environment-presence.md) §7 and from §1: once
+the outcome is always a pull request a human merges, whether anyone was watching while it ran
+changes nothing about the risk. One code path serves a laptop, a runner and a sandbox.
 
-/** null ⇒ allowed. A string ⇒ the refusal message (verbatim to the user). Pure, total. */
-export function refuseGitAction(i: GitActionInputs, intent: GitIntent): string | null;
-```
+### 7. Bounds on a single run
 
-**Six structural conditions (evaluated in order):**
-
-| # | Condition | Refusal guards against |
-|---|---|---|
-| 1 | `i.resolved` is external mode, `isUnder(hubsRoot(), i.hub.root)` is true, and `i.hub.source === "derived"` | Running git in a user-owned repo, in-repo KB, hand-placed clone, or `hub_path` fallback. |
-| 2 | `i.arrival.ok` (`looksLikeHub` and canonicalized `origin` matches canonicalized `hub_repo`) | Pushing to a substituted remote or committing to an unverified directory. |
-| 3 | Policy ladder (`submit` requires `policy !== "suggest"`; `sync` requires `policy === "sync"`) | Unintended git execution when policy is unconfigured or set to suggest-only. |
-| 4 | For `submit` only: `intent.branch` matches `/^mage\/[a-z0-9][a-z0-9/-]*$/` and `intent.branch !== i.defaultBranch` | Unattended writes landing on the default branch without human merge ratification. |
-| 5 | `!i.redaction.blocked` | Secrets leaking onto pushed branches ([ADR-0014](0014-two-gate-redaction.md)). |
-| 6 | For `sync` only: every entry in `i.dirtyPaths` is under recognized KB paths | Accidental commits of unrelated working tree changes. |
-
-**Banned inputs:** `process.stdout.isTTY`, `process.env.CI`, `GITHUB_ACTIONS`, `CLAUDE_CODE*`, and all other environment variables are strictly forbidden from `src/git-policy.ts`.
+A run proposes at most one pull request, and a bounded number of notes within it, so a
+misbehaving pipeline produces something reviewable rather than a flood. Gate-2 redaction
+([ADR-0014](0014-two-gate-redaction.md)) runs over the exact content before it is committed, and a
+blocked scan stops the push rather than redacting silently. Documented workflows extract knowledge
+from merged changes rather than from open pull requests, and never hold write credentials in a job
+that has checked out untrusted content.
 
 ## Considered options
 
-- **Direct commit of learned notes to hub default branch in CI:** Rejected. Lacks human ratification, recreates memory poisoning vulnerabilities, and grants unreviewed write access to memory.
-- **Landing memory in reviewed code repository:** Rejected. Expands CI write blast radius to the target codebase and violates cross-repository boundaries.
-- **Server-side or PR-comment store:** Rejected per [ADR-0001](0001-memory-first-product-supersedes-specshub.md) (files-as-truth) and [ADR-0020](0020-no-server-tiered-dashboards.md) (no server). Comments are not searchable memory.
-- **"No TTY" as unattended predicate:** Rejected. Hook executions lack TTYs while attended; CI wrappers can allocate PTYs.
-- **Environment detection flags (`GITHUB_ACTIONS`, etc.):** Rejected. Safety is guaranteed by structural branch isolation and merge ratification.
-- **Fourth rung on ADR-0030 ladder:** Rejected. [ADR-0030](0030-agent-autonomy-ladder.md) governs session grooming judgment; git transport is a separate operational dial.
-- **Approval-delay / auto-merge timers:** Rejected. Timers turn silence into ratification, undermining the human security boundary.
-- **Reusing `mage dream` proposal terminology / naming verb `mage propose`:** Rejected. Avoids collision with `mage dream --apply` proposal formats.
+- **Committing learned notes directly to a default branch.** Rejected. It removes the human
+  decision and makes an injected rule effective immediately.
+- **Restricting git to a hub clone only.** Rejected. It excludes in-repo projects, which are the
+  ones needing the least credential ceremony, and it keys safety on location when the risk lives in
+  the outcome.
+- **A separate verb for committing and pushing to a default branch.** Rejected by §1; there is no
+  permitted outcome for it to produce.
+- **Detecting whether a human is attached.** Rejected. It cannot be detected reliably in either
+  direction, and §1 makes it unnecessary.
+- **A fourth rung on the autonomy ladder.** Rejected. Git transport and judgement licence are
+  different axes; see §5.
+- **A timer that adopts a proposal if nobody objects.** Rejected. It converts silence into consent
+  and removes the boundary this decision rests on.
+- **Storing proposals outside git — a server, or pull request comments.** Rejected per
+  [ADR-0001](0001-memory-first-product-supersedes-specshub.md) and
+  [ADR-0020](0020-no-server-tiered-dashboards.md); comments are not searchable memory.
 
 ## Consequences
 
-- Autonomous memory capture in CI runners is safely enabled via isolated branch proposals and asynchronous PR review.
-- The invariant "mage never runs git against a repo you own" is preserved while enabling hub-internal git transport.
-- [ADR-0031](0031-programmatic-provenance-stamp.md) reconciler cohorts are undisturbed: pipeline notes omit `provenance.autonomy`, so `src/grooming/reconcile.ts:130` skips them.
-- Hub owners retain complete authority over durable memory adoption via git merge.
+- A pipeline can propose knowledge, and no pipeline can adopt it.
+- The git invariant is stated in a form that is true of the code as it already exists.
+- Both external and in-repo projects are served by one mechanism.
+- The command surface does not grow.
+- An unmerged proposal is invisible to recall, so poisoning is bounded by the merge decision.
+- Notes that came from a pipeline remain identifiable for as long as they exist.
 
 ## Relations
 
-- amends [ADR-0012 — A wing is an optional convention; hubs are standalone-first](0012-wings-optional-convention-standalone-hubs.md) (§3 bullet 4: invariant re-scoped to user-owned repos)
-- amends [ADR-0013 — Procedure skills and the self-grooming loop](0013-procedure-skills-self-grooming-loop.md) (§4: ratification extends from commit to hub PR merge)
-- amends [ADR-0030 — Agent autonomy ladder](0030-agent-autonomy-ladder.md) (§3 bullet 1: floor takes second form on pipeline branches)
-- amends [ADR-0044 — Setup is a conversation over one address](0044-setup-is-a-conversation-over-one-address.md) (§4: clone-on-demand permitted behind explicit `--clone` on `mage submit`)
-- rides [ADR-0014 — Two-gate redaction](0014-two-gate-redaction.md) (Gate-2 secret redaction enforced before commit/push)
-- extends [ADR-0042 — the reach tier: harness grants](0042-reach-tier-harness-grants.md) and [ADR-0043 — A hub is addressed by its remote, located by derivation](0043-hub-addressed-by-remote-located-by-derivation.md) (re-uses `looksLikeHub` and derivation gates)
-- bounded_by [ADR-0009 — no runtime; automation rides host hooks](0009-no-runtime-automation-rides-host-hooks.md) (deterministic git plumbing, host agent judgment)
-- paired_with [ADR-0045 — Cross-environment presence: one root variable, one obtain verb, explicit location registration, and the cloud mandate](0045-cross-environment-presence.md)
+- amends [ADR-0012 — A wing is an optional convention; hubs are standalone-first](0012-wings-optional-convention-standalone-hubs.md) (§3 bullet 4: the git invariant restated in terms of outcome)
+- amends [ADR-0013 — Procedure skills and the self-grooming loop](0013-procedure-skills-self-grooming-loop.md) (§4: a merge is a confirm, alongside a commit)
+- amends [ADR-0030 — Agent autonomy ladder](0030-agent-autonomy-ladder.md) (§3: pipeline proposals sit beside the ladder, not on it)
+- rides [ADR-0014 — Two-gate redaction](0014-two-gate-redaction.md) (Gate-2 runs before any commit)
+- extends [ADR-0031 — Programmatic provenance stamp](0031-programmatic-provenance-stamp.md) (channel and review recorded at creation)
+- bounded_by [ADR-0009 — no runtime; automation rides host hooks](0009-no-runtime-automation-rides-host-hooks.md)
+- paired_with [ADR-0045 — Cross-environment presence](0045-cross-environment-presence.md)

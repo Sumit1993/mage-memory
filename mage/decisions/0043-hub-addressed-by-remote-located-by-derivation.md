@@ -5,7 +5,7 @@ tags:
 created: "2026-07-29"
 updated: 2026-08-22
 last_reviewed: 2026-08-22
-status: proposed
+status: accepted
 provenance:
   repo: mage-memory
   work: adr-0043-hub-derivation
@@ -126,14 +126,14 @@ question — `mage connect` offering it on a hub-absent machine is the obvious s
 this ADR deliberately does not fix the surface. What it fixes is the principle: **a missing
 hub is a recoverable state with a defined remedy, not an error the user must diagnose.**
 ADR-0042 §7's hub-absent case stops being merely "warn and grant nothing."
-> **Amendment (2026-08-22, [ADR-0045](0045-cross-environment-presence.md)).** `mage hub ensure` is the one obtain implementation; `mage connect` drives it interactively.
+> **Amendment (2026-08-22, [ADR-0045](0045-cross-environment-presence.md)).** `mage connect` is the one obtain surface, and it asks before cloning. No separate obtain verb exists.
 
 **5. An existing clone is MOVED, once — and mage only suggests the move.** A hub already
 cloned somewhere else is relocated to its derived path, and **no symlink is left behind**.
 mage prints the exact `git`/`mv` command; the human runs it (AGENTS.md: mage never commits
 for you). The move preserves uncommitted work, which a delete-and-reclone would destroy —
 that is why it is a move and not a fresh clone.
-> **Amendment (2026-08-22, [ADR-0045](0045-cross-environment-presence.md)).** Where a move is impossible or the clone is owned by another system (a harness-attached repo, a managed worktree), `mage hub use <path>` registers the clone's location in `$MAGE_HOME/redirects.json` after the same arrival verification; the registration is machine-local and never appears in a git-tracked file. `connect`/`doctor` suggest both remedies for a displaced clone: the `mv`, or `mage hub use`. The one-shared-function invariant (`chosenHubRoot`/`resolveHubGrant`) survives and is strengthened: the redirect step is inserted ahead of derivation inside the shared functions, routing `hub ensure`, `hub use`, `hub mandate`, `connect`, `doctor`, and `externalDocsRoot` identically.
+> **Amendment (2026-08-22, [ADR-0045](0045-cross-environment-presence.md)).** The derived path is the *only* place a hub clone can be. mage keeps no registry and follows no redirect: a clone that is not at the derived path is **unreachable**, and the remedies are to move it there or to clone it there. Where an environment fixes paths mage cannot satisfy, relocating `$MAGE_HOME` so the fixed path *becomes* the derived path is the supported adaptation — this is exactly how the CI recipe works. `hub_path` is retired as a location of record.
 
 **6. `hub_repo` becomes the authoritative address; `hub_path` is deprecated.** `hub_path`
 is read as a **fallback** during a transition window and is slated for removal.
@@ -188,7 +188,7 @@ doctor's RECALL check already reads the effective grant, not the literal string.
 - **Prefer an existing clone wherever it happens to be** — **rejected**: it destroys the
   determinism that makes the whole thing work. The derived path would then be a *hint*, and
   a hint cannot be committed into a project-scope grant.
-  > **Amendment (2026-08-22, [ADR-0045](0045-cross-environment-presence.md)).** The rejection stands for *implicit* preference (scanning); an *explicit, origin-verified, machine-local* registration via `mage hub use` is admitted by amendment.
+  > **Amendment (2026-08-22, [ADR-0045](0045-cross-environment-presence.md)).** The rejection stands in full. Explicit registration of a clone's location was considered and rejected too: it reintroduces a second resolution path and machine-local state that ADR-0045 §8 forbids.
 - **A user-scope grant in `~/.claude/settings.json`** (issue #103, direction 3) —
   **works, and is the wrong shape.** Claude Code concatenates array-valued settings across
   scopes, so one machine-wide entry genuinely covers the hub from every worktree. But it

@@ -69,8 +69,9 @@ load-bearing invariants — *no runtime of our own* ([ADR-0009](0009-no-runtime-
    and *shared*, so the commit is the natural human gate (unlike ECC's local YAML).
    > **Amendment (2026-08-22, [ADR-0046](0046-derived-hub-git-and-merge-ratification.md)).**
    > The human confirms — and the confirm is a **human git ratification**: the git commit
-   > in the working-tree flow (unchanged), or the **merge of a mage-opened hub proposal PR**
-   > in the pipeline flow ([ADR-0046](0046-derived-hub-git-and-merge-ratification.md)).
+   > in the working-tree flow (unchanged), or the **merge of a mage-opened proposal PR**
+   > in the pipeline flow ([ADR-0046](0046-derived-hub-git-and-merge-ratification.md)) — in a hub
+   > or in the project's own repo, whichever holds the KB.
    > "mage never auto-adopts" holds: no mage path lands content on a KB default branch autonomously.
    > Per-class confidence thresholds may opt low-risk skills into auto-*write*, but **never auto-*adopt***.
 

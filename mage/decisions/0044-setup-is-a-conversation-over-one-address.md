@@ -5,7 +5,7 @@ tags:
 created: "2026-07-31"
 updated: 2026-08-22
 last_reviewed: 2026-08-22
-status: proposed
+status: accepted
 provenance:
   repo: mage-memory
   work: adr-c-setup-conversation
@@ -140,7 +140,7 @@ path free of network calls.
 > than silently corrected: **`connect` obtains, `link` registers, and neither
 > borrows the other's job.**
 >
-> **Amendment (2026-08-22, [ADR-0045](0045-cross-environment-presence.md) / [ADR-0046](0046-derived-hub-git-and-merge-ratification.md)).** `mage hub ensure` is the obtain plumbing; `connect` remains the human surface that gathers consent and drives it; `link` still registers and still never clones. `mage hub use` joins as registration-of-*location* (distinct from `link`'s registration-of-*address*). Clone-on-demand stays wired to `connect` alone — plus, behind an explicit `--clone` flag, to `mage submit` ([ADR-0046](0046-derived-hub-git-and-merge-ratification.md)), where the committed workflow file that invokes it is the standing consent.
+> **Amendment (2026-08-22, [ADR-0045](0045-cross-environment-presence.md)).** This section stands. `connect` obtains and asks; `link` registers an address and never clones. No obtain verb and no registration-of-location verb are added — a clone is only ever found at its derived path (ADR-0045 §2). In CI the clone is placed there by an ordinary checkout with `$MAGE_HOME` pointed into the workspace, so clone-on-demand stays wired to `connect` alone.
 
 A filesystem path still works as a deprecated shim: mage reads its origin,
 resolves the address, **prints the canonical command**, warns, and — having
