@@ -6,6 +6,7 @@ import { gitInit } from "../git.js";
 import { REDACT_HOOK_MARKER, resolveHooksDir } from "../git-hooks.js";
 import { upsertMageHooks } from "../adapters/claude-code/settings.js";
 import { canonicalizeHubRepo } from "../hub-url.js";
+import { logger } from "../logger.js";
 import { connect, connectAllProjects } from "./connect.js";
 import { disconnect } from "./disconnect.js";
 
@@ -549,13 +550,45 @@ describe("reach tier — connect grants out-of-repo KB access (ADR-0042)", () =>
     const { code } = await externalRepo({ hubExists: false });
     const r = await connect({ cwd: code, yes: true, gitHook: false });
 
-    // 13 = 10 base + 3 commandeer: resolveDocsRoot does not stat hub_path, so the
-    // commandeer tier still gates on. The point is that connect COMPLETES.
-    expect(r.wired).toBe(13);
+    // 10 base hooks: resolveDocsRoot returns null when hub is absent, so commandeer
+    // tier does not gate on (autoMemoryDirectory not set to repo mage/). The point is that connect COMPLETES.
+    expect(r.wired).toBe(10);
+    expect(r.commandeer).toBe(false);
     const s = JSON.parse(await readFile(r.path, "utf8"));
     expect(s.hooks?.SessionStart?.some((g: { id?: string }) => g.id === "mage:observe:SessionStart")).toBe(
       true,
     );
+  });
+
+  it("SAYS WHY the commandeer tier declined when the hub is unreachable (#158)", async () => {
+    // The decline is correct (ADR-0032 gates autoMemoryDirectory on a resolvable docs
+    // root, and pointing it at the repo `mage/` would misfile into a second KB) — but a
+    // silent decline is the same absent-vs-healthy blind spot one level out.
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    try {
+      const { code, hub } = await externalRepo({ hubExists: false });
+      const r = await connect({ cwd: code, yes: true, gitHook: false });
+      expect(r.commandeer).toBe(false);
+      const said = warn.mock.calls.map((c) => String(c[0])).join("\n");
+      expect(said).toMatch(/Skipping the commandeer tier/);
+      expect(said).toContain(hub);
+      expect(said).toMatch(/mage connect/);
+      expect(said).toMatch(/Do NOT run `mage init`/);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("Finding 3 regression: does not warn about skipping commandeer tier when scope is user (#158)", async () => {
+    const dir = await tmpDir("mage-connect-user-noskipwarn-");
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    try {
+      await connect({ cwd: dir, yes: true, user: true, gitHook: false });
+      const said = warn.mock.calls.map((c) => String(c[0])).join("\n");
+      expect(said).not.toMatch(/Skipping the commandeer tier/);
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it("refuses to grant a directory that exists but is NOT a hub", async () => {

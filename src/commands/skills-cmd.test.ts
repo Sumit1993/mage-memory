@@ -9,6 +9,26 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+/** A code repo in external mode whose hub is not on this machine (#158). */
+async function unreachableExternalRepo(prefix: string): Promise<string> {
+  const code = await tmpDir(prefix);
+  const missing = join(await tmpDir(`${prefix}hub-`), "not-cloned");
+  await mkdir(join(code, "mage"), { recursive: true });
+  await writeFile(
+    join(code, "mage", "metadata.json"),
+    JSON.stringify({
+      schema: "mage.v2",
+      mode: "external",
+      project: "engine",
+      hub_path: missing,
+      hub_repo: null,
+      hub_refs: [],
+      linked_at: "",
+    }),
+  );
+  return code;
+}
+
 async function vault(): Promise<string> {
   const dir = await tmpDir("mage-skills-");
   await init({ mode: "in-repo", yes: true, codeRepo: dir, project: "t" });
@@ -474,5 +494,14 @@ describe("mage skills --metrics (read-only)", () => {
     expect(r.written).toEqual([]);
     // No wing skill should have been written in metrics mode.
     await expect(readFile(skillFile(dir, "alpha"), "utf8")).rejects.toThrow();
+  });
+});
+
+describe("mage skills — an unreachable external hub is not a missing KB (#158)", () => {
+  it("names `mage connect`, never `mage init` (which would mint a SECOND KB)", async () => {
+    const code = await unreachableExternalRepo("mage-skills-external-");
+    await expect(skills({ dir: code })).rejects.toThrow(/external mode/);
+    await expect(skills({ dir: code })).rejects.toThrow(/mage connect/);
+    await expect(skills({ dir: code })).rejects.toThrow(/Do NOT run `mage init`/);
   });
 });

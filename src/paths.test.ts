@@ -21,7 +21,10 @@ import {
   normalizeMetadata,
   ownedDocsRoots,
   readHubMetadata,
+  explainNoDocsRoot,
+  externalDocsRoot,
   readMetadata,
+  requireDocsRoot,
   resolveDocsRoot,
   writeHubMetadata,
   writeMetadata,
@@ -217,7 +220,7 @@ describe("paths", () => {
     }
   });
 
-  it("resolveDocsRoot degrades to the repo KB on a malformed hub_repo — never throws", async () => {
+  it("resolveDocsRoot returns null on a malformed hub_repo (mode: external) — never degrades to repo KB", async () => {
     const code = await tmpDir("mage-derive-malformed-");
     await mkdir(join(code, "mage"), { recursive: true });
     await writeFile(
@@ -233,12 +236,11 @@ describe("paths", () => {
       }),
     );
     const r = await resolveDocsRoot(code);
-    expect(r?.kind).toBe("repo");
-    expect(r?.root).toBe(join(code, "mage"));
+    expect(r).toBeNull();
   });
 
-  it("resolveDocsRoot falls back to repo KB when external metadata is malformed", async () => {
-    // mode=external but no hub_path → degrade to the code repo's own mage/ (never null).
+  it("resolveDocsRoot returns null when external metadata is malformed", async () => {
+    // mode=external but no hub_path → returns null (never degrades to repo KB).
     const code = await tmpDir("mage-extbad-");
     await mkdir(join(code, "mage"), { recursive: true });
     await writeFile(
@@ -246,8 +248,302 @@ describe("paths", () => {
       JSON.stringify({ schema: METADATA_SCHEMA, mode: "external", project: "x", hub_path: null }),
     );
     const r = await resolveDocsRoot(code);
-    expect(r?.kind).toBe("repo");
-    expect(r?.root).toBe(join(code, "mage"));
+    expect(r).toBeNull();
+  });
+
+  describe("externalDocsRoot discriminated results (issue #158)", () => {
+    it("returns not-external when mode is in-repo or hybrid or metadata absent", async () => {
+      const code = await tmpDir("mage-inrepo-");
+      await mkdir(join(code, "mage"), { recursive: true });
+      await writeFile(
+        join(code, "mage", "metadata.json"),
+        JSON.stringify({ schema: METADATA_SCHEMA, mode: "in-repo", project: "x" }),
+      );
+      expect(await externalDocsRoot(code)).toEqual({ kind: "not-external" });
+
+      const noMeta = await tmpDir("mage-nometa-");
+      expect(await externalDocsRoot(noMeta)).toEqual({ kind: "not-external" });
+    });
+
+    it("returns hub-unreachable (malformed-config) when mode is external but project is missing", async () => {
+      const code = await tmpDir("mage-noproject-");
+      await mkdir(join(code, "mage"), { recursive: true });
+      await writeFile(
+        join(code, "mage", "metadata.json"),
+        JSON.stringify({ schema: METADATA_SCHEMA, mode: "external", hub_path: "/some/path" }),
+      );
+      const res = await externalDocsRoot(code);
+      expect(res).toEqual({
+        kind: "hub-unreachable",
+        reason: "malformed-config",
+        expectedAddress: undefined,
+        expectedPath: "/some/path",
+      });
+    });
+
+    it("returns hub-unreachable (no-hub-target) when mode is external but hub_repo and hub_path are absent/null", async () => {
+      const code = await tmpDir("mage-notarget-");
+      await mkdir(join(code, "mage"), { recursive: true });
+      await writeFile(
+        join(code, "mage", "metadata.json"),
+        JSON.stringify({ schema: METADATA_SCHEMA, mode: "external", project: "engine", hub_path: null, hub_repo: null }),
+      );
+      const res = await externalDocsRoot(code);
+      expect(res).toEqual({
+        kind: "hub-unreachable",
+        reason: "no-hub-target",
+        expectedAddress: undefined,
+        expectedPath: undefined,
+      });
+    });
+
+    it("returns hub-unreachable (hub-corrupted) when hub_path does not look like a hub", async () => {
+      const code = await tmpDir("mage-badpath-");
+      await mkdir(join(code, "mage"), { recursive: true });
+      const nonHub = await tmpDir("not-a-hub-");
+      await writeFile(
+        join(code, "mage", "metadata.json"),
+        JSON.stringify({ schema: METADATA_SCHEMA, mode: "external", project: "engine", hub_path: nonHub }),
+      );
+      const res = await externalDocsRoot(code);
+      expect(res).toEqual({
+        kind: "hub-unreachable",
+        reason: "hub-corrupted",
+        expectedAddress: undefined,
+        expectedPath: nonHub,
+      });
+    });
+
+    it("Finding 1 regression: degrades to not-external (and repo KB) when metadata is unreadable and mode is unknown (#158)", async () => {
+      const code = await tmpDir("mage-corruptmeta-degrade-");
+      await mkdir(join(code, "mage"), { recursive: true });
+      await writeFile(join(code, "mage", "metadata.json"), "invalid json{");
+      const res = await externalDocsRoot(code);
+      expect(res).toEqual({
+        kind: "not-external",
+      });
+      const resolved = await resolveDocsRoot(code);
+      expect(resolved).toEqual({
+        root: join(code, "mage"),
+        kind: "repo",
+        repo: code,
+      });
+    });
+
+    it("Finding 2 regression: returns hub-unreachable (hub-mismatch) when clone origin does not match hub_repo (#158)", async () => {
+      const saved = process.env.MAGE_HOME;
+      const home = await tmpDir("mage-mismatch-home-");
+      process.env.MAGE_HOME = home;
+      try {
+        const code = await tmpDir("mage-mismatch-code-");
+        await mkdir(join(code, "mage"), { recursive: true });
+        await writeFile(
+          join(code, "mage", "metadata.json"),
+          JSON.stringify({
+            schema: METADATA_SCHEMA,
+            mode: "external",
+            project: "engine",
+            hub_repo: "https://example.com/acme/expected-hub.git",
+          }),
+        );
+        const derivedHub = join(home, "hubs", "example.com", "acme", "expected-hub");
+        await mkdir(join(derivedHub, "projects", "engine"), { recursive: true });
+        await writeFile(
+          join(derivedHub, "metadata.json"),
+          JSON.stringify({ schema: METADATA_SCHEMA, projects: [{ name: "engine", storage: "repo-owned" }] }),
+        );
+        await mkdir(join(derivedHub, ".git"), { recursive: true });
+        await writeFile(
+          join(derivedHub, ".git", "config"),
+          `[remote "origin"]\n  url = https://example.com/acme/other-hub.git\n`,
+        );
+
+        const res = await externalDocsRoot(code);
+        expect(res).toEqual({
+          kind: "hub-unreachable",
+          reason: "hub-mismatch",
+          expectedAddress: "https://example.com/acme/expected-hub.git",
+          expectedPath: derivedHub,
+          detail: expect.stringMatching(/does not match the clone's origin/),
+        });
+
+        const why = await explainNoDocsRoot(code);
+        expect(why.hubUnreachable).toBe(true);
+        expect(why.reason).toBe("hub-mismatch");
+        expect(why.message).toMatch(/does not match the clone's origin/);
+        expect(why.message).not.toMatch(/is not a mage hub/);
+      } finally {
+        if (saved === undefined) delete process.env.MAGE_HOME;
+        else process.env.MAGE_HOME = saved;
+      }
+    });
+
+    it("Finding 2 regression: returns hub-unreachable (hub-origin-unreadable) when clone origin cannot be read (#158)", async () => {
+      const saved = process.env.MAGE_HOME;
+      const home = await tmpDir("mage-unreadable-home-");
+      process.env.MAGE_HOME = home;
+      try {
+        const code = await tmpDir("mage-unreadable-code-");
+        await mkdir(join(code, "mage"), { recursive: true });
+        await writeFile(
+          join(code, "mage", "metadata.json"),
+          JSON.stringify({
+            schema: METADATA_SCHEMA,
+            mode: "external",
+            project: "engine",
+            hub_repo: "https://example.com/acme/expected-hub.git",
+          }),
+        );
+        const derivedHub = join(home, "hubs", "example.com", "acme", "expected-hub");
+        await mkdir(join(derivedHub, "projects", "engine"), { recursive: true });
+        await writeFile(
+          join(derivedHub, "metadata.json"),
+          JSON.stringify({ schema: METADATA_SCHEMA, projects: [{ name: "engine", storage: "repo-owned" }] }),
+        );
+        const res = await externalDocsRoot(code);
+        expect(res).toEqual({
+          kind: "hub-unreachable",
+          reason: "hub-origin-unreadable",
+          expectedAddress: "https://example.com/acme/expected-hub.git",
+          expectedPath: derivedHub,
+          detail: expect.stringMatching(/could not read the origin remote/),
+        });
+
+        const why = await explainNoDocsRoot(code);
+        expect(why.hubUnreachable).toBe(true);
+        expect(why.reason).toBe("hub-origin-unreadable");
+        expect(why.message).toMatch(/could not read the origin remote/);
+        expect(why.message).not.toMatch(/is not a mage hub/);
+      } finally {
+        if (saved === undefined) delete process.env.MAGE_HOME;
+        else process.env.MAGE_HOME = saved;
+      }
+    });
+  });
+
+  // Issue #158's second half: `resolveDocsRoot` collapses the 5-reason union back to
+  // `null`, so `null` means BOTH "no KB anywhere" and "your hub is unreachable".
+  // These pin the ONE place that tells them apart and the MESSAGE a human sees.
+  describe("explainNoDocsRoot — the user-visible half of issue #158", () => {
+    async function externalRepo(meta: Record<string, unknown>): Promise<string> {
+      const code = await tmpDir("mage-explain-");
+      await mkdir(join(code, "mage"), { recursive: true });
+      await writeFile(
+        join(code, "mage", "metadata.json"),
+        JSON.stringify({ schema: METADATA_SCHEMA, mode: "external", ...meta }),
+      );
+      return code;
+    }
+
+    it("no KB at all → the init/link message, and NOT flagged hub-unreachable", async () => {
+      const dir = await tmpDir("mage-explain-none-");
+      const why = await explainNoDocsRoot(dir);
+      expect(why.hubUnreachable).toBe(false);
+      expect(why.message).toContain("No mage knowledge base found");
+      expect(why.message).toMatch(/mage init/);
+    });
+
+    it("hub-absent (hub_path points nowhere) → names the path, points at `mage connect`", async () => {
+      const missing = join(await tmpDir("mage-explain-abs-"), "not-cloned");
+      const code = await externalRepo({ project: "engine", hub_path: missing });
+      const why = await explainNoDocsRoot(code);
+      expect(why.hubUnreachable).toBe(true);
+      expect(why.reason).toBe("hub-absent");
+      expect(why.expectedPath).toBe(missing);
+      expect(why.message).toContain(missing);
+      expect(why.message).toMatch(/mage connect/);
+      // The wrong-remedy trap: `mage init` here mints a SECOND KB.
+      expect(why.message).toMatch(/Do NOT run `mage init`/);
+    });
+
+    it("hub-absent (hub_repo derives, nothing cloned there) → names the derived path", async () => {
+      const saved = process.env.MAGE_HOME;
+      process.env.MAGE_HOME = await tmpDir("mage-explain-home-");
+      try {
+        const code = await externalRepo({
+          project: "engine",
+          hub_repo: "https://example.com/acme/hub.git",
+        });
+        const why = await explainNoDocsRoot(code);
+        expect(why.hubUnreachable).toBe(true);
+        expect(why.reason).toBe("hub-absent");
+        expect(why.expectedPath).toContain(join("hubs", "example.com", "acme", "hub"));
+        expect(why.expectedAddress).toBe("https://example.com/acme/hub.git");
+        expect(why.message).toMatch(/mage connect/);
+        expect(why.message).toMatch(/Do NOT run `mage init`/);
+      } finally {
+        if (saved === undefined) delete process.env.MAGE_HOME;
+        else process.env.MAGE_HOME = saved;
+      }
+    });
+
+    it("no-hub-target → points at `mage link <address>`", async () => {
+      const code = await externalRepo({ project: "engine", hub_path: null, hub_repo: null });
+      const why = await explainNoDocsRoot(code);
+      expect(why.hubUnreachable).toBe(true);
+      expect(why.reason).toBe("no-hub-target");
+      expect(why.message).toMatch(/mage link <address>/);
+    });
+
+    it("malformed-config (no project) → points at `mage link <address>`", async () => {
+      const code = await externalRepo({ hub_path: "/some/path" });
+      const why = await explainNoDocsRoot(code);
+      expect(why.reason).toBe("malformed-config");
+      expect(why.message).toMatch(/names no project/);
+    });
+
+    it("unreadable metadata in non-external repo is not classified as hub-unreachable", async () => {
+      const code = await tmpDir("mage-explain-bad-");
+      await mkdir(join(code, "mage"), { recursive: true });
+      await writeFile(join(code, "mage", "metadata.json"), "invalid json{");
+      const why = await explainNoDocsRoot(code);
+      expect(why.hubUnreachable).toBe(false);
+      expect(why.message).toMatch(/No mage knowledge base found/);
+    });
+
+    it("REDACTS credentials in a hub_repo address before printing it", async () => {
+      const code = await externalRepo({
+        project: "engine",
+        hub_repo: "https://x-access-token:ghp_SECRETVALUE@example.com/acme/hub.git",
+      });
+      const why = await explainNoDocsRoot(code);
+      expect(why.hubUnreachable).toBe(true);
+      expect(why.message).not.toContain("ghp_SECRETVALUE");
+      expect(why.expectedAddress).not.toContain("ghp_SECRETVALUE");
+    });
+
+    it("hub-corrupted (something IS there, but is not a hub) is told apart from absent", async () => {
+      const notAHub = await tmpDir("mage-explain-nothub-");
+      const code = await externalRepo({ project: "engine", hub_path: notAHub });
+      const why = await explainNoDocsRoot(code);
+      expect(why.reason).toBe("hub-corrupted");
+      // The message must not claim a non-existent directory "exists" — and must not
+      // claim an existing one is missing.
+      expect(why.message).toMatch(/something exists at/);
+    });
+
+    it("unknown-failure → explains unexpected failure without blaming metadata.json", async () => {
+      const hub = await tmpDir("mage-explain-hub-");
+      await mkdir(join(hub, "projects"), { recursive: true });
+      await writeFile(
+        join(hub, "metadata.json"),
+        JSON.stringify({ schema: METADATA_SCHEMA, projects: [] }),
+      );
+      const code = await externalRepo({ project: "../unsafe", hub_path: hub });
+      const why = await explainNoDocsRoot(code);
+      expect(why.hubUnreachable).toBe(true);
+      expect(why.reason).toBe("unknown-failure");
+      expect(why.message).toMatch(/an unexpected failure occurred while resolving the external hub/);
+      expect(why.message).toMatch(/Check permissions, or re-register with `mage link <address>`/);
+      expect(why.message).not.toMatch(/metadata\.json could not be read/);
+    });
+
+    it("requireDocsRoot THROWS the hub-unreachable message, not the generic no-KB one", async () => {
+      const missing = join(await tmpDir("mage-explain-req-"), "not-cloned");
+      const code = await externalRepo({ project: "engine", hub_path: missing });
+      await expect(requireDocsRoot(code)).rejects.toThrow(/external mode/);
+      await expect(requireDocsRoot(code)).rejects.toThrow(/mage connect/);
+    });
   });
 
   it("returns null when no knowledge base is found", async () => {

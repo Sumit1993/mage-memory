@@ -101,6 +101,33 @@ describe("adopt", () => {
     expect(reasons).toEqual(["origin-has-no-kb", "unknown-cwd"]);
   });
 
+  it("an external origin whose hub is unreachable is NOT `origin-has-no-kb` (#158)", async () => {
+    // The origin DOES have a knowledge base — it just isn't on this machine. Calling
+    // it "no KB" sends the user to `mage init`, which mints a SECOND one.
+    const kb = await withKb();
+    const home = await tmpDir("cc-home");
+    const code = await tmpDir("mage-adopt-external-");
+    const missing = join(await tmpDir("mage-adopt-hub-"), "not-cloned");
+    await mkdir(join(code, "mage"), { recursive: true });
+    await writeFile(
+      join(code, "mage", "metadata.json"),
+      JSON.stringify({
+        schema: "mage.v2",
+        mode: "external",
+        project: "engine",
+        hub_path: missing,
+        hub_repo: null,
+        hub_refs: [],
+        linked_at: "",
+      }),
+    );
+    await ccProject(home, "-ext", code, { "c.md": nativeCapture({ body: "# C\n\nz." }) });
+
+    const r = await adopt({ dir: kb.repo, home, yes: true });
+
+    expect(r.unclaimed.map((u) => u.reason)).toEqual(["origin-hub-unreachable"]);
+  });
+
   it("reports an out-of-shape memory to distill — never copies it verbatim", async () => {
     const kb = await withKb();
     const home = await tmpDir("cc-home");
