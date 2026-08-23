@@ -14,12 +14,12 @@ allowed-tools: Read, Grep, Glob, Bash
 
 # /mage:graduate — note → Procedure skill
 
-A **proven procedural note** — a playbook or gotcha that was read across **≥ M
+A **proven procedural note** — a procedure or gotcha (legacy: playbook) that was read across **≥ M
 distinct chapters** — earns its own loadable **Procedure skill**
 (`mage-skill-<slug>`). The note stays the substrate; the skill is its *pushed
 form* (ADR-0013 §1). A skill is **auto-loaded** into context, so it must be an
 actionable, proven **procedure** — you auto-load a *procedure*, not a *fact*. That
-is why **only playbook/gotcha notes graduate**: principle / reference / interface
+is why **only procedure/gotcha notes (legacy: playbook) graduate**: principle / reference / interface
 notes carry knowledge, not a method to run, so they stay notes (ADR-0019 §5).
 
 Note-read usage — not context-match — gates graduation: a not-yet-graduated note emits
@@ -50,8 +50,8 @@ write through the single applier.
    {
      "action": "graduate",
      "target": "notes/<file>.md",            // the backing note's relPath
-     "payload": { "note": "…", "wing": "…", "type": "playbook"|"gotcha" },
-     "evidence": "note read in N distinct chapter(s) — a proven playbook, ready to graduate to a skill"
+     "payload": { "note": "…", "wing": "…", "type": "procedure"|"gotcha"|"playbook" },
+     "evidence": "note read in N distinct chapter(s) — a proven procedure, ready to graduate to a skill"
    }
    ```
    If there are no `graduate` proposals, say so and stop — nothing has been read
@@ -59,7 +59,7 @@ write through the single applier.
 
 3. **Show the human the backing note + the note-read usage evidence.** For each
    `graduate` proposal, read the note at `target` and present:
-   - the note's title, `type`, and wing (confirm it really is a playbook/gotcha —
+   - the note's title, `type`, and wing (confirm it really is a procedure/gotcha (legacy: playbook) —
      a non-procedural note is a reader/judgment mismatch; do **not** graduate it);
    - the note-read `evidence` (how many distinct chapters it was read in);
    - what graduation will produce: a `mage-skill-<slug>` SKILL.md written into both
@@ -74,7 +74,7 @@ write through the single applier.
    exact proposal JSON to `mage dream --apply` on **stdin** (the graduate payload
    is `{}` — the applier reads the note at `target` and derives its wing):
    ```bash
-   printf '%s' '{"action":"graduate","target":"notes/<file>.md","payload":{},"evidence":"note read in N distinct chapter(s) — a proven playbook, ready to graduate to a skill"}' | mage dream --apply
+   printf '%s' '{"action":"graduate","target":"notes/<file>.md","payload":{},"evidence":"note read in N distinct chapter(s) — a proven procedure, ready to graduate to a skill"}' | mage dream --apply
    ```
    The applier (the single serialized writer):
    - renders the SKILL.md from the note's body and writes it into **both**
@@ -85,8 +85,9 @@ write through the single applier.
      writes over a mage-generated target);
    - **refuses to write past Gate 2** (a live secret in the rendered skill blocks
      the write);
-   - **structurally refuses a non-playbook/gotcha note** — the renderer throws, so
-     a misrouted proposal cannot mint a skill from a fact;
+   - **structurally refuses a non-procedural note** — the renderer throws (only
+     procedure/gotcha notes graduate; legacy tail: playbook), so a misrouted
+     proposal cannot mint a skill from a fact;
    - **never commits.** It prints what it wrote/archived, or a refusal if a ceiling
      blocked it.
 
@@ -149,7 +150,7 @@ stay a note.
 
 ## Quality bar
 
-- Only **proven** procedures graduate — a playbook/gotcha that was read in ≥ M
+- Only **proven** procedures graduate — a procedure/gotcha (legacy: playbook) that was read in ≥ M
   distinct chapters, confirmed against the actual note body before applying.
 - The **note persists** — graduation pushes a copy up into a skill and points the
   note at it; it never deletes or replaces the note.
