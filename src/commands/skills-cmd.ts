@@ -15,6 +15,7 @@ import {
 import { readNote } from "../note.js";
 import {
   absolutePath,
+  explainNoDocsRoot,
   learningsPath,
   readGenreOverrides,
   resolveDocsRoot,
@@ -83,11 +84,9 @@ export async function skills(opts: SkillsOptions = {}): Promise<SkillsResult> {
   if (opts.metrics) return skillsMetrics(start, opts);
 
   const resolved = await resolveDocsRoot(start);
-  if (!resolved) {
-    throw new Error(
-      `No mage knowledge base found at or above ${start}. Run \`mage init\` first.`,
-    );
-  }
+  // `null` is two states: no KB at all, OR an external-mode repo whose hub is
+  // unreachable — which `mage init` would answer by minting a SECOND KB (#158).
+  if (!resolved) throw new Error((await explainNoDocsRoot(start)).message);
   const { root, repo } = resolved;
   const docsRel = toRel(relative(repo, root));
   const genreOverrides = await readGenreOverrides(resolved);

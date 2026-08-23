@@ -1,7 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
-import { type ChosenHubRootSource, chosenHubRoot, verifyHubArrival } from "./hub-url.js";
+import { type ChosenHubRootSource, chosenHubRoot, redactUrl, verifyHubArrival } from "./hub-url.js";
 import { exists, hubMetadataPath, isUnder, looksLikeHub, META_FILE, PROJECTS_DIR } from "./path-guards.js";
 import { type Genre, resolveGenreOverrides } from "./scanner/genre-map.js";
 
@@ -10,7 +10,7 @@ import { type Genre, resolveGenreOverrides } from "./scanner/genre-map.js";
 // this file, which itself imports hub-url.ts). Re-exported here so every existing
 // `from "./paths.js"` import keeps working unchanged.
 export { exists, hubMetadataPath, isUnder, looksLikeHub, META_FILE, PROJECTS_DIR };
-export { chosenHubRoot, hubsRoot, type ChosenHubRoot, type ChosenHubRootSource } from "./hub-url.js";
+export { chosenHubRoot, hubsRoot, redactUrl, type ChosenHubRoot, type ChosenHubRootSource } from "./hub-url.js";
 
 // ─── path constants ──────────────────────────────────────────────────────
 /** The knowledge-base (KB) dir nested in a code repo (in-repo and hybrid modes). */
@@ -448,6 +448,32 @@ export async function findCodeRepoRoot(startDir: string): Promise<string | null>
   }
 }
 
+export type HubUnreachableReason =
+  | "malformed-config"
+  | "no-hub-target"
+  | "hub-absent"
+  | "hub-corrupted"
+  | "hub-mismatch"
+  | "hub-origin-unreadable"
+  | "unknown-failure";
+
+// INVARIANT: this union and {@link HubGrantResolution} answer the same question
+// (where does this repo's hub resolve to) and must stay in agreement — ADR-0043
+// §5's one-shared-function rule. Converging them is issue #158's follow-up.
+export type ExternalDocsRootResult =
+  | { kind: "resolved"; value: ResolvedDocsRoot }
+  | { kind: "not-external" }
+  | {
+      kind: "hub-unreachable";
+      reason: HubUnreachableReason;
+      /** The hub's ADDRESS as recorded (`hub_repo`) — REDACT before printing. */
+      expectedAddress?: string;
+      /** The filesystem path the hub was expected AT (derived, or `hub_path`). */
+      expectedPath?: string;
+      /** Diagnostic detail from arrival verification (e.g. mismatch or unreadable origin). */
+      detail?: string;
+    };
+
 /**
  * Resolve the mage docs root to operate on, starting from `startDir` (default cwd):
  *  - repo KB:  the nearest ancestor with `mage/metadata.json` (mode=in-repo or
@@ -459,8 +485,10 @@ export async function findCodeRepoRoot(startDir: string): Promise<string | null>
  *  - hub:      `startDir` is a hub root, or sits inside one. Inside a hub-owned
  *              project dir (`<hub>/projects/<name>/…`) → that project's flat docs
  *              root; the hub root or elsewhere under it → the hub root. Kind "hub".
- * Returns null if none is found. A malformed/unreadable metadata degrades to the
- * repo KB root (never throws — this is on the capture hot path).
+ * Returns null if none is found, or if external mode hub is unreachable (never degrades
+ * an unreachable external hub to repo KB). Never throws — this is on the capture hot path.
+ * `null` therefore means two different things; an INTERACTIVE caller must run
+ * {@link explainNoDocsRoot} to tell them apart and print a remedy (issue #158).
  */
 export async function resolveDocsRoot(
   startDir: string,
@@ -470,11 +498,12 @@ export async function resolveDocsRoot(
   // Walk up looking for a code-repo `mage/metadata.json` (in-repo/hybrid/external).
   const codeRepo = await findCodeRepoRoot(abs);
   if (codeRepo) {
-    // Honor mode=external by following hub_path; a bad read degrades to repo KB.
-    const external = await externalDocsRoot(codeRepo).catch(() => null);
-    return (
-      external ?? { root: codeRepoDocsRoot(codeRepo), kind: "repo", repo: codeRepo }
-    );
+    // Honor mode=external by following hub_path/hub_repo.
+    // If external metadata exists but hub is unreachable, return null (do NOT fall back to repo KB).
+    const external = await externalDocsRoot(codeRepo);
+    if (external.kind === "resolved") return external.value;
+    if (external.kind === "hub-unreachable") return null;
+    return { root: codeRepoDocsRoot(codeRepo), kind: "repo", repo: codeRepo };
   }
 
   // Otherwise, walk up looking for a hub root. `startDir` may BE the hub, or sit
@@ -494,6 +523,76 @@ export async function resolveDocsRoot(
   return null;
 }
 
+/** Why {@link resolveDocsRoot} found nothing, as something a human can act on. */
+export interface UnresolvedDocsRoot {
+  /** True when an external-mode repo was found but its hub could not be reached. */
+  hubUnreachable: boolean;
+  reason?: HubUnreachableReason;
+  /** The external-mode code repo whose hub is unreachable. */
+  codeRepo?: string;
+  /** Already redacted — safe to print. */
+  expectedAddress?: string;
+  expectedPath?: string;
+  detail?: string;
+  /** One printable explanation ending in the command that fixes it. */
+  message: string;
+}
+
+/** The remedy per reason, per ADR-0044 §4: name the command that OBTAINS the hub. */
+function hubUnreachableMessage(r: ExternalDocsRootResult & { kind: "hub-unreachable" }): string {
+  const at = r.expectedPath ? ` at ${r.expectedPath}` : "";
+  const addr = r.expectedAddress ? ` (address ${redactUrl(r.expectedAddress)})` : "";
+  const head = "This repo is in external mode, so its knowledge base lives in a hub — but the hub is unreachable";
+  const dontInit = "Do NOT run `mage init` here: it would mint a SECOND knowledge base.";
+  switch (r.reason) {
+    case "hub-absent":
+      return `${head}: no hub${at}${addr}. Run \`mage connect\` to clone it there (or \`mage init --local <name>\` for a local-only hub). ${dontInit}`;
+    case "hub-corrupted":
+      return `${head}: something exists${at}${addr} but is not a mage hub (no projects/ + metadata.json). Move or remove it, then run \`mage connect\`. ${dontInit}`;
+    case "hub-mismatch":
+      return `${head}: ${r.detail ?? `hub origin mismatch${at}`}. ${dontInit}`;
+    case "hub-origin-unreadable":
+      return `${head}: ${r.detail ?? `could not read the origin remote${at}`}. ${dontInit}`;
+    case "no-hub-target":
+      return `${head}: mage/metadata.json records no usable hub address. Run \`mage link <address>\` to record one, then \`mage connect\`. ${dontInit}`;
+    case "malformed-config":
+      return `${head}: mage/metadata.json is mode=external but names no project. Run \`mage link <address>\` to re-register this repo. ${dontInit}`;
+    default:
+      return `${head}: an unexpected failure occurred while resolving the external hub. Check permissions, or re-register with \`mage link <address>\`. ${dontInit}`;
+  }
+}
+
+/**
+ * Explain a `null` from {@link resolveDocsRoot}, which means BOTH "there is no KB
+ * anywhere" and "this repo is external-mode but its hub is unreachable". It stays
+ * `null` because most call sites are the deliberate fail-open capture hot path;
+ * this is the ONE place that converts the state into a message, so every
+ * interactive surface says the same thing — and never suggests `mage init`, which
+ * would mint a SECOND KB (issue #158). Never throws.
+ */
+export async function explainNoDocsRoot(startDir: string): Promise<UnresolvedDocsRoot> {
+  const start = absolutePath(startDir);
+  const codeRepo = await findCodeRepoRoot(start).catch(() => null);
+  if (codeRepo) {
+    const external = await externalDocsRoot(codeRepo);
+    if (external.kind === "hub-unreachable") {
+      return {
+        hubUnreachable: true,
+        reason: external.reason,
+        codeRepo,
+        expectedAddress: external.expectedAddress ? redactUrl(external.expectedAddress) : undefined,
+        expectedPath: external.expectedPath,
+        detail: external.detail,
+        message: hubUnreachableMessage(external),
+      };
+    }
+  }
+  return {
+    hubUnreachable: false,
+    message: `No mage knowledge base found at or above ${start}. Run \`mage init\` or \`mage link\` first.`,
+  };
+}
+
 /**
  * Resolve the docs root to operate on, or THROW the canonical "no knowledge base" error. The
  * resolve-or-throw every interactive command opens with: `dir` defaults to cwd and walks up
@@ -503,11 +602,7 @@ export async function resolveDocsRoot(
 export async function requireDocsRoot(dir?: string): Promise<ResolvedDocsRoot> {
   const start = absolutePath(dir ?? process.cwd());
   const resolved = await resolveDocsRoot(start);
-  if (!resolved) {
-    throw new Error(
-      `No mage knowledge base found at or above ${start}. Run \`mage init\` or \`mage link\` first.`,
-    );
-  }
+  if (!resolved) throw new Error((await explainNoDocsRoot(start)).message);
   return resolved;
 }
 
@@ -528,9 +623,16 @@ function hubDocsRoot(hub: string, abs: string): ResolvedDocsRoot {
   return { root: hub, kind: "hub", repo: hub };
 }
 
+/** Nothing there at all vs. something there that is not a hub — the two are told
+ *  apart so the message never claims a non-existent directory "exists". */
+async function missingHubReason(root: string): Promise<"hub-absent" | "hub-corrupted"> {
+  return (await exists(root)) ? "hub-corrupted" : "hub-absent";
+}
+
 /**
- * If the code repo at `dir` is linked in external mode, the hub project docs
- * root it points to; otherwise null (caller falls back to repo-KB handling).
+ * If the code repo at `dir` is linked in external mode, returns the resolved hub project
+ * docs root or a hub-unreachable result explaining why it cannot be resolved; otherwise
+ * returns not-external (caller falls back to repo-KB handling).
  * ADR-0043 resolution order, via the ONE shared {@link chosenHubRoot}:
  *
  *   1. `hub_repo` present → derive its path, and use it only if BOTH arrival
@@ -538,42 +640,86 @@ function hubDocsRoot(hub: string, abs: string): ResolvedDocsRoot {
  *   2. Else (absent, wrong shape, unreadable origin, OR a hard origin
  *      MISMATCH) fall back to `hub_path`, gated on the same shape check —
  *      the deprecated transition path (ADR-0043 §6).
- *   3. Else null — the hub-absent state; {@link resolveDocsRoot} degrades to
- *      the repo KB. This function must never throw for that case (the hot-path
- *      contract): a mismatch here is silently absorbed, NOT surfaced as an
- *      error — `doctor`/`connect` re-run the same resolution to report it
- *      loudly (see {@link outOfRepoKbTargets} + connect.ts).
- *
- * May still throw on an unknown/foreign metadata schema or unsafe project
- * name — {@link resolveDocsRoot} catches it.
+ *   3. Else hub-unreachable — returns `{ kind: "hub-unreachable", reason,
+ *      expectedAddress, expectedPath }`;
+ *      {@link resolveDocsRoot} returns null (does NOT degrade to repo KB).
+ *      This function must never throw for any case (the hot-path contract).
  */
-async function externalDocsRoot(dir: string): Promise<ResolvedDocsRoot | null> {
-  const meta = await readMetadata(dir);
-  if (!meta || meta.mode !== "external" || !meta.project) return null;
-
-  const chosen = chosenHubRoot(meta.hub_repo, meta.hub_path);
-  if (!chosen) return null;
-
-  let hubRoot: string;
-  if (chosen.source === "derived") {
-    const arrival = await verifyHubArrival(chosen.root, meta.hub_repo as string);
-    if (arrival.ok) {
-      hubRoot = chosen.root;
-    } else if (meta.hub_path && (await looksLikeHub(meta.hub_path))) {
-      hubRoot = meta.hub_path; // fall back to the deprecated hub_path (incl. on a mismatch)
-    } else {
-      return null; // hub-absent state
-    }
-  } else {
-    if (!(await looksLikeHub(chosen.root))) return null;
-    hubRoot = chosen.root;
+export async function externalDocsRoot(dir: string): Promise<ExternalDocsRootResult> {
+  let meta: MageMetadata | null;
+  try {
+    meta = await readMetadata(dir);
+  } catch {
+    // A metadata read/parse failure for an unknown mode falls back to not-external
+    // (repo-KB handling), matching the degrade-on-bad-read behavior.
+    return { kind: "not-external" };
   }
+  if (!meta || meta.mode !== "external") return { kind: "not-external" };
 
-  return {
-    root: hubProjectDocsRoot(hubRoot, meta.project),
-    kind: "hub",
-    repo: hubRoot,
-  };
+  try {
+    const expectedAddress = meta.hub_repo ?? undefined;
+    const expectedPath = meta.hub_path ?? undefined;
+    if (!meta.project) {
+      return { kind: "hub-unreachable", reason: "malformed-config", expectedAddress, expectedPath };
+    }
+
+    const chosen = chosenHubRoot(meta.hub_repo, meta.hub_path);
+    if (!chosen) {
+      return { kind: "hub-unreachable", reason: "no-hub-target", expectedAddress, expectedPath };
+    }
+
+    let hubRoot: string;
+    if (chosen.source === "derived") {
+      const arrival = await verifyHubArrival(chosen.root, meta.hub_repo as string);
+      if (arrival.ok) {
+        hubRoot = chosen.root;
+      } else if (meta.hub_path && (await looksLikeHub(meta.hub_path))) {
+        hubRoot = meta.hub_path; // fall back to the deprecated hub_path (incl. on a mismatch)
+      } else {
+        const reason: HubUnreachableReason =
+          arrival.reason === "origin-mismatch"
+            ? "hub-mismatch"
+            : arrival.reason === "origin-unreadable"
+              ? "hub-origin-unreadable"
+              : arrival.reason === "not-a-hub"
+                ? "hub-corrupted"
+                : "hub-absent";
+        return {
+          kind: "hub-unreachable",
+          reason,
+          expectedAddress,
+          expectedPath: chosen.root,
+          detail: arrival.detail,
+        };
+      }
+    } else {
+      if (!(await looksLikeHub(chosen.root))) {
+        return {
+          kind: "hub-unreachable",
+          reason: await missingHubReason(chosen.root),
+          expectedAddress,
+          expectedPath: chosen.root,
+        };
+      }
+      hubRoot = chosen.root;
+    }
+
+    return {
+      kind: "resolved",
+      value: {
+        root: hubProjectDocsRoot(hubRoot, meta.project),
+        kind: "hub",
+        repo: hubRoot,
+      },
+    };
+  } catch {
+    return {
+      kind: "hub-unreachable",
+      reason: "unknown-failure",
+      expectedAddress: meta.hub_repo ?? undefined,
+      expectedPath: meta.hub_path ?? undefined,
+    };
+  }
 }
 
 /**

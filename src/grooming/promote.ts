@@ -5,7 +5,7 @@
 //
 // ONE LADDER RUNG (ADR-0038 deleted the other):
 //   note → skill (graduate): a note READ in >= thresholds.graduateSessions distinct
-//      chapters (M) earns a Procedure skill, iff it is PROCEDURAL (playbook/gotcha — you
+//      chapters (M) earns a Procedure skill, iff it is PROCEDURAL (procedure/gotcha — you
 //      auto-load a procedure, not a fact, ADR-0019 §5) and not rejected.
 //
 // The scratch → note rung is GONE. [ADR-0038] deleted it: proposing a NEW note from
@@ -52,9 +52,9 @@ export function graduateProposalFor(note: ScannedNote, stat: NoteReadStat): Prop
   };
 }
 
-/** A note graduates only if it is a PROCEDURE (playbook/gotcha) — ADR-0019 §5. */
+/** A note graduates only if it is a PROCEDURE (procedure/gotcha; legacy tail: playbook) — ADR-0019 §5. */
 function isProcedural(type: string): boolean {
-  return type === "playbook" || type === "gotcha";
+  return type === "procedure" || type === "gotcha" || type === "playbook";
 }
 
 // ─── the bounded promotion budget (0.0.11) — rank strongest-first, surface top-N ─────

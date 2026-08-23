@@ -19,19 +19,29 @@ on:
       - reopened
       - edited
       - synchronize
+  # Merge-queue support (#403). A required check must report on the queue's
+  # speculative merge commit or the queue can never merge anything. There is no
+  # PR title to validate in a `merge_group` event — the title was already
+  # validated (and is immutable to the queue) on the pull_request_target events
+  # above, and a PR with a red title check cannot enter the queue in the first
+  # place — so the queue leg passes by construction rather than re-checking.
+  merge_group:
 
 permissions:
   pull-requests: read
 
 jobs:
+  # ONE job, with the event condition at STEP level. Not two same-named jobs
+  # with job-level `if`s: that publishes two check runs under the required
+  # context name (one real, one skipped), and which of them branch protection
+  # resolves the context against is undefined — a skipped run could shadow a
+  # genuine lint failure. A step-level skip leaves this single job (and its
+  # single check run) green, so exactly one check run per event carries the
+  # required name. Caught by the review lane on the PR that introduced the
+  # two-job split.
   validate:
     name: Validate PR title (conventional commits)
     runs-on: ubuntu-latest
     steps:
-      # No `with:` config — defaults validate against the standard conventional-commit
-      # types (feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert).
-      # Scopes are intentionally unrestricted: the repo uses both version scopes
-      # (feat(0.0.12):) and word scopes (chore(deps):, ci(release):).
-      - uses: amannn/action-semantic-pull-request@v6
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # validation logic lives in canon; the job/check name must stay stable.
+      - uses: prismalens/gh-workflows/actions/pr-title@main

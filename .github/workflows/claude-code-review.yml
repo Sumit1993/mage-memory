@@ -1,0 +1,39 @@
+name: Claude Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
+  # Comment triggers carry the `@claude review` summon; the callee decides
+  # admission (org member + explicit verb).
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+
+# This is a managed caller stub.
+# The lane logic lives in prismalens/gh-workflows/.github/workflows/claude-code-review.yml.
+# Do not add logic here.
+
+concurrency:
+  group: claude-code-review-${{ github.event.pull_request.number || github.event.issue.number }}
+  # A summon never cancels an in-flight automatic round; it queues behind it.
+  # A push still supersedes anything in the group, including a summon.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  review:
+    # Caller-side draft guard: skip before the reusable workflow is even invoked
+    # (the callee carries a backstop guard; GitHub cannot filter drafts at the trigger).
+    if: github.event.pull_request.draft != true
+    uses: prismalens/gh-workflows/.github/workflows/claude-code-review.yml@main
+    # inherit does not cross ownership boundaries (this repo -> prismalens org);
+    # the callee's required secret must be mapped explicitly.
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+    permissions:
+      contents: read
+      # write is the ceiling for the callee's `announce` liveness job;
+      # the callee's `review` job self-restricts to read.
+      pull-requests: write
+      issues: read
+      id-token: write

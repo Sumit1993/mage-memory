@@ -91,6 +91,27 @@ describe("buildManifest — graduation on NOTE-READ usage (ADR-0038 §2)", () =>
     expect(m.proposals.map((p) => p.target)).toEqual(["notes/g.md"]);
   });
 
+  it("graduates procedure notes (and gotcha and legacy playbook), but REJECTS non-procedural notes such as principle", () => {
+    const notes = [
+      note({ relPath: "notes/p.md", type: "procedure" }),
+      note({ relPath: "notes/g.md", type: "gotcha" }),
+      note({ relPath: "notes/pb.md", type: "playbook" }),
+      note({ relPath: "notes/pr.md", type: "principle" }),
+    ];
+    const t = tally({
+      "notes/p.md": stat({ chapters: 9 }),
+      "notes/g.md": stat({ chapters: 9 }),
+      "notes/pb.md": stat({ chapters: 9 }),
+      "notes/pr.md": stat({ chapters: 99 }),
+    });
+    const m = buildManifest(t, notes, T, [], {});
+    expect(m.proposals.map((p) => p.target)).toEqual([
+      "notes/g.md",
+      "notes/p.md",
+      "notes/pb.md",
+    ]);
+  });
+
   it("binds by PATH, not by fuzzy keyword overlap — a wrong note can no longer graduate", () => {
     // The whole point of ADR-0038 §2: the note is identified by the path that was read.
     const t = tally({ "notes/right.md": stat({ chapters: 8 }) });

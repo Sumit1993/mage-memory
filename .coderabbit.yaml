@@ -17,7 +17,7 @@ reviews:
     #
     # So: the CodeRabbit CLI (a separate, larger counter) reviews every push via
     # the kit's pre-push gate, and this scarce online counter is no longer spent
-    # automatically — only on PRs explicitly labelled `review-ready`.
+    # automatically — only on PRs explicitly labelled `coderabbit_review`.
     #
     # SCOPE, precisely: `labels` gates AUTOMATIC review only. Manual triggers —
     # `@coderabbitai review` and `@coderabbitai full review` — run regardless of
@@ -39,7 +39,7 @@ reviews:
     # The revert is one commit — see ci/cli-first-valve-REVERT.
     enabled: false
     labels:
-      - "review-ready"
+      - "coderabbit_review"
     auto_pause_after_reviewed_commits: 1
     ignore_title_keywords:
       - "WIP"

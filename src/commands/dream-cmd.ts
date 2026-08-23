@@ -181,6 +181,7 @@ function emptyResult(root: string): DreamResult {
     emptyProjects: [],
     unregisteredProjectDirs: [],
     untaggedNudge: [],
+    mergeCandidates: { signalA: [], signalB: [] },
     findingCount: 0,
   };
 }
@@ -206,7 +207,14 @@ function renderReport(r: DreamReport): void {
 
 /** Advisory drift — printed even when clean; never counted as a finding/failure. */
 function renderDriftInfo(r: DreamReport): void {
-  if (!r.emptyProjects.length && !r.unregisteredProjectDirs.length && !r.untaggedNudge.length) return;
+  const { signalA, signalB } = r.mergeCandidates;
+  const hasDrift =
+    r.emptyProjects.length > 0 ||
+    r.unregisteredProjectDirs.length > 0 ||
+    r.untaggedNudge.length > 0 ||
+    signalA.length > 0 ||
+    signalB.length > 0;
+  if (!hasDrift) return;
   logger.blank();
   logger.info("info (advisory — never failures):");
   if (r.emptyProjects.length > 0) {
@@ -216,6 +224,13 @@ function renderDriftInfo(r: DreamReport): void {
     logger.detail(`projects/ dir(s) not in the registry: ${r.unregisteredProjectDirs.join(", ")}`);
   }
   for (const m of r.untaggedNudge) logger.detail(m);
+  // Merge-candidate annotations (Signal A: annotate directly; Signal B: candidates, not verdicts)
+  for (const p of signalA) {
+    logger.detail(`note pair answers-one-question? — ${p.noteA} ↔ ${p.noteB} ${p.reason}; merge candidates`);
+  }
+  for (const p of signalB) {
+    logger.detail(`note pair merge candidate — ${p.noteA} ↔ ${p.noteB} (${p.reason}; review suggested)`);
+  }
 }
 
 function section(title: string, findings: DreamFinding[]): void {
