@@ -27,7 +27,7 @@ import type { OpenWith } from "../dashboard/html.js";
 import { renderDashboardMarkdown } from "../dashboard/markdown.js";
 import { ensureGitignored } from "../gitignore.js";
 import { logger } from "../logger.js";
-import { absolutePath, resolveDocsRoot } from "../paths.js";
+import { absolutePath, explainNoDocsRoot, resolveDocsRoot } from "../paths.js";
 import { mageVersion } from "../version.js";
 
 /** The committable knowledge-tier markdown dashboard (tier 0). */
@@ -73,8 +73,11 @@ export async function dashboard(opts: DashboardOptions = {}): Promise<DashboardR
   const startDir = opts.hub ? absolutePath(opts.hub) : (opts.cwd ?? process.cwd());
   const kb = await resolveDocsRoot(startDir);
   if (!kb) {
+    // `null` is two states: no KB at all, OR an external-mode repo whose hub is
+    // unreachable — which `mage init` would answer by minting a SECOND KB (#158).
+    const why = await explainNoDocsRoot(startDir);
     logger.error(
-      `No mage knowledge base found at or above ${startDir} — run \`mage init\` first, or pass --hub <path>.`,
+      why.hubUnreachable ? why.message : `${why.message} Or pass --hub <path>.`,
     );
     return { written: [] };
   }

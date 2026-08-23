@@ -8,6 +8,7 @@ import { logger } from "../logger.js";
 import { type NoteFrontmatter, parseNote } from "../note.js";
 import {
   type ResolvedDocsRoot,
+  explainNoDocsRoot,
   ownedDocsRoots,
   requireDocsRoot,
   resolveDocsRoot,
@@ -76,7 +77,7 @@ export interface ElsewhereItem {
 export interface UnclaimedItem {
   cwd: string | null;
   count: number;
-  reason: "unknown-cwd" | "origin-has-no-kb";
+  reason: "unknown-cwd" | "origin-has-no-kb" | "origin-hub-unreachable";
 }
 
 export interface AdoptResult {
@@ -217,7 +218,15 @@ async function planAdopt(kb: ResolvedDocsRoot, opts: AdoptOptions): Promise<Adop
     }
     const originKb = await resolveDocsRoot(dir.cwd);
     if (!originKb) {
-      result.unclaimed.push({ cwd: dir.cwd, count: dir.files.length, reason: "origin-has-no-kb" });
+      // `null` is two states (#158). An external-mode origin whose hub is missing
+      // HAS a KB — misreporting it as "no KB" sends the user to `mage init`, which
+      // would mint a second one; the fix is to obtain the hub.
+      const why = await explainNoDocsRoot(dir.cwd);
+      result.unclaimed.push({
+        cwd: dir.cwd,
+        count: dir.files.length,
+        reason: why.hubUnreachable ? "origin-hub-unreachable" : "origin-has-no-kb",
+      });
       continue;
     }
     const claimedHere = owned.has(originKb.root);
@@ -294,7 +303,11 @@ function reportAdopt(r: AdoptResult): void {
   }
   for (const u of r.unclaimed) {
     const where = u.cwd ?? "(cwd unrecoverable)";
-    logger.detail(`  unclaimed ${u.count} from ${where} — ${u.reason}; aim it with \`mage init\`/\`mage link\``);
+    const aim =
+      u.reason === "origin-hub-unreachable"
+        ? "its hub is not on this machine — run `mage connect` there (NOT `mage init`)"
+        : "aim it with `mage init`/`mage link`";
+    logger.detail(`  unclaimed ${u.count} from ${where} — ${u.reason}; ${aim}`);
   }
   for (const s of r.skipped) {
     logger.detail(`  skip   ${s.slug} — ${s.reason}`);

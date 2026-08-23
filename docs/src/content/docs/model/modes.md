@@ -121,7 +121,10 @@ Most mage commands need to locate the docs root to operate on. They do this by w
    - If its mode is `in-repo` or `hybrid`, the docs root is that repo's `mage/`.
    - If its mode is `external`, mage resolves the hub's location (see below) and
      follows it to the hub's `projects/<name>/` — so captures and grooming land
-     in the hub, where the notes actually are, not in the code repo.
+     in the hub, where the notes actually are, not in the code repo. If the hub
+     cannot be reached, mage resolves **nothing** rather than falling back to the
+     code repo's own `mage/` — see [When the hub is
+     unreachable](#when-the-hub-is-unreachable--reasons-and-what-you-see).
 2. Otherwise, look upward for a **hub root** (a directory with a `projects/` registry and a top-level `metadata.json`). Inside a `projects/<name>/` directory it resolves to that project's flat docs root; anywhere else under the hub it resolves to the hub root itself.
 
 This is why you can run `mage` commands from anywhere inside a repo or hub and they find the right knowledge base. It is also why an `external`-mode code repo's captures end up in the hub even though you were working in the code repo — the metadata pointer redirects them.
@@ -155,6 +158,74 @@ clone already sitting somewhere ELSE with a matching origin is detected (a
 scan under the hubs root, sorted and deterministic) and mage prints the exact
 `mv` to relocate it — it never performs the move itself. When nothing is found
 at all, `mage connect` offers to clone `hub_repo` there on the spot.
+
+## When the hub is unreachable — reasons and what you see
+
+An `external`-mode repo's knowledge base is somewhere else. When mage cannot get
+to it, it **stops** — it never quietly writes into the code repo's own `mage/`,
+because that would mint a second, divergent knowledge base and silently misfile
+everything you learned into it.
+
+Every interactive command reports the reason and **the command that obtains the hub** (ADR-0044
+§4) — never `mage init`, which is the one command that would make it worse. Run
+`mage doctor` and read the `external hub` line:
+
+| Reason | What happened | The fix |
+| --- | --- | --- |
+| `hub-absent` | The address resolves, but nothing is cloned at the derived path yet — the normal state on a fresh clone of the code repo. | `mage connect` (it offers to clone it) |
+| `hub-corrupted` | Something *is* at that path, but it is not a mage hub (no `projects/` + `metadata.json`). | Move or remove it, then `mage connect` |
+| `hub-mismatch` | A mage hub exists at that path, but its origin remote does not match `hub_repo`. | Fix the clone's remote, or re-run `mage link <address>` |
+| `hub-origin-unreadable` | A mage hub exists at that path, but its origin remote could not be read from `.git/config`. | Check `.git` permissions and configuration |
+| `no-hub-target` | `mage/metadata.json` is `mode: external` but records no usable `hub_repo`/`hub_path`. | `mage link <address>`, then `mage connect` |
+| `malformed-config` | `mode: external` with no `project` name, so there is no `projects/<name>/` to resolve to. | `mage link <address>` |
+| `unknown-failure` | An unexpected failure occurred while resolving the external hub. | Check permissions, or re-register with `mage link <address>` |
+
+Worked transcript, one repo per reason (paths shortened):
+
+```console
+$ cd ~/code/my-service   # hub_repo = https://github.com/acme/my-hub.git, nothing cloned yet
+$ mage doctor
+✗ external hub        : unreachable (hub-absent) — This repo is in external mode, so its knowledge base lives in a hub — but the hub is unreachable: no hub at ~/.mage/hubs/github.com/acme/my-hub (address https://github.com/acme/my-hub.git). Run `mage connect` to clone it there (or `mage init --local <name>` for a local-only hub). Do NOT run `mage init` here: it would mint a SECOND knowledge base.
+✓ KB access grant     : no mage hub at ~/.mage/hubs/github.com/acme/my-hub on this machine yet — nothing to grant yet
+
+$ cd ~/code/svc-corrupt   # hub_path points at a directory that is not a hub
+$ mage doctor
+✗ external hub        : unreachable (hub-corrupted) — … something exists at ~/hubs/decoy but is not a mage hub (no projects/ + metadata.json). Move or remove it, then run `mage connect`. Do NOT run `mage init` here: it would mint a SECOND knowledge base.
+
+$ cd ~/code/svc-mismatch  # hub exists at derived path but origin remote points to a different repo
+$ mage doctor
+✗ external hub        : unreachable (hub-mismatch) — This repo is in external mode, so its knowledge base lives in a hub — but the hub is unreachable: hub_repo https://github.com/acme/expected.git does not match the clone's origin https://github.com/acme/other.git found at ~/.mage/hubs/github.com/acme/expected — never reused, never clobbered. Do NOT run `mage init` here: it would mint a SECOND knowledge base.
+
+$ cd ~/code/svc-notarget   # mode: external, but hub_repo and hub_path are both null
+$ mage doctor
+✗ external hub        : unreachable (no-hub-target) — … mage/metadata.json records no usable hub address. Run `mage link <address>` to record one, then `mage connect`. Do NOT run `mage init` here: it would mint a SECOND knowledge base.
+
+$ cd ~/code/svc-malformed   # mode: external, but no project name
+$ mage doctor
+✗ external hub        : unreachable (malformed-config) — … mage/metadata.json is mode=external but names no project. Run `mage link <address>` to re-register this repo. Do NOT run `mage init` here: it would mint a SECOND knowledge base.
+```
+
+Once the hub is reachable, the same check passes and names where the notes
+actually live:
+
+```console
+$ mage connect          # clones the hub to its derived path, then grants access
+$ mage doctor
+✓ external hub        : hub reachable — this repo's notes live at ~/.mage/hubs/github.com/acme/my-hub/projects/my-service
+✓ KB access grant     : granted: ~/.mage/hubs/github.com/acme/my-hub
+```
+
+The other interactive commands say the same thing in their own voice — `mage
+skills` and `mage dashboard` refuse with that message rather than the generic
+"no knowledge base found", `mage connect` says why it skipped the commandeer
+tier, and `mage adopt` reports such an origin as `origin-hub-unreachable`
+rather than `origin-has-no-kb`.
+
+**The capture path stays silent on purpose.** The session-start nudge, the
+PostToolUse observer, the memory hook, and the Gate-2 staged-secret scan all
+**fail open** on an unreachable hub: they capture nothing and return normally, so
+a machine without the hub still starts sessions, runs tools, and commits. Silence
+there is the mechanism; the message belongs on the commands you actually invoke.
 
 ## Reaching a hub from the code repo
 
