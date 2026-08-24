@@ -2,7 +2,18 @@ import { rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { tmpDir } from "../test/fixtures/kb.js";
-import { gitInit, isGitRepo, noteExistsInHead, noteGitState } from "./git.js";
+import {
+  filterDirtyPathsOutsideKb,
+  getDefaultBranch,
+  getDirtyPaths,
+  getRepoRoot,
+  gitAdd,
+  gitCheckoutNewBranch,
+  gitInit,
+  isGitRepo,
+  noteExistsInHead,
+  noteGitState,
+} from "./git.js";
 import { run } from "./shell.js";
 
 const tmp = (): Promise<string> => tmpDir("mage-git-");
@@ -77,5 +88,65 @@ describe("noteGitState", () => {
     await run("git", ["-C", repo, "add", "--", "x.md"]);
     await gitCommit(repo, "add x");
     expect(await noteExistsInHead(repo, "x.md")).toBe(true);
+  });
+});
+
+describe("proposal git helpers", () => {
+  it("getRepoRoot returns repo root when inside repo, null otherwise", async () => {
+    const repo = await tmp();
+    expect(await getRepoRoot(repo)).toBeNull();
+    await gitInit(repo);
+    const resolved = await getRepoRoot(repo);
+    expect(resolved).toBeTruthy();
+  });
+
+  it("getDefaultBranch detects main or branch configured", async () => {
+    const repo = await tmp();
+    await gitInit(repo);
+    const def = await getDefaultBranch(repo);
+    expect(def).toBeDefined();
+    expect(typeof def).toBe("string");
+  });
+
+  it("getDirtyPaths lists untracked and modified files", async () => {
+    const repo = await tmp();
+    await gitInit(repo);
+    await writeFile(join(repo, "file1.txt"), "hello\n");
+    await writeFile(join(repo, "file2.txt"), "world\n");
+    const dirty = await getDirtyPaths(repo);
+    expect(dirty).toContain("file1.txt");
+    expect(dirty).toContain("file2.txt");
+  });
+
+  it("filterDirtyPathsOutsideKb filters paths properly", () => {
+    const repo = "/repos/project";
+    const docsRoot = "/repos/project/mage";
+    const dirty = ["src/index.ts", "mage/notes/a.md", "package.json", "mage/INDEX.md"];
+    const outside = filterDirtyPathsOutsideKb(repo, docsRoot, dirty);
+    expect(outside).toEqual(["src/index.ts", "package.json"]);
+  });
+
+  it("filterDirtyPathsOutsideKb handles hub where docsRoot is repo", () => {
+    const repo = "/hubs/my-hub";
+    const docsRoot = "/hubs/my-hub";
+    const dirty = ["notes/a.md", "projects/p/notes/b.md"];
+    const outside = filterDirtyPathsOutsideKb(repo, docsRoot, dirty);
+    expect(outside).toEqual([]);
+  });
+
+  it("gitCheckoutNewBranch, gitAdd, gitCommit work in repo", async () => {
+    const repo = await tmp();
+    await gitInit(repo);
+    await writeFile(join(repo, "init.txt"), "init\n");
+    await run("git", ["-C", repo, "-c", "user.email=t@e.com", "-c", "user.name=t", "add", "init.txt"]);
+    await run("git", ["-C", repo, "-c", "user.email=t@e.com", "-c", "user.name=t", "commit", "-m", "initial"]);
+
+    await gitCheckoutNewBranch(repo, "mage/proposal/test-branch");
+    await writeFile(join(repo, "note.md"), "test\n");
+    await gitAdd(repo, ["note.md"]);
+    await run("git", ["-C", repo, "-c", "user.email=t@e.com", "-c", "user.name=t", "commit", "-m", "add note"]);
+
+    const head = await run("git", ["-C", repo, "rev-parse", "--abbrev-ref", "HEAD"]);
+    expect(head.stdout.trim()).toBe("mage/proposal/test-branch");
   });
 });

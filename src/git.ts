@@ -1,5 +1,5 @@
 import { access } from "node:fs/promises";
-import { join } from "node:path";
+import { join, relative, sep } from "node:path";
 import { run, which } from "./shell.js";
 
 /**
@@ -30,6 +30,14 @@ export async function isGitRepo(dir: string): Promise<boolean> {
 }
 
 /**
+ * The top-level root directory of the git repo containing `dir`, or null if not a repo.
+ */
+export async function getRepoRoot(dir: string): Promise<string | null> {
+  const r = await run("git", ["-C", dir, "rev-parse", "--show-toplevel"]);
+  return r.code === 0 ? r.stdout.trim() || null : null;
+}
+
+/**
  * The short HEAD commit hash for `repoPath` (e.g. "aad31f0"), or null when git is
  * missing, `repoPath` is not a repo, or it has no commits yet. Read-only; never
  * throws. The provenance `commit` staleness anchor mage stamps at note creation
@@ -38,6 +46,122 @@ export async function isGitRepo(dir: string): Promise<boolean> {
 export async function getHeadCommit(repoPath: string): Promise<string | null> {
   const r = await run("git", ["-C", repoPath, "rev-parse", "--short", "HEAD"]);
   return r.code === 0 ? r.stdout.trim() || null : null;
+}
+
+/**
+ * Determine the default branch name of `repoPath`, defaulting to "main".
+ */
+export async function getDefaultBranch(repoPath: string): Promise<string> {
+  const originHead = await run("git", [
+    "-C",
+    repoPath,
+    "symbolic-ref",
+    "refs/remotes/origin/HEAD",
+    "--short",
+  ]);
+  if (originHead.code === 0 && originHead.stdout.trim()) {
+    return originHead.stdout.trim().replace(/^origin\//, "");
+  }
+  const initDefault = await run("git", ["-C", repoPath, "config", "init.defaultBranch"]);
+  if (initDefault.code === 0 && initDefault.stdout.trim()) {
+    return initDefault.stdout.trim();
+  }
+  const hasMain = await run("git", ["-C", repoPath, "rev-parse", "--verify", "refs/heads/main"]);
+  if (hasMain.code === 0) return "main";
+  const hasMaster = await run("git", ["-C", repoPath, "rev-parse", "--verify", "refs/heads/master"]);
+  if (hasMaster.code === 0) return "master";
+  return "main";
+}
+
+/**
+ * Get repo-relative dirty (modified, added, deleted, untracked) paths.
+ */
+export async function getDirtyPaths(repoPath: string): Promise<string[]> {
+  const r = await run("git", ["-C", repoPath, "status", "--porcelain", "-z"]);
+  if (r.code !== 0) return [];
+  const entries = r.stdout.split("\0").filter((s) => s.length > 0);
+  const paths: string[] = [];
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i];
+    if (!entry) continue;
+    const status = entry.slice(0, 2);
+    const path = entry.slice(3);
+    if (path) paths.push(path);
+    if (status.includes("R") || status.includes("C")) {
+      i++;
+    }
+  }
+  return paths;
+}
+
+/**
+ * Filter dirty paths to only those sitting outside the knowledge base root.
+ */
+export function filterDirtyPathsOutsideKb(
+  repo: string,
+  docsRoot: string,
+  dirtyPaths: readonly string[],
+): string[] {
+  const prefix = relative(repo, docsRoot).split(sep).join("/");
+  const isInside = (file: string) => {
+    if (prefix === "" || prefix === ".") return true;
+    return file === prefix || file.startsWith(`${prefix}/`);
+  };
+  return dirtyPaths.filter((p) => !isInside(p));
+}
+
+/**
+ * Create and check out a new branch in `repoPath`.
+ */
+export async function gitCheckoutNewBranch(repoPath: string, branchName: string): Promise<void> {
+  await run("git", ["-C", repoPath, "checkout", "-b", branchName], { throwOnError: true });
+}
+
+/**
+ * Stage paths in `repoPath`.
+ */
+export async function gitAdd(repoPath: string, paths: string[]): Promise<void> {
+  await run("git", ["-C", repoPath, "add", "--", ...paths], { throwOnError: true });
+}
+
+/**
+ * Create a commit with message in `repoPath`.
+ */
+export async function gitCommit(repoPath: string, message: string): Promise<void> {
+  await run("git", ["-C", repoPath, "commit", "-m", message], { throwOnError: true });
+}
+
+/**
+ * Push branch to origin in `repoPath`.
+ */
+export async function gitPush(repoPath: string, branchName: string): Promise<void> {
+  await run("git", ["-C", repoPath, "push", "-u", "origin", branchName], { throwOnError: true });
+}
+
+/**
+ * Open a pull request using `gh pr create` (ADR-0046). Returns the PR URL.
+ */
+export async function createPullRequest(
+  repoPath: string,
+  opts: { branch: string; base: string; title: string; body: string },
+): Promise<string> {
+  const r = await run(
+    "gh",
+    [
+      "pr",
+      "create",
+      "--head",
+      opts.branch,
+      "--base",
+      opts.base,
+      "--title",
+      opts.title,
+      "--body",
+      opts.body,
+    ],
+    { cwd: repoPath, throwOnError: true },
+  );
+  return r.stdout.trim();
 }
 
 /** The git state of ONE note file, from the reject-ledger reconciler's view (ADR-0031 P2). */

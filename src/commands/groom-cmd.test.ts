@@ -1,6 +1,9 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
+import { gitInit } from "../git.js";
+import * as gitModule from "../git.js";
+import { run } from "../shell.js";
 import { exists, stagingPath } from "../paths.js";
 import { parseNote } from "../note.js";
 import { withKb } from "../../test/fixtures/kb.js";
@@ -24,6 +27,8 @@ async function stageDistinct(dir: string, n: number): Promise<string[]> {
     { title: "Gamma index walk", tags: "mage/index", body: "gamma lesson about scanning" },
     { title: "Delta hook wiring", tags: "mage/connect", body: "delta lesson about hooks" },
     { title: "Epsilon dream applier", tags: "mage/dream", body: "epsilon lesson about applying" },
+    { title: "Zeta telemetry stream", tags: "mage/telemetry", body: "zeta lesson about logs" },
+    { title: "Eta benchmark cycle", tags: "mage/bench", body: "eta lesson about speed" },
   ];
   const slugs: string[] = [];
   for (const s of seeds.slice(0, n)) {
@@ -180,5 +185,142 @@ describe("mage groom — guards", () => {
     const dir = await makeKb();
     await stageDistinct(dir, 1);
     await expect(groomCmd({ dir, accept: "nope" })).rejects.toThrow(/no staged draft/);
+  });
+  it("refuses --propose without --accept", async () => {
+    const dir = await makeKb();
+    await expect(groomCmd({ dir, propose: true })).rejects.toThrow(/--propose requires --accept/);
+  });
+  it("refuses --propose with --reject", async () => {
+    const dir = await makeKb();
+    await expect(groomCmd({ dir, reject: "all", propose: true })).rejects.toThrow(
+      /--propose cannot be used with --reject/,
+    );
+  });
+});
+
+describe("mage groom --accept … --propose (ADR-0046)", () => {
+  it("refuses when grooming.proposals is not enabled", async () => {
+    const { dir } = await withKb({ kind: "repo" });
+    await stageDistinct(dir, 1);
+    await expect(groomCmd({ dir, accept: "all", propose: true })).rejects.toThrow(
+      /proposals are off for this knowledge base/,
+    );
+  });
+
+  it("refuses when noteCount exceeds PROPOSAL_NOTE_CAP (5 notes)", async () => {
+    const { dir, repo } = await withKb({ kind: "repo", grooming: { proposals: true } });
+    await gitInit(repo);
+    await stageDistinct(dir, 6);
+    await expect(groomCmd({ dir, accept: "all", propose: true })).rejects.toThrow(
+      /cannot propose 6 notes in one pull request; limit is 5/,
+    );
+  });
+
+  it("refuses when dirty paths exist outside the knowledge base", async () => {
+    const { dir, repo } = await withKb({ kind: "repo", grooming: { proposals: true } });
+    await gitInit(repo);
+    // Baseline commit
+    await run("git", ["-C", repo, "-c", "user.email=t@e.com", "-c", "user.name=t", "add", "."]);
+    await run("git", ["-C", repo, "-c", "user.email=t@e.com", "-c", "user.name=t", "commit", "-m", "init"]);
+    // Create dirty file outside KB
+    await writeFile(join(dir, "outside.txt"), "dirty outside kb\n");
+    await stageDistinct(dir, 1);
+    await expect(groomCmd({ dir, accept: "all", propose: true })).rejects.toThrow(
+      /dirty paths outside knowledge base/,
+    );
+  });
+
+  it("refuses when candidate draft contains live secrets (Gate-2)", async () => {
+    const { dir, repo } = await withKb({ kind: "repo", grooming: { proposals: true } });
+    await gitInit(repo);
+    await run("git", ["-C", repo, "-c", "user.email=t@e.com", "-c", "user.name=t", "add", "."]);
+    await run("git", ["-C", repo, "-c", "user.email=t@e.com", "-c", "user.name=t", "commit", "-m", "init"]);
+    // Write draft directly into staging containing a live secret (bypassing Gate-1 scrub)
+    const sDir = stagingPath(join(dir, "mage"));
+    await mkdir(sDir, { recursive: true });
+    await writeFile(
+      join(sDir, "leaked-secret.md"),
+      "---\ntype: gotcha\ntags: [mage/secret]\n---\n# Leaked secret note\n\nleaked aws key: AKIAIOSFODNN7EXAMPLE\n",
+    );
+    await expect(groomCmd({ dir, accept: "all", propose: true })).rejects.toThrow(
+      /Gate-2 redaction scan blocked/,
+    );
+  });
+
+  it("creates branch, commits, pushes, opens PR, and stamps review", async () => {
+    const { dir, repo } = await withKb({
+      kind: "repo",
+      grooming: { proposals: true, autonomy: "overseer" },
+    });
+    await gitInit(repo);
+    await run("git", ["-C", repo, "-c", "user.email=t@e.com", "-c", "user.name=t", "add", "."]);
+    await run("git", ["-C", repo, "-c", "user.email=t@e.com", "-c", "user.name=t", "commit", "-m", "init"]);
+
+    // Spy on gitPush and createPullRequest
+    const prUrl = "https://github.com/acme/repo/pull/42";
+    const prSpy = vi.spyOn(gitModule, "createPullRequest").mockResolvedValue(prUrl);
+    const pushSpy = vi.spyOn(gitModule, "gitPush").mockResolvedValue();
+
+    try {
+      const [slug] = await stageDistinct(dir, 1);
+      const res = await groomCmd({ dir, accept: slug, propose: true });
+
+      expect(res.accepted).toEqual([`notes/${slug}.md`]);
+      expect(res.proposalBranch).toBe(`mage/proposal/${slug}`);
+      expect(res.proposalPr).toBe(prUrl);
+
+      // Verify PR was created
+      expect(prSpy).toHaveBeenCalledOnce();
+      expect(pushSpy).toHaveBeenCalledTimes(2); // Initial commit push + review follow-up push
+
+      // Check note content on disk
+      const noteContent = await readFile(noteFile(dir, slug!), "utf8");
+      const parsed = parseNote(noteContent);
+
+      expect(parsed.frontmatter.provenance).toBeDefined();
+      expect(parsed.frontmatter.provenance?.channel).toBe("pipeline");
+      expect(parsed.frontmatter.provenance?.review).toBe(prUrl);
+      // Ensure no autonomy mark is stamped on pipeline notes (even though KB had overseer)
+      expect(parsed.frontmatter.provenance?.autonomy).toBeUndefined();
+
+      // Check git log has 2 commits on proposal branch
+      const log = await run("git", ["-C", repo, "log", "--oneline", "-n", "3"]);
+      expect(log.stdout).toContain(`feat(memory): propose note ${slug}`);
+      expect(log.stdout).toContain(`chore(provenance): record review ${prUrl}`);
+    } finally {
+      prSpy.mockRestore();
+      pushSpy.mockRestore();
+    }
+  });
+
+  it("handles follow-up review stamp failure gracefully without failing the run", async () => {
+    const { dir, repo } = await withKb({
+      kind: "repo",
+      grooming: { proposals: true },
+    });
+    await gitInit(repo);
+    await run("git", ["-C", repo, "-c", "user.email=t@e.com", "-c", "user.name=t", "add", "."]);
+    await run("git", ["-C", repo, "-c", "user.email=t@e.com", "-c", "user.name=t", "commit", "-m", "init"]);
+
+    const prUrl = "https://github.com/acme/repo/pull/99";
+    const prSpy = vi.spyOn(gitModule, "createPullRequest").mockResolvedValue(prUrl);
+    // Second gitPush fails
+    let pushCount = 0;
+    const pushSpy = vi.spyOn(gitModule, "gitPush").mockImplementation(async () => {
+      pushCount++;
+      if (pushCount === 2) throw new Error("network disconnect during follow-up push");
+    });
+
+    try {
+      const [slug] = await stageDistinct(dir, 1);
+      const res = await groomCmd({ dir, accept: slug, propose: true });
+
+      // Run succeeds despite review push failure
+      expect(res.accepted).toEqual([`notes/${slug}.md`]);
+      expect(res.proposalPr).toBe(prUrl);
+    } finally {
+      prSpy.mockRestore();
+      pushSpy.mockRestore();
+    }
   });
 });
