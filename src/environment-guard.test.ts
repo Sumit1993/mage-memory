@@ -111,34 +111,60 @@ export const FORBIDDEN_ENV_MARKERS = [
 ] as const;
 
 /**
- * Strip comments from a line to check only executable code. Quote-aware on purpose:
- * a plain indexOf cut `fetch("https://x", process.env.CI)` at the URL and hid the read,
- * which is a silent false negative in a guard whose contract is to have none.
+ * Return a line's executable code, carrying block-comment state across lines. One
+ * quote-aware pass owns every "is this really code" decision: three silent false
+ * negatives came from deciding it with substring searches instead (a URL's `//`, a
+ * `${VAR#pattern}`, and a `/*` inside a string literal).
  */
-function stripComments(line: string, isShell: boolean): string {
+function stripNonCode(
+  line: string,
+  isShell: boolean,
+  inBlock: boolean,
+): { code: string; inBlock: boolean } {
+  let out = "";
   let quote: string | null = null;
   let braceDepth = 0;
+  let block = inBlock;
   for (let i = 0; i < line.length; i++) {
     const ch = line[i];
+    if (block) {
+      if (!isShell && ch === "*" && line[i + 1] === "/") {
+        block = false;
+        i++;
+      }
+      continue;
+    }
     if (quote) {
-      if (ch === "\\") i++;
-      else if (ch === quote) quote = null;
+      out += ch;
+      if (ch === "\\") {
+        i++;
+        if (i < line.length) out += line[i];
+      } else if (ch === quote) {
+        quote = null;
+      }
       continue;
     }
     if (ch === '"' || ch === "'" || ch === "`") {
       quote = ch;
+      out += ch;
       continue;
     }
     if (isShell) {
-      // `${VAR#pattern}` carries a literal # that does not start a comment.
       if (ch === "$" && line[i + 1] === "{") braceDepth++;
       else if (ch === "}" && braceDepth > 0) braceDepth--;
-      else if (ch === "#" && braceDepth === 0) return line.slice(0, i);
-    } else if (ch === "/" && line[i + 1] === "/") {
-      return line.slice(0, i);
+      else if (ch === "#" && braceDepth === 0) return { code: out, inBlock: false };
+      out += ch;
+      continue;
     }
+    if (ch === "/" && line[i + 1] === "/") return { code: out, inBlock: false };
+    if (ch === "/" && line[i + 1] === "*") {
+      block = true;
+      i++;
+      continue;
+    }
+    out += ch;
   }
-  return line;
+  return { code: out, inBlock: block };
 }
 
 /**
@@ -156,21 +182,9 @@ export function scanSource(relPath: string, content: string): Violation[] {
     const rawLine = lines[i] ?? "";
     const lineNum = i + 1;
 
-    // Handle TS block comments
-    if (!isShell) {
-      if (inBlockComment) {
-        if (rawLine.includes("*/")) {
-          inBlockComment = false;
-        }
-        continue;
-      }
-      if (rawLine.includes("/*") && !rawLine.includes("*/")) {
-        inBlockComment = true;
-        continue;
-      }
-    }
-
-    const code = stripComments(rawLine, isShell).trim();
+    const scanned = stripNonCode(rawLine, isShell, inBlockComment);
+    inBlockComment = scanned.inBlock;
+    const code = scanned.code.trim();
     if (code.length === 0) continue;
 
     // 1. Check for forbidden environment identity markers
@@ -327,7 +341,7 @@ describe("ADR-0045 §7 — Environment Rule Guard", () => {
     });
 
     it("does not lose a process.env read that sits after a URL on the same line", () => {
-      // The old stripComments cut the line at the `//` inside "https://".
+      // The old substring strip cut the line at the `//` inside "https://".
       const code = 'const ok = await fetch("https://x.com", { flag: process.env.CI });';
       expect(scanSource("src/example.ts", code).length).toBeGreaterThan(0);
     });
@@ -335,6 +349,21 @@ describe("ADR-0045 §7 — Environment Rule Guard", () => {
     it("does not mistake a ${VAR#pattern} expansion for a shell comment", () => {
       const script = 'VAL="${PATH#/usr}"; if [ "$CI" = true ]; then';
       expect(scanSource("scripts/unexempt-example.sh", script).length).toBeGreaterThan(0);
+    });
+
+    it("a bare /* inside a string literal does not blind the scanner", () => {
+      const code = [
+        'const marker = "/* not a real comment";',
+        "const bad = process.env.SOMETHING;",
+      ].join("\n");
+      expect(scanSource("src/example.ts", code).length).toBeGreaterThan(0);
+    });
+
+    it("still honours a real block comment, and keeps code preceding it", () => {
+      const blind = ["/* genuinely commented", "const hidden = process.env.CI;", "*/"].join("\n");
+      expect(scanSource("src/example.ts", blind)).toHaveLength(0);
+      // code BEFORE a block comment on the same line used to be dropped wholesale
+      expect(scanSource("src/example.ts", "const x = process.env.CI; /* trailing").length).toBeGreaterThan(0);
     });
 
     it("the cloud-setup.sh exemption is what silences that same script", () => {
