@@ -334,10 +334,14 @@ async function proposeBatch(
 
   let accepted: string[];
   let prUrl: string;
+  // Tracked outside the try: promoteBatch consumes the staged drafts, so if a later step
+  // throws the error must be able to say where the notes ended up.
+  let promoted: string[] = [];
   try {
     // Stamp channel at creation (ADR-0046 §4). No autonomy mark.
     const stamp = await resolveCreationStamp(resolved, { channel: "pipeline" });
     accepted = await promoteBatch(root, selected, stamp);
+    promoted = accepted;
     await index({ dir: opts.dir, quiet: opts.json });
 
     // Stage changes under docsRoot and commit
@@ -376,10 +380,18 @@ async function proposeBatch(
     // Leaving the user on a half-built proposal branch with their drafts already
     // consumed is unrecoverable without hand-run git. Put them back where they were.
     const kept = await restoreBranch(kbRepo, originBranch, branchName);
+    const why = err instanceof Error ? err.message : String(err);
     if (kept) {
-      const why = err instanceof Error ? err.message : String(err);
       throw new Error(
         `${why}\n\nYour notes are committed on \`${kept}\`, which has been left in place — the staged drafts are already consumed, so this branch is the only copy. Push it or cherry-pick from it once the cause is fixed.`,
+      );
+    }
+    if (promoted.length > 0) {
+      // No commit was made, so the branch is gone — but promoteBatch already moved the
+      // drafts out of staging, so re-running reports "no staged draft" and the user has
+      // no way to know the files are sitting there uncommitted.
+      throw new Error(
+        `${why}\n\nNothing was committed or pushed, but ${promoted.length} note(s) were already written and their staged drafts consumed. They are uncommitted in your working tree: ${promoted.join(", ")}. Commit them yourself, or delete them to start over.`,
       );
     }
     throw err;

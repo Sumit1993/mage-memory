@@ -322,7 +322,17 @@ describe("mage groom --accept … --propose (ADR-0046)", () => {
     const [slug] = await stageDistinct(dir, 1);
     const commitSpy = vi.spyOn(gitModule, "gitCommit").mockRejectedValue(new Error("commit refused"));
     try {
-      await expect(groomCmd({ dir, accept: slug, propose: true })).rejects.toThrow(/commit refused/);
+      // the branch goes, but the note is already on disk with its draft consumed —
+      // the error has to say so or the user cannot find it
+      // One call only: a second would hit "no staged draft", which is precisely the
+      // dead end this message exists to prevent.
+      const err = await groomCmd({ dir, accept: slug, propose: true }).then(
+        () => null,
+        (e: unknown) => (e instanceof Error ? e.message : String(e)),
+      );
+      expect(err).toMatch(/commit refused/);
+      expect(err).toMatch(/uncommitted in your working tree/i);
+      expect(err).toMatch(/notes\//);
       const after = (await run("git", ["-C", repo, "rev-parse", "--abbrev-ref", "HEAD"])).stdout.trim();
       expect(after).toBe(before);
       const branches = (await run("git", ["-C", repo, "branch", "--list", "mage/proposal/*"])).stdout.trim();
