@@ -33,6 +33,8 @@ export interface ResolvedGrooming {
   sensitivity: Sensitivity;
   /** The opt-in autonomy level (ADR-0030); absent/junk ⇒ "operator". */
   autonomy: Autonomy;
+  /** Proposals setting (ADR-0046); absent/junk/non-boolean ⇒ false. */
+  proposals: boolean;
   /** The backlog-reminder window in hours (ADR-0030 §5); absent/non-number ⇒ undefined (caller defaults). */
   nudgeThrottleHours: number | undefined;
   /** The pre-registered autonomy keep-rate threshold (ADR-0031 P2 §7); absent/non-number ⇒ undefined (unset). */
@@ -67,6 +69,7 @@ export async function readGrooming(resolved: ResolvedDocsRoot): Promise<Resolved
   return {
     sensitivity: narrowSensitivity(raw?.sensitivity),
     autonomy: narrowAutonomy(raw?.autonomy),
+    proposals: typeof raw?.proposals === "boolean" ? raw.proposals : false,
     nudgeThrottleHours: typeof raw?.nudgeThrottleHours === "number" ? raw.nudgeThrottleHours : undefined,
     crownThreshold: typeof raw?.crownThreshold === "number" ? raw.crownThreshold : undefined,
   };
