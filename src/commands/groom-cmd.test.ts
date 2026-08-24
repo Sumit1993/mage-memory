@@ -257,6 +257,56 @@ describe("mage groom --accept … --propose (ADR-0046)", () => {
     );
   });
 
+  it("re-scans the INDEX after staging, catching a dirty KB file the first scan could not see", async () => {
+    const { dir, repo, root } = await withKb({
+      kind: "repo",
+      grooming: { proposals: true, autonomy: "overseer" },
+    });
+    await initRepoWithIdentity(repo);
+    await run("git", ["-C", repo, "add", "."]);
+    await run("git", ["-C", repo, "commit", "-m", "init"]);
+
+    const [slug] = await stageDistinct(dir, 1);
+    // An UNRELATED dirty file under the KB root. judgeProposal permits dirty paths
+    // inside the KB, and gitAdd sweeps it in — so only an index re-scan can catch it.
+    await mkdir(join(root, "notes"), { recursive: true });
+    await writeFile(join(root, "notes", "unrelated.md"), "aws key: AKIAIOSFODNN7EXAMPLE\n");
+
+    const pushSpy = vi.spyOn(gitModule, "gitPush").mockResolvedValue();
+    const prSpy = vi.spyOn(gitModule, "createPullRequest").mockResolvedValue("https://x/pull/1");
+    try {
+      await expect(groomCmd({ dir, accept: slug, propose: true })).rejects.toThrow(/redaction scan blocked/i);
+      expect(pushSpy).not.toHaveBeenCalled();
+      expect(prSpy).not.toHaveBeenCalled();
+    } finally {
+      pushSpy.mockRestore();
+      prSpy.mockRestore();
+    }
+  });
+
+  it("puts the user back on their original branch when the push fails", async () => {
+    const { dir, repo } = await withKb({
+      kind: "repo",
+      grooming: { proposals: true, autonomy: "overseer" },
+    });
+    await initRepoWithIdentity(repo);
+    await run("git", ["-C", repo, "add", "."]);
+    await run("git", ["-C", repo, "commit", "-m", "init"]);
+    const before = (await run("git", ["-C", repo, "rev-parse", "--abbrev-ref", "HEAD"])).stdout.trim();
+
+    const [slug] = await stageDistinct(dir, 1);
+    const pushSpy = vi.spyOn(gitModule, "gitPush").mockRejectedValue(new Error("no remote"));
+    try {
+      await expect(groomCmd({ dir, accept: slug, propose: true })).rejects.toThrow(/no remote/);
+      const after = (await run("git", ["-C", repo, "rev-parse", "--abbrev-ref", "HEAD"])).stdout.trim();
+      expect(after).toBe(before);
+      const branches = (await run("git", ["-C", repo, "branch", "--list", "mage/proposal/*"])).stdout.trim();
+      expect(branches).toBe("");
+    } finally {
+      pushSpy.mockRestore();
+    }
+  });
+
   it("creates branch, commits, pushes, opens PR, and stamps review", async () => {
     const { dir, repo } = await withKb({
       kind: "repo",

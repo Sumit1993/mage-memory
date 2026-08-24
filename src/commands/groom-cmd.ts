@@ -29,7 +29,10 @@ import {
   getDirtyPaths,
   getRepoRoot,
   gitAdd,
+  getCurrentBranch,
+  gitCheckoutBranch,
   gitCheckoutNewBranch,
+  gitDeleteBranch,
   gitCommit,
   gitPush,
   hasGh,
@@ -241,6 +244,22 @@ async function rejectBatch(
 
 // ─── propose: branch + commit + push + pr + review stamp (ADR-0046) ────────
 
+/**
+ * Best-effort return to where the user was before a failed proposal run: back to the
+ * original branch, and delete the proposal branch when it holds nothing pushed. Never
+ * throws — it runs on an error path and must not mask the real failure.
+ */
+async function restoreBranch(
+  repo: string,
+  originBranch: string | null,
+  proposalBranch: string,
+): Promise<void> {
+  if (!originBranch || originBranch === proposalBranch) return;
+  if (await gitCheckoutBranch(repo, originBranch)) {
+    await gitDeleteBranch(repo, proposalBranch);
+  }
+}
+
 async function proposeBatch(
   resolved: ResolvedDocsRoot,
   staged: StagedDraft[],
@@ -305,34 +324,57 @@ async function proposeBatch(
     throw new Error("gh (GitHub CLI) is required to open pull requests.");
   }
 
-  await gitCheckoutNewBranch(kbRepo, branchName);
+  const originBranch = await getCurrentBranch(kbRepo);
+  // Cut from the default branch, never from HEAD: on a feature branch the proposal PR
+  // would otherwise carry that branch's unrelated commits (ADR-0046 §1).
+  await gitCheckoutNewBranch(kbRepo, branchName, defaultBranch);
 
-  // Stamp channel at creation (ADR-0046 §4). No autonomy mark.
-  const stamp = await resolveCreationStamp(resolved, { channel: "pipeline" });
-  const accepted = await promoteBatch(root, selected, stamp);
-  await index({ dir: opts.dir, quiet: opts.json });
+  let accepted: string[];
+  let prUrl: string;
+  try {
+    // Stamp channel at creation (ADR-0046 §4). No autonomy mark.
+    const stamp = await resolveCreationStamp(resolved, { channel: "pipeline" });
+    accepted = await promoteBatch(root, selected, stamp);
+    await index({ dir: opts.dir, quiet: opts.json });
 
-  // Stage changes under docsRoot and commit
-  await gitAdd(kbRepo, [root]);
-  const commitMsg1 =
-    selected.length === 1
-      ? `feat(memory): propose note ${first.slug}`
-      : `feat(memory): propose ${selected.length} notes`;
-  await gitCommit(kbRepo, commitMsg1);
-  await gitPush(kbRepo, branchName);
+    // Stage changes under docsRoot and commit
+    await gitAdd(kbRepo, [root]);
 
-  // Open PR
-  const prTitle =
-    selected.length === 1
-      ? `feat(memory): propose note ${first.slug}`
-      : `feat(memory): propose ${selected.length} notes`;
-  const prBody = formatProposalPrBody(selected);
-  const prUrl = await createPullRequest(kbRepo, {
-    branch: branchName,
-    base: defaultBranch,
-    title: prTitle,
-    body: prBody,
-  });
+    // Gate-2 over what is ACTUALLY staged. The earlier scan ran before anything was
+    // added, so it saw an empty index; `gitAdd` sweeps in every dirty file under the
+    // KB root, which the dirty-path check deliberately permits (ADR-0014, ADR-0046 §7).
+    const indexScan = await scanStaged(kbRepo);
+    if (indexScan.blocked) {
+      throw new Error(
+        "mage groom --propose: the redaction scan blocked the staged content, so nothing was committed or pushed.",
+      );
+    }
+
+    const commitMsg1 =
+      selected.length === 1
+        ? `feat(memory): propose note ${first.slug}`
+        : `feat(memory): propose ${selected.length} notes`;
+    await gitCommit(kbRepo, commitMsg1);
+    await gitPush(kbRepo, branchName);
+
+    // Open PR
+    const prTitle =
+      selected.length === 1
+        ? `feat(memory): propose note ${first.slug}`
+        : `feat(memory): propose ${selected.length} notes`;
+    const prBody = formatProposalPrBody(selected);
+    prUrl = await createPullRequest(kbRepo, {
+      branch: branchName,
+      base: defaultBranch,
+      title: prTitle,
+      body: prBody,
+    });
+  } catch (err) {
+    // Leaving the user on a half-built proposal branch with their drafts already
+    // consumed is unrecoverable without hand-run git. Put them back where they were.
+    await restoreBranch(kbRepo, originBranch, branchName);
+    throw err;
+  }
 
   // Step 5: Follow-up commit stamping review
   try {

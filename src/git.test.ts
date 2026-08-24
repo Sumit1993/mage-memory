@@ -8,7 +8,9 @@ import {
   getDirtyPaths,
   getRepoRoot,
   gitAdd,
+  getCurrentBranch,
   gitCheckoutNewBranch,
+  gitCommit,
   gitInit,
   isGitRepo,
   noteExistsInHead,
@@ -148,5 +150,54 @@ describe("proposal git helpers", () => {
 
     const head = await run("git", ["-C", repo, "rev-parse", "--abbrev-ref", "HEAD"]);
     expect(head.stdout.trim()).toBe("mage/proposal/test-branch");
+  });
+});
+
+describe("getDirtyPaths — rename sources (ADR-0046 §7 gate)", () => {
+  async function repoWithCommit(): Promise<string> {
+    const repo = await tmp();
+    await gitInit(repo);
+    await run("git", ["-C", repo, "config", "user.email", "t@e.com"]);
+    await run("git", ["-C", repo, "config", "user.name", "t"]);
+    return repo;
+  }
+
+  it("reports a rename's SOURCE, so an outside→inside-KB move cannot slip the gate", async () => {
+    const repo = await repoWithCommit();
+    await run("mkdir", ["-p", join(repo, "src"), join(repo, "mage", "notes")]);
+    await writeFile(join(repo, "src", "foo.ts"), "hi\n");
+    await gitAdd(repo, [repo]);
+    await gitCommit(repo, "init");
+    await run("git", ["-C", repo, "mv", "src/foo.ts", "mage/notes/foo.md"]);
+
+    const dirty = await getDirtyPaths(repo);
+    expect(dirty).toContain("mage/notes/foo.md");
+    expect(dirty).toContain("src/foo.ts");
+    // and therefore the gate sees a path outside the KB
+    expect(filterDirtyPathsOutsideKb(repo, join(repo, "mage"), dirty)).toEqual(["src/foo.ts"]);
+  });
+});
+
+describe("gitCheckoutNewBranch start point", () => {
+  it("cuts from the given branch, not from HEAD", async () => {
+    const repo = await tmp();
+    await gitInit(repo);
+    await run("git", ["-C", repo, "config", "user.email", "t@e.com"]);
+    await run("git", ["-C", repo, "config", "user.name", "t"]);
+    await writeFile(join(repo, "a.txt"), "a\n");
+    await gitAdd(repo, [repo]);
+    await gitCommit(repo, "base");
+    const base = await getCurrentBranch(repo);
+
+    await gitCheckoutNewBranch(repo, "feature");
+    await writeFile(join(repo, "b.txt"), "b\n");
+    await gitAdd(repo, [repo]);
+    await gitCommit(repo, "unrelated feature work");
+
+    // from the feature branch, cut a proposal branch off the base branch
+    await gitCheckoutNewBranch(repo, "mage/proposal/x", base ?? "main");
+    const log = await run("git", ["-C", repo, "log", "--oneline"]);
+    expect(log.stdout).not.toContain("unrelated feature work");
+    expect(log.stdout).toContain("base");
   });
 });
