@@ -343,6 +343,7 @@ async function proposeBatch(
   // Tracked outside the try: promoteBatch consumes the staged drafts, so if a later step
   // throws the error must be able to say where the notes ended up.
   let promoted: string[] = [];
+  let pushed = false;
   try {
     // Stamp channel at creation (ADR-0046 §4). No autonomy mark.
     const stamp = await resolveCreationStamp(resolved, { channel: "pipeline" });
@@ -369,6 +370,7 @@ async function proposeBatch(
         : `feat(memory): propose ${selected.length} notes`;
     await gitCommit(kbRepo, commitMsg1);
     await gitPush(kbRepo, branchName);
+    pushed = true;
 
     // Open PR
     const prTitle =
@@ -388,8 +390,13 @@ async function proposeBatch(
     const kept = await restoreBranch(kbRepo, originBranch, branchName, defaultBranch);
     const why = err instanceof Error ? err.message : String(err);
     if (kept) {
+      // The right advice depends entirely on whether the push landed, and only a live run
+      // shows the difference: every test mocks gitPush.
+      const next = pushed
+        ? `It is already pushed, so finish by hand once the cause is fixed:\n  gh pr create --head ${kept} --base ${defaultBranch}`
+        : "It has NOT been pushed, so this branch is the only copy. Push it or cherry-pick from it once the cause is fixed.";
       throw new Error(
-        `${why}\n\nYour notes are committed on \`${kept}\`, which has been left in place — the staged drafts are already consumed, so this branch is the only copy. Push it or cherry-pick from it once the cause is fixed.`,
+        `${why}\n\nYour notes are committed on \`${kept}\`, which has been left in place — the staged drafts are already consumed. ${next}`,
       );
     }
     if (promoted.length > 0) {
