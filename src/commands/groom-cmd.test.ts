@@ -368,6 +368,33 @@ describe("mage groom --accept … --propose (ADR-0046)", () => {
     }
   });
 
+  it("never claims a commit that was not made, even when checkout-back fails", async () => {
+    const { dir, repo } = await withKb({
+      kind: "repo",
+      grooming: { proposals: true, autonomy: "overseer" },
+    });
+    await initRepoWithIdentity(repo);
+    await run("git", ["-C", repo, "add", "."]);
+    await run("git", ["-C", repo, "commit", "-m", "init"]);
+
+    const [slug] = await stageDistinct(dir, 1);
+    // fail before the commit, and make the return to the original branch fail too
+    const addSpy = vi.spyOn(gitModule, "gitAdd").mockRejectedValue(new Error("add refused"));
+    const backSpy = vi.spyOn(gitModule, "gitCheckoutBranch").mockResolvedValue(false);
+    try {
+      const err = await groomCmd({ dir, accept: slug, propose: true }).then(
+        () => null,
+        (e: unknown) => (e instanceof Error ? e.message : String(e)),
+      );
+      expect(err).toMatch(/add refused/);
+      expect(err).toMatch(/Nothing was committed/i);
+      expect(err).not.toMatch(/notes are committed on/i);
+    } finally {
+      addSpy.mockRestore();
+      backSpy.mockRestore();
+    }
+  });
+
   it("deletes the proposal branch when the run failed BEFORE any commit", async () => {
     const { dir, repo } = await withKb({
       kind: "repo",

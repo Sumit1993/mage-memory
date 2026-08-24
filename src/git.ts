@@ -62,14 +62,20 @@ export async function getDefaultBranch(repoPath: string): Promise<string> {
   if (originHead.code === 0 && originHead.stdout.trim()) {
     return originHead.stdout.trim().replace(/^origin\//, "");
   }
-  const initDefault = await run("git", ["-C", repoPath, "config", "init.defaultBranch"]);
-  if (initDefault.code === 0 && initDefault.stdout.trim()) {
-    return initDefault.stdout.trim();
-  }
+  // Refs that EXIST decide first. `init.defaultBranch` is a global preference for repos
+  // yet to be created and says nothing about this one, so it ranks below both.
   const hasMain = await run("git", ["-C", repoPath, "rev-parse", "--verify", "refs/heads/main"]);
   if (hasMain.code === 0) return "main";
   const hasMaster = await run("git", ["-C", repoPath, "rev-parse", "--verify", "refs/heads/master"]);
   if (hasMaster.code === 0) return "master";
+  const remoteMain = await run("git", ["-C", repoPath, "rev-parse", "--verify", "refs/remotes/origin/main"]);
+  if (remoteMain.code === 0) return "main";
+  const remoteMaster = await run("git", ["-C", repoPath, "rev-parse", "--verify", "refs/remotes/origin/master"]);
+  if (remoteMaster.code === 0) return "master";
+  const initDefault = await run("git", ["-C", repoPath, "config", "init.defaultBranch"]);
+  if (initDefault.code === 0 && initDefault.stdout.trim()) {
+    return initDefault.stdout.trim();
+  }
   return "main";
 }
 

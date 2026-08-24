@@ -8,7 +8,7 @@
 // Hidden plumbing behind the `mage:groom` skill. Accept is the ONLY thing that
 // writes into committed `notes/`; the human still commits the diff (ADR-0013).
 
-import { readFile } from "node:fs/promises";
+import { readFile, realpath } from "node:fs/promises";
 import { join } from "node:path";
 import { logger } from "../logger.js";
 import { type ResolvedDocsRoot, requireDocsRoot, stagingPath } from "../paths.js";
@@ -278,7 +278,9 @@ async function proposeBatch(
   opts: GroomOptions,
 ): Promise<GroomResult> {
   const root = resolved.root;
-  const kbRepo = resolved.repo;
+  // getRepoRoot returns a realpath'd toplevel, so an un-canonicalised kbRepo makes the
+  // gate's equality check misfire on a symlinked dir or a trailing slash.
+  const kbRepo = await realpath(resolved.repo).catch(() => resolved.repo);
   const selected = select(spec, staged);
 
   const first = selected[0];
@@ -351,6 +353,7 @@ async function proposeBatch(
   // Tracked outside the try: promoteBatch consumes the staged drafts, so if a later step
   // throws the error must be able to say where the notes ended up.
   let promoted: string[] = [];
+  let committed = false;
   let pushed = false;
   try {
     // Stamp channel at creation (ADR-0046 §4). No autonomy mark.
@@ -377,6 +380,7 @@ async function proposeBatch(
         ? `feat(memory): propose note ${first.slug}`
         : `feat(memory): propose ${selected.length} notes`;
     await gitCommit(kbRepo, commitMsg1);
+    committed = true;
     await gitPush(kbRepo, branchName);
     pushed = true;
 
@@ -397,7 +401,7 @@ async function proposeBatch(
     // consumed is unrecoverable without hand-run git. Put them back where they were.
     const kept = await restoreBranch(kbRepo, originBranch, branchName, defaultBranch, startPoint);
     const why = err instanceof Error ? err.message : String(err);
-    if (kept) {
+    if (kept && committed) {
       // The right advice depends entirely on whether the push landed, and only a live run
       // shows the difference: every test mocks gitPush.
       const next = pushed
@@ -405,6 +409,13 @@ async function proposeBatch(
         : "It has NOT been pushed, so this branch is the only copy. Push it or cherry-pick from it once the cause is fixed.";
       throw new Error(
         `${why}\n\nYour notes are committed on \`${kept}\`, which has been left in place — the staged drafts are already consumed. ${next}`,
+      );
+    }
+    if (kept && !committed) {
+      // restoreBranch also returns the branch when it simply could not check out away
+      // from it. That is not evidence of a commit, so say what is actually true.
+      throw new Error(
+        `${why}\n\nNothing was committed. You may still be on \`${kept}\`; the ${promoted.length} promoted note(s) are uncommitted in your working tree${promoted.length > 0 ? `: ${promoted.join(", ")}` : ""}.`,
       );
     }
     if (promoted.length > 0) {

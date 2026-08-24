@@ -237,3 +237,18 @@ describe("resolveBranchRef — the CI shape (origin/main, no local main)", () =>
     expect(await resolveBranchRef(repo, "nope")).toBeNull();
   });
 });
+
+describe("getDefaultBranch precedence", () => {
+  it("prefers a branch that EXISTS over the global init.defaultBranch preference", async () => {
+    const repo = await tmp();
+    await run("git", ["-C", repo, "init", "-q", "-b", "master", "."]);
+    await run("git", ["-C", repo, "config", "user.email", "t@e.com"]);
+    await run("git", ["-C", repo, "config", "user.name", "t"]);
+    // the common developer setup: global preference says main, this repo is master
+    await run("git", ["-C", repo, "config", "init.defaultBranch", "main"]);
+    await writeFile(join(repo, "a.txt"), "a\n");
+    await gitAdd(repo, [repo]);
+    await gitCommit(repo, "base");
+    expect(await getDefaultBranch(repo)).toBe("master");
+  });
+});
