@@ -88,6 +88,10 @@ export async function getDirtyPaths(repoPath: string): Promise<string[]> {
     const path = entry.slice(3);
     if (path) paths.push(path);
     if (status.includes("R") || status.includes("C")) {
+      // porcelain -z emits `XY <new>\0<orig>\0`. A RENAME's source is a real change
+      // outside the KB and must be seen; a COPY leaves its source untouched.
+      const origPath = entries[i + 1];
+      if (status.includes("R") && origPath) paths.push(origPath);
       i++;
     }
   }
@@ -113,8 +117,36 @@ export function filterDirtyPathsOutsideKb(
 /**
  * Create and check out a new branch in `repoPath`.
  */
-export async function gitCheckoutNewBranch(repoPath: string, branchName: string): Promise<void> {
-  await run("git", ["-C", repoPath, "checkout", "-b", branchName], { throwOnError: true });
+export async function gitCheckoutNewBranch(
+  repoPath: string,
+  branchName: string,
+  startPoint?: string,
+): Promise<void> {
+  // Without a start point this cuts from HEAD, so a feature branch's unrelated commits
+  // ride into a proposal PR opened against the default branch (ADR-0046 §1).
+  const args = ["-C", repoPath, "checkout", "-b", branchName];
+  if (startPoint) args.push(startPoint);
+  await run("git", args, { throwOnError: true });
+}
+
+/** Check out an existing branch. Returns false instead of throwing. */
+export async function gitCheckoutBranch(repoPath: string, branchName: string): Promise<boolean> {
+  const r = await run("git", ["-C", repoPath, "checkout", branchName]);
+  return r.code === 0;
+}
+
+/** Force-delete a local branch. Returns false instead of throwing. */
+export async function gitDeleteBranch(repoPath: string, branchName: string): Promise<boolean> {
+  const r = await run("git", ["-C", repoPath, "branch", "-D", branchName]);
+  return r.code === 0;
+}
+
+/** The branch currently checked out, or null when detached / not a repo. */
+export async function getCurrentBranch(repoPath: string): Promise<string | null> {
+  const r = await run("git", ["-C", repoPath, "rev-parse", "--abbrev-ref", "HEAD"]);
+  if (r.code !== 0) return null;
+  const name = r.stdout.trim();
+  return name && name !== "HEAD" ? name : null;
 }
 
 /**
