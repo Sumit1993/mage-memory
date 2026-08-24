@@ -36,7 +36,7 @@ keywords:
 
 # 0044 — Setup is a conversation over one address (ADR-C, Wave C of ADR-0041)
 
-> **Status: proposed (grilled 2026-07-31).** This is the ADR-C that
+> **Status: accepted (2026-08-24; grilled 2026-07-31).** This is the ADR-C that
 > [ADR-0041](0041-genre-decides-the-recall-rung.md)'s wave plan named and never
 > drafted, closing [#104](https://github.com/Sumit1993/mage-memory/issues/104).
 > It sits **on top of** [ADR-0042](0042-reach-tier-harness-grants.md) (grants) and
@@ -241,9 +241,12 @@ model the operator must understand the first time anything breaks.
 
 ## Ratification
 
-This ADR stays `proposed` until its implementation ships and one real setup run —
-a fresh code repo linked to each of a remote-backed hub and a local-only hub —
-completes without consulting the source. **KILL if** the confirmation step in §5
+Ratified 2026-08-24, ahead of its implementation: ADR-0045 amends this record, and
+amending an unratified decision is what produced the six-deep stack this repo spent a
+release unwinding. The acceptance test still stands as a release gate rather than a
+ratification gate — one real setup run, a fresh code repo linked to each of a
+remote-backed hub and a local-only hub, completing without consulting the source.
+**KILL if** the confirmation step in §5
 proves to be the enter-key reflex it was meant to avoid (measured by whether any
 `--storage` override is ever issued after a confirmation), or if the `local://`
 scheme collides with a real-world remote form not anticipated in §3.

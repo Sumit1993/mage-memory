@@ -163,9 +163,18 @@ branch name, the redaction result and â€” for the branch it is about to create â
 It returns either permission or the message shown verbatim to the user. It reads no environment
 variable and no terminal state; a test asserts that.
 
-It refuses when: the setting is not enabled; the target branch is the default branch or outside the
-reserved prefix; the redaction scan blocked; the repository is not the one the resolved knowledge
-base lives in; or the working tree holds changes outside recognised knowledge-base paths.
+It refuses on seven conditions, checked in this order, first match winning so the message is
+always the most fundamental reason:
+
+1. the setting is not enabled;
+2. the target branch is the default branch;
+3. the target branch is outside the reserved prefix;
+4. the redaction scan blocked;
+5. the repository is not the one the resolved knowledge base lives in;
+6. the working tree holds changes outside recognised knowledge-base paths;
+7. the run would propose more notes than the cap.
+
+Every message says what to do next, not only what went wrong.
 
 **Config field.** One more key in the `grooming` block read by `readGrooming` in
 `src/grooming/config.ts`, narrowed the same way as `autonomy` and `sensitivity`, absent meaning off.
