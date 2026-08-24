@@ -4,6 +4,7 @@
 
 > 41 accepted decisions govern this repo — read `decisions/` before architectural or scope changes.
 
+- `gotcha` [CI propose probe full (delete me)](notes/ci-propose-probe-full-delete-me.md) — mage
 - `reference` [The boundary nudge — internals + where each piece lives](notes/boundary-nudge-internals.md) — digest, startup, session-start, watermark, once-per-chapter, teaser, two-channel, systemMessage, additionalContext, offer-first
 - `gotcha` [Gotcha — distill's corrections lens counts harness notifications as user corrections](notes/harness-notifications-pollute-the-corrections-lens.md) — task-notification, monitor-event, user-prompt, capture-schema, signal-to-noise, background-agents, groom
 - `principle` [mage is one durable memory — of hard-earned knowledge](notes/mage-is-durable-memory.md) — charter, identity, unified-memory, portable, notes-are-memories, insight, procedure, gotcha, pointer
@@ -42,4 +43,4 @@
 - `gotcha` [Gotcha — scope Gate-2 to the knowledge base, not the whole repo](notes/gate2-blocks-own-redaction-fixtures.md) — pre-commit, hook, docs-root, connect, dogfood
 - `gotcha` [Gotcha — key bodies with `-`/`_` partially leak past the high-entropy detector](notes/redaction-anthropic-key-detector.md) — mage
 
-> 37 memory notes total (37 shown). Read INDEX.md before non-trivial work.
+> 38 memory notes total (38 shown). Read INDEX.md before non-trivial work.

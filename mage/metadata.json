@@ -5,5 +5,8 @@
   "hub_path": null,
   "hub_repo": null,
   "hub_refs": [],
-  "linked_at": "2026-06-01T16:25:32Z"
+  "linked_at": "2026-06-01T16:25:32Z",
+  "grooming": {
+    "proposals": true
+  }
 }
