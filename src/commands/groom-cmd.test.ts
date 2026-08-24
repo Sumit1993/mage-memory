@@ -226,6 +226,34 @@ describe("mage groom --accept … --propose (ADR-0046)", () => {
     );
   });
 
+  it("treats the whole hub repo as inside the KB (a hub IS the knowledge base)", async () => {
+    // Measured in a real external-mode CI run: the hub's own metadata.json read as
+    // "outside the knowledge base" and refused the run before anything could happen.
+    const { dir, repo, root } = await withKb({ kind: "external", grooming: { proposals: true } });
+    await initRepoWithIdentity(repo);
+    await run("git", ["-C", repo, "add", "."]);
+    await run("git", ["-C", repo, "commit", "-m", "init"]);
+    expect(root).not.toBe(repo); // hub-owned project docs live under projects/<name>/
+
+    const [slug] = await stageDistinct(dir, 1);
+    // dirty hub-ROOT file, exactly the shape that blocked CI
+    await writeFile(join(repo, "metadata.json"), await readFile(join(repo, "metadata.json"), "utf8"));
+    await writeFile(join(repo, "INDEX.md"), "# regenerated\n");
+
+    const pushSpy = vi.spyOn(gitModule, "gitPush").mockResolvedValue();
+    const prSpy = vi.spyOn(gitModule, "createPullRequest").mockResolvedValue("https://x/pull/1");
+    try {
+      const err = await groomCmd({ dir, accept: slug, propose: true }).then(
+        () => null,
+        (e: unknown) => (e instanceof Error ? e.message : String(e)),
+      );
+      expect(String(err ?? "")).not.toMatch(/outside knowledge base/i);
+    } finally {
+      pushSpy.mockRestore();
+      prSpy.mockRestore();
+    }
+  });
+
   it("refuses when dirty paths exist outside the knowledge base", async () => {
     const { dir, repo } = await withKb({ kind: "repo", grooming: { proposals: true } });
     await initRepoWithIdentity(repo);

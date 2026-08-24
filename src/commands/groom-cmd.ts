@@ -277,10 +277,10 @@ async function proposeBatch(
   spec: string,
   opts: GroomOptions,
 ): Promise<GroomResult> {
-  const root = resolved.root;
   // getRepoRoot returns a realpath'd toplevel, so an un-canonicalised kbRepo makes the
   // gate's equality check misfire on a symlinked dir or a trailing slash.
   const kbRepo = await realpath(resolved.repo).catch(() => resolved.repo);
+  const root = await realpath(resolved.root).catch(() => resolved.root);
   const selected = select(spec, staged);
 
   const first = selected[0];
@@ -312,7 +312,12 @@ async function proposeBatch(
   }
 
   const dirtyPaths = await getDirtyPaths(kbRepo);
-  const dirtyPathsOutsideKb = filterDirtyPathsOutsideKb(kbRepo, root, dirtyPaths);
+  // A hub repo IS the knowledge base in its entirety (ADR-0012), so for a hub-owned KB
+  // the boundary is the repo, not `<hub>/projects/<name>/`. Measured in CI: the hub's own
+  // metadata.json — the file that carries `grooming.proposals` — read as outside the KB
+  // and refused every run, and `mage index` rewrites hub-root INDEX.md on every run too.
+  const kbBoundary = resolved.kind === "hub" ? kbRepo : root;
+  const dirtyPathsOutsideKb = filterDirtyPathsOutsideKb(kbRepo, kbBoundary, dirtyPaths);
 
   const verdict = judgeProposal({
     repoRoot,
