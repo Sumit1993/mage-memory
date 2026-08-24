@@ -2,7 +2,7 @@
 
 # Index
 
-> 38 accepted decisions govern this repo — read `decisions/` before architectural or scope changes.
+> 41 accepted decisions govern this repo — read `decisions/` before architectural or scope changes.
 
 - `reference` [The boundary nudge — internals + where each piece lives](notes/boundary-nudge-internals.md) — digest, startup, session-start, watermark, once-per-chapter, teaser, two-channel, systemMessage, additionalContext, offer-first
 - `gotcha` [Gotcha — distill's corrections lens counts harness notifications as user corrections](notes/harness-notifications-pollute-the-corrections-lens.md) — task-notification, monitor-event, user-prompt, capture-schema, signal-to-noise, background-agents, groom

@@ -3,9 +3,9 @@ type: decision
 tags:
   - mage/decisions
 created: "2026-07-31"
-updated: 2026-07-31
-last_reviewed: 2026-07-31
-status: proposed
+updated: 2026-08-22
+last_reviewed: 2026-08-22
+status: accepted
 provenance:
   repo: mage-memory
   work: adr-c-setup-conversation
@@ -36,7 +36,7 @@ keywords:
 
 # 0044 — Setup is a conversation over one address (ADR-C, Wave C of ADR-0041)
 
-> **Status: proposed (grilled 2026-07-31).** This is the ADR-C that
+> **Status: accepted (2026-08-22; grilled 2026-07-31).** This is the ADR-C that
 > [ADR-0041](0041-genre-decides-the-recall-rung.md)'s wave plan named and never
 > drafted, closing [#104](https://github.com/Sumit1993/mage-memory/issues/104).
 > It sits **on top of** [ADR-0042](0042-reach-tier-harness-grants.md) (grants) and
@@ -139,6 +139,8 @@ path free of network calls.
 > the hub, which contradicted this ADR's own Relations line. Recorded here rather
 > than silently corrected: **`connect` obtains, `link` registers, and neither
 > borrows the other's job.**
+>
+> **Amendment (2026-08-22, [ADR-0045](0045-cross-environment-presence.md)).** This section stands. `connect` obtains and asks; `link` registers an address and never clones. No obtain verb and no registration-of-location verb are added — a clone is only ever found at its derived path (ADR-0045 §2). In CI the clone is placed there by an ordinary checkout with `$MAGE_HOME` pointed into the workspace, so clone-on-demand stays wired to `connect` alone.
 
 A filesystem path still works as a deprecated shim: mage reads its origin,
 resolves the address, **prints the canonical command**, warns, and — having
@@ -239,9 +241,12 @@ model the operator must understand the first time anything breaks.
 
 ## Ratification
 
-This ADR stays `proposed` until its implementation ships and one real setup run —
-a fresh code repo linked to each of a remote-backed hub and a local-only hub —
-completes without consulting the source. **KILL if** the confirmation step in §5
+Ratified 2026-08-22, ahead of its implementation: ADR-0045 amends this record, and
+amending an unratified decision is what produced the six-deep stack this repo spent a
+release unwinding. The acceptance test still stands as a release gate rather than a
+ratification gate — one real setup run, a fresh code repo linked to each of a
+remote-backed hub and a local-only hub, completing without consulting the source.
+**KILL if** the confirmation step in §5
 proves to be the enter-key reflex it was meant to avoid (measured by whether any
 `--storage` override is ever issued after a confirmation), or if the `local://`
 scheme collides with a real-world remote form not anticipated in §3.
@@ -254,3 +259,4 @@ scheme collides with a real-world remote form not anticipated in §3.
 - Sits on [ADR-0042](0042-reach-tier-harness-grants.md) — grants are unchanged
 - Honors [ADR-0009](0009-no-runtime-automation-rides-host-hooks.md): setup asks and
   suggests; it starts no watcher and clones only from `connect`
+- amended_by [ADR-0045 — Cross-environment presence](0045-cross-environment-presence.md) (§4 obtain plumbing vs human surface)

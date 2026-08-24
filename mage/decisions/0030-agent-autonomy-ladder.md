@@ -3,8 +3,8 @@ type: decision
 tags:
   - mage/decisions
 created: "2026-06-21"
-updated: 2026-07-10
-last_reviewed: 2026-07-10
+updated: 2026-08-22
+last_reviewed: 2026-08-22
 status: active
 provenance:
   repo: mage-memory
@@ -84,6 +84,12 @@ direct tooling precedent of **Claude Code's own permission modes** (`default` �
 3. **The irreducible floor, at EVERY level — this is what makes high autonomy safe:**
    - **mage never commits → the git commit is the human's confirm** (ADR-0013). Autonomous writes land
      in the working tree *uncommitted*; reviewing the diff is the review, the commit is the "yes".
+     > **Amendment (2026-08-22, [ADR-0046](0046-derived-hub-git-and-merge-ratification.md)).** In the
+     > ADR-0046 pipeline lane the same floor takes its second form: autonomous writes land on a reserved
+     > branch of the KB's own repo, un-merged; the merge is the confirm. Both forms keep the human on the loop —
+     > the HOOTL impossibility claim stands. The Operator/Approver/Overseer ladder itself is untouched:
+     > it governs grooming judgment in a session; ADR-0046 governs transport. The two dials are
+     > independent by design.
    - **Gate-2 redaction always runs** before any tracked write (ADR-0014), regardless of level.
    - **mage's engine never calls a model** (ADR-0009): the CLI only string-templates a mandate by
      reading a config field; the host agent does all judgment and writing; mage spawns no process.
@@ -228,6 +234,7 @@ This closes the "non-compacting user never sees a keeper" gap while preserving t
   model-free (it only templates a mandate; the host agent reasons).
 - **bounded_by** [ADR-0013](0013-procedure-skills-self-grooming-loop.md) — the commit IS the human's
   confirm; this is the floor that caps the ladder at HOTL.
+- **amended_by** [ADR-0046](0046-derived-hub-git-and-merge-ratification.md) — §3: floor takes second form on pipeline branches; HOTL ceiling reaffirmed.
 - **rides** [ADR-0014](0014-two-gate-redaction.md) — Gate-2 redaction before any autonomous tracked write.
 - **mirrors** [ADR-0016](0016-context-match-confidence-ladder-applier.md) — the existing propose-only →
   higher-rung applier ladder; same shape, new domain.

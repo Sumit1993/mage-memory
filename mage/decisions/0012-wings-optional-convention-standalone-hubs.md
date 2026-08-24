@@ -2,7 +2,7 @@
 type: decision
 tags: [mage/decisions]
 created: "2026-06-03"
-updated: "2026-06-03"
+updated: "2026-08-22"
 last_reviewed: "2026-06-03"
 status: active
 provenance:
@@ -30,6 +30,7 @@ mage was framed "for software systems," and its hub mechanics encode that: a "pr
    - `mage init <name>` → a **hub** at that location (bare name → `./<name>`; a path → that path, like `git init`/`npm init`); inside a git repo it *warns* about nesting.
    - `--in-repo` / `--hub` + `-y` are the explicit non-interactive forms (agents/CI). The word `--external` is **retired** (capability = `--hub`; its create-as-sibling magic is dropped). `mage link` is unchanged.
    - **`init` stays suggest-only** — it prints the exact commit command and **never runs git** (the "mage never runs git" invariant stays absolute; an agent must never land a surprise commit).
+     > **Amendment (2026-08-22, [ADR-0046](0046-derived-hub-git-and-merge-ratification.md)).** The invariant is restated in terms of what mage *produces*, because "never runs git" was already inaccurate: `connect` clones on consent, and the pre-commit gate re-stages files during a commit the human started. mage may run git in the repository that holds the knowledge base, but the only thing it may produce is **a branch and a pull request** — never a commit on a default branch, never a push outside that branch, and only when explicitly invoked. `init` stays suggest-only regardless.
 
 4. **The system is a wing** (hub-level notes). Cross-cutting hub notes — `relationship`s, hub-wide ADRs, the MAP/MOC — tag the **hub's own name** as their wing (`prismalens/relationships`, `prismalens/decisions`). No magic `_hub`/`meta` wing; the whole-system scope is just a wing. "Cross-cutting" remains the fallback for genuinely unscoped notes.
 
@@ -61,5 +62,6 @@ mage was framed "for software systems," and its hub mechanics encode that: a "pr
 - extends [ADR-0011 — recursive scan; hub projects are wings](0011-recursive-scan-hub-projects.md)
 - refines [ADR-0006 — two-layer recall](0006-two-layer-recall-per-wing-skills.md)
 - see_also [ADR-0009 — no runtime; automation rides host hooks](0009-no-runtime-automation-rides-host-hooks.md)
+- amended_by [ADR-0046 — a branch and a pull request are the only way knowledge lands](0046-derived-hub-git-and-merge-ratification.md) (§1: invariant re-keyed on the outcome)
 - realizes [migration field notes](../notes/migration-field-notes.md)
 - informs [mage roadmap](../work/roadmap.md)
