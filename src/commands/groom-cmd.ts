@@ -29,6 +29,7 @@ import {
   getDirtyPaths,
   getRepoRoot,
   gitAdd,
+  branchHasUniqueCommits,
   getCurrentBranch,
   gitCheckoutBranch,
   gitCheckoutNewBranch,
@@ -245,19 +246,21 @@ async function rejectBatch(
 // ─── propose: branch + commit + push + pr + review stamp (ADR-0046) ────────
 
 /**
- * Best-effort return to where the user was before a failed proposal run: back to the
- * original branch, and delete the proposal branch when it holds nothing pushed. Never
- * throws — it runs on an error path and must not mask the real failure.
+ * Best-effort return to where the user was before a failed proposal run. The branch is
+ * deleted ONLY when it holds no commit of its own: once `gitCommit` has run, the promoted
+ * note exists nowhere else (the draft is already consumed), so deleting would destroy it.
+ * Returns the branch name when it was kept, so the caller can say so. Never throws.
  */
 async function restoreBranch(
   repo: string,
   originBranch: string | null,
   proposalBranch: string,
-): Promise<void> {
-  if (!originBranch || originBranch === proposalBranch) return;
-  if (await gitCheckoutBranch(repo, originBranch)) {
-    await gitDeleteBranch(repo, proposalBranch);
-  }
+): Promise<string | null> {
+  if (!originBranch || originBranch === proposalBranch) return proposalBranch;
+  if (!(await gitCheckoutBranch(repo, originBranch))) return proposalBranch;
+  if (await branchHasUniqueCommits(repo, originBranch, proposalBranch)) return proposalBranch;
+  await gitDeleteBranch(repo, proposalBranch);
+  return null;
 }
 
 async function proposeBatch(
@@ -372,7 +375,13 @@ async function proposeBatch(
   } catch (err) {
     // Leaving the user on a half-built proposal branch with their drafts already
     // consumed is unrecoverable without hand-run git. Put them back where they were.
-    await restoreBranch(kbRepo, originBranch, branchName);
+    const kept = await restoreBranch(kbRepo, originBranch, branchName);
+    if (kept) {
+      const why = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        `${why}\n\nYour notes are committed on \`${kept}\`, which has been left in place — the staged drafts are already consumed, so this branch is the only copy. Push it or cherry-pick from it once the cause is fixed.`,
+      );
+    }
     throw err;
   }
 

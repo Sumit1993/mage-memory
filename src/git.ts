@@ -135,6 +135,17 @@ export async function gitCheckoutBranch(repoPath: string, branchName: string): P
   return r.code === 0;
 }
 
+/** True when `branch` holds commits that `base` does not. Fail-safe: true on error. */
+export async function branchHasUniqueCommits(
+  repoPath: string,
+  base: string,
+  branch: string,
+): Promise<boolean> {
+  const r = await run("git", ["-C", repoPath, "rev-list", `${base}..${branch}`]);
+  if (r.code !== 0) return true; // cannot tell ⇒ assume it holds work, never discard
+  return r.stdout.trim().length > 0;
+}
+
 /** Force-delete a local branch. Returns false instead of throwing. */
 export async function gitDeleteBranch(repoPath: string, branchName: string): Promise<boolean> {
   const r = await run("git", ["-C", repoPath, "branch", "-D", branchName]);

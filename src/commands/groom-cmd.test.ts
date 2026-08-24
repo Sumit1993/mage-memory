@@ -284,7 +284,7 @@ describe("mage groom --accept … --propose (ADR-0046)", () => {
     }
   });
 
-  it("puts the user back on their original branch when the push fails", async () => {
+  it("keeps the proposal branch when the push fails AFTER the commit — the note lives only there", async () => {
     const { dir, repo } = await withKb({
       kind: "repo",
       grooming: { proposals: true, autonomy: "overseer" },
@@ -297,13 +297,38 @@ describe("mage groom --accept … --propose (ADR-0046)", () => {
     const [slug] = await stageDistinct(dir, 1);
     const pushSpy = vi.spyOn(gitModule, "gitPush").mockRejectedValue(new Error("no remote"));
     try {
-      await expect(groomCmd({ dir, accept: slug, propose: true })).rejects.toThrow(/no remote/);
+      // The draft is already consumed by promoteBatch, so the commit on the proposal
+      // branch is the ONLY copy of the note. Deleting it would be data loss.
+      await expect(groomCmd({ dir, accept: slug, propose: true })).rejects.toThrow(/only copy/i);
+      const after = (await run("git", ["-C", repo, "rev-parse", "--abbrev-ref", "HEAD"])).stdout.trim();
+      expect(after).toBe(before);
+      const branches = (await run("git", ["-C", repo, "branch", "--list", "mage/proposal/*"])).stdout;
+      expect(branches).toContain("mage/proposal/");
+    } finally {
+      pushSpy.mockRestore();
+    }
+  });
+
+  it("deletes the proposal branch when the run failed BEFORE any commit", async () => {
+    const { dir, repo } = await withKb({
+      kind: "repo",
+      grooming: { proposals: true, autonomy: "overseer" },
+    });
+    await initRepoWithIdentity(repo);
+    await run("git", ["-C", repo, "add", "."]);
+    await run("git", ["-C", repo, "commit", "-m", "init"]);
+    const before = (await run("git", ["-C", repo, "rev-parse", "--abbrev-ref", "HEAD"])).stdout.trim();
+
+    const [slug] = await stageDistinct(dir, 1);
+    const commitSpy = vi.spyOn(gitModule, "gitCommit").mockRejectedValue(new Error("commit refused"));
+    try {
+      await expect(groomCmd({ dir, accept: slug, propose: true })).rejects.toThrow(/commit refused/);
       const after = (await run("git", ["-C", repo, "rev-parse", "--abbrev-ref", "HEAD"])).stdout.trim();
       expect(after).toBe(before);
       const branches = (await run("git", ["-C", repo, "branch", "--list", "mage/proposal/*"])).stdout.trim();
       expect(branches).toBe("");
     } finally {
-      pushSpy.mockRestore();
+      commitSpy.mockRestore();
     }
   });
 
