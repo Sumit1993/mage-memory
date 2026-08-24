@@ -338,6 +338,36 @@ describe("mage groom --accept … --propose (ADR-0046)", () => {
     }
   });
 
+  it("when the push landed and only the PR failed, says so and gives the gh command", async () => {
+    // The live run hit exactly this: push succeeded, gh pr create failed, and the old
+    // message still told the user to push. No test could catch it — they all mock push.
+    const { dir, repo } = await withKb({
+      kind: "repo",
+      grooming: { proposals: true, autonomy: "overseer" },
+    });
+    await initRepoWithIdentity(repo);
+    await run("git", ["-C", repo, "add", "."]);
+    await run("git", ["-C", repo, "commit", "-m", "init"]);
+
+    const [slug] = await stageDistinct(dir, 1);
+    const pushSpy = vi.spyOn(gitModule, "gitPush").mockResolvedValue();
+    const prSpy = vi
+      .spyOn(gitModule, "createPullRequest")
+      .mockRejectedValue(new Error("no known GitHub host"));
+    try {
+      const err = await groomCmd({ dir, accept: slug, propose: true }).then(
+        () => null,
+        (e: unknown) => (e instanceof Error ? e.message : String(e)),
+      );
+      expect(err).toMatch(/already pushed/i);
+      expect(err).toMatch(/gh pr create --head mage\/proposal\//);
+      expect(err).not.toMatch(/has NOT been pushed/i);
+    } finally {
+      pushSpy.mockRestore();
+      prSpy.mockRestore();
+    }
+  });
+
   it("deletes the proposal branch when the run failed BEFORE any commit", async () => {
     const { dir, repo } = await withKb({
       kind: "repo",
