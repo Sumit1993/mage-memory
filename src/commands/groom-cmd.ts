@@ -30,6 +30,7 @@ import {
   getRepoRoot,
   gitAdd,
   branchHasUniqueCommits,
+  resolveBranchRef,
   getCurrentBranch,
   gitCheckoutBranch,
   gitCheckoutNewBranch,
@@ -256,6 +257,7 @@ async function restoreBranch(
   originBranch: string | null,
   proposalBranch: string,
   defaultBranch: string,
+  startPoint: string,
 ): Promise<string | null> {
   // A detached HEAD (what a CI checkout gives you by default) has no branch to return
   // to, so fall back to the default branch rather than reporting a phantom commit.
@@ -264,7 +266,7 @@ async function restoreBranch(
   if (!(await gitCheckoutBranch(repo, target))) return proposalBranch;
   // Compare against the START POINT, not wherever the user stood: cut from defaultBranch,
   // so anything unique to the proposal branch is mage's own commit and nothing else.
-  if (await branchHasUniqueCommits(repo, defaultBranch, proposalBranch)) return proposalBranch;
+  if (await branchHasUniqueCommits(repo, startPoint, proposalBranch)) return proposalBranch;
   await gitDeleteBranch(repo, proposalBranch);
   return null;
 }
@@ -336,7 +338,13 @@ async function proposeBatch(
   const originBranch = await getCurrentBranch(kbRepo);
   // Cut from the default branch, never from HEAD: on a feature branch the proposal PR
   // would otherwise carry that branch's unrelated commits (ADR-0046 §1).
-  await gitCheckoutNewBranch(kbRepo, branchName, defaultBranch);
+  const startPoint = await resolveBranchRef(kbRepo, defaultBranch);
+  if (!startPoint) {
+    throw new Error(
+      `mage groom --propose: cannot resolve the default branch \`${defaultBranch}\` locally or as \`origin/${defaultBranch}\`, so there is nothing safe to cut the proposal branch from. Fetch it first (in CI, actions/checkout leaves no local branch: \`git fetch origin ${defaultBranch}\`).`,
+    );
+  }
+  await gitCheckoutNewBranch(kbRepo, branchName, startPoint);
 
   let accepted: string[];
   let prUrl: string;
@@ -387,7 +395,7 @@ async function proposeBatch(
   } catch (err) {
     // Leaving the user on a half-built proposal branch with their drafts already
     // consumed is unrecoverable without hand-run git. Put them back where they were.
-    const kept = await restoreBranch(kbRepo, originBranch, branchName, defaultBranch);
+    const kept = await restoreBranch(kbRepo, originBranch, branchName, defaultBranch, startPoint);
     const why = err instanceof Error ? err.message : String(err);
     if (kept) {
       // The right advice depends entirely on whether the push landed, and only a live run

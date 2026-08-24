@@ -135,6 +135,19 @@ export async function gitCheckoutBranch(repoPath: string, branchName: string): P
   return r.code === 0;
 }
 
+/**
+ * A commit-ish that actually resolves for `branch`, preferring the local branch and
+ * falling back to origin's. A CI checkout has `origin/main` and no local `main`, so
+ * `checkout -b x main` dies with "'main' is not a commit" — measured in Actions.
+ */
+export async function resolveBranchRef(repoPath: string, branch: string): Promise<string | null> {
+  for (const ref of [branch, `origin/${branch}`]) {
+    const r = await run("git", ["-C", repoPath, "rev-parse", "--verify", "--quiet", `${ref}^{commit}`]);
+    if (r.code === 0) return ref;
+  }
+  return null;
+}
+
 /** True when `branch` holds commits that `base` does not. Fail-safe: true on error. */
 export async function branchHasUniqueCommits(
   repoPath: string,

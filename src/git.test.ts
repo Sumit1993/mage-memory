@@ -9,6 +9,7 @@ import {
   getRepoRoot,
   gitAdd,
   getCurrentBranch,
+  resolveBranchRef,
   gitCheckoutNewBranch,
   gitCommit,
   gitInit,
@@ -199,5 +200,40 @@ describe("gitCheckoutNewBranch start point", () => {
     const log = await run("git", ["-C", repo, "log", "--oneline"]);
     expect(log.stdout).not.toContain("unrelated feature work");
     expect(log.stdout).toContain("base");
+  });
+});
+
+describe("resolveBranchRef — the CI shape (origin/main, no local main)", () => {
+  it("falls back to origin/<branch> when no local branch exists", async () => {
+    const upstream = await tmp();
+    await gitInit(upstream);
+    await run("git", ["-C", upstream, "config", "user.email", "t@e.com"]);
+    await run("git", ["-C", upstream, "config", "user.name", "t"]);
+    await writeFile(join(upstream, "a.txt"), "a\n");
+    await gitAdd(upstream, [upstream]);
+    await gitCommit(upstream, "base");
+    const upstreamBranch = (await getCurrentBranch(upstream)) ?? "main";
+
+    // What actions/checkout leaves you with: the remote-tracking ref only.
+    const clone = await tmp();
+    await run("git", ["clone", "--depth", "1", "--branch", upstreamBranch, upstream, clone]);
+    await run("git", ["-C", clone, "checkout", "-B", "feature"]);
+    await run("git", ["-C", clone, "branch", "-D", upstreamBranch]);
+
+    expect(
+      (await run("git", ["-C", clone, "rev-parse", "--verify", "--quiet", upstreamBranch])).code,
+    ).not.toBe(0);
+    expect(await resolveBranchRef(clone, upstreamBranch)).toBe(`origin/${upstreamBranch}`);
+
+    // and the branch can actually be cut from what it returns
+    const start = (await resolveBranchRef(clone, upstreamBranch)) as string;
+    await gitCheckoutNewBranch(clone, "mage/proposal/ci", start);
+    expect(await getCurrentBranch(clone)).toBe("mage/proposal/ci");
+  });
+
+  it("returns null when neither the branch nor origin's copy exists", async () => {
+    const repo = await tmp();
+    await gitInit(repo);
+    expect(await resolveBranchRef(repo, "nope")).toBeNull();
   });
 });
