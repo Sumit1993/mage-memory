@@ -547,7 +547,7 @@ export function hubUnreachableMessage(
   const addr = r.expectedAddress ? ` (address ${redactUrl(r.expectedAddress)})` : "";
   const head = "This repo is in external mode, so its knowledge base lives in a hub — but the hub is unreachable";
   const forAgent = opts?.forAgent === true;
-  const dontInit = forAgent ? "" : " Do NOT run `mage init` here: it would mint a SECOND knowledge base.";
+  const dontInit = " Do NOT run `mage init` here: it would mint a SECOND knowledge base.";
   switch (r.reason) {
     case "hub-absent": {
       const obtain = forAgent

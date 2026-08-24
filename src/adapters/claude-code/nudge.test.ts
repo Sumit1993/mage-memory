@@ -571,11 +571,14 @@ describe("mage nudge — unreachable external hub (ADR-0045 §6)", () => {
     expect(r.notice).toContain("mage · recent work:");
   });
 
-  it("the agent text never contains `mage init`", async () => {
+  it("the agent text carries the mage init prohibition, never the instruction", async () => {
     const { dir } = await setupUnreachable();
     const r = await nudgeCmd({ cwd: dir, source: "startup" });
     expect(r.nudge).not.toBeNull();
-    expect(r.nudge).not.toContain("mage init");
+    // The prohibition is exactly what the agent channel must carry; only the
+    // `mage init --local` ALTERNATIVE is an instruction, and only that is dropped.
+    expect(r.nudge).toContain("Do NOT run `mage init` here");
+    expect(r.nudge).not.toContain("mage init --local");
   });
 });
 
