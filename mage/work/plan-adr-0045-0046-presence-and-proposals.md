@@ -159,7 +159,8 @@ name that is not under that prefix, or that equals the default branch, is refuse
 
 **Refusal conditions.** One pure, total predicate gates every git write. It takes the resolved
 knowledge base, the repository root and how it was resolved, the configured setting, the default
-branch name, the redaction result and — for the branch it is about to create — the intended name.
+branch name, the redaction result, how many notes the run would propose and, for the branch it is
+about to create, the intended name.
 It returns either permission or the message shown verbatim to the user. It reads no environment
 variable and no terminal state; a test asserts that.
 
@@ -213,5 +214,5 @@ what one person can actually read in a sitting, which is the whole point of merg
   informational: under ADR-0045 §2 the sandbox is supported only if the hub can exist at the derived
   path there. Record the answer into ADR-0045 as a dated environment fact.
 - The `0046-derived-hub-git-and-merge-ratification.md` filename no longer matches its title, since
-  git is no longer restricted to derived hub clones. Renaming costs link updates in five decision
-  files (0012, 0013, 0030, 0044, 0045); deferred deliberately.
+  git is no longer restricted to derived hub clones. Renaming costs link updates in four decision
+  files (0012, 0013, 0030, 0045); deferred deliberately.
