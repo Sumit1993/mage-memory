@@ -2,7 +2,7 @@
 
 # mage
 
-> 37 notes. Part of the [index](INDEX.md).
+> 38 notes. Part of the [index](INDEX.md).
 
 ## build
 
@@ -42,6 +42,10 @@
 - `gotcha` [Gotcha — promote's recurrence fold has near-zero precision on a mature KB](notes/promote-folds-mechanical-tokens.md) — denoise, signature, keyword-fold, watermark, rejected-buffer, soak
 - `reference` [Replay-gate methodology — does a capture mechanism produce USEFUL knowledge?](notes/replay-gate-methodology.md) — calibration, lessons, paid, three
 - `principle` [Route a memory to the store that matches its scope, not the KB you happen to be in](notes/route-memories-to-the-matching-store.md) — memory-routing, user-level, repo-kb, hub, capture, ft-20
+
+## probe
+
+- `gotcha` [Live propose probe (delete me)](notes/live-propose-probe-delete-me.md) — mage
 
 ## redaction
 
