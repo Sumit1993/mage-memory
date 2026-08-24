@@ -36,7 +36,7 @@ keywords:
 
 # 0043 — A hub is addressed by its remote, located by derivation
 
-> **Status: accepted (2026-08-24).** Owner decisions of 2026-07-29, settling the open question the
+> **Status: accepted (2026-08-22).** Owner decisions of 2026-07-29, settling the open question the
 > 2026-07-27 grill left in [ADR-0042](0042-reach-tier-harness-grants.md)'s **Revisit
 > trigger**. This ADR *is* that revisit, and it is the decision
 > [#103](https://github.com/Sumit1993/mage-memory/issues/103) asks for.

@@ -3,8 +3,8 @@ type: decision
 tags:
   - mage/decisions
 created: "2026-07-27"
-updated: 2026-07-27
-last_reviewed: 2026-07-27
+updated: 2026-08-22
+last_reviewed: 2026-08-22
 status: accepted
 provenance:
   repo: mage-memory
@@ -36,7 +36,7 @@ modified: 2026-07-27T17:20:22.726Z
 
 # 0042 — the reach tier: mage grants the harness access to an out-of-repo knowledge base
 
-> **Status: accepted (2026-08-24).** Output of a 2026-07-27 grill prompted by onboarding repos into
+> **Status: accepted (2026-08-22).** Output of a 2026-07-27 grill prompted by onboarding repos into
 > t3code (a wrapper over Claude Code and other harnesses). Sibling to the ADR-0032
 > commandeer tier, deliberately gated apart from it.
 
