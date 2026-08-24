@@ -255,10 +255,16 @@ async function restoreBranch(
   repo: string,
   originBranch: string | null,
   proposalBranch: string,
+  defaultBranch: string,
 ): Promise<string | null> {
-  if (!originBranch || originBranch === proposalBranch) return proposalBranch;
-  if (!(await gitCheckoutBranch(repo, originBranch))) return proposalBranch;
-  if (await branchHasUniqueCommits(repo, originBranch, proposalBranch)) return proposalBranch;
+  // A detached HEAD (what a CI checkout gives you by default) has no branch to return
+  // to, so fall back to the default branch rather than reporting a phantom commit.
+  const target = originBranch ?? defaultBranch;
+  if (target === proposalBranch) return proposalBranch;
+  if (!(await gitCheckoutBranch(repo, target))) return proposalBranch;
+  // Compare against the START POINT, not wherever the user stood: cut from defaultBranch,
+  // so anything unique to the proposal branch is mage's own commit and nothing else.
+  if (await branchHasUniqueCommits(repo, defaultBranch, proposalBranch)) return proposalBranch;
   await gitDeleteBranch(repo, proposalBranch);
   return null;
 }
@@ -379,7 +385,7 @@ async function proposeBatch(
   } catch (err) {
     // Leaving the user on a half-built proposal branch with their drafts already
     // consumed is unrecoverable without hand-run git. Put them back where they were.
-    const kept = await restoreBranch(kbRepo, originBranch, branchName);
+    const kept = await restoreBranch(kbRepo, originBranch, branchName, defaultBranch);
     const why = err instanceof Error ? err.message : String(err);
     if (kept) {
       throw new Error(

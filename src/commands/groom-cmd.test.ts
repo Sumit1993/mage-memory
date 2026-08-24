@@ -309,6 +309,35 @@ describe("mage groom --accept … --propose (ADR-0046)", () => {
     }
   });
 
+  it("from a detached HEAD, does not claim a phantom commit (the CI default)", async () => {
+    const { dir, repo } = await withKb({
+      kind: "repo",
+      grooming: { proposals: true, autonomy: "overseer" },
+    });
+    await initRepoWithIdentity(repo);
+    await run("git", ["-C", repo, "add", "."]);
+    await run("git", ["-C", repo, "commit", "-m", "init"]);
+    // What actions/checkout leaves you on.
+    const sha = (await run("git", ["-C", repo, "rev-parse", "HEAD"])).stdout.trim();
+    await run("git", ["-C", repo, "checkout", sha]);
+
+    const [slug] = await stageDistinct(dir, 1);
+    const commitSpy = vi.spyOn(gitModule, "gitCommit").mockRejectedValue(new Error("commit refused"));
+    try {
+      const err = await groomCmd({ dir, accept: slug, propose: true }).then(
+        () => null,
+        (e: unknown) => (e instanceof Error ? e.message : String(e)),
+      );
+      // nothing was committed, so it must NOT say the notes are committed on a branch
+      expect(err).not.toMatch(/notes are committed on/i);
+      expect(err).toMatch(/uncommitted in your working tree/i);
+      const branches = (await run("git", ["-C", repo, "branch", "--list", "mage/proposal/*"])).stdout.trim();
+      expect(branches).toBe("");
+    } finally {
+      commitSpy.mockRestore();
+    }
+  });
+
   it("deletes the proposal branch when the run failed BEFORE any commit", async () => {
     const { dir, repo } = await withKb({
       kind: "repo",
