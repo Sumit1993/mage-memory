@@ -62,6 +62,6 @@ mage was framed "for software systems," and its hub mechanics encode that: a "pr
 - extends [ADR-0011 — recursive scan; hub projects are wings](0011-recursive-scan-hub-projects.md)
 - refines [ADR-0006 — two-layer recall](0006-two-layer-recall-per-wing-skills.md)
 - see_also [ADR-0009 — no runtime; automation rides host hooks](0009-no-runtime-automation-rides-host-hooks.md)
-- amended_by [ADR-0046 — mage runs git only in derived hub clones](0046-derived-hub-git-and-merge-ratification.md) (§3: invariant re-scoped)
+- amended_by [ADR-0046 — a branch and a pull request are the only way knowledge lands](0046-derived-hub-git-and-merge-ratification.md) (§1: invariant re-keyed on the outcome)
 - realizes [migration field notes](../notes/migration-field-notes.md)
 - informs [mage roadmap](../work/roadmap.md)

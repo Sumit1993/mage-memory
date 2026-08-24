@@ -257,4 +257,3 @@ scheme collides with a real-world remote form not anticipated in §3.
 - Honors [ADR-0009](0009-no-runtime-automation-rides-host-hooks.md): setup asks and
   suggests; it starts no watcher and clones only from `connect`
 - amended_by [ADR-0045 — Cross-environment presence](0045-cross-environment-presence.md) (§4 obtain plumbing vs human surface)
-- amended_by [ADR-0046 — mage runs git only in derived hub clones](0046-derived-hub-git-and-merge-ratification.md) (§4 clone-on-demand for submit)

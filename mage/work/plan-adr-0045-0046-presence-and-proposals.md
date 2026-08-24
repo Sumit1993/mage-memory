@@ -36,8 +36,10 @@ reopening an ADR.
 1. **Ratify [ADR-0042](../decisions/0042-reach-tier-harness-grants.md),
    [ADR-0043](../decisions/0043-hub-addressed-by-remote-located-by-derivation.md) and
    [ADR-0044](../decisions/0044-setup-is-a-conversation-over-one-address.md) first.** 0045 amends
-   0043 and 0044 and leans on 0042; all three are still `proposed`, and 0044's `local://` address
-   scheme has no implementation. Amending unratified decisions is what produced the six-deep stack.
+   0043 and 0044 and leans on 0042. Amending unratified decisions is what produced the six-deep
+   stack. **Done** — the pull request carrying 0045 and 0046 flips all three to `accepted`. 0044's
+   `local://` address scheme still has no implementation; that is lane work, not a ratification
+   blocker.
 2. **Land the resolution-states work** (below). ADR-0045 §5 depends on it.
 3. **Then the presence lane**, then the proposal lane. The proposal lane writes into a knowledge
    base that must be resolvable first.
@@ -174,7 +176,8 @@ note arrived through, and a reference to the review that produced it. Creation-o
 [ADR-0031](../decisions/0031-programmatic-provenance-stamp.md) §3. No authorship level is set, which
 is what keeps the reject-ledger cohort in `src/grooming/reconcile.ts` unchanged.
 
-**Bounds.** One pull request per run; a cap on notes per run.
+**Bounds.** One pull request per run, and at most **five** notes in it (ADR-0046 §7). Five is
+what one person can actually read in a sitting, which is the whole point of merge-as-ratification.
 
 ## Docs surfaces
 
@@ -182,15 +185,24 @@ is what keeps the reject-ledger cohort in `src/grooming/reconcile.ts` unchanged.
 - `docs/src/content/docs/guides/hub-and-external-mode.md` — cross-link; the unreachable-hub state.
 - `docs/src/content/docs/reference/layout.md` — `MAGE_HOME` as a supported contract, and the fact
   that a bare clone is sufficient.
-- `docs/src/content/docs/model/modes.md` — the three resolution outcomes.
+- `docs/src/content/docs/model/modes.md` — the three resolution outcomes. Carried by a terminal
+  transcript, not prose: one block per outcome (resolved, no knowledge base, hub unreachable) as
+  the CLI actually prints it, and for the third, what `mage observe` and `mage doctor` each do
+  with it.
 - `skills/guide/SKILL.md` — the unreachable-hub state and what an agent should do about it.
+- `docs/src/content/docs/loop/stage-groom.md` — the `--propose` flag on `groom --accept`, the
+  `grooming.proposals` setting, and what a run produces. Carried by a worked example: one accept
+  run with the flag, from staged drafts through to the pull request it opens.
+- `src/cli-program.ts` — the help string for `--propose`.
+- `docs/src/content/docs/reference/` — the refusal conditions. This is a precedence rule with
+  seven ordered cases, so it is carried by a table of condition, message and what the user does
+  next, never by a paragraph listing them.
 
 ## Open
 
 - The cloud-sandbox probe (`~/ai-context/mage-cloud-grant-probe.md`) is now decisive rather than
   informational: under ADR-0045 §2 the sandbox is supported only if the hub can exist at the derived
   path there. Record the answer into ADR-0045 as a dated environment fact.
-- ADR-0046 §7's note cap needs a number.
 - The `0046-derived-hub-git-and-merge-ratification.md` filename no longer matches its title, since
-  git is no longer restricted to derived hub clones. Renaming costs link updates in six decision
-  files; deferred deliberately.
+  git is no longer restricted to derived hub clones. Renaming costs link updates in five decision
+  files (0012, 0013, 0030, 0044, 0045); deferred deliberately.

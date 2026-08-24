@@ -158,7 +158,7 @@ load-bearing invariants — *no runtime of our own* ([ADR-0009](0009-no-runtime-
 - bounded_by [ADR-0010 — durable memory, not a coordination layer](0010-durable-memory-not-coordination-layer.md)
 - realizes [ADR-0004 — capture insight, not copies](0004-capture-insight-not-copies.md)
 - gated_by [ADR-0014 — two-gate redaction](0014-two-gate-redaction.md)
-- amended_by [ADR-0046 — mage runs git only in derived hub clones](0046-derived-hub-git-and-merge-ratification.md) (§4: commit or PR merge ratification)
+- amended_by [ADR-0046 — a branch and a pull request are the only way knowledge lands](0046-derived-hub-git-and-merge-ratification.md) (§4: a merge confirms, alongside a commit)
 - mines microsoft/SkillOpt (text-space skill optimizer) + ECC `continuous-learning-v2`
 - sequenced_by [release sequence](../work/plan-release-sequence.md)
 - informs [mage roadmap](../work/roadmap.md)
