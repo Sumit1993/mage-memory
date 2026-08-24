@@ -198,6 +198,16 @@ describe("mage groom — guards", () => {
   });
 });
 
+/**
+ * A temp repo that git will actually commit in. CI runners carry no user.name /
+ * user.email, so production `gitCommit` fails there while passing on a dev box.
+ */
+async function initRepoWithIdentity(repo: string): Promise<void> {
+  await gitInit(repo);
+  await run("git", ["-C", repo, "config", "user.email", "t@e.com"]);
+  await run("git", ["-C", repo, "config", "user.name", "t"]);
+}
+
 describe("mage groom --accept … --propose (ADR-0046)", () => {
   it("refuses when grooming.proposals is not enabled", async () => {
     const { dir } = await withKb({ kind: "repo" });
@@ -209,7 +219,7 @@ describe("mage groom --accept … --propose (ADR-0046)", () => {
 
   it("refuses when noteCount exceeds PROPOSAL_NOTE_CAP (5 notes)", async () => {
     const { dir, repo } = await withKb({ kind: "repo", grooming: { proposals: true } });
-    await gitInit(repo);
+    await initRepoWithIdentity(repo);
     await stageDistinct(dir, 6);
     await expect(groomCmd({ dir, accept: "all", propose: true })).rejects.toThrow(
       /cannot propose 6 notes in one pull request; limit is 5/,
@@ -218,7 +228,7 @@ describe("mage groom --accept … --propose (ADR-0046)", () => {
 
   it("refuses when dirty paths exist outside the knowledge base", async () => {
     const { dir, repo } = await withKb({ kind: "repo", grooming: { proposals: true } });
-    await gitInit(repo);
+    await initRepoWithIdentity(repo);
     // Baseline commit
     await run("git", ["-C", repo, "-c", "user.email=t@e.com", "-c", "user.name=t", "add", "."]);
     await run("git", ["-C", repo, "-c", "user.email=t@e.com", "-c", "user.name=t", "commit", "-m", "init"]);
@@ -232,7 +242,7 @@ describe("mage groom --accept … --propose (ADR-0046)", () => {
 
   it("refuses when candidate draft contains live secrets (Gate-2)", async () => {
     const { dir, repo } = await withKb({ kind: "repo", grooming: { proposals: true } });
-    await gitInit(repo);
+    await initRepoWithIdentity(repo);
     await run("git", ["-C", repo, "-c", "user.email=t@e.com", "-c", "user.name=t", "add", "."]);
     await run("git", ["-C", repo, "-c", "user.email=t@e.com", "-c", "user.name=t", "commit", "-m", "init"]);
     // Write draft directly into staging containing a live secret (bypassing Gate-1 scrub)
@@ -252,7 +262,7 @@ describe("mage groom --accept … --propose (ADR-0046)", () => {
       kind: "repo",
       grooming: { proposals: true, autonomy: "overseer" },
     });
-    await gitInit(repo);
+    await initRepoWithIdentity(repo);
     await run("git", ["-C", repo, "-c", "user.email=t@e.com", "-c", "user.name=t", "add", "."]);
     await run("git", ["-C", repo, "-c", "user.email=t@e.com", "-c", "user.name=t", "commit", "-m", "init"]);
 
@@ -298,7 +308,7 @@ describe("mage groom --accept … --propose (ADR-0046)", () => {
       kind: "repo",
       grooming: { proposals: true },
     });
-    await gitInit(repo);
+    await initRepoWithIdentity(repo);
     await run("git", ["-C", repo, "-c", "user.email=t@e.com", "-c", "user.name=t", "add", "."]);
     await run("git", ["-C", repo, "-c", "user.email=t@e.com", "-c", "user.name=t", "commit", "-m", "init"]);
 
