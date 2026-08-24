@@ -541,6 +541,7 @@ export function buildProgram(): Command {
         hub: opts.hub,
         fix: opts.fix,
         report: opts.report,
+        network: true,
       });
       if (!result.passed) process.exit(1);
     });
