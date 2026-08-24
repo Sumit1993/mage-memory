@@ -111,16 +111,32 @@ export const FORBIDDEN_ENV_MARKERS = [
 ] as const;
 
 /**
- * Strip comments from a line to check only executable code.
+ * Strip comments from a line to check only executable code. Quote-aware on purpose:
+ * a plain indexOf cut `fetch("https://x", process.env.CI)` at the URL and hid the read,
+ * which is a silent false negative in a guard whose contract is to have none.
  */
 function stripComments(line: string, isShell: boolean): string {
-  if (isShell) {
-    const hashIdx = line.indexOf("#");
-    return hashIdx >= 0 ? line.slice(0, hashIdx) : line;
-  }
-  const slashIdx = line.indexOf("//");
-  if (slashIdx >= 0) {
-    return line.slice(0, slashIdx);
+  let quote: string | null = null;
+  let braceDepth = 0;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (quote) {
+      if (ch === "\\") i++;
+      else if (ch === quote) quote = null;
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === "`") {
+      quote = ch;
+      continue;
+    }
+    if (isShell) {
+      // `${VAR#pattern}` carries a literal # that does not start a comment.
+      if (ch === "$" && line[i + 1] === "{") braceDepth++;
+      else if (ch === "}" && braceDepth > 0) braceDepth--;
+      else if (ch === "#" && braceDepth === 0) return line.slice(0, i);
+    } else if (ch === "/" && line[i + 1] === "/") {
+      return line.slice(0, i);
+    }
   }
   return line;
 }
@@ -192,7 +208,9 @@ export function scanSource(relPath: string, content: string): Violation[] {
 
     // 3. Check for shell environment branching on generic CI/vendor variables
     if (isShell) {
-      if (/\b(if\s+\[|\[\[|test\s+|\[\s+)/.test(code)) {
+      // A leading \b made the bracket alternatives unreachable (\b cannot hold before
+      // `[` unless a word char precedes it) and missed `elif`/`while`/`until` entirely.
+      if (/(?:^|[\s;&|(])(?:(?:if|elif|while|until)\s+\[|test\s+|\[\s)|\[\[/.test(code)) {
         const matches = code.matchAll(/\$\{?([A-Z0-9_]+)/g);
         for (const match of matches) {
           const varName = match[1];
@@ -295,6 +313,28 @@ describe("ADR-0045 §7 — Environment Rule Guard", () => {
       const findings = scanSource("src/utils.ts", code);
       expect(findings.length).toBeGreaterThan(0);
       expect(findings.some((f) => f.reason.includes("CI") || f.reason.includes("process.env"))).toBe(true);
+    });
+
+    it("detects CI branching in elif, while and bare [[ shell shapes", () => {
+      // A leading \b in the old condition regex made all three unreachable.
+      for (const shape of [
+        'elif [ "$CI" = "true" ]; then',
+        'while [ "$CI" ]; do',
+        '[[ "$CI" == "true" ]] && echo hi',
+      ]) {
+        expect(scanSource("scripts/unexempt-example.sh", shape).length).toBeGreaterThan(0);
+      }
+    });
+
+    it("does not lose a process.env read that sits after a URL on the same line", () => {
+      // The old stripComments cut the line at the `//` inside "https://".
+      const code = 'const ok = await fetch("https://x.com", { flag: process.env.CI });';
+      expect(scanSource("src/example.ts", code).length).toBeGreaterThan(0);
+    });
+
+    it("does not mistake a ${VAR#pattern} expansion for a shell comment", () => {
+      const script = 'VAL="${PATH#/usr}"; if [ "$CI" = true ]; then';
+      expect(scanSource("scripts/unexempt-example.sh", script).length).toBeGreaterThan(0);
     });
 
     it("the cloud-setup.sh exemption is what silences that same script", () => {
