@@ -16,7 +16,7 @@ export interface Violation {
 export interface Exemption {
   file: string;
   pattern: RegExp;
-  category: "pass-through" | "recording" | "injected-read" | "machine-root" | "build-metadata";
+  category: "pass-through" | "recording" | "injected-read" | "machine-root" | "build-metadata" | "provisioning";
   rationale: string;
 }
 
@@ -78,6 +78,13 @@ export const EXEMPTIONS: readonly Exemption[] = [
     pattern: /env:\s*NodeJS\.ProcessEnv\s*=\s*process\.env/,
     category: "injected-read",
     rationale: "Injected parameter default in adapter layer (ADR-0045 §7)",
+  },
+  {
+    file: "scripts/cloud-setup.sh",
+    pattern: /CLAUDE_CODE_REMOTE/,
+    category: "provisioning",
+    rationale:
+      "Installs tooling on a blank VM; it decides what to INSTALL, not what mage does, so ADR-0045 §7's correctness-path rule does not reach it. The check must stay: this script is wired to SessionStart in .claude/settings.json, and without it a local session would apt-install gh and npm -g the PUBLISHED mage over a contributor's working tree.",
   },
 ];
 
@@ -194,6 +201,9 @@ export function scanSource(relPath: string, content: string): Violation[] {
             varName === "CONTINUOUS_INTEGRATION" ||
             FORBIDDEN_ENV_MARKERS.includes(varName as typeof FORBIDDEN_ENV_MARKERS[number])
           ) {
+            // The shell path honours EXEMPTIONS like the TypeScript paths do; without
+            // this a shipped script has no way to record a reviewed exception.
+            if (EXEMPTIONS.some((e) => e.file === relPath && e.pattern.test(rawLine))) continue;
             violations.push({
               file: relPath,
               line: lineNum,
@@ -271,7 +281,9 @@ describe("ADR-0045 §7 — Environment Rule Guard", () => {
           exit 0
         fi
       `;
-      const findings = scanSource("scripts/cloud-setup.sh", script);
+      // A NON-exempt shell path: cloud-setup.sh carries a reviewed exemption, so using
+      // it here would prove nothing about the detector.
+      const findings = scanSource("scripts/unexempt-example.sh", script);
       expect(findings.length).toBeGreaterThan(0);
       expect(findings.some((f) => f.reason.includes("CLAUDE_CODE_REMOTE"))).toBe(true);
     });
@@ -283,6 +295,12 @@ describe("ADR-0045 §7 — Environment Rule Guard", () => {
       const findings = scanSource("src/utils.ts", code);
       expect(findings.length).toBeGreaterThan(0);
       expect(findings.some((f) => f.reason.includes("CI") || f.reason.includes("process.env"))).toBe(true);
+    });
+
+    it("the cloud-setup.sh exemption is what silences that same script", () => {
+      const script = `if [ "\${CLAUDE_CODE_REMOTE:-}" != "true" ]; then\n  exit 0\nfi`;
+      expect(scanSource("scripts/unexempt-example.sh", script).length).toBeGreaterThan(0);
+      expect(scanSource("scripts/cloud-setup.sh", script)).toHaveLength(0);
     });
 
     it("detects unexempt process.env access in TypeScript", () => {

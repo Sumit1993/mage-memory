@@ -1,7 +1,10 @@
 #!/bin/bash
-# Ephemeral-VM setup script for mage and GitHub CLI (#175).
+# Claude Code cloud-session bootstrap — no-op outside cloud VMs. #175 tracks
+# the full ephemeral-VM story (capture hooks stay unavailable in cloud).
 set -u
-
+if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
+  exit 0
+fi
 
 # Root containers often ship without sudo; non-root sessions need it. With neither, the apt
 # install below cannot succeed — skip it rather than warn and then fail loudly anyway. #176.
