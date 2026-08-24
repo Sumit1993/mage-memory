@@ -302,7 +302,7 @@ export async function flattenAllNotes(repoPath: string): Promise<FlattenStagedRe
   // Best-effort git toplevel so reported paths match the other sweeps (toplevel-relative)
   // when this is a repo; a standalone KB reports docs-root-relative paths (top === root).
   // A toplevel is only a valid BASE when the docs root actually lives under it: in
-  // mode=external the KB is hub-owned (`<hub_path>/projects/<project>/`), i.e. a different
+  // mode=external the KB is hub-owned (`<derived hub root>/projects/<project>/`, ADR-0043), i.e. a different
   // repo entirely, so `relative(top, abs)` would emit `../../…` and break the reported-path
   // contract. Fall back to the docs root whenever it isn't beneath the toplevel.
   const gitTop = await gitToplevel(repoPath);

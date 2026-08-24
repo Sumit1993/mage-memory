@@ -25,6 +25,18 @@ mage skills --metrics --json
 
 The report does the threshold math and emits a `status` per skill (`ok`, `reword-suggested`, or `demote-suggested`), worst-first. You trust the status rather than re-deriving the rate.
 
+Three rows, one per status (each row also carries a `trigger_hash` and per-dimension match counts, elided here):
+
+```jsonc
+[
+  { "skill": "mage-skill-redact-strip",   "loads": 20, "matchRate": 0.1,  "status": "demote-suggested" }, // below 0.2 over enough loads
+  { "skill": "mage-wing-billing",         "loads": 4,  "matchRate": 0.25, "status": "ok" },               // only 4 loads — under the 5-load floor, left alone
+  { "skill": "mage-skill-migration-lock", "loads": 10, "matchRate": 0.3,  "status": "reword-suggested" }  // at least 0.2 and below 0.4
+]
+```
+
+The middle row is the floor at work: its rate sits in the reword band, but with fewer than 5 loads the report refuses to judge it. And however many rows suggest action, a pass applies at most 3 edits — both bounds below.
+
 ## Never judge on thin evidence
 
 A new trigger has no signal to optimize against. So context-match only suggests a reword or demote after a skill has auto-loaded at least **5 times** (the minimum loads floor). Below that, the skill is left alone no matter its rate — optimizing noise is worse than waiting.
