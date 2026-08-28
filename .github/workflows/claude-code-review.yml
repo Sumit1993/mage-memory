@@ -38,11 +38,6 @@ jobs:
     # the callee's required secret must be mapped explicitly.
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-      # Shared `prismalens-automation` App. The callee's `mutate` job mints a
-      # downscoped token from it; GITHUB_TOKEN cannot resolve review threads.
-      # Absent, the lane still posts verdicts and leaves threads open.
-      AUTOMATION_APP_ID: ${{ secrets.AUTOMATION_APP_ID }}
-      AUTOMATION_APP_PRIVATE_KEY: ${{ secrets.AUTOMATION_APP_PRIVATE_KEY }}
     permissions:
       # write is the ceiling only; the callee's `mutate` job needs it to resolve review
       # threads with GITHUB_TOKEN. Every job in the callee still declares its own subset,
