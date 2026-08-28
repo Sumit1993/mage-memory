@@ -15,7 +15,15 @@ on:
 # Do not add logic here.
 
 concurrency:
-  group: claude-code-review-${{ github.event.pull_request.number || github.event.issue.number }}
+  # The lane's own emissions must never enter a real group. Concurrency is allocated at run
+  # creation, before any job `if:` runs, so the callee's admission gate cannot keep them out:
+  # a `claude[bot]` verdict comment took the pending seat and cancelled the queued human
+  # reply four times out of four. Story: prismalens/gh-workflows#12.
+  group: >-
+    ${{ (github.event.comment.user.type == 'Bot'
+         || (github.event_name == 'issue_comment' && !github.event.issue.pull_request))
+        && format('claude-code-review-junk-{0}', github.run_id)
+        || format('claude-code-review-{0}', github.event.pull_request.number || github.event.issue.number) }}
   # A summon never cancels an in-flight automatic round; it queues behind it.
   # A push still supersedes anything in the group, including a summon.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
