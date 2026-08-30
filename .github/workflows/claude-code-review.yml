@@ -38,6 +38,8 @@ jobs:
     # the callee's required secret must be mapped explicitly.
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      REVIEW_TELEMETRY_URL: ${{ secrets.REVIEW_TELEMETRY_URL }}
+      REVIEW_TELEMETRY_TOKEN: ${{ secrets.REVIEW_TELEMETRY_TOKEN }}
     permissions:
       # write is the ceiling only; the callee's `mutate` job needs it to resolve review
       # threads with GITHUB_TOKEN. Every job in the callee still declares its own subset,
