@@ -15,7 +15,15 @@ on:
 # Do not add logic here.
 
 concurrency:
-  group: claude-code-review-${{ github.event.pull_request.number || github.event.issue.number }}
+  # The lane's own emissions must never enter a real group. Concurrency is allocated at run
+  # creation, before any job `if:` runs, so the callee's admission gate cannot keep them out:
+  # a `claude[bot]` verdict comment took the pending seat and cancelled the queued human
+  # reply four times out of four. Story: prismalens/gh-workflows#12.
+  group: >-
+    ${{ (github.event.comment.user.type == 'Bot'
+         || (github.event_name == 'issue_comment' && !github.event.issue.pull_request))
+        && format('claude-code-review-junk-{0}', github.run_id)
+        || format('claude-code-review-{0}', github.event.pull_request.number || github.event.issue.number) }}
   # A summon never cancels an in-flight automatic round; it queues behind it.
   # A push still supersedes anything in the group, including a summon.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -30,8 +38,13 @@ jobs:
     # the callee's required secret must be mapped explicitly.
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      REVIEW_TELEMETRY_URL: ${{ secrets.REVIEW_TELEMETRY_URL }}
+      REVIEW_TELEMETRY_TOKEN: ${{ secrets.REVIEW_TELEMETRY_TOKEN }}
     permissions:
-      contents: read
+      # write is the ceiling only; the callee's `mutate` job needs it to resolve review
+      # threads with GITHUB_TOKEN. Every job in the callee still declares its own subset,
+      # and `review` stays pinned to read. Story: prismalens/gh-workflows#20.
+      contents: write
       # write is the ceiling for the callee's `announce` liveness job;
       # the callee's `review` job self-restricts to read.
       pull-requests: write
