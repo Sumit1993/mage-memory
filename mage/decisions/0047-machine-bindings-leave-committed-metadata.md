@@ -75,7 +75,7 @@ no layer that overrides another, because no two carriers ever hold the same key.
 | Portable identity (`mode`, `project`, `hub_repo`, `name`, `projects[].{name, storage, code_repo_url}`) | the knowledge base's `metadata.json` | yes | whoever may merge to that repo |
 | Policy (`grooming`, `redact`, `genres`) | the knowledge base's `metadata.json` | yes | whoever may merge to that repo |
 | Machine binding, derivable (the hub path) | nothing; derived at runtime from `hub_repo` + `MAGE_HOME` | n/a | nobody, it is computed |
-| Machine binding, non-derivable (`code_repo_path`) | `metadata.local.json` beside the committed file | no, gitignored | the machine itself |
+| Machine binding, non-derivable (`code_repo_path`) | none; the field is removed and nothing replaces it | n/a | nobody |
 | Secrets | no carrier; git resolves credentials (ADR-0045 §4) | never | nobody |
 
 ### 2. Policy is read from the knowledge base, never from the code repo
@@ -216,19 +216,14 @@ Dropping the field costs the seven sites above the value outright, with no reloc
 to. `connect --all-projects` and the ADR-0012 §2 pointer are the two that most directly need a
 replacement, a target to wire into, a location to point a reader at. The rest degrade to "unknown"
 the same way they already do for a legacy hub with no registry. The removal work, dropping the
-field, the four `link.ts` write sites' hub-side counterpart, and updating the seven consumers above,
-needs its own tracking issue; none exists yet as of 2026-09-01.
+field, the four `link.ts` write sites' hub-side counterpart, and updating the seven consumers
+above, needs its own tracking issue: [#193](https://github.com/Sumit1993/mage-memory/issues/193),
+"Remove code_repo_path and the hub-side fan-out it exists for."
 
 Android's `repo` manifests and Chromium's `gclient` DEPS are the closest prior art for reverse
 linkage done safely. Both commit paths, but relative to a root the tool itself creates and controls,
 never absolute, and `repo`'s own docs forbid absolute paths. If a hub ever needs to point back at a
 code repo again, that is the shape to copy, not this one.
-
-### 5. A missing local file is never an error
-
-ADR-0045 §8 rules that a bare clone is the whole of "connected". `metadata.local.json` is a
-convenience, never a prerequisite. Absent, mage degrades exactly as it does today when a path is
-unknown, and heals through `doctor --fix` or `mage link`.
 
 ## Considered options
 
@@ -241,8 +236,21 @@ file, which would be buried inside a nine-section ADR about locating hubs.
 tools converge on, but ADR-0045 §8 forbids the machine-state layers it depends on, and mage has no
 fleet administrator distinct from the knowledge base owner, so the managed tier has no owner.
 
-**Delete `code_repo_path` outright.** Rejected on evidence. Nothing can derive it and eight call
-sites consume it.
+**Delete `code_repo_path` outright.** First rejected on a call-site count: eight peers were
+believed to consume it, too many to strand without a replacement. **Accepted (2026-09-01)** once
+that count was corrected to seven load-bearing consumers (§4) and prior art was checked rather than
+assumed. No tool commits an absolute filesystem path to a shared repo so a central store can reach
+outward into a consumer checkout. Local path registries are standard, Claude Code's
+`~/.claude.json` and Codex CLI's `~/.codex/config.toml` both keep one, but neither reaches into the
+target repo with it; each remembers only where to relaunch or what trust applies.
+`connect --all-projects`, mage's own feature that writes settings files into other checkouts from a
+central registry, was found in no tool at all. That absence, not the corrected count alone, is what
+changed the answer.
+
+**Relocate `code_repo_path` to a gitignored `metadata.local.json` beside the committed file.** What
+an earlier draft of §4 prescribed. Rejected: once deletion was accepted, no local carrier is needed
+for a field nothing derives and only the machine itself already knows, and a local file is one more
+thing to explain during onboarding for consumers that no longer read it.
 
 ## Consequences
 
