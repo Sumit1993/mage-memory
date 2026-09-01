@@ -168,9 +168,41 @@ function stripNonCode(
       i++;
       continue;
     }
+    // A `/` after an operator/keyword/line-start opens a regex literal, not division.
+    // A backtick inside one (demote.ts:116) must not toggle template-quote state.
+    if (ch === "/" && looksLikeRegexStart(out)) {
+      const end = regexLiteralEnd(line, i + 1);
+      out += line.slice(i, end);
+      i = end - 1;
+      continue;
+    }
     out += ch;
   }
   return { code: out, inBlock: block, inTemplate: quote === "`" };
+}
+
+const REGEX_PRECEDES = /(?:^|[([{,;:=!&|?+\-*%^~<>]|\b(?:return|typeof|instanceof|in|of|new|delete|void|yield|throw|do|else|case))\s*$/;
+
+/** Whether a `/` at the end of `codeSoFar` opens a regex literal rather than division. */
+function looksLikeRegexStart(codeSoFar: string): boolean {
+  return REGEX_PRECEDES.test(codeSoFar);
+}
+
+/** Index just past a regex literal's closing `/`, honouring escapes and `[...]` classes. */
+function regexLiteralEnd(line: string, start: number): number {
+  let inClass = false;
+  let i = start;
+  for (; i < line.length; i++) {
+    const c = line[i];
+    if (c === "\\") {
+      i++;
+      continue;
+    }
+    if (c === "[") inClass = true;
+    else if (c === "]") inClass = false;
+    else if (c === "/" && !inClass) return i + 1;
+  }
+  return line.length;
 }
 
 /**
@@ -388,6 +420,38 @@ describe("ADR-0045 §7 — Environment Rule Guard", () => {
         "const s = `line one",
         "/* looks like a comment but is just template text",
         "line three still in template`;",
+        "const violation = process.env.SOMETHING;",
+      ].join("\n");
+      expect(scanSource("src/example.ts", code).length).toBeGreaterThan(0);
+    });
+
+    it("a regex literal with an odd backtick count does not latch the scanner into template mode", () => {
+      // src/dream/demote.ts:116 has this exact shape: 3 backticks inside a regex
+      // literal, which look like an unterminated template to naive parity counting.
+      const code = [
+        "const m = skillRaw.match(/This skill graduated from `([^`]+)`/);",
+        "const violation = process.env.SOMETHING;",
+      ].join("\n");
+      expect(scanSource("src/example.ts", code).length).toBeGreaterThan(0);
+    });
+
+    it("a regex-derived false latch does not swallow a real template and the violation after it", () => {
+      // The odd-backtick regex line reads the next line's real opening backtick as
+      // its own fake close, so the "/*" after that reads as a genuine block comment
+      // and swallows every line to end of file, including the real violation.
+      const code = [
+        "const m = skillRaw.match(/This skill graduated from `([^`]+)`/);",
+        "const s = `line two",
+        "/* looks like a comment but is just template text",
+        "line three still in template`;",
+        "const violation = process.env.SOMETHING;",
+      ].join("\n");
+      expect(scanSource("src/example.ts", code).length).toBeGreaterThan(0);
+    });
+
+    it("a backtick inside a line comment does not latch template mode", () => {
+      const code = [
+        "// odd backtick count in a comment: `",
         "const violation = process.env.SOMETHING;",
       ].join("\n");
       expect(scanSource("src/example.ts", code).length).toBeGreaterThan(0);
