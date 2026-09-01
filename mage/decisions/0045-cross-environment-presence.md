@@ -139,6 +139,29 @@ No marketplace action and no separate action repository. mage is a Node CLI; the
 installs it is already standard, and the remaining steps compose from maintained actions. A wrapper
 would be a versioned support surface with no functional gain.
 
+### 10. Configuration reaches mage as a given value, never as a detected identity
+
+Two corollaries, one of §1 and one of §7, stated here because both were reopened by running mage in
+real CI.
+
+`MAGE_HOME` is the only environment variable mage reads outside a harness adapter. No policy key
+gains an environment carrier, and none gains a generic `-c key=value` flag. The reason is not that
+environment variables are untrustworthy. It is that a mechanical mapping from key path to variable
+name auto-mints a carrier for every field anyone ever adds, including write-enables, so the trust
+question would have to be re-answered per field forever. A curated table makes granting a carrier a
+reviewed decision, and the table currently holds one entry. Prior art splits along exactly this
+line: the mechanical mappers (Terraform, npm) run where the environment's setter is the trusted
+operator by construction, while the tools that run inside repositories of mixed trust (git, Codex,
+Claude Code) all curate.
+
+An environment-*selected* configuration layer is forbidden. A profile auto-chosen by detecting
+Actions, a container, or a vendor marker is §7's prohibition wearing a config file as a disguise. A
+config file is a value somebody chose; identity detection is a value nobody chose. Configuration
+may vary per machine only through values that machine was explicitly given.
+
+What may live in which file is settled by
+[ADR-0047](0047-machine-bindings-leave-committed-metadata.md).
+
 ## Considered options
 
 - **A registry or redirect file mapping a hub to wherever it actually is.** Rejected. It buys one
@@ -175,4 +198,5 @@ would be a versioned support surface with no functional gain.
 - amends [ADR-0044 — Setup is a conversation over one address](0044-setup-is-a-conversation-over-one-address.md) (§4: `connect` obtains, `link` registers, no obtain verb)
 - honors [ADR-0009 — no runtime; automation rides host hooks](0009-no-runtime-automation-rides-host-hooks.md) (the session-start message rides an existing hook and makes no network call)
 - extends [ADR-0025 — one transient-state home](0025-one-transient-state-home.md)
+- parent_of [ADR-0047 — Machine bindings leave committed metadata](0047-machine-bindings-leave-committed-metadata.md)
 - paired_with [ADR-0046 — a branch and a pull request are the only way knowledge lands](0046-derived-hub-git-and-merge-ratification.md)
