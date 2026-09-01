@@ -129,10 +129,13 @@ This is worth stating plainly, because the flag is easily mistaken for a securit
 not. Whoever controls a CI job can already push branches and open pull requests with the
 credentials that job holds, and can edit the checked-out hub in the runner before mage ever reads
 it. The flag does not stop them, and no carrier choice could. Tampering is bounded by credentials
-(§4 of [ADR-0045](0045-cross-environment-presence.md)) and by merge ratification (§4 above). What
-the committed carrier does buy is consent: a project operator who holds push credentials but whose
-hub owner has declined proposals cannot flip that "no" from their own environment. An
-environment-settable enable would delete the paragraph above it.
+(§4 of [ADR-0045](0045-cross-environment-presence.md)) and by merge ratification (§4 above).
+
+What the committed carrier buys is not an unbypassable "no". An operator who can edit the
+checked-out hub in the runner can already flip the switch there, for that one run. What it buys
+instead is persistence and a paper trail: a lasting "yes" needs a commit to the hub's own history,
+visible and revertible by its owner. An environment-settable enable would let that same operator
+override the switch silently, run after run, with nothing left in the hub to show for it.
 
 ### 6. Attendance is not an input
 

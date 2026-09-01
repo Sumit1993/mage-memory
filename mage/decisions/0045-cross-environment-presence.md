@@ -144,8 +144,9 @@ would be a versioned support surface with no functional gain.
 Two corollaries, one of §1 and one of §7, stated here because both were reopened by running mage in
 real CI.
 
-`MAGE_HOME` is the only environment variable mage reads outside a harness adapter. No policy key
-gains an environment carrier, and none gains a generic `-c key=value` flag. The reason is not that
+`MAGE_HOME` is the only environment variable that carries a policy or configuration value mage
+reads outside a harness adapter. No policy key gains an environment carrier, and none gains a
+generic `-c key=value` flag. The reason is not that
 environment variables are untrustworthy. It is that a mechanical mapping from key path to variable
 name auto-mints a carrier for every field anyone ever adds, including write-enables, so the trust
 question would have to be re-answered per field forever. A curated table makes granting a carrier a

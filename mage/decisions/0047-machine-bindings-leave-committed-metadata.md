@@ -50,9 +50,10 @@ values that are true on exactly one machine. From `prismalens/prismalens`, commi
 
 `hub_repo` is portable. `hub_path` names one laptop's home directory and is wrong on every other
 machine. A live GitHub Actions run on 2026-08-29 (run `33254009691`, which opened and closed
-`prismalens/prismalens-kb#26`) confirmed mage already ignores the stored value and re-derives the
-path from `hub_repo` and `MAGE_HOME`. The field does not merely fail to help. It states something
-false and invites a reader to trust it.
+`prismalens/prismalens-kb#26`) happened to derive the correct path from `hub_repo` and `MAGE_HOME`
+without incident. That one run does not generalise: §3 measures a case where the committed
+`hub_path` overrides correct derivation instead of merely sitting unread. The field does not merely
+fail to help. It can state something false and still win over the right answer.
 
 The hub-side registry has the same shape: `projects[].code_repo_url` is portable,
 `projects[].code_repo_path` is not. That one is worse than dead weight, because `doctor --fix`
@@ -75,8 +76,14 @@ no layer that overrides another, because no two carriers ever hold the same key.
 | Portable identity (`mode`, `project`, `hub_repo`, `name`, `projects[].{name, storage, code_repo_url}`) | the knowledge base's `metadata.json` | yes | whoever may merge to that repo |
 | Policy (`grooming`, `redact`, `genres`) | the knowledge base's `metadata.json` | yes | whoever may merge to that repo |
 | Machine binding, derivable (the hub path) | nothing; derived at runtime from `hub_repo` + `MAGE_HOME` | n/a | nobody, it is computed |
+| Machine binding, derived but materialized locally (Claude Code's docs-root grant) | the project's gitignored `.claude/settings.local.json` (`additionalDirectories[0]`, `autoMemoryDirectory`, `mageOwnedAdditionalDirectories[0]`) | no | `mage connect`, via the Claude Code adapter |
 | Machine binding, non-derivable (`code_repo_path`) | none; the field is removed and nothing replaces it | n/a | nobody |
 | Secrets | no carrier; git resolves credentials (ADR-0045 §4) | never | nobody |
+
+The derivable row's "nobody, it is computed" does not hold yet for a hub with no remote at all.
+Until [ADR-0044](0044-setup-is-a-conversation-over-one-address.md)'s `local://` scheme lands, that
+one case still reads and writes `hub_path` from the knowledge base's own committed `metadata.json`
+(§3).
 
 ### 2. Policy is read from the knowledge base, never from the code repo
 
@@ -113,9 +120,9 @@ An earlier reading of this decision held that mage "already ignores `hub_path` a
 generalising from the GitHub Actions probe where the hub sat at the derived path with no symlink and
 derivation did win. That generalisation is wrong and is corrected here. A committed machine binding
 does not merely fail to help on a foreign machine. It overrides the correct answer. It is not derivable for a hub that has no remote at all, created
-locally and never pushed, because there is no host, owner, or repo to derive from. `src/hub-url.ts`
-rejects local paths for exactly this reason and `src/paths.ts` falls back to `hub_path` only when
-`hub_repo` is missing or will not canonicalize. That single case is what ADR-0044's proposed
+locally and never pushed, because there is no host, owner, or repo to derive from. `chosenHubRoot`
+(`src/hub-url.ts`) rejects local paths for exactly this reason and falls back to `hub_path` only
+when `hub_repo` is missing or will not canonicalize. That single case is what ADR-0044's proposed
 `local://<name>` scheme exists to close.
 
 Because the field overrides derivation rather than merely sitting unused, removal is more urgent
@@ -229,8 +236,9 @@ code repo again, that is the shape to copy, not this one.
 
 **Fold all of this into ADR-0045.** Rejected in part, accepted in part. The environment-carrier and
 environment-identity corollaries genuinely belong to 0045 and are amended into it as §10, and the
-consent-carrier rule belongs to 0046 §5. What remains is a schema decision that introduces a new
-file, which would be buried inside a nine-section ADR about locating hubs.
+consent-carrier rule belongs to 0046 §5. What remains is a schema-ownership decision spanning two
+removals, one from the committed hub metadata and one from project metadata, which would be buried
+inside a ten-section ADR about locating hubs.
 
 **A general precedence stack (system, user, project, local, env).** Rejected. It is what mature
 tools converge on, but ADR-0045 §8 forbids the machine-state layers it depends on, and mage has no
