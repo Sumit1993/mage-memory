@@ -244,11 +244,26 @@ skills` and `mage dashboard` refuse with that message rather than the generic
 tier, and `mage adopt` reports such an origin as `origin-hub-unreachable`
 rather than `origin-has-no-kb`.
 
-**The capture path stays silent on purpose.** The session-start nudge, the
-PostToolUse observer, the memory hook, and the Gate-2 staged-secret scan all
-**fail open** on an unreachable hub: they capture nothing and return normally, so
-a machine without the hub still starts sessions, runs tools, and commits. Silence
-there is the mechanism; the message belongs on the commands you actually invoke.
+**The capture path stays silent on purpose, with one exception.** The PostToolUse
+observer, the memory hook, and the Gate-2 staged-secret scan all **fail open** on
+an unreachable hub: they capture nothing and return normally, so a machine
+without the hub still starts sessions, runs tools, and commits. Silence there is
+the mechanism; the message belongs on the commands you actually invoke.
+
+The session-start nudge is the exception (ADR-0045 §6). It still captures
+nothing, but on `startup`, `resume`, or `compact` it surfaces the unreachable
+hub immediately on both channels, exempt from the backlog throttle:
+
+```console
+systemMessage    : mage · external hub is unreachable: https://github.com/acme/docs.git
+additionalContext: This repo is in external mode, so its knowledge base lives in
+                    a hub — but the hub is unreachable: no hub at
+                    ~/.mage/hubs/github.com/acme/docs (address
+                    https://github.com/acme/docs.git). Run `mage connect` to
+                    clone it there. Do NOT run `mage init` here: it would mint a
+                    SECOND knowledge base.
+```
+
 ## Reaching a hub from the code repo
 
 Finding the knowledge base and being *allowed to read it* are two different things. In `external` and `hybrid` modes the docs root sits outside the repo your agent was launched in, and agent harnesses confine file access to the project root. So `mage connect` also grants access to the hub — for Claude Code, by adding it to `permissions.additionalDirectories` in the repo's local settings.
