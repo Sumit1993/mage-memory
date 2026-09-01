@@ -87,9 +87,9 @@ may be done to it". `grooming` is already read exclusively from the resolved kno
 and `doctor` warns when it finds one. If a shorthand is wanted: the hub wins, because the code repo
 is never asked.
 
-### 3. A derivable binding is derived, and its field removed
+### 3. A derivable binding is derived, and writing it stops now
 
-`hub_path` and `hub_refs[].hub_path` leave the schema, completing what
+`hub_path` and `hub_refs[].hub_path` will leave the schema, completing what
 [ADR-0043](0043-hub-addressed-by-remote-located-by-derivation.md) §6 slated and
 [ADR-0044](0044-setup-is-a-conversation-over-one-address.md) sequenced.
 
@@ -274,6 +274,6 @@ thing to explain during onboarding for consumers that no longer read it.
 
 - child_of [ADR-0045 — Cross-environment presence](0045-cross-environment-presence.md)
 - amends [ADR-0012 — A wing is an optional convention; hubs are standalone-first](0012-wings-optional-convention-standalone-hubs.md) (HubProject loses `code_repo_path` outright, not relocated; §2's in-repo pointer, which reads the field directly, loses its filesystem detail and needs its own fix)
-- completes [ADR-0043 — A hub is addressed by remote and located by derivation](0043-hub-addressed-by-remote-located-by-derivation.md) (§6, the `hub_path` removal)
+- completes [ADR-0043 — A hub is addressed by remote and located by derivation](0043-hub-addressed-by-remote-located-by-derivation.md) (§6: writing stops here, full removal still awaits ADR-0044's `local://`)
 - sequenced_by [ADR-0044 — Setup is a conversation over one address](0044-setup-is-a-conversation-over-one-address.md) (`local://` lands before `hub_path` goes)
 - paired_with [ADR-0046 — A branch and a pull request are the only way knowledge lands](0046-derived-hub-git-and-merge-ratification.md)
