@@ -1,12 +1,11 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { gitInit } from "../git.js";
 import * as gitModule from "../git.js";
 import { run } from "../shell.js";
 import { exists, stagingPath } from "../paths.js";
 import { parseNote } from "../note.js";
-import { withKb } from "../../test/fixtures/kb.js";
+import { initRepoWithIdentity, withKb } from "../../test/fixtures/kb.js";
 import { groomCmd } from "./groom-cmd.js";
 import { stageCmd } from "./stage-cmd.js";
 
@@ -197,16 +196,6 @@ describe("mage groom — guards", () => {
     );
   });
 });
-
-/**
- * A temp repo that git will actually commit in. CI runners carry no user.name /
- * user.email, so production `gitCommit` fails there while passing on a dev box.
- */
-async function initRepoWithIdentity(repo: string): Promise<void> {
-  await gitInit(repo);
-  await run("git", ["-C", repo, "config", "user.email", "t@e.com"]);
-  await run("git", ["-C", repo, "config", "user.name", "t"]);
-}
 
 describe("mage groom --accept … --propose (ADR-0046)", () => {
   it("refuses when grooming.proposals is not enabled", async () => {
