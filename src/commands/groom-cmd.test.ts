@@ -210,7 +210,10 @@ async function initRepoWithIdentity(repo: string): Promise<void> {
 
 describe("mage groom --accept … --propose (ADR-0046)", () => {
   it("refuses when grooming.proposals is not enabled", async () => {
-    const { dir } = await withKb({ kind: "repo" });
+    const { dir, repo } = await withKb({ kind: "repo" });
+    // A real git repo: getRepoRoot must succeed here so the run reaches judgeProposal's
+    // proposals-off check instead of failing closed on an undeterminable repo root first.
+    await initRepoWithIdentity(repo);
     await stageDistinct(dir, 1);
     await expect(groomCmd({ dir, accept: "all", propose: true })).rejects.toThrow(
       /proposals are off for this knowledge base/,
@@ -224,6 +227,32 @@ describe("mage groom --accept … --propose (ADR-0046)", () => {
     await expect(groomCmd({ dir, accept: "all", propose: true })).rejects.toThrow(
       /cannot propose 6 notes in one pull request; limit is 5/,
     );
+  });
+
+  it("refuses closed when getRepoRoot cannot determine the repo (git failure), never falls back to kbRepo", async () => {
+    // Old behaviour: `getRepoRoot(kbRepo) ?? kbRepo` collapsed to kbRepo on failure, so
+    // judgeProposal's `repoRoot !== kbRepo` check compared kbRepo to itself and could
+    // never fire — a git failure here silently cleared the gate instead of blocking it.
+    const { dir, repo } = await withKb({ kind: "repo", grooming: { proposals: true } });
+    await initRepoWithIdentity(repo);
+    await run("git", ["-C", repo, "add", "."]);
+    await run("git", ["-C", repo, "commit", "-m", "init"]);
+
+    const [slug] = await stageDistinct(dir, 1);
+    const rootSpy = vi.spyOn(gitModule, "getRepoRoot").mockResolvedValue(null);
+    const pushSpy = vi.spyOn(gitModule, "gitPush").mockResolvedValue();
+    const prSpy = vi.spyOn(gitModule, "createPullRequest").mockResolvedValue("https://x/pull/1");
+    try {
+      await expect(groomCmd({ dir, accept: slug, propose: true })).rejects.toThrow(
+        /could not determine the git repository root/,
+      );
+      expect(pushSpy).not.toHaveBeenCalled();
+      expect(prSpy).not.toHaveBeenCalled();
+    } finally {
+      rootSpy.mockRestore();
+      pushSpy.mockRestore();
+      prSpy.mockRestore();
+    }
   });
 
   it("treats the whole hub repo as inside the KB (a hub IS the knowledge base)", async () => {
@@ -248,6 +277,39 @@ describe("mage groom --accept … --propose (ADR-0046)", () => {
         (e: unknown) => (e instanceof Error ? e.message : String(e)),
       );
       expect(String(err ?? "")).not.toMatch(/outside knowledge base/i);
+    } finally {
+      pushSpy.mockRestore();
+      prSpy.mockRestore();
+    }
+  });
+
+  it("for a hub-owned KB, does not sweep a pre-staged unrelated hub file into the proposal commit", async () => {
+    // The widened hub dirty-path boundary (above) deliberately lets an unrelated staged
+    // file pass judgeProposal's gate. Old `gitCommit(kbRepo, msg)` took no pathspec, so
+    // it committed the WHOLE index — including that file — into the pushed proposal PR.
+    const { dir, repo } = await withKb({ kind: "external", grooming: { proposals: true } });
+    await initRepoWithIdentity(repo);
+    await run("git", ["-C", repo, "add", "."]);
+    await run("git", ["-C", repo, "commit", "-m", "init"]);
+
+    const [slug] = await stageDistinct(dir, 1);
+    // A file elsewhere in the hub the user already `git add`-ed before running --propose.
+    await writeFile(join(repo, "unrelated-elsewhere.md"), "someone else's staged edit\n");
+    await run("git", ["-C", repo, "add", "unrelated-elsewhere.md"]);
+
+    const pushSpy = vi.spyOn(gitModule, "gitPush").mockResolvedValue();
+    const prSpy = vi.spyOn(gitModule, "createPullRequest").mockResolvedValue("https://x/pull/1");
+    try {
+      await groomCmd({ dir, accept: slug, propose: true });
+      // HEAD~1 is the propose commit (gitAdd([root]) + gitCommit); HEAD is the follow-up
+      // provenance-stamp commit. Neither is scoped to include the unrelated file.
+      const proposeCommit = await run("git", ["-C", repo, "show", "--name-only", "--pretty=format:", "HEAD~1"]);
+      const provenanceCommit = await run("git", ["-C", repo, "show", "--name-only", "--pretty=format:", "HEAD"]);
+      expect(proposeCommit.stdout).not.toContain("unrelated-elsewhere.md");
+      expect(provenanceCommit.stdout).not.toContain("unrelated-elsewhere.md");
+      // Still staged, untouched by the proposal's scoped commits.
+      const status = await run("git", ["-C", repo, "status", "--porcelain"]);
+      expect(status.stdout).toContain("unrelated-elsewhere.md");
     } finally {
       pushSpy.mockRestore();
       prSpy.mockRestore();

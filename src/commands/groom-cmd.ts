@@ -290,7 +290,14 @@ async function proposeBatch(
 
   // Step 3: Build ProposalRequest and call judgeProposal
   const proposalsEnabled = (await readGrooming(resolved)).proposals;
-  const repoRoot = (await getRepoRoot(kbRepo)) ?? kbRepo;
+  // Fail closed: falling back to kbRepo here would make judgeProposal's `repoRoot !==
+  // kbRepo` check compare kbRepo to itself and never fire, vacuously passing condition 5.
+  const repoRoot = await getRepoRoot(kbRepo);
+  if (!repoRoot) {
+    throw new Error(
+      `mage groom --propose: could not determine the git repository root for \`${kbRepo}\`; is it a git repository?`,
+    );
+  }
   const defaultBranch = await getDefaultBranch(kbRepo);
   const branchSuffix =
     selected.length === 1
@@ -384,7 +391,9 @@ async function proposeBatch(
       selected.length === 1
         ? `feat(memory): propose note ${first.slug}`
         : `feat(memory): propose ${selected.length} notes`;
-    await gitCommit(kbRepo, commitMsg1);
+    // Scope to root: for a hub-owned KB gitAdd only staged the project subtree, and an
+    // unscoped commit would sweep in whatever else was already staged in the hub repo.
+    await gitCommit(kbRepo, commitMsg1, [root]);
     committed = true;
     await gitPush(kbRepo, branchName);
     pushed = true;
@@ -443,8 +452,9 @@ async function proposeBatch(
       const updatedFm = stampProvenance(frontmatter, { review: prUrl });
       await writeNote(notePath, updatedFm, body);
     }
-    await gitAdd(kbRepo, accepted.map((rel) => join(root, rel)));
-    await gitCommit(kbRepo, `chore(provenance): record review ${prUrl}`);
+    const provenancePaths = accepted.map((rel) => join(root, rel));
+    await gitAdd(kbRepo, provenancePaths);
+    await gitCommit(kbRepo, `chore(provenance): record review ${prUrl}`, provenancePaths);
     await gitPush(kbRepo, branchName);
   } catch (err) {
     logger.warn(
