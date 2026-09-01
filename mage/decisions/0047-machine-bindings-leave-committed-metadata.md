@@ -16,7 +16,7 @@ sources:
   - decisions/0045-cross-environment-presence.md
   - src/paths.ts
   - src/commands/link.ts
-  - src/commands/doctor/link-checks.ts
+  - src/doctor/link-checks.ts
 keywords:
   - metadata-schema
   - machine-binding
@@ -57,7 +57,7 @@ false and invites a reader to trust it.
 The hub-side registry has the same shape: `projects[].code_repo_url` is portable,
 `projects[].code_repo_path` is not. That one is worse than dead weight, because `doctor --fix`
 writes the running machine's path back into the **committed** file
-(`src/commands/doctor/link-checks.ts:144`), so every machine that heals the hub churns a shared
+(`src/doctor/link-checks.ts:144`), so every machine that heals the hub churns a shared
 file against every other machine.
 
 ADR-0045 settles where a hub lives and how a machine reaches it. It does not say what may be
@@ -264,8 +264,11 @@ thing to explain during onboarding for consumers that no longer read it.
   `pushLinkedRepos`/`inRepoMembers` (`src/commands/index-cmd.ts:209-211,233-238`), so existing
   hubs need regenerating, not just a schema migration.
 - Whatever ADR-0012 §2's pointer requirement becomes, it can no longer be a filesystem path.
-- Existing knowledge bases carry dead fields until `mage migrate` runs; readers fold with a
-  fallback for one release.
+- Neither field needs `mage migrate`, which upgrades the metadata schema version and
+  ADR-0025's state-fold layout, unrelated to this decision. `hub_path` withers by attrition.
+  Writing stops immediately (§3), and the read fallback stays for remoteless hubs.
+  `code_repo_path` is removed outright (§4); existing hubs need only the `INDEX.md`
+  regeneration described above.
 
 ## Relations
 
