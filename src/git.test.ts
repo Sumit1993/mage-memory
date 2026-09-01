@@ -1,7 +1,7 @@
 import { rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { tmpDir } from "../test/fixtures/kb.js";
+import { initRepoWithIdentity, tmpDir } from "../test/fixtures/kb.js";
 import {
   filterDirtyPathsOutsideKb,
   getDefaultBranch,
@@ -162,7 +162,9 @@ describe("proposal git helpers", () => {
 
   it("gitCommit with paths excludes other staged files (no whole-index sweep)", async () => {
     const repo = await tmp();
-    await gitInit(repo);
+    // Line 177 below calls production gitCommit (no -c flags), which needs a real
+    // repo identity on a CI runner with no global user.email/user.name.
+    await initRepoWithIdentity(repo);
     await writeFile(join(repo, "init.txt"), "init\n");
     await run("git", ["-C", repo, "-c", "user.email=t@e.com", "-c", "user.name=t", "add", "init.txt"]);
     await run("git", ["-C", repo, "-c", "user.email=t@e.com", "-c", "user.name=t", "commit", "-m", "initial"]);
