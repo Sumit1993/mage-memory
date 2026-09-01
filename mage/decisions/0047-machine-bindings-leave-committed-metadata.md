@@ -133,9 +133,8 @@ has nothing else to stand on. **Reading** it needs narrowing in two places, and 
 same fix.
 
 The first is correct but insufficient: `hub_path` is consulted only when `hub_repo` is absent or
-will not canonicalize, never as a fallback when derivation produced a path that exists. That closes
-`chosenHubRoot` (`src/hub-url.ts`), which already rejects local paths and reaches `hub_path` only
-when there is no remote to derive from.
+will not canonicalize, never as a fallback when derivation produced a path that exists. That is the
+`chosenHubRoot` behavior described above, and it stops there.
 
 The second is the fallback that actually fired in the incident measured above, and an earlier draft
 of this section named the wrong one. [#191](https://github.com/Sumit1993/mage-memory/issues/191),
