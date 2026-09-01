@@ -111,18 +111,21 @@ export const FORBIDDEN_ENV_MARKERS = [
 ] as const;
 
 /**
- * Return a line's executable code, carrying block-comment state across lines. One
- * quote-aware pass owns every "is this really code" decision: three silent false
- * negatives came from deciding it with substring searches instead (a URL's `//`, a
- * `${VAR#pattern}`, and a `/*` inside a string literal).
+ * Return a line's executable code, carrying block-comment and template-literal state
+ * across lines. One quote-aware pass owns every "is this really code" decision: three
+ * silent false negatives came from deciding it with substring searches instead (a
+ * URL's `//`, a `${VAR#pattern}`, and a `/*` inside a string literal).
  */
 function stripNonCode(
   line: string,
   isShell: boolean,
   inBlock: boolean,
-): { code: string; inBlock: boolean } {
+  inTemplate = false,
+): { code: string; inBlock: boolean; inTemplate: boolean } {
   let out = "";
-  let quote: string | null = null;
+  // Single/double-quoted strings stay per-line (JS forbids raw newlines in them);
+  // only a backtick template literal needs its open state carried to the next line.
+  let quote: string | null = inTemplate ? "`" : null;
   let braceDepth = 0;
   let block = inBlock;
   for (let i = 0; i < line.length; i++) {
@@ -152,11 +155,14 @@ function stripNonCode(
     if (isShell) {
       if (ch === "$" && line[i + 1] === "{") braceDepth++;
       else if (ch === "}" && braceDepth > 0) braceDepth--;
-      else if (ch === "#" && braceDepth === 0) return { code: out, inBlock: false };
+      // `$#` (positional-parameter count) has no `{`; braceDepth alone can't tell it
+      // apart from a real comment start, so also check the char right before `#`.
+      else if (ch === "#" && braceDepth === 0 && line[i - 1] !== "$")
+        return { code: out, inBlock: false, inTemplate: false };
       out += ch;
       continue;
     }
-    if (ch === "/" && line[i + 1] === "/") return { code: out, inBlock: false };
+    if (ch === "/" && line[i + 1] === "/") return { code: out, inBlock: false, inTemplate: false };
     if (ch === "/" && line[i + 1] === "*") {
       block = true;
       i++;
@@ -164,7 +170,7 @@ function stripNonCode(
     }
     out += ch;
   }
-  return { code: out, inBlock: block };
+  return { code: out, inBlock: block, inTemplate: quote === "`" };
 }
 
 /**
@@ -177,13 +183,15 @@ export function scanSource(relPath: string, content: string): Violation[] {
   const isTypeScript = relPath.endsWith(".ts") || relPath.endsWith(".js") || relPath.endsWith(".mjs");
 
   let inBlockComment = false;
+  let inTemplate = false;
 
   for (let i = 0; i < lines.length; i++) {
     const rawLine = lines[i] ?? "";
     const lineNum = i + 1;
 
-    const scanned = stripNonCode(rawLine, isShell, inBlockComment);
+    const scanned = stripNonCode(rawLine, isShell, inBlockComment, inTemplate);
     inBlockComment = scanned.inBlock;
+    inTemplate = scanned.inTemplate;
     const code = scanned.code.trim();
     if (code.length === 0) continue;
 
@@ -351,6 +359,13 @@ describe("ADR-0045 §7 — Environment Rule Guard", () => {
       expect(scanSource("scripts/unexempt-example.sh", script).length).toBeGreaterThan(0);
     });
 
+    it("does not lose a $CI check after an unquoted $# on the same shell line", () => {
+      // $# (positional-parameter count) has no `{`, so it used to be mistaken for a
+      // comment start, discarding the rest of the line including the real $CI check.
+      const script = 'if [ $# -eq 0 ] && [ -n "$CI" ]; then';
+      expect(scanSource("scripts/unexempt-example.sh", script).length).toBeGreaterThan(0);
+    });
+
     it("a bare /* inside a string literal does not blind the scanner", () => {
       const code = [
         'const marker = "/* not a real comment";',
@@ -364,6 +379,18 @@ describe("ADR-0045 §7 — Environment Rule Guard", () => {
       expect(scanSource("src/example.ts", blind)).toHaveLength(0);
       // code BEFORE a block comment on the same line used to be dropped wholesale
       expect(scanSource("src/example.ts", "const x = process.env.CI; /* trailing").length).toBeGreaterThan(0);
+    });
+
+    it("a multi-line template literal doesn't get mistaken for a block comment", () => {
+      // The quote state used to reset every line while block-comment state carried
+      // over, so a `/*`-looking line inside an open template blinded real code after it.
+      const code = [
+        "const s = `line one",
+        "/* looks like a comment but is just template text",
+        "line three still in template`;",
+        "const violation = process.env.SOMETHING;",
+      ].join("\n");
+      expect(scanSource("src/example.ts", code).length).toBeGreaterThan(0);
     });
 
     it("the cloud-setup.sh exemption is what silences that same script", () => {
