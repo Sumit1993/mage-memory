@@ -119,11 +119,13 @@ arriving by a second route.
 An earlier reading of this decision held that mage "already ignores `hub_path` and re-derives",
 generalising from the GitHub Actions probe where the hub sat at the derived path with no symlink and
 derivation did win. That generalisation is wrong and is corrected here. A committed machine binding
-does not merely fail to help on a foreign machine. It overrides the correct answer. It is not derivable for a hub that has no remote at all, created
-locally and never pushed, because there is no host, owner, or repo to derive from. `chosenHubRoot`
-(`src/hub-url.ts`) rejects local paths for exactly this reason and falls back to `hub_path` only
-when `hub_repo` is missing or will not canonicalize. That single case is what ADR-0044's proposed
-`local://<name>` scheme exists to close.
+does not merely fail to help on a foreign machine. It overrides the correct answer.
+
+`hub_path` is not derivable for a hub that has no remote at all, created locally and never pushed,
+because there is no host, owner, or repo to derive from. `chosenHubRoot` (`src/hub-url.ts`) rejects
+local paths for exactly this reason and falls back to `hub_path` only when `hub_repo` is missing or
+will not canonicalize. That single case is what ADR-0044's proposed `local://<name>` scheme exists
+to close.
 
 Because the field overrides derivation rather than merely sitting unused, removal is more urgent
 than "deprecated" implies. Removal of the *field* still waits on `local://`, since a remoteless hub
