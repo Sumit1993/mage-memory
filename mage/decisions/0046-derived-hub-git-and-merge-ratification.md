@@ -118,6 +118,25 @@ agent's licence in order to enable a mechanism that increases oversight.
 Committing the setting is what lets the owner of a shared hub decline proposals from a project they
 do not control.
 
+That committed field is the switch's **only** carrier. No environment variable and no flag may
+enable it, and none is needed to. A CI runner already has the knowledge base checked out at its
+derived path, and mage reads `grooming` from that checkout, so a hub whose metadata carries
+`proposals: true` passes the gate on a runner with nothing set in the environment. Enabling
+proposals for a knowledge base is therefore a one-line pull request to that knowledge base, adopted
+by the same merge that adopts its notes.
+
+This is worth stating plainly, because the flag is easily mistaken for a security boundary it is
+not. Whoever controls a CI job can already push branches and open pull requests with the
+credentials that job holds, and can edit the checked-out hub in the runner before mage ever reads
+it. The flag does not stop them, and no carrier choice could. Tampering is bounded by credentials
+(§4 of [ADR-0045](0045-cross-environment-presence.md)) and by merge ratification (§4 above).
+
+What the committed carrier buys is not an unbypassable "no". An operator who can edit the
+checked-out hub in the runner can already flip the switch there, for that one run. What it buys
+instead is persistence and a paper trail: a lasting "yes" needs a commit to the hub's own history,
+visible and revertible by its owner. An environment-settable enable would let that same operator
+override the switch silently, run after run, with nothing left in the hub to show for it.
+
 ### 6. Attendance is not an input
 
 Nothing consults a terminal, a CI variable or any environment marker to decide whether a git action
@@ -170,4 +189,5 @@ that has checked out untrusted content.
 - rides [ADR-0014 — Two-gate redaction](0014-two-gate-redaction.md) (Gate-2 runs before any commit)
 - extends [ADR-0031 — Programmatic provenance stamp](0031-programmatic-provenance-stamp.md) (channel and review recorded at creation)
 - bounded_by [ADR-0009 — no runtime; automation rides host hooks](0009-no-runtime-automation-rides-host-hooks.md)
+- paired_with [ADR-0047 — Machine bindings leave committed metadata](0047-machine-bindings-leave-committed-metadata.md)
 - paired_with [ADR-0045 — Cross-environment presence](0045-cross-environment-presence.md)

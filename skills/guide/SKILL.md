@@ -45,6 +45,15 @@ location per remote, at `~/.mage/hubs/<host>/<owner>/<repo>` (`$MAGE_HOME/hubs`
 when set) — never read off a recorded path. `hub_path` is a deprecated fallback,
 used only when `hub_repo` is absent or doesn't resolve.
 
+**Unreachable hub.** `mode: external` but no usable clone at the derived path.
+At session start this fires on both channels together (ADR-0045 §6). The
+human sees a `mage · external hub is unreachable: ...` notice in the
+terminal. You get an `additionalContext` message naming the derived path and
+the one command that obtains it; that is the message you act on, and you
+never receive the terminal notice. Run `mage connect` to clone the hub there.
+Do **not** run `mage init`, since that mints a second, divergent knowledge
+base instead of reaching the real one.
+
 Hybrid is its own mode value (`"hybrid"`): docs root is the in-repo `mage/`;
 each `hub_ref` is a cross-cutting registration with a hub. (A schema-v1 file
 recorded as mode=in-repo with non-empty `hub_refs[]` is read as hybrid.)
