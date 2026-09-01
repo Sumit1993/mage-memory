@@ -83,8 +83,11 @@ export async function getDefaultBranch(repoPath: string): Promise<string> {
  * Get repo-relative dirty (modified, added, deleted, untracked) paths.
  */
 export async function getDirtyPaths(repoPath: string): Promise<string[]> {
-  const r = await run("git", ["-C", repoPath, "status", "--porcelain", "-z"]);
-  if (r.code !== 0) return [];
+  // Fail closed: a caller uses this to decide whether a write is safe (ADR-0046 §7),
+  // so a git failure must not read as "clean tree" — throw rather than return [].
+  const r = await run("git", ["-C", repoPath, "status", "--porcelain", "-z"], {
+    throwOnError: true,
+  });
   const entries = r.stdout.split("\0").filter((s) => s.length > 0);
   const paths: string[] = [];
   for (let i = 0; i < entries.length; i++) {
@@ -187,10 +190,17 @@ export async function gitAdd(repoPath: string, paths: string[]): Promise<void> {
 }
 
 /**
- * Create a commit with message in `repoPath`.
+ * Create a commit with message in `repoPath`. With `paths`, the commit is scoped to
+ * those paths (git's own pathspec limit) instead of the whole index — pass the same
+ * list given to `gitAdd` so pre-staged unrelated files elsewhere in the repo cannot
+ * ride along (ADR-0046 §7).
  */
-export async function gitCommit(repoPath: string, message: string): Promise<void> {
-  await run("git", ["-C", repoPath, "commit", "-m", message], { throwOnError: true });
+export async function gitCommit(repoPath: string, message: string, paths?: string[]): Promise<void> {
+  const args = ["-C", repoPath, "commit", "-m", message];
+  if (paths && paths.length > 0) {
+    args.push("--", ...paths);
+  }
+  await run("git", args, { throwOnError: true });
 }
 
 /**

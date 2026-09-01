@@ -121,6 +121,13 @@ describe("proposal git helpers", () => {
     expect(dirty).toContain("file2.txt");
   });
 
+  it("getDirtyPaths throws instead of reporting a clean tree when git status fails", async () => {
+    // Not a git repo: `git status` exits non-zero. The old behaviour returned [], which a
+    // caller reads as "nothing dirty" — exactly the vacuous pass this must not produce.
+    const notARepo = await tmp();
+    await expect(getDirtyPaths(notARepo)).rejects.toThrow(/Command failed/);
+  });
+
   it("filterDirtyPathsOutsideKb filters paths properly", () => {
     const repo = "/repos/project";
     const docsRoot = "/repos/project/mage";
@@ -151,6 +158,30 @@ describe("proposal git helpers", () => {
 
     const head = await run("git", ["-C", repo, "rev-parse", "--abbrev-ref", "HEAD"]);
     expect(head.stdout.trim()).toBe("mage/proposal/test-branch");
+  });
+
+  it("gitCommit with paths excludes other staged files (no whole-index sweep)", async () => {
+    const repo = await tmp();
+    await gitInit(repo);
+    await writeFile(join(repo, "init.txt"), "init\n");
+    await run("git", ["-C", repo, "-c", "user.email=t@e.com", "-c", "user.name=t", "add", "init.txt"]);
+    await run("git", ["-C", repo, "-c", "user.email=t@e.com", "-c", "user.name=t", "commit", "-m", "initial"]);
+
+    // Simulates a pre-staged unrelated file elsewhere in the repo, as `git add` would
+    // leave it before a proposal run's own gitAdd/gitCommit pair.
+    await writeFile(join(repo, "unrelated.txt"), "unrelated\n");
+    await gitAdd(repo, ["unrelated.txt"]);
+
+    await writeFile(join(repo, "note.md"), "test\n");
+    await gitAdd(repo, ["note.md"]);
+    await gitCommit(repo, "add note", ["note.md"]);
+
+    const committed = await run("git", ["-C", repo, "show", "--name-only", "--pretty=format:", "HEAD"]);
+    expect(committed.stdout).toContain("note.md");
+    expect(committed.stdout).not.toContain("unrelated.txt");
+    // unrelated.txt stays staged, untouched by the scoped commit.
+    const status = await run("git", ["-C", repo, "status", "--porcelain"]);
+    expect(status.stdout).toContain("unrelated.txt");
   });
 });
 
