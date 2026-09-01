@@ -257,7 +257,13 @@ thing to explain during onboarding for consumers that no longer read it.
 - Committed metadata becomes portable, so a checkout on a runner or a sandbox carries no false
   paths and no other machine's state.
 - The `doctor --fix` multi-machine churn on shared hub metadata stops.
-- One more gitignored file to explain during onboarding, and one more thing that can be absent.
+- Seven consumers lose their input and need reworking or removing, three of which degrade
+  silently today. `connect --all-projects` loses the ability to fan out at all, since writing
+  settings into another checkout is the behaviour being retired.
+- Every hub's committed `INDEX.md` currently carries one machine's absolute paths, written by
+  `pushLinkedRepos`/`inRepoMembers` (`src/commands/index-cmd.ts:209-211,233-238`), so existing
+  hubs need regenerating, not just a schema migration.
+- Whatever ADR-0012 §2's pointer requirement becomes, it can no longer be a filesystem path.
 - Existing knowledge bases carry dead fields until `mage migrate` runs; readers fold with a
   fallback for one release.
 
