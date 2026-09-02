@@ -3,8 +3,8 @@ type: gotcha
 tags:
   - mage/soak
 created: "2026-07-31"
-updated: 2026-08-12
-last_reviewed: 2026-08-12
+updated: 2026-09-02
+last_reviewed: 2026-09-02
 status: active
 provenance:
   repo: mage-memory
@@ -68,6 +68,11 @@ absence.
 same smell [ADR-0043](../decisions/0043-hub-addressed-by-remote-located-by-derivation.md)
 retires for `hub_path` — and `code_repo_path` is the *same shape of field that
 ADR-0043 does not cover*. Expect this class again until it is derived too.
+
+**Recurred 2026-09-02, one level up.** The monitor's own `TARGETS` list in `soak-report.mjs`
+named `prismalens-docs-hub` and `sumit1993/sreforge-memory`; the hubs had been renamed to
+`prismalens/prismalens-kb` and `prismalens/sreforge-kb`. Both units were dark for 33 days.
+Same fix: compare the target list against the live `~/.mage/hubs/` tree before reading a digest.
 
 ## Blind spot 2 — a footer that says "not computed" long after it is computable
 

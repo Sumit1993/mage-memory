@@ -4,11 +4,13 @@
 
 > 41 accepted decisions govern this repo — read `decisions/` before architectural or scope changes.
 
+- `gotcha` [The soak monitor reports "absent" and "healthy" the same way — three blind spots that cost an observation window](notes/soak-monitor-blind-spots.md) — blind-spot, dark-unit, keep-rate, capture-vs-adopt, baseline-flag, code-repo-path, absolute-path, evidence-pipeline, ratification-gate, cron
+- `pointer` [mage soak — the external dogfood targets + the read-only monitor](notes/soak-targets.md) — prismalens, sreforge, lesson-path, digest
+- `gotcha` [Gotcha — this repo has two learnings dirs, and the obvious one is a decoy](notes/two-learnings-dirs-one-is-a-decoy.md) — wrong-directory, measurement, note-read, recall-audit
 - `reference` [The boundary nudge — internals + where each piece lives](notes/boundary-nudge-internals.md) — digest, startup, session-start, watermark, once-per-chapter, teaser, two-channel, systemMessage, additionalContext, offer-first
 - `gotcha` [Gotcha — distill's corrections lens counts harness notifications as user corrections](notes/harness-notifications-pollute-the-corrections-lens.md) — task-notification, monitor-event, user-prompt, capture-schema, signal-to-noise, background-agents, groom
 - `principle` [mage is one durable memory — of hard-earned knowledge](notes/mage-is-durable-memory.md) — charter, identity, unified-memory, portable, notes-are-memories, insight, procedure, gotcha, pointer
 - `gotcha` [Gotcha — which `mage` binary am I actually running? Bare runs working tree, `npx` runs published](notes/npx-mage-runs-the-published-release.md) — dogfood, stale-binary, global-install, dist, dream, index, false-positive, self-hosting, verification, npm-link
-- `gotcha` [The soak monitor reports "absent" and "healthy" the same way — three blind spots that cost an observation window](notes/soak-monitor-blind-spots.md) — blind-spot, dark-unit, keep-rate, capture-vs-adopt, baseline-flag, code-repo-path, absolute-path, evidence-pipeline, ratification-gate, cron
 - `feedback` [Agent-maintained files carry standing rules only — no decision history, no trivial negatives](notes/agent-maintained-files-carry-standing-rules-only.md) — claude-md, skills, trim, context-cost
 - `gotcha` [Gotcha — ctx_execute_file refuses paths outside the project root, and the scratchpad is always outside it](notes/context-mode-blocks-files-outside-project-root.md) — ai-context, file-access-blocked, allow-rule, sandbox
 - `feedback` [Dogfood before release](notes/dogfood-before-release.md) — mage
@@ -34,7 +36,6 @@
 - `gotcha` [Gotcha — promote's recurrence fold has near-zero precision on a mature KB](notes/promote-folds-mechanical-tokens.md) — denoise, signature, keyword-fold, watermark, rejected-buffer, soak
 - `gotcha` [Gotcha — a constant that is defined but never imported reports a false state while every test passes](notes/unreachable-constant-reports-a-false-state.md) — dead-code, green-tests, wiring-bug, regression-test, default-parameter
 - `gotcha` [Gotcha — weakening a test's assertions to make it pass can delete its purpose](notes/weakening-a-test-can-delete-its-purpose.md) — vacuous, green-suite, false-confidence, behaviour-change, fixture, regression, code-review, coderabbit
-- `pointer` [mage soak — the external dogfood targets + the read-only monitor](notes/soak-targets.md) — prismalens, sreforge, lesson-path, digest
 - `gotcha` [Gotcha — a Gate-2 false positive can stall an autonomous groom; never disable the hook to unblock](notes/gate2-fp-blocks-autonomy.md) — redaction, overseer, approver, capture, soak
 - `gotcha` [A release bump touches MORE than package.json — release-please now owns it](notes/release-bump-touches-many-artifacts.md) — version, changelog, readme, badge, plugin, marketplace, consistency, hygiene, pat
 - `gotcha` [Test files were never type-checked (tsconfig excluded them)](notes/test-files-were-excluded-from-typecheck.md) — tsc, tests, exclude, vitest, tsup, esbuild, ci, fixture
@@ -42,4 +43,4 @@
 - `gotcha` [Gotcha — scope Gate-2 to the knowledge base, not the whole repo](notes/gate2-blocks-own-redaction-fixtures.md) — pre-commit, hook, docs-root, connect, dogfood
 - `gotcha` [Gotcha — key bodies with `-`/`_` partially leak past the high-entropy detector](notes/redaction-anthropic-key-detector.md) — mage
 
-> 37 memory notes total (37 shown). Read INDEX.md before non-trivial work.
+> 38 memory notes total (38 shown). Read INDEX.md before non-trivial work.

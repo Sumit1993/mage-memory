@@ -2,7 +2,7 @@
 
 # mage
 
-> 37 notes. Part of the [index](INDEX.md).
+> 38 notes. Part of the [index](INDEX.md).
 
 ## build
 
@@ -64,3 +64,4 @@
 ## soak
 
 - `gotcha` [The soak monitor reports "absent" and "healthy" the same way — three blind spots that cost an observation window](notes/soak-monitor-blind-spots.md) — blind-spot, dark-unit, keep-rate, capture-vs-adopt, baseline-flag, code-repo-path, absolute-path, evidence-pipeline, ratification-gate, cron
+- `gotcha` [Gotcha — this repo has two learnings dirs, and the obvious one is a decoy](notes/two-learnings-dirs-one-is-a-decoy.md) — wrong-directory, measurement, note-read, recall-audit

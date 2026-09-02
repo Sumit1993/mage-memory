@@ -16,7 +16,9 @@ procedure, and pointers (not copies of sources) — navigable as an Obsidian gra
    the task actually touches; don't read everything.
 2. Follow the links in those notes (standard markdown `[text](path.md)` links)
    and skim `mage/decisions/` for governing decisions.
-3. Treat notes as point-in-time. If a note is `status: stale-suspect`, or its
+3. Before picking work, read the pinned tracking issue on GitHub (`gh issue list --search 'Tracking: order of work'`).
+   It is the one place that says what comes next; `mage/work/roadmap.md` is status: stale-suspect.
+4. Treat notes as point-in-time. If a note is `status: stale-suspect`, or its
    `last_reviewed` / `provenance.commit` looks old, verify it against the
    current code before relying on it.
 

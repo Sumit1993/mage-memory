@@ -3,7 +3,7 @@ type: pointer
 tags:
   - mage/roadmap
 created: "2026-06-28"
-last_reviewed: 2026-06-28
+last_reviewed: 2026-09-02
 sources:
   - file:~/ai-context/mage-soak/soak-report.mjs
   - file:~/ai-context/handoff-mage-testing-strategy-2026-06-27.md
@@ -30,12 +30,15 @@ surfaced in recall — a note IS a memory, see [mage is durable memory](mage-is-
 
 ## The soak units (capture targets)
 
-- **mage-memory** — in-repo self-dogfood (`~/mage-memory`).
-- **prismalens** — code repo `~/prismalens-org/prismalens`; notes in hub
-  `~/prismalens-org/prismalens-docs-hub/projects/prismalens-platform`.
-  (`prismalens-agents` / `prismalens-engine` was RETIRED 2026-06-18, superseded by prismalens-platform.)
-- **sreforge** — code repo `~/sources/sreforge-workspace/sreforge`; notes in hub
-  `~/sources/sreforge-workspace/sreforge-memory/projects/sreforge`.
+- **mage-memory** — in-repo self-dogfood, `~/sources/mage-memory`. Learnings at `mage/.mage/learnings/`.
+- **prismalens** — code repo under `~/sources/prismalens-org/`; notes in hub
+  `~/.mage/hubs/github.com/prismalens/prismalens-kb/projects/prismalens-platform`.
+- **sreforge** — code repo under `~/sources/sreforge-workspace/`; notes in hub
+  `~/.mage/hubs/github.com/prismalens/sreforge-kb/projects/sreforge`.
+
+Hub locations are derived from the remote (ADR-0043); the paths above are what derivation yields
+on this machine as of 2026-09-02. If a hub is renamed, the monitor's target list in
+`soak-report.mjs` does not follow. Check it first.
 
 A soak UNIT is one capture target, never a whole hub: an in-repo KB is its own unit; a hub fans
 out one unit per registered project, driven from the project's CODE repo (ADR-0010/0012).
@@ -51,4 +54,5 @@ counts organic notes against a stamped `soak-baseline.json`, and writes a dated 
 **Signal:** staged lessons pending (lesson path) + organic notes created since baseline; recurrence
 candidates are a secondary momentum line.
 
-**Run:** `node ~/ai-context/mage-soak/soak-report.mjs` (cron-driven via `soak-digest.sh`).
+**Run:** `node ~/ai-context/mage-soak/soak-report.mjs`, by hand, when someone asks. Cron is
+abandoned (see [[soak-monitor-blind-spots]] blind spot 3).

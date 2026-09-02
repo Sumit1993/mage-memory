@@ -5,7 +5,7 @@ tags:
 created: "2026-06-03"
 updated: 2026-07-01
 last_reviewed: 2026-07-01
-status: active
+status: stale-suspect
 provenance:
   repo: mage-memory
   work: mega-grill-skill-loop
