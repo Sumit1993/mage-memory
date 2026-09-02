@@ -48,6 +48,11 @@ export {
   dream,
 } from "./commands/dream-cmd.js";
 export {
+  type GroomOptions,
+  type GroomResult,
+  groomCmd,
+} from "./commands/groom-cmd.js";
+export {
   type IndexOptions,
   type IndexResult,
   index,
@@ -299,6 +304,14 @@ export {
 } from "./grooming/proposals.js";
 // `noteProposalFor` is GONE with the note-proposal rung (ADR-0038).
 export { buildManifest, graduateProposalFor } from "./grooming/promote.js";
+// Proposal refusal gate (ADR-0046).
+export {
+  PROPOSAL_BRANCH_PREFIX,
+  PROPOSAL_NOTE_CAP,
+  type ProposalRequest,
+  type ProposalVerdict,
+  judgeProposal,
+} from "./grooming/proposal-gate.js";
 // dream applier (ADR-0019 §6 / ADR-0016 §4): the single serialized writer that turns
 // a confirmed Proposal into file changes, enforcing the §3 ceilings. The executors
 // (graduate/demote/merge/split/reword) are READ-ONLY planners; the applier is the one

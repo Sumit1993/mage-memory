@@ -96,7 +96,7 @@ write through the single applier.
    git -C <repo> add .claude/skills .agents/skills mage \
      && git -C <repo> commit -m "graduate: <note title> → mage-skill-<slug>"
    ```
-   mage never commits for you — review the two written SKILL.md files and the
+   mage never commits for you here — review the two written SKILL.md files and the
    re-pointed note, then commit. If the applier printed a refusal (a ceiling
    blocked it), nothing was written — resolve the cause (strip a secret, pick a
    different slug if a bespoke skill owns the name) and re-run, or leave it.

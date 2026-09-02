@@ -32,5 +32,8 @@ decisions, not notes (ADR-0041).
 **Docs surfaces:** Every implementation spec handed to a coding agent must include a "Docs surfaces" deliverable section naming the specific files to update, or an explicit "none affected because …". Where a named surface explains three or more interacting parts (a resolution order, a topology, a state machine, a pipeline, a precedence rule), the spec must also say which concrete artifact will carry it — a worked example, a terminal transcript, a diagram, or (only if genuinely graphical) a screenshot with a stated invalidation trigger. Prose-only for that kind of surface is an incomplete spec.
 
 **Commit hygiene:** mage never commits for you. It suggests `git` commands; you
-run them.
+run them. The one exception is `mage groom --accept … --propose`, which you have
+to turn on per knowledge base (`grooming.proposals`) and invoke by hand: it
+commits to a branch under `mage/proposal/` and opens a pull request, and can
+produce nothing else — never a commit on a default branch (ADR-0046).
 <!-- END mage -->

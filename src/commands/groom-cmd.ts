@@ -8,11 +8,38 @@
 // Hidden plumbing behind the `mage:groom` skill. Accept is the ONLY thing that
 // writes into committed `notes/`; the human still commits the diff (ADR-0013).
 
+import { readFile, realpath } from "node:fs/promises";
+import { join } from "node:path";
 import { logger } from "../logger.js";
 import { type ResolvedDocsRoot, requireDocsRoot, stagingPath } from "../paths.js";
-import { resolveCreationStamp } from "../provenance.js";
+import { resolveCreationStamp, stampProvenance } from "../provenance.js";
 import { scanNotes } from "../scan.js";
+import { hasLiveSecret, scanSecrets } from "../redact.js";
+import { scanStaged } from "../staged-scan.js";
 import { BASE_THRESHOLDS } from "../grooming/thresholds.js";
+import { readGrooming } from "../grooming/config.js";
+import {
+  PROPOSAL_BRANCH_PREFIX,
+  judgeProposal,
+} from "../grooming/proposal-gate.js";
+import {
+  createPullRequest,
+  filterDirtyPathsOutsideKb,
+  getDefaultBranch,
+  getDirtyPaths,
+  getRepoRoot,
+  gitAdd,
+  branchHasUniqueCommits,
+  resolveBranchRef,
+  getCurrentBranch,
+  gitCheckoutBranch,
+  gitCheckoutNewBranch,
+  gitDeleteBranch,
+  gitCommit,
+  gitPush,
+  hasGh,
+  hasGit,
+} from "../git.js";
 import {
   type StagedDraft,
   addStagedRejects,
@@ -22,7 +49,7 @@ import {
   readStagedDrafts,
   readStagedRejects,
 } from "../grooming/staging.js";
-import { normalizeTags } from "../note.js";
+import { normalizeTags, parseNote, writeNote } from "../note.js";
 import { type InboxIngestResult, ingestCaptureInbox } from "../adapters/claude-code/inbox.js";
 import { index } from "./index-cmd.js";
 
@@ -36,6 +63,8 @@ export interface GroomOptions {
   accept?: string;
   /** Discard these staged drafts ("all" or a comma-separated slug list). */
   reject?: string;
+  /** Open a pull request with the promoted notes instead of leaving them uncommitted. */
+  propose?: boolean;
 }
 
 /** One surfaced draft in the read-only batch view. */
@@ -62,6 +91,10 @@ export interface GroomResult {
   ingested?: string[];
   /** count of inbox captures dropped because an existing note already covered them. */
   ingestCovered?: number;
+  /** Branch name created for the proposal (--propose). */
+  proposalBranch?: string;
+  /** URL of the pull request opened (--propose). */
+  proposalPr?: string;
 }
 
 /**
@@ -75,6 +108,12 @@ export async function groomCmd(opts: GroomOptions): Promise<GroomResult> {
   if (opts.accept !== undefined && opts.reject !== undefined) {
     throw new Error("mage groom: choose one of --accept / --reject, not both.");
   }
+  if (opts.propose && opts.reject !== undefined) {
+    throw new Error("mage groom: --propose cannot be used with --reject.");
+  }
+  if (opts.propose && opts.accept === undefined) {
+    throw new Error("mage groom: --propose requires --accept.");
+  }
 
   // Lift any CC capture-inbox files (Gate-0 drops scrubbed native-memory writes at
   // the docs-root top) into staging FIRST, so they flow through the same
@@ -85,7 +124,9 @@ export async function groomCmd(opts: GroomOptions): Promise<GroomResult> {
   const staged = await readStagedDrafts(stagingPath(root));
   const result =
     opts.accept !== undefined
-      ? await acceptBatch(resolved, staged, opts.accept, opts)
+      ? opts.propose
+        ? await proposeBatch(resolved, staged, opts.accept, opts)
+        : await acceptBatch(resolved, staged, opts.accept, opts)
       : opts.reject !== undefined
         ? await rejectBatch(root, staged, opts.reject, opts)
         : await surface(root, staged, opts.json);
@@ -201,6 +242,254 @@ async function rejectBatch(
   if (opts.json) return result; // JSON is emitted once by groomCmd (with the ingest summary)
   logger.success(`Rejected ${selected.length} draft(s) — they won't be re-drafted.`);
   return result;
+}
+
+// ─── propose: branch + commit + push + pr + review stamp (ADR-0046) ────────
+
+/**
+ * Best-effort return to where the user was before a failed proposal run. The branch is
+ * deleted ONLY when it holds no commit of its own: once `gitCommit` has run, the promoted
+ * note exists nowhere else (the draft is already consumed), so deleting would destroy it.
+ * Returns the branch name when it was kept, so the caller can say so. Never throws.
+ */
+async function restoreBranch(
+  repo: string,
+  originBranch: string | null,
+  proposalBranch: string,
+  defaultBranch: string,
+  startPoint: string,
+): Promise<string | null> {
+  // A detached HEAD (what a CI checkout gives you by default) has no branch to return
+  // to, so fall back to the default branch rather than reporting a phantom commit.
+  const target = originBranch ?? defaultBranch;
+  if (target === proposalBranch) return proposalBranch;
+  if (!(await gitCheckoutBranch(repo, target))) return proposalBranch;
+  // Compare against the START POINT, not wherever the user stood: cut from defaultBranch,
+  // so anything unique to the proposal branch is mage's own commit and nothing else.
+  if (await branchHasUniqueCommits(repo, startPoint, proposalBranch)) return proposalBranch;
+  await gitDeleteBranch(repo, proposalBranch);
+  return null;
+}
+
+async function proposeBatch(
+  resolved: ResolvedDocsRoot,
+  staged: StagedDraft[],
+  spec: string,
+  opts: GroomOptions,
+): Promise<GroomResult> {
+  // getRepoRoot returns a realpath'd toplevel, so an un-canonicalised kbRepo makes the
+  // gate's equality check misfire on a symlinked dir or a trailing slash.
+  const kbRepo = await realpath(resolved.repo).catch(() => resolved.repo);
+  const root = await realpath(resolved.root).catch(() => resolved.root);
+  const selected = select(spec, staged);
+
+  const first = selected[0];
+  if (!first) {
+    throw new Error("mage groom: no drafts selected to propose.");
+  }
+
+  // Step 3: Build ProposalRequest and call judgeProposal
+  const proposalsEnabled = (await readGrooming(resolved)).proposals;
+  // Fail closed: falling back to kbRepo here would make judgeProposal's `repoRoot !==
+  // kbRepo` check compare kbRepo to itself and never fire, vacuously passing condition 5.
+  const repoRoot = await getRepoRoot(kbRepo);
+  if (!repoRoot) {
+    throw new Error(
+      `mage groom --propose: could not determine the git repository root for \`${kbRepo}\`; is it a git repository?`,
+    );
+  }
+  const defaultBranch = await getDefaultBranch(kbRepo);
+  const branchSuffix =
+    selected.length === 1
+      ? first.slug
+      : `${first.slug}-and-${selected.length - 1}-more`;
+  const branchName = `${PROPOSAL_BRANCH_PREFIX}${branchSuffix}`;
+
+  // Gate-2 redaction check: scan candidate drafts + staged files
+  const stagedScan = await scanStaged(kbRepo);
+  let redactionBlocked = stagedScan.blocked;
+  if (!redactionBlocked) {
+    for (const draft of selected) {
+      const findings = scanSecrets(`${JSON.stringify(draft.frontmatter)}\n${draft.body}`);
+      if (hasLiveSecret(findings)) {
+        redactionBlocked = true;
+        break;
+      }
+    }
+  }
+
+  const dirtyPaths = await getDirtyPaths(kbRepo);
+  // A hub repo IS the knowledge base in its entirety (ADR-0012), so for a hub-owned KB
+  // the boundary is the repo, not `<hub>/projects/<name>/`. Measured in CI: the hub's own
+  // metadata.json — the file that carries `grooming.proposals` — read as outside the KB
+  // and refused every run, and `mage index` rewrites hub-root INDEX.md on every run too.
+  const kbBoundary = resolved.kind === "hub" ? kbRepo : root;
+  const dirtyPathsOutsideKb = filterDirtyPathsOutsideKb(kbRepo, kbBoundary, dirtyPaths);
+
+  const verdict = judgeProposal({
+    repoRoot,
+    kbRepo,
+    proposalsEnabled,
+    defaultBranch,
+    branchName,
+    redactionBlocked,
+    dirtyPathsOutsideKb,
+    noteCount: selected.length,
+  });
+
+  if (!verdict.ok) {
+    throw new Error(verdict.message);
+  }
+
+  // Step 4: Create branch, promote, commit, push, open PR
+  if (!(await hasGit())) {
+    throw new Error("git is required to propose notes.");
+  }
+  if (!(await hasGh())) {
+    throw new Error("gh (GitHub CLI) is required to open pull requests.");
+  }
+
+  const originBranch = await getCurrentBranch(kbRepo);
+  // Cut from the default branch, never from HEAD: on a feature branch the proposal PR
+  // would otherwise carry that branch's unrelated commits (ADR-0046 §1).
+  const startPoint = await resolveBranchRef(kbRepo, defaultBranch);
+  if (!startPoint) {
+    throw new Error(
+      `mage groom --propose: cannot resolve the default branch \`${defaultBranch}\` locally or as \`origin/${defaultBranch}\`, so there is nothing safe to cut the proposal branch from. Fetch it first (in CI, actions/checkout leaves no local branch: \`git fetch origin ${defaultBranch}\`).`,
+    );
+  }
+  await gitCheckoutNewBranch(kbRepo, branchName, startPoint);
+
+  let accepted: string[];
+  let prUrl: string;
+  // Tracked outside the try: promoteBatch consumes the staged drafts, so if a later step
+  // throws the error must be able to say where the notes ended up.
+  let promoted: string[] = [];
+  let committed = false;
+  let pushed = false;
+  try {
+    // Stamp channel at creation (ADR-0046 §4). No autonomy mark.
+    const stamp = await resolveCreationStamp(resolved, { channel: "pipeline" });
+    accepted = await promoteBatch(root, selected, stamp);
+    promoted = accepted;
+    await index({ dir: opts.dir, quiet: opts.json });
+
+    // Stage changes under docsRoot and commit
+    await gitAdd(kbRepo, [root]);
+
+    // Gate-2 over what is ACTUALLY staged. The earlier scan ran before anything was
+    // added, so it saw an empty index; `gitAdd` sweeps in every dirty file under the
+    // KB root, which the dirty-path check deliberately permits (ADR-0014, ADR-0046 §7).
+    const indexScan = await scanStaged(kbRepo);
+    if (indexScan.blocked) {
+      throw new Error(
+        "mage groom --propose: the redaction scan blocked the staged content, so nothing was committed or pushed.",
+      );
+    }
+
+    const commitMsg1 =
+      selected.length === 1
+        ? `feat(memory): propose note ${first.slug}`
+        : `feat(memory): propose ${selected.length} notes`;
+    // Scope to root: for a hub-owned KB gitAdd only staged the project subtree, and an
+    // unscoped commit would sweep in whatever else was already staged in the hub repo.
+    await gitCommit(kbRepo, commitMsg1, [root]);
+    committed = true;
+    await gitPush(kbRepo, branchName);
+    pushed = true;
+
+    // Open PR
+    const prTitle =
+      selected.length === 1
+        ? `feat(memory): propose note ${first.slug}`
+        : `feat(memory): propose ${selected.length} notes`;
+    const prBody = formatProposalPrBody(selected);
+    prUrl = await createPullRequest(kbRepo, {
+      branch: branchName,
+      base: defaultBranch,
+      title: prTitle,
+      body: prBody,
+    });
+  } catch (err) {
+    // Leaving the user on a half-built proposal branch with their drafts already
+    // consumed is unrecoverable without hand-run git. Put them back where they were.
+    const kept = await restoreBranch(kbRepo, originBranch, branchName, defaultBranch, startPoint);
+    const why = err instanceof Error ? err.message : String(err);
+    if (kept && committed) {
+      // The right advice depends entirely on whether the push landed, and only a live run
+      // shows the difference: every test mocks gitPush.
+      const next = pushed
+        ? `It is already pushed, so finish by hand once the cause is fixed:\n  gh pr create --head ${kept} --base ${defaultBranch}`
+        : "It has NOT been pushed, so this branch is the only copy. Push it or cherry-pick from it once the cause is fixed.";
+      throw new Error(
+        `${why}\n\nYour notes are committed on \`${kept}\`, which has been left in place — the staged drafts are already consumed. ${next}`,
+      );
+    }
+    if (kept && !committed) {
+      // restoreBranch also returns the branch when it simply could not check out away
+      // from it. That is not evidence of a commit, so say what is actually true.
+      throw new Error(
+        `${why}\n\nNothing was committed. You may still be on \`${kept}\`; the ${promoted.length} promoted note(s) are uncommitted in your working tree${promoted.length > 0 ? `: ${promoted.join(", ")}` : ""}.`,
+      );
+    }
+    if (promoted.length > 0) {
+      // No commit was made, so the branch is gone — but promoteBatch already moved the
+      // drafts out of staging, so re-running reports "no staged draft" and the user has
+      // no way to know the files are sitting there uncommitted.
+      throw new Error(
+        `${why}\n\nNothing was committed or pushed, but ${promoted.length} note(s) were already written and their staged drafts consumed. They are uncommitted in your working tree: ${promoted.join(", ")}. Commit them yourself, or delete them to start over.`,
+      );
+    }
+    throw err;
+  }
+
+  // Step 5: Follow-up commit stamping review
+  try {
+    for (const rel of accepted) {
+      const notePath = join(root, rel);
+      const raw = await readFile(notePath, "utf8");
+      const { frontmatter, body } = parseNote(raw);
+      const updatedFm = stampProvenance(frontmatter, { review: prUrl });
+      await writeNote(notePath, updatedFm, body);
+    }
+    const provenancePaths = accepted.map((rel) => join(root, rel));
+    await gitAdd(kbRepo, provenancePaths);
+    await gitCommit(kbRepo, `chore(provenance): record review ${prUrl}`, provenancePaths);
+    await gitPush(kbRepo, branchName);
+  } catch (err) {
+    logger.warn(
+      `Could not record review stamp on proposal branch: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
+  const result: GroomResult = {
+    accepted,
+    proposalBranch: branchName,
+    proposalPr: prUrl,
+  };
+
+  if (opts.json) return result;
+  logger.success(`Promoted ${accepted.length} draft(s) to notes/ and opened proposal PR.`);
+  for (const rel of accepted) logger.detail(rel);
+  logger.detail(`Branch: ${branchName}`);
+  logger.detail(`Pull Request: ${prUrl}`);
+  return result;
+}
+
+function formatProposalPrBody(drafts: StagedDraft[]): string {
+  const lines = [
+    "## Proposed Knowledge Notes",
+    "",
+    "Proposed via `mage groom --accept … --propose` (ADR-0046).",
+    "",
+    "### Notes",
+    "",
+  ];
+  for (const d of drafts) {
+    lines.push(`- **${d.title}** (\`${d.slug}\`)`);
+  }
+  lines.push("");
+  return lines.join("\n");
 }
 
 // ─── selection ───────────────────────────────────────────────────────────────
