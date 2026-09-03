@@ -67,9 +67,13 @@ log because the observer listens after the call.
    it does not. Anything else is a one-line contract: emit this JSONL here.
 4. **A note is admitted only with a named trigger moment and a pointer, and is expected to
    leave**: promoted to a higher rung, or deleted when its trigger stops occurring.
-5. **Outputs land wherever the host harness lets config live**: project scope in the repo,
-   user scope in a kit the user owns and names at connect, local scope as today. The
-   adapter's whole job is that mapping (ADR-0036 still holds; one harness, no seam yet).
+5. **Mode and scope are independent axes.** Mode (in-repo, hybrid, external) says where
+   memory lives; scope says where a fix lands. Landing scopes are the code repo, the kit the
+   user names at connect, and the org workflows repo. `connect` records which of them accept
+   a pull request on this machine: the code repo does in in-repo and hybrid mode, and in
+   external mode only with explicit consent (ADR-0047 carrier). A fix goes to the highest rung
+   that has a writable scope. When none does, it becomes a note in the KB carrying its intended
+   rung. Memory works in every mode without any of this; the loop needs one writable scope.
 6. **Two numbers gate 0.1.0**: bad actions prevented by a landed fix, and notes that left
    the queue. They replace the a1 gate of ADR-0024 and ADR-0040.
 7. **Native auto-memory is off.** Capture reaches the store only through mage's own hooks.
@@ -89,7 +93,7 @@ log because the observer listens after the call.
   (digest target is the rung proposal, not the lesson), 0040 (named release stays, gate
   replaced by decision 6).
 - Unchanged and load-bearing: 0004, 0008, 0009, 0010, 0014, 0015, 0016, 0017, 0021, 0030,
-  0036, 0042 to 0047. 0021 (no phone-home) gets its own ADR after 0.1.0.
+  0036, 0042 to 0045, 0047. 0021 (no phone-home) gets its own ADR after 0.1.0.
 
 ## Consequences
 

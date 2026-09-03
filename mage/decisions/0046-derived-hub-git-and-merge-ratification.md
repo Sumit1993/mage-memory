@@ -3,8 +3,8 @@ type: decision
 tags:
   - mage/decisions
 created: "2026-08-22"
-updated: 2026-08-22
-last_reviewed: 2026-08-22
+updated: 2026-09-03
+last_reviewed: 2026-09-03
 status: proposed
 provenance:
   repo: mage-memory
@@ -29,6 +29,8 @@ keywords:
 ---
 
 # 0046 — A branch and a pull request are the only way knowledge lands
+
+> Amended by [ADR-0048](0048-repeated-failures-become-enforcement.md) on 2026-09-03: a proposal pull request may also target the code repo when it is the landing scope for a fix and consent was recorded at connect; the bound on what mage may produce is unchanged.
 
 > **Status: proposed (2026-08-22).** Defines what mage may do with git, how knowledge captured by
 > an automated pipeline reaches a knowledge base, and who ratifies it. Amends
