@@ -91,7 +91,8 @@ log because the observer listens after the call.
 - Amended: 0001 (charter), 0005 (native memory off, not a feeder), 0006 and 0033 (roster
   bounded to admitted notes), 0013 (skills are one output rung, measured by firing), 0029
   (digest target is the rung proposal, not the lesson), 0040 (named release stays, gate
-  replaced by decision 6).
+  replaced by decision 6), 0046 (a proposal PR may also target the code repo when it is
+  the landing scope and consent was recorded at connect).
 - Unchanged and load-bearing: 0004, 0008, 0009, 0010, 0014, 0015, 0016, 0017, 0021, 0030,
   0036, 0042 to 0045, 0047. 0021 (no phone-home) gets its own ADR after 0.1.0.
 
