@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mage: the road to 0.1.0</title>
+<style>
+  :root { --ink:#1f2328; --mute:#57606a; --line:#d0d7de; --bg:#ffffff; --soft:#f6f8fa; --red:#cf222e; --green:#1a7f37; --blue:#0969da; --amber:#9a6700; --purple:#8250df; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:15px/1.5 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color:var(--ink); background:var(--bg); }
+  main { max-width:1100px; margin:0 auto; padding:24px 20px 80px; }
+  h1 { font-size:28px; margin:0 0 4px; }
+  h2 { font-size:21px; margin:44px 0 10px; padding-top:14px; border-top:1px solid var(--line); }
+  h3 { font-size:16px; margin:22px 0 6px; }
+  p { margin:8px 0; }
+  .sub { color:var(--mute); }
+  .pitch { font-size:17px; background:var(--soft); border-left:4px solid var(--blue); padding:10px 14px; margin:14px 0; }
+  table { border-collapse:collapse; width:100%; font-size:13.5px; margin:10px 0; }
+  th, td { border:1px solid var(--line); padding:6px 8px; vertical-align:top; text-align:left; }
+  th { background:var(--soft); }
+  td.n { text-align:right; white-space:nowrap; }
+  code { font:12.5px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background:var(--soft); padding:1px 4px; border-radius:3px; }
+  pre { background:var(--soft); padding:10px 12px; overflow:auto; font-size:12.5px; border:1px solid var(--line); }
+  .tag { display:inline-block; font-size:11.5px; padding:1px 7px; border-radius:10px; border:1px solid var(--line); background:var(--soft); white-space:nowrap; }
+  .keep { color:var(--green); border-color:var(--green); }
+  .amend { color:var(--amber); border-color:var(--amber); }
+  .super { color:var(--red); border-color:var(--red); }
+  .new { color:var(--blue); border-color:var(--blue); }
+  .hand { color:var(--purple); border-color:var(--purple); }
+  figure { margin:14px 0; border:1px solid var(--line); border-radius:6px; padding:10px; background:#fff; overflow:auto; }
+  figcaption { font-size:13px; color:var(--mute); margin-top:6px; }
+  svg { display:block; max-width:100%; height:auto; font-family:inherit; }
+  .box { fill:#fff; stroke:#57606a; stroke-width:1.2; }
+  .dead { fill:#fff5f5; stroke:var(--red); stroke-dasharray:4 3; }
+  .new-box { fill:#eef6ff; stroke:var(--blue); }
+  .soft-box { fill:var(--soft); stroke:#8c959f; }
+  .lbl { font-size:12.5px; fill:var(--ink); }
+  .small { font-size:11px; fill:var(--mute); }
+  .redt { fill:var(--red); font-size:11px; }
+  .arrow { stroke:#57606a; stroke-width:1.3; fill:none; marker-end:url(#ah); }
+  .arrow-red { stroke:var(--red); stroke-width:1.3; fill:none; stroke-dasharray:4 3; marker-end:url(#ahr); }
+  .arrow-blue { stroke:var(--blue); stroke-width:1.4; fill:none; marker-end:url(#ahb); }
+  .wp { border:1px solid var(--line); border-radius:6px; padding:10px 14px; margin:10px 0; }
+  .wp h4 { margin:0 0 4px; font-size:15px; }
+  .wp dl { margin:0; display:grid; grid-template-columns:110px 1fr; gap:2px 10px; font-size:13.5px; }
+  .wp dt { color:var(--mute); }
+  .wp dd { margin:0; }
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  @media (max-width:800px) { .two { grid-template-columns:1fr; } .wp dl { grid-template-columns:1fr; } }
+  ul { margin:6px 0 6px 20px; padding:0; }
+  li { margin:3px 0; }
+  .toc a { margin-right:14px; font-size:13.5px; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>mage: the road to 0.1.0</h1>
+<p class="sub">Plan as of 2026-09-03. Nothing here is applied. Branch <code>docs/adr-0048-enforcement-redirection</code> holds the one draft file, ADR-0048. Every section below is meant to be handed to a cheaper agent as a work package; section 9 lists them with inputs, outputs and verification.</p>
+
+<p class="toc">
+<a href="#s1">1 Where we are</a><a href="#s2">2 The redirection</a><a href="#s3">3 The ladder</a><a href="#s4">4 Where things land</a><a href="#s5">5 Timeline to 0.1.0</a><a href="#s6">6 ADR map</a><a href="#s7">7 Issue and PR map</a><a href="#s8">8 Docs surfaces</a><a href="#s9">9 Work packages</a><a href="#s10">10 Traps</a><a href="#s11">11 Open rulings</a>
+</p>
+
+<div class="pitch">Your agents keep making the same mistakes. mage notices, and turns each one into a hook, a lint, or a rule, by pull request. It keeps a memory only for what cannot be enforced.</div>
+
+<!-- ================================================================== -->
+<h2 id="s1">1. Where we are</h2>
+
+<table>
+<tr><th>Fact</th><th>Value</th><th>Source</th></tr>
+<tr><td>Published version</td><td>0.0.17 (2026-07-30). Release PR #122 for 0.0.18 open.</td><td>npm, gh</td></tr>
+<tr><td>Decisions</td><td>47 ADRs, 6,825 lines. 0048 drafted on the branch.</td><td><code>mage/decisions/</code></td></tr>
+<tr><td>Notes in this repo</td><td>39. Best gotcha read by 2 sessions that did not write it, in 3 months.</td><td>observe log census</td></tr>
+<tr><td>Chapters here that read any note</td><td>3 of 126</td><td>recall handoff 2026-09-01</td></tr>
+<tr><td>prismalens / sreforge note reads</td><td>18 in 30 sessions / 0 for a month (grant broken, unnoticed)</td><td>underuse audits</td></tr>
+<tr><td>Generated skills ever minted</td><td>0. One hand-written wing skill, 4 loads.</td><td><code>mage skills --metrics --json</code></td></tr>
+<tr><td>Tool calls / failed, all units</td><td>25,374 / 400. Failures are crashes, not mistakes.</td><td>observe log census</td></tr>
+<tr><td>PRs with review findings since July</td><td>claude[bot] 87, coderabbit 283 (mage + prismalens)</td><td>gh search</td></tr>
+<tr><td>Plugin interceptions in transcripts since Aug</td><td>133 events, 43 of 754 sessions, 0 seen by observe</td><td>~/.claude/projects grep</td></tr>
+<tr><td>Deterministic lesson selection, three gates</td><td>0/62, 0/55, 115 buckets to 0 proposals</td><td>ADR-0027, 0028, 0038</td></tr>
+<tr><td>Open issues / PRs / milestones</td><td>19 / 6 / 0</td><td>gh</td></tr>
+</table>
+
+<figure>
+<svg viewBox="0 0 1060 330" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <marker id="ah" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#57606a"/></marker>
+  <marker id="ahr" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#cf222e"/></marker>
+  <marker id="ahb" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#0969da"/></marker>
+</defs>
+<!-- row 1: capture -->
+<rect x="20" y="40" width="130" height="50" rx="6" class="box"/><text x="85" y="60" text-anchor="middle" class="lbl">Claude Code session</text><text x="85" y="76" text-anchor="middle" class="small">hooks (ADR-0017)</text>
+<path d="M150,65 L200,65" class="arrow"/>
+<rect x="200" y="40" width="140" height="50" rx="6" class="box"/><text x="270" y="60" text-anchor="middle" class="lbl">mage observe</text><text x="270" y="76" text-anchor="middle" class="small">.mage/learnings/*.jsonl</text>
+<path d="M340,65 L390,65" class="arrow"/>
+<rect x="390" y="40" width="150" height="50" rx="6" class="box"/><text x="465" y="60" text-anchor="middle" class="lbl">nudge digest</text><text x="465" y="76" text-anchor="middle" class="small">session start (ADR-0029)</text>
+<path d="M540,65 L590,65" class="arrow"/>
+<rect x="590" y="40" width="130" height="50" rx="6" class="box"/><text x="655" y="60" text-anchor="middle" class="lbl">agent judges</text><text x="655" y="76" text-anchor="middle" class="small">mage:groom</text>
+<path d="M720,65 L770,65" class="arrow"/>
+<rect x="770" y="40" width="120" height="50" rx="6" class="box"/><text x="830" y="60" text-anchor="middle" class="lbl">mage/notes/</text><text x="830" y="76" text-anchor="middle" class="small">39 notes</text>
+<path d="M890,65 L940,65" class="arrow"/>
+<rect x="940" y="40" width="100" height="50" rx="6" class="box"/><text x="990" y="60" text-anchor="middle" class="lbl">roster</text><text x="990" y="76" text-anchor="middle" class="small">MEMORY.md</text>
+<!-- roster back to session: the read that does not happen -->
+<path d="M990,90 L990,140 L85,140 L85,90" class="arrow-red"/>
+<text x="540" y="132" text-anchor="middle" class="redt">read at the moment of need: 3 of 126 chapters here, 0 in sreforge</text>
+<!-- row 2: dead machinery -->
+<rect x="200" y="190" width="140" height="50" rx="6" class="dead"/><text x="270" y="210" text-anchor="middle" class="lbl">mage distill</text><text x="270" y="226" text-anchor="middle" class="redt">ADR-0018, retire</text>
+<rect x="390" y="190" width="150" height="50" rx="6" class="dead"/><text x="465" y="210" text-anchor="middle" class="lbl">mage promote</text><text x="465" y="226" text-anchor="middle" class="redt">115 buckets, 0 proposals</text>
+<rect x="590" y="190" width="130" height="50" rx="6" class="dead"/><text x="655" y="210" text-anchor="middle" class="lbl">graduate to skill</text><text x="655" y="226" text-anchor="middle" class="redt">never fired once</text>
+<rect x="770" y="190" width="120" height="50" rx="6" class="dead"/><text x="830" y="210" text-anchor="middle" class="lbl">soak, keep-rate</text><text x="830" y="226" text-anchor="middle" class="redt">unread 33 days</text>
+<rect x="20" y="190" width="130" height="50" rx="6" class="dead"/><text x="85" y="210" text-anchor="middle" class="lbl">CC auto-memory</text><text x="85" y="226" text-anchor="middle" class="redt">commandeered into mage/</text>
+<path d="M85,190 L85,90" class="arrow-red"/>
+<!-- row 3: what never reaches observe -->
+<rect x="20" y="270" width="300" height="44" rx="6" class="dead"/><text x="170" y="288" text-anchor="middle" class="lbl">blocks and redirects by other plugins</text><text x="170" y="304" text-anchor="middle" class="redt">PreToolUse fires before the observer: 0 recorded</text>
+<rect x="390" y="270" width="330" height="44" rx="6" class="dead"/><text x="555" y="288" text-anchor="middle" class="lbl">review findings on PRs</text><text x="555" y="304" text-anchor="middle" class="redt">hundreds since July, no stream into mage</text>
+<path d="M320,292 L270,240" class="arrow-red"/><path d="M555,270 L465,240" class="arrow-red"/>
+</svg>
+<figcaption>The current loop. Solid boxes work as designed. Dashed red boxes are either retired by this plan or never produced output. The red return arrow is the read that the whole design depends on and that does not happen.</figcaption>
+</figure>
+
+<!-- ================================================================== -->
+<h2 id="s2">2. The redirection</h2>
+<p>mage stops being a store and becomes the loop that turns a failure into enforcement. The shape that survived three killed gates stays: code narrows, the agent judges, the human merges (ADR-0029, ADR-0046). What changes is the target. The agent no longer asks "is this a lesson worth a note". It asks "which rung fixes this", and the answer lands as a pull request in the repo or kit where it applies.</p>
+
+<figure>
+<svg viewBox="0 0 1060 360" xmlns="http://www.w3.org/2000/svg">
+<!-- streams -->
+<text x="20" y="28" class="lbl" font-weight="600">streams (anything that emits observe events, ADR-0015)</text>
+<rect x="20" y="40" width="150" height="40" rx="6" class="box"/><text x="95" y="64" text-anchor="middle" class="lbl">hooks (today)</text>
+<rect x="20" y="88" width="150" height="40" rx="6" class="new-box"/><text x="95" y="106" text-anchor="middle" class="lbl">PreToolUse attempt</text><text x="95" y="120" text-anchor="middle" class="small">makes blocks visible</text>
+<rect x="20" y="136" width="150" height="40" rx="6" class="box"/><text x="95" y="160" text-anchor="middle" class="lbl">operator corrections</text>
+<rect x="20" y="184" width="150" height="40" rx="6" class="new-box"/><text x="95" y="202" text-anchor="middle" class="lbl">review findings</text><text x="95" y="216" text-anchor="middle" class="small">gh puller, #177</text>
+<rect x="20" y="232" width="150" height="40" rx="6" class="soft-box"/><text x="95" y="250" text-anchor="middle" class="lbl">anything else</text><text x="95" y="264" text-anchor="middle" class="small">"emit this JSONL here"</text>
+<path d="M170,60 L230,150" class="arrow"/><path d="M170,108 L230,150" class="arrow"/><path d="M170,156 L230,152" class="arrow"/><path d="M170,204 L230,156" class="arrow"/><path d="M170,252 L230,158" class="arrow"/>
+<!-- observe -->
+<rect x="232" y="130" width="130" height="50" rx="6" class="box"/><text x="297" y="150" text-anchor="middle" class="lbl">observe log</text><text x="297" y="166" text-anchor="middle" class="small">v1, additive</text>
+<path d="M362,155 L410,155" class="arrow"/>
+<!-- digest -->
+<rect x="410" y="130" width="130" height="50" rx="6" class="box"/><text x="475" y="150" text-anchor="middle" class="lbl">digest, first sight</text><text x="475" y="166" text-anchor="middle" class="small">counts rank, never gate</text>
+<path d="M540,155 L588,155" class="arrow"/>
+<!-- agent -->
+<rect x="588" y="130" width="140" height="50" rx="6" class="new-box"/><text x="658" y="150" text-anchor="middle" class="lbl">agent picks the rung</text><text x="658" y="166" text-anchor="middle" class="small">mage:groom, repointed</text>
+<path d="M728,155 L776,155" class="arrow"/>
+<!-- PR -->
+<rect x="776" y="130" width="120" height="50" rx="6" class="box"/><text x="836" y="150" text-anchor="middle" class="lbl">proposal PR</text><text x="836" y="166" text-anchor="middle" class="small">ADR-0046, budgeted</text>
+<path d="M896,155 L944,155" class="arrow"/>
+<!-- human -->
+<rect x="944" y="130" width="96" height="50" rx="6" class="box"/><text x="992" y="150" text-anchor="middle" class="lbl">human merges</text><text x="992" y="166" text-anchor="middle" class="small">or closes</text>
+<!-- landing -->
+<path d="M992,180 L992,230" class="arrow-blue"/>
+<rect x="620" y="230" width="420" height="44" rx="6" class="new-box"/><text x="830" y="248" text-anchor="middle" class="lbl">lands in the repo (project), the kit (user), or local settings</text><text x="830" y="264" text-anchor="middle" class="small">deny rule, hook, lint, CI check, rule line, skill, note</text>
+<!-- ledger -->
+<path d="M620,252 L560,252" class="arrow-blue"/>
+<rect x="410" y="230" width="150" height="44" rx="6" class="new-box"/><text x="485" y="248" text-anchor="middle" class="lbl">fire ledger</text><text x="485" y="264" text-anchor="middle" class="small">"prevented" per fix</text>
+<path d="M410,252 L362,252" class="arrow-blue"/>
+<rect x="232" y="230" width="130" height="44" rx="6" class="new-box"/><text x="297" y="248" text-anchor="middle" class="lbl">stale list</text><text x="297" y="264" text-anchor="middle" class="small">dream, extended</text>
+<path d="M297,274 L297,320 L475,320 L475,300" class="arrow-blue"/>
+<text x="386" y="335" text-anchor="middle" class="small">never fired / trigger silent / dead pointer -&gt; delete proposal, same PR path</text>
+<!-- notes as queue -->
+<rect x="20" y="300" width="200" height="44" rx="6" class="soft-box"/><text x="120" y="318" text-anchor="middle" class="lbl">notes: the queue</text><text x="120" y="334" text-anchor="middle" class="small">admitted with a trigger, expected to leave</text>
+</svg>
+<figcaption>The new loop. Blue boxes are new. Everything else is existing code with a new target. The stale list closes the loop: what never fires gets a delete proposal through the same door it came in.</figcaption>
+</figure>
+
+<h3>Two numbers replace the keep-rate gate</h3>
+<table>
+<tr><th>Number</th><th>Definition</th><th>How it is counted</th></tr>
+<tr><td><b>prevented</b></td><td>A landed fix fired: a deny refused a call, a hook blocked or rewrote, a check failed in CI or pre-commit.</td><td>PreToolUse attempt event without a matching PostToolUse (deny); hook exit code; CI job status via gh. Ledger committed in the KB, per fix, per unit.</td></tr>
+<tr><td><b>left the queue</b></td><td>A note promoted to a higher rung or deleted.</td><td>PR merged that removes or replaces a note; ledger row.</td></tr>
+<tr><td><i>dead</i> (surfaced, not gated)</td><td>A landed fix with zero fires in 90 days; a note whose trigger has not been observed in 90 days.</td><td>ledger age; observe log scan for the trigger signature.</td></tr>
+</table>
+
+<!-- ================================================================== -->
+<h2 id="s3">3. The ladder</h2>
+<p>Highest rung that can carry the lesson wins. A note is the last resort and must name the moment an agent will ask for it. The right column is where the 39 notes in this repo landed when routed on 2026-09-03 (full table in <code>~/ai-context/mage-notes-ladder-routing-2026-09-03.md</code>).</p>
+
+<figure>
+<svg viewBox="0 0 1060 300" xmlns="http://www.w3.org/2000/svg">
+<g font-size="12.5">
+<rect x="20" y="20" width="620" height="38" rx="5" class="box"/><text x="32" y="44" class="lbl"><tspan font-weight="600">1 impossible</tspan>  architecture, config, deny rule. The failure cannot happen.</text>
+<rect x="660" y="20" width="380" height="38" rx="5" class="soft-box"/><text x="672" y="44" class="lbl">1 note  (main branch protection already refuses the push)</text>
+<rect x="20" y="66" width="620" height="38" rx="5" class="box"/><text x="32" y="90" class="lbl"><tspan font-weight="600">2 check</tspan>  lint, test, CI job, pre-commit. Fails when violated.</text>
+<rect x="660" y="66" width="380" height="38" rx="5" class="soft-box"/><text x="672" y="90" class="lbl">11 notes  (diff-stat on agy runs, typecheck ordering, ...)</text>
+<rect x="20" y="112" width="620" height="38" rx="5" class="box"/><text x="32" y="136" class="lbl"><tspan font-weight="600">3 hook</tspan>  blocks or rewrites at the moment of the action.</text>
+<rect x="660" y="112" width="380" height="38" rx="5" class="soft-box"/><text x="672" y="136" class="lbl">5 notes  (commit-trailer verify, ctx_execute_file rewrite, ...)</text>
+<rect x="20" y="158" width="620" height="38" rx="5" class="box"/><text x="32" y="182" class="lbl"><tspan font-weight="600">4 rule</tspan>  one line in AGENTS.md or a skill. Only what no program can detect.</text>
+<rect x="660" y="158" width="380" height="38" rx="5" class="soft-box"/><text x="672" y="182" class="lbl">9 notes</text>
+<rect x="20" y="204" width="620" height="38" rx="5" class="box"/><text x="32" y="228" class="lbl"><tspan font-weight="600">5 note</tspan>  memory, with a named trigger moment and a pointer. Expected to leave.</text>
+<rect x="660" y="204" width="380" height="38" rx="5" class="soft-box"/><text x="672" y="228" class="lbl">8 notes, 3 survive the redirection</text>
+<rect x="20" y="250" width="620" height="38" rx="5" class="dead"/><text x="32" y="274" class="lbl"><tspan font-weight="600">delete</tspan>  already enforced, point in time, no trigger, or docs not memory.</text>
+<rect x="660" y="250" width="380" height="38" rx="5" class="soft-box"/><text x="672" y="274" class="lbl">5 notes  (charter, context.md, release-bump, ...)</text>
+</g>
+</svg>
+<figcaption>Rungs 1 to 3 are programs and produce a "prevented" count. Rung 4 is doctrine and is measured only by its absence of repeats. Rung 5 is what mage used to be.</figcaption>
+</figure>
+
+<!-- ================================================================== -->
+<h2 id="s4">4. Where things land</h2>
+<p>Topology is wherever each harness lets config live. For Claude Code that is three scopes, and every output type has a natural one. The kit is a repo the user owns and names at <code>connect</code>; claude-kit is the reference instance. ADR-0036 holds: one harness, no adapter interface until a second harness forces one.</p>
+
+<figure>
+<svg viewBox="0 0 1060 300" xmlns="http://www.w3.org/2000/svg">
+<rect x="20" y="30" width="300" height="240" rx="8" class="box"/><text x="170" y="54" text-anchor="middle" class="lbl" font-weight="600">project scope: the repo</text>
+<text x="34" y="80" class="lbl">.claude/settings.json (hooks, deny)</text>
+<text x="34" y="102" class="lbl">CI jobs, lint config, tests</text>
+<text x="34" y="124" class="lbl">pre-commit hooks</text>
+<text x="34" y="146" class="lbl">AGENTS.md rule lines</text>
+<text x="34" y="168" class="lbl">mage/notes/ (rung 5), mage/decisions/</text>
+<text x="34" y="190" class="lbl">.mage/ ledger and observe log</text>
+<text x="34" y="230" class="small">ADR-0008, 0025, 0046</text>
+<rect x="380" y="30" width="300" height="240" rx="8" class="new-box"/><text x="530" y="54" text-anchor="middle" class="lbl" font-weight="600">user scope: the kit</text>
+<text x="394" y="80" class="lbl">a git repo the user owns (claude-kit)</text>
+<text x="394" y="102" class="lbl">plugin hooks with tests</text>
+<text x="394" y="124" class="lbl">process skills</text>
+<text x="394" y="146" class="lbl">settings fragment: user-wide deny rules</text>
+<text x="394" y="168" class="lbl">the user's AGENTS.md doctrine</text>
+<text x="394" y="190" class="lbl">installed by the kit's own installer</text>
+<text x="394" y="230" class="small">named at connect (amends ADR-0044); contract in WP-H4</text>
+<rect x="740" y="30" width="300" height="240" rx="8" class="soft-box"/><text x="890" y="54" text-anchor="middle" class="lbl" font-weight="600">local scope: this machine</text>
+<text x="754" y="80" class="lbl">.claude/settings.local.json</text>
+<text x="754" y="102" class="lbl">observe hook groups (mage:observe:*)</text>
+<text x="754" y="124" class="lbl">reach grants (additionalDirectories)</text>
+<text x="754" y="146" class="lbl">no commandeer, no autoMemoryDirectory</text>
+<text x="754" y="190" class="lbl">hub location derived (ADR-0043, 0045)</text>
+<text x="754" y="230" class="small">ADR-0017, 0042, 0047</text>
+</svg>
+<figcaption>The three landing zones for Claude Code. A proposal names its zone. Hubs (external and hybrid mode) are project scope for the repos they serve; their notes and ledgers live in the hub, their checks and hooks still land in the code repo.</figcaption>
+</figure>
+
+<!-- ================================================================== -->
+<h2 id="s5">5. Timeline to 0.1.0</h2>
+<p>0.1.0 is the named release for a proven loop, not a version release-please happens to mint. Migration and retirements ship as patches. No code for the new loop is written until the hand-landed fixes move a count.</p>
+
+<figure>
+<svg viewBox="0 0 1060 330" xmlns="http://www.w3.org/2000/svg">
+<line x1="30" y1="60" x2="1030" y2="60" stroke="#57606a" stroke-width="2"/>
+<g>
+<circle cx="60" cy="60" r="7" fill="#57606a"/><text x="60" y="40" text-anchor="middle" class="lbl">0.0.17</text><text x="60" y="88" text-anchor="middle" class="small">today</text>
+<circle cx="200" cy="60" r="7" fill="#57606a"/><text x="200" y="40" text-anchor="middle" class="lbl">0.0.18</text><text x="200" y="88" text-anchor="middle" class="small">PR #122, merge as is</text>
+<circle cx="380" cy="60" r="7" fill="#0969da"/><text x="380" y="40" text-anchor="middle" class="lbl">0.0.19  clearing</text><text x="380" y="88" text-anchor="middle" class="small">migrate + deprecations, no "!" markers</text>
+<circle cx="580" cy="60" r="7" fill="#8250df"/><text x="580" y="40" text-anchor="middle" class="lbl">phase 0, by hand</text><text x="580" y="88" text-anchor="middle" class="small">route notes, land 3 fixes, count</text>
+<circle cx="780" cy="60" r="7" fill="#0969da"/><text x="780" y="40" text-anchor="middle" class="lbl">0.0.20 .. 0.0.n  the loop</text><text x="780" y="88" text-anchor="middle" class="small">only if the counts moved</text>
+<circle cx="980" cy="60" r="9" fill="#1a7f37"/><text x="980" y="40" text-anchor="middle" class="lbl" font-weight="600">0.1.0 named</text><text x="980" y="88" text-anchor="middle" class="small">gate: two numbers, two units</text>
+</g>
+<g>
+<rect x="290" y="120" width="180" height="90" rx="6" class="new-box"/><text x="300" y="140" class="lbl" font-weight="600">P1 clearing (code)</text><text x="300" y="158" class="small">mage migrate: settings, state, block</text><text x="300" y="174" class="small">verbs print replacement, exit 0</text><text x="300" y="190" class="small">observe: PreToolUse attempt event</text><text x="300" y="206" class="small">nudge: drop backlog tally + keep-rate</text>
+<rect x="490" y="120" width="180" height="90" rx="6" class="soft-box"/><text x="500" y="140" class="lbl" font-weight="600">P0 hand (no code)</text><text x="500" y="158" class="small">issue set from the routing table</text><text x="500" y="174" class="small">same for both hubs</text><text x="500" y="190" class="small">3 fixes with before/after counts</text><text x="500" y="206" class="small">kit contract written from claude-kit</text>
+<rect x="690" y="120" width="180" height="90" rx="6" class="new-box"/><text x="700" y="140" class="lbl" font-weight="600">P2 loop (code)</text><text x="700" y="158" class="small">review-findings stream</text><text x="700" y="174" class="small">proposal types + landing scope</text><text x="700" y="190" class="small">groom repointed, PRs per type</text><text x="700" y="206" class="small">ledger, stale in dream + nudge</text>
+<rect x="890" y="120" width="150" height="90" rx="6" class="box"/><text x="900" y="140" class="lbl" font-weight="600">P3 release</text><text x="900" y="158" class="small">docs rewrite (#114)</text><text x="900" y="174" class="small">ADR flags, 0040 amend</text><text x="900" y="190" class="small">plugin + marketplace text</text><text x="900" y="206" class="small">evidence in the release notes</text>
+</g>
+<text x="30" y="250" class="lbl" font-weight="600">Exit criteria</text>
+<text x="30" y="270" class="small">P1: a 0.0.17 KB runs migrate, ends with commandeer off, no retired state, doctor green. Both hubs migrated. Tests green.</text>
+<text x="30" y="286" class="small">P0: three fixes merged in their landing repos; each has a count before and a count after one week; the seam record says which repo took each and why.</text>
+<text x="30" y="302" class="small">P2: one review finding and one blocked call each travelled stream -&gt; digest -&gt; proposal PR -&gt; merge -&gt; ledger row, on a unit that is not this repo.</text>
+<text x="30" y="318" class="small">0.1.0: prevented &gt; 0 for three distinct fixes on two units that are not mage-memory; left-the-queue &gt; 0; docs describe what ships.</text>
+</svg>
+<figcaption>Versions are release-please's. The names are ours. P1 and P0 run in parallel; P2 waits on P0's counts.</figcaption>
+</figure>
+
+<!-- ================================================================== -->
+<h2 id="s6">6. ADR map</h2>
+<p>48 decisions. Only rows that change carry detail. "Flag" means: set <code>status: superseded</code>, add a one-line pointer to 0048 under the title, touch nothing else. Digest with each ADR's motivation: <code>~/ai-context/mage-adr-digest-2026-09-03.md</code>.</p>
+
+<table>
+<tr><th>ADR</th><th>Disposition</th><th>Change</th></tr>
+<tr><td>0048 repeated failures become enforcement</td><td><span class="tag new">new</span></td><td>Drafted on the branch. Still to fold in: no weights on streams, first sight not repeats, decision 8 becomes "migration is <code>mage migrate</code>, no new verb", decision 1 drops "counts repeats". Then status stays proposed until P0 counts exist.</td></tr>
+<tr><td>0003 track work units</td><td><span class="tag super">supersede</span></td><td>Flag. <code>work/</code> retired; plans live in the tracker. Existing files move to issue bodies or delete.</td></tr>
+<tr><td>0018 distill</td><td><span class="tag super">supersede</span></td><td>Flag. Verb deprecated in P1, code removed in P2.</td></tr>
+<tr><td>0019 promote</td><td><span class="tag super">supersede</span></td><td>Flag. Same.</td></tr>
+<tr><td>0024 organic grooming loop</td><td><span class="tag super">supersede</span></td><td>Flag. Keep its two survivors by citation in 0048: first-sight, and the anti-flood budget.</td></tr>
+<tr><td>0032 capture-redirect</td><td><span class="tag super">supersede</span></td><td>Flag. Commandeer off; memory-hook and flatten hook groups removed by migrate.</td></tr>
+<tr><td>0038 graduate on usage</td><td><span class="tag super">supersede</span></td><td>Flag. Graduate skill removed.</td></tr>
+<tr><td>0041 genre decides recall rung</td><td><span class="tag super">supersede</span></td><td>Flag. Was proposed, never accepted. Its "recall at the moment of need" concern moves to the merged #201 + #174 issue.</td></tr>
+<tr><td>0001 memory-first product</td><td><span class="tag amend">amend</span></td><td>One line under the title: charter sentence now in 0048.</td></tr>
+<tr><td>0005 one canonical memory</td><td><span class="tag amend">amend</span></td><td>Native memory is off, not a feeder.</td></tr>
+<tr><td>0006 two-layer recall, 0033 @import roster</td><td><span class="tag amend">amend</span></td><td>Roster stays, bounded to admitted notes (trigger + pointer).</td></tr>
+<tr><td>0013 procedure skills</td><td><span class="tag amend">amend</span></td><td>A skill is one output rung, measured by firing (0016). No graduation path from notes.</td></tr>
+<tr><td>0015 observe schema</td><td><span class="tag amend">amend</span></td><td>Additive: <code>tool_attempt</code> event on PreToolUse (tool, paths, detail). Streams contract: any producer of v1 events.</td></tr>
+<tr><td>0017 connect</td><td><span class="tag amend">amend</span></td><td>Installs the PreToolUse observe arm; never installs commandeer; asks for the kit.</td></tr>
+<tr><td>0029 digest to agent</td><td><span class="tag amend">amend</span></td><td>Target is the rung proposal, not the lesson. Shape unchanged.</td></tr>
+<tr><td>0030 autonomy ladder</td><td><span class="tag keep">keep</span></td><td>Answers "who ratifies": the merge is the human gate at every level. Later levels may auto-merge rung-1 fixes; not now.</td></tr>
+<tr><td>0035 notes are memories</td><td><span class="tag amend">amend</span></td><td>"One unified store" no longer includes native memory. Flatten retired with it.</td></tr>
+<tr><td>0037 doctor remit</td><td><span class="tag amend">amend</span></td><td>Drop skills-readiness for graduated skills; add: kit reachable, streams configured, ledger present, commandeer absent.</td></tr>
+<tr><td>0040 versions mechanical</td><td><span class="tag amend">amend</span></td><td>Named release stays. Gate is 0048 decision 6. Drop the requirement for an evidence ADR per release; evidence goes in the release notes.</td></tr>
+<tr><td>0044 setup conversation</td><td><span class="tag amend">amend</span></td><td>Two more questions: which kit, which streams.</td></tr>
+<tr><td>0021 no phone-home</td><td><span class="tag keep">keep</span></td><td>Unchanged for 0.1.0. Telemetry ADR (0049) after.</td></tr>
+<tr><td>0020 dashboard</td><td><span class="tag keep">keep</span></td><td>Deprioritized. A ledger view is the only addition, later.</td></tr>
+<tr><td>0016, 0031, 0039</td><td><span class="tag keep">keep</span></td><td>Context-match becomes the skill fire counter; provenance stamps the ledger; footprint unchanged.</td></tr>
+<tr><td>0002, 0004, 0007 to 0012, 0014, 0022, 0023, 0025 to 0028, 0034, 0036, 0042, 0043, 0045 to 0047</td><td><span class="tag keep">keep</span></td><td>Nothing.</td></tr>
+<tr><td>0049 telemetry and phone-home</td><td><span class="tag new">later</span></td><td>After 0.1.0. Self-hostable, opt-in, the gh-workflows Worker as prior art.</td></tr>
+</table>
+
+<!-- ================================================================== -->
+<h2 id="s7">7. Issue and PR map</h2>
+
+<h3>Open issues</h3>
+<table>
+<tr><th>Issue</th><th>Disposition</th><th>How</th></tr>
+<tr><td>#204 tracking: order of work</td><td><span class="tag amend">rewrite</span></td><td>Body replaced by <code>~/ai-context/mage-tracking-issue-draft-2026-09-03.md</code>, updated for first-sight and no-weights. Pin it. Sections: P1, P0, P2, P3, each linking its issues.</td></tr>
+<tr><td>#202 wire pushReachGrantCheck into nudge</td><td><span class="tag keep">keep, P1</span></td><td>A rung-1 fix for the sreforge silence. Small, own PR.</td></tr>
+<tr><td>#201 recall has no mid-task trigger</td><td><span class="tag amend">rescope</span></td><td>Merge with #174 into one design issue: "recall at the moment of need: a rung-5 note names its trigger; the trigger is matched in UserPromptSubmit or PreToolUse". Correct the 91.9 figure in the body. Close #174 into it.</td></tr>
+<tr><td>#200 harness layer rewrites frontmatter</td><td><span class="tag super">close</span></td><td>Root cause removed: commandeer off after migrate. Note the reason.</td></tr>
+<tr><td>#199 flatten drops object-form sources</td><td><span class="tag super">close</span></td><td>Flatten retired with commandeer.</td></tr>
+<tr><td>#198 link regenerating AGENTS.md block destroys content</td><td><span class="tag keep">keep, P1 blocker</span></td><td>Migrate rewrites that block. Fix first.</td></tr>
+<tr><td>#197, #196, #195, #194, #193, #191</td><td><span class="tag keep">keep</span></td><td>Plumbing bugs under 0043 to 0047. Order as #204 had them. Not redirection work; do not count them as such.</td></tr>
+<tr><td>#177 review-lane memory for a GH Actions consumer</td><td><span class="tag amend">rescope, P2</span></td><td>Becomes "review findings stream": pull PR review comments into observe events. Headless read path stays in the merged #201.</td></tr>
+<tr><td>#175 ephemeral VM story</td><td><span class="tag keep">keep, after 0.1.0</span></td><td>Committable hook registration matters for streams in CI. Not a gate.</td></tr>
+<tr><td>#174 CI/headless diff-aware retrieval</td><td><span class="tag super">close into #201</span></td><td>See #201.</td></tr>
+<tr><td>#154 KB curation miscalls</td><td><span class="tag super">close</span></td><td>Superseded by the routing migration.</td></tr>
+<tr><td>#137 playbook unclassified at rung 3</td><td><span class="tag super">close</span></td><td>0041 superseded.</td></tr>
+<tr><td>#135 decisions invisible to keyword search</td><td><span class="tag keep">keep, low</span></td><td>Unchanged.</td></tr>
+<tr><td>#114 docs-governance rollout</td><td><span class="tag amend">rescope, P3</span></td><td>Becomes the 0.1.0 docs rewrite (section 8).</td></tr>
+</table>
+
+<h3>Open PRs</h3>
+<table>
+<tr><th>PR</th><th>Disposition</th></tr>
+<tr><td>#122 release 0.0.18</td><td>Merge. Prior ruling: does not wait.</td></tr>
+<tr><td>#181 env guard (ADR-0045 s7)</td><td>Fix the two claude[bot] findings, merge.</td></tr>
+<tr><td>#182 groom --propose (ADR-0046)</td><td>Merge after #181. This is the PR path the whole loop rides on.</td></tr>
+<tr><td>#205 soak targets note edits</td><td>Close. Soak is retired and both touched notes route to delete or check.</td></tr>
+<tr><td>#203, #185 dependabot</td><td>Merge.</td></tr>
+</table>
+
+<h3>New issues, by phase</h3>
+<table>
+<tr><th>Id</th><th>Title</th><th>Phase</th><th>Notes</th></tr>
+<tr><td>N1</td><td>migrate: 0.0.x clearing (commandeer off, retired state, AGENTS.md block, warnings)</td><td>P1</td><td>Idempotent. Runs in hubs and code repos. Never commits.</td></tr>
+<tr><td>N2</td><td>deprecate distill, promote, graduate; skills groom/learn/optimize repointed; commit messages without "!"</td><td>P1</td><td>Verbs print the replacement and exit 0. Code removal is P2.</td></tr>
+<tr><td>N3</td><td>observe: tool_attempt event on PreToolUse (ADR-0015 additive)</td><td>P1</td><td>Makes blocks visible. Add to hook groups and schema docs.</td></tr>
+<tr><td>N4</td><td>nudge: drop backlog tally, keep-rate, dream weekly tick; keep chapter digest</td><td>P1</td><td>Digest wording changes in P2.</td></tr>
+<tr><td>N5</td><td>docs drift snapshot: regenerate after N2, commands page</td><td>P1</td><td>The drift test fails otherwise.</td></tr>
+<tr><td>N6</td><td>hubs: run migrate on prismalens-kb and sreforge-kb, delete ~/ai-context/mage-soak</td><td>P1</td><td>Operator task, recorded.</td></tr>
+<tr><td>H1</td><td>route mage-memory notes: 39 rows to issues in landing repos</td><td>P0</td><td>Spec: the routing table. Output: issue links per row.</td></tr>
+<tr><td>H2</td><td>route prismalens and sreforge hub notes</td><td>P0</td><td>Same prompt as the 09-03 agy run, per hub.</td></tr>
+<tr><td>H3</td><td>land three fixes by hand, with counts</td><td>P0</td><td>WebFetch deny (kit), diff-stat check in agy-delegate (kit), commit-trailer hook (repo). Record the seam.</td></tr>
+<tr><td>H4</td><td>the kit contract</td><td>P0</td><td>What a user-scope kit is: layout, installer, how connect names it. Written from claude-kit.</td></tr>
+<tr><td>L1</td><td>streams contract + review-findings puller (was #177)</td><td>P2</td><td>gh pull of PR review comments into v1 events. Rate-limit aware.</td></tr>
+<tr><td>L2</td><td>proposal schema: output types + landing scope</td><td>P2</td><td>deny, hook, check, rule, skill, note, delete. Single applier (0016).</td></tr>
+<tr><td>L3</td><td>groom repointed: judge the rung; groom --propose opens PRs per type</td><td>P2</td><td>Extends #182. Budget per pass.</td></tr>
+<tr><td>L4</td><td>fire ledger</td><td>P2</td><td>Definition in section 2. Committed in the KB.</td></tr>
+<tr><td>L5</td><td>stale: dream extends to fixes and silent triggers; nudge surfaces it</td><td>P2</td><td>Delete proposals through L3.</td></tr>
+<tr><td>L6</td><td>recall at the moment of need (merged #201 + #174)</td><td>P2</td><td>Design issue first, then a hook.</td></tr>
+<tr><td>L7</td><td>connect asks kit + streams; doctor checks them (0044, 0037 amend)</td><td>P2</td><td></td></tr>
+<tr><td>L8</td><td>remove retired code: distill, promote, graduate, flatten, keep-rate, staging</td><td>P2</td><td>After deprecation shipped.</td></tr>
+<tr><td>R1</td><td>docs rewrite for 0.1.0 (was #114)</td><td>P3</td><td>Section 8.</td></tr>
+<tr><td>R2</td><td>README, plugin.json, marketplace.json descriptions</td><td>P3</td><td>One sentence, section 0.</td></tr>
+<tr><td>R3</td><td>ADR supersede flags and amendments per section 6</td><td>P3</td><td>Mechanical.</td></tr>
+<tr><td>R4</td><td>0.1.0 named release with the two counts in the notes</td><td>P3</td><td>Gate in section 5.</td></tr>
+<tr><td>R5</td><td>ADR-0049 telemetry and phone-home</td><td>after</td><td>Not a gate.</td></tr>
+</table>
+
+<!-- ================================================================== -->
+<h2 id="s8">8. Docs surfaces</h2>
+<table>
+<tr><th>Surface</th><th>Change</th><th>When</th></tr>
+<tr><td><code>README.md</code></td><td>First paragraph becomes the pitch. Feature list: streams, ladder, PRs, ledger, notes as queue. Remove grooming-loop language.</td><td>P3</td></tr>
+<tr><td><code>.claude-plugin/plugin.json</code>, <code>marketplace.json</code></td><td>Description sentence. Skill list: guide, groom (repointed), learn (admission rule). graduate and optimize removed or renamed.</td><td>P2/P3</td></tr>
+<tr><td><code>docs/.../index.md</code>, <code>start/quickstart.md</code></td><td>Pitch, the loop diagram (section 2 as a terminal transcript: count before, proposal PR, count after), connect asks for kit and streams.</td><td>P3</td></tr>
+<tr><td><code>loop/overview.md</code>, <code>loop/capture.md</code>, <code>loop/nudge.md</code></td><td>Rewrite around streams, first-sight digest, the rung proposal.</td><td>P3</td></tr>
+<tr><td><code>loop/promote-graduate.md</code>, <code>loop/stage-groom.md</code>, <code>loop/optimize.md</code></td><td>Retire. Leave a stub naming the replacement so old links do not 404.</td><td>P1 stub, P3 remove</td></tr>
+<tr><td><code>loop/autonomy.mdx</code></td><td>Levels now describe proposal PRs, not note writes.</td><td>P3</td></tr>
+<tr><td><code>model/notes.md</code></td><td>Admission rule: trigger moment, pointer, expected exit. Drop the genre rungs.</td><td>P3</td></tr>
+<tr><td><code>model/modes.md</code>, <code>model/graph.md</code></td><td>Modes unchanged. Graph page shrinks to "Obsidian still opens it".</td><td>P3</td></tr>
+<tr><td><code>reference/commands.mdx</code>, <code>reference/hooks.mdx</code>, <code>reference/thresholds.mdx</code></td><td>Generated from code; regenerate after every P1 and P2 change or the drift test fails. Hooks page gains tool_attempt.</td><td>P1, P2</td></tr>
+<tr><td><code>reference/layout.md</code></td><td>work/ removed; .mage/ gains the ledger; staging and tally gone.</td><td>P1</td></tr>
+<tr><td><code>guides/uninstall-and-pause.md</code></td><td>Migration section for 0.0.x users: what migrate does, what the retired verbs print.</td><td>P1</td></tr>
+<tr><td><code>guides/hub-and-external-mode.md</code>, <code>guides/import-existing-notes.md</code></td><td>Hubs: run migrate per hub. Import: notes need a trigger line to be admitted.</td><td>P1, P3</td></tr>
+<tr><td><code>reference/glossary.md</code></td><td>Add: stream, rung, kit, ledger, prevented, left the queue. Remove: chapter mining, graduation, keep-rate.</td><td>P3</td></tr>
+<tr><td><code>skills/*/SKILL.md</code></td><td>groom: judge the rung. learn: admission rule. guide: the ladder replaces "read INDEX, capture after". graduate: delete. optimize: fold into groom or delete.</td><td>P1 wording, P2 behaviour</td></tr>
+<tr><td>AGENTS.md block written by <code>src/agents-md.ts</code></td><td>The ladder in five lines, the admission rule in one, migrate note. Fix #198 first.</td><td>P1</td></tr>
+<tr><td><code>mage/notes/mage-is-durable-memory.md</code>, <code>context.md</code></td><td>Retire; the charter is 0048.</td><td>P0 (routing table)</td></tr>
+<tr><td><code>CHANGELOG.md</code></td><td>release-please writes it. The 0.0.19 entry needs a hand-written "what changed and why" paragraph at the top pointing at 0048.</td><td>P1</td></tr>
+</table>
+
+<!-- ================================================================== -->
+<h2 id="s9">9. Work packages for cheaper agents</h2>
+<p>Each package is self-contained: an agent with only the named inputs can do it. Model column follows the routing table in AGENTS.md. Every package that opens a PR gets <code>pr-watch</code> armed by the session that dispatched it. Anything marked <span class="tag hand">ruling</span> needs a Fable or Opus seat and is not delegable.</p>
+
+<div class="wp"><h4>WP-1  Fold the last three rulings into ADR-0048 <span class="tag hand">ruling</span></h4><dl>
+<dt>inputs</dt><dd>the ADR on the branch; this page sections 2 and 3</dd>
+<dt>output</dt><dd>decision 1 without "counts repeats"; decision 3 without weights; decision 8 as migrate; one screen</dd>
+<dt>verify</dt><dd><code>wc -l</code> under 100; <code>node dist/cli.js index</code> clean; links resolve</dd>
+<dt>model</dt><dd>Fable (this session) or Opus</dd></dl></div>
+
+<div class="wp"><h4>WP-2  Rewrite #204 and create the P1/P0/P2/P3 issues</h4><dl>
+<dt>inputs</dt><dd>section 7 tables; the tracking-issue draft; <code>gh</code> auth</dd>
+<dt>output</dt><dd>#204 body replaced and pinned; 24 new issues (N1..N6, H1..H4, L1..L8, R1..R5) with labels; closures and rescopes applied with a one-line reason each</dd>
+<dt>verify</dt><dd><code>gh issue list --limit 60</code> matches the table; each closed issue has the reason comment</dd>
+<dt>model</dt><dd>Gemini via agy, or Sonnet. Mechanical. Watch the secondary rate limit: one call per second.</dd></dl></div>
+
+<div class="wp"><h4>WP-3  ADR supersede flags and amendments (R3)</h4><dl>
+<dt>inputs</dt><dd>section 6; the digest; ADR frontmatter convention (0047 as sample)</dd>
+<dt>output</dt><dd>one PR: status flags on 7 ADRs, one-line amendment notes under 12 titles, nothing else touched</dd>
+<dt>verify</dt><dd><code>git diff --stat</code> shows only decisions/; each changed file diff is under 6 lines; index clean</dd>
+<dt>model</dt><dd>Gemini via agy or Sonnet</dd></dl></div>
+
+<div class="wp"><h4>WP-4  migrate: the 0.0.x clearing (N1) + deprecations (N2)</h4><dl>
+<dt>inputs</dt><dd>inventory sections 3, 4, 8 (<code>~/ai-context/mage-functional-inventory-2026-09-03.md</code>); <code>src/commands/migrate.ts</code>, <code>connect.ts</code>, <code>src/adapters/claude-code/settings.ts</code>, <code>src/agents-md.ts</code>; #198</dd>
+<dt>output</dt><dd>migrate restores stashed autoMemoryDirectory, removes mage:memory:* and mage:flatten:* hook groups, deletes .mage/staging, tally.json, nudge-state, rewrites the AGENTS.md block safely, warns on work/; distill, promote, graduate print replacement and exit 0; tests for each; commits without "!" or BREAKING CHANGE</dd>
+<dt>verify</dt><dd>integration test: a 0.0.17-shaped fixture KB ends migrated and idempotent on second run; <code>pnpm test</code> green; <code>grep -L 'BREAKING' </code> on the commit messages</dd>
+<dt>model</dt><dd>Opus. Code with a security-shaped edge (settings file rewrite).</dd></dl></div>
+
+<div class="wp"><h4>WP-5  observe: tool_attempt event (N3) + nudge trim (N4) + drift regen (N5)</h4><dl>
+<dt>inputs</dt><dd>inventory sections 3, 4, 6; <code>src/observe/</code>, <code>src/adapters/claude-code/nudge.ts</code>; ADR-0015 additive rule; docs drift test</dd>
+<dt>output</dt><dd>PreToolUse observe arm writing <code>tool_attempt</code>; nudge without backlog tally, keep-rate, dream tick; regenerated docs snapshot; hooks reference page updated</dd>
+<dt>verify</dt><dd>a denied WebFetch in a fixture transcript yields one tool_attempt and no tool_use; drift test green; footprint unchanged</dd>
+<dt>model</dt><dd>Opus for observe, Sonnet for the regen</dd></dl></div>
+
+<div class="wp"><h4>WP-6  Route the hub notes (H2)</h4><dl>
+<dt>inputs</dt><dd><code>~/ai-context/agy-prompts/mage-notes-ladder-routing.md</code> with the path and count changed per hub; fix the filename regex to <code>[a-z0-9.-]+</code></dd>
+<dt>output</dt><dd>one routing table per hub in ~/ai-context</dd>
+<dt>verify</dt><dd>row count equals note count; every rung valid; repo untouched</dd>
+<dt>model</dt><dd>Gemini via agy (Sonnet fallback, as on 09-03)</dd></dl></div>
+
+<div class="wp"><h4>WP-7  Issues from the routing tables (H1 for this repo, then per hub)</h4><dl>
+<dt>inputs</dt><dd>the routing table(s); section 4 for the landing repo per rung; <code>gh</code></dd>
+<dt>output</dt><dd>one issue per row routed to impossible/check/hook/rule, in the repo where the fix lands (kit rows go to claude-kit); one PR per row routed to delete, removing the note; a comment on the note's row linking the issue</dd>
+<dt>verify</dt><dd>issue count equals routed rows; the delete PR removes exactly the listed files; index clean</dd>
+<dt>model</dt><dd>Sonnet. Do not let it write the fixes; issues only.</dd></dl></div>
+
+<div class="wp"><h4>WP-8  Land three fixes by hand, with counts (H3) <span class="tag hand">judgment</span></h4><dl>
+<dt>inputs</dt><dd>count before: 24 WebFetch redirects in 8 sessions; the Gemini re-indent gotcha; the commit-trailer gotcha; claude-kit layout</dd>
+<dt>output</dt><dd>three PRs in their landing repos; a seam record in ~/ai-context: which repo took each and why; a second count one week after merge</dd>
+<dt>verify</dt><dd>the redirect count in new transcripts is zero; the diff-stat check fires on a synthetic tab re-indent; the trailer hook rejects a bad trailer</dd>
+<dt>model</dt><dd>Opus for the hooks, operator merges</dd></dl></div>
+
+<div class="wp"><h4>WP-9  The kit contract (H4) <span class="tag hand">ruling</span></h4><dl>
+<dt>inputs</dt><dd>claude-kit tree; Claude Code plugin and settings docs; section 4</dd>
+<dt>output</dt><dd>a short spec: what a user-scope kit must contain for mage to land fixes in it, how connect records it, what doctor checks</dd>
+<dt>verify</dt><dd>claude-kit satisfies it without changes, or the diff is listed</dd>
+<dt>model</dt><dd>Fable or Opus</dd></dl></div>
+
+<div class="wp"><h4>WP-10  Streams contract + review-findings puller (L1) and proposal types (L2)</h4><dl>
+<dt>inputs</dt><dd>ADR-0015, 0016, 0046; #182 diff; section 2; gh API for PR review comments</dd>
+<dt>output</dt><dd>a one-page contract; a puller that writes v1 events; Proposal JSON gains type and scope; single applier handles each type</dd>
+<dt>verify</dt><dd>puller on prismalens yields events for known findings; applier round-trips each type in tests</dd>
+<dt>model</dt><dd>Opus. Spec first from a Fable seat if L2's schema is contested.</dd></dl></div>
+
+<div class="wp"><h4>WP-11  groom repointed, ledger, stale (L3, L4, L5)</h4><dl>
+<dt>inputs</dt><dd>WP-10 output; <code>skills/groom/SKILL.md</code>; <code>src/dream</code>; nudge</dd>
+<dt>output</dt><dd>groom judges the rung and opens PRs per type under a budget; ledger file and counters; dream reports never-fired and silent triggers; nudge shows repeats, proposals and stale</dd>
+<dt>verify</dt><dd>P2 exit criterion in section 5, on a unit that is not this repo</dd>
+<dt>model</dt><dd>Opus, one lane per issue</dd></dl></div>
+
+<div class="wp"><h4>WP-12  Docs rewrite and release text (R1, R2)</h4><dl>
+<dt>inputs</dt><dd>section 8; this page; the P2 code</dd>
+<dt>output</dt><dd>the pages in section 8; README; plugin and marketplace descriptions; a transcript of the loop for the front page</dd>
+<dt>verify</dt><dd>drift test green; every retired page is a stub with a pointer; no page mentions distill, promote, graduate, keep-rate, soak</dd>
+<dt>model</dt><dd>Sonnet drafts, Opus reviews the front page</dd></dl></div>
+
+<!-- ================================================================== -->
+<h2 id="s10">10. Traps</h2>
+<ul>
+<li><b>release-please mints 0.1.0 on any breaking marker.</b> <code>bump-minor-pre-major</code> is on. Retirements are deprecations: no <code>!</code>, no <code>BREAKING CHANGE</code> footer. Add a line to CONTRIBUTING.</li>
+<li><b>The docs drift test fails the moment a verb goes.</b> Regenerate the snapshot in the same PR (N5).</li>
+<li><b>Migrate before anything else touches the KB.</b> While commandeer is on, every Write or Edit under mage/ gets its frontmatter rewritten by the harness (#200). Run migrate first, in every unit.</li>
+<li><b>Hubs migrate separately.</b> prismalens-kb and sreforge-kb are external-mode stores with their own .mage state and their own hook groups in each code repo. Migrate runs in the hub and in each linked code repo.</li>
+<li><b>The plugin marketplace serves a stale copy.</b> A directory-source marketplace snapshots the tree (existing gotcha). Reinstall after N2 or the old skills keep loading.</li>
+<li><b>Which binary.</b> Bare <code>mage</code> runs the working tree, <code>npx mage</code> runs 0.0.17. Verification commands in every package say which.</li>
+<li><b>gh secondary rate limit.</b> The issue-creation package and the findings puller both hit it at burst. One call per second.</li>
+<li><b>#198 first.</b> Migrate rewrites the AGENTS.md block; today that rewrite destroys hand-written content.</li>
+<li><b>A user-scope deny rule cannot come from a plugin.</b> Claude Code plugins carry hooks and skills, not permission rules. Deny rules land in the kit's settings fragment and reach the machine through the kit's installer. The kit contract (WP-9) must say so.</li>
+<li><b>Worktrees for every lane.</b> Delegated work never runs in a main checkout. Each lane removes its tree when its PR lands.</li>
+<li><b>Do not rebuild recurrence.</b> Three gates say deterministic selection of lessons produces nothing. Counts rank the digest. The agent judges. If a package proposes a threshold, it is off spec.</li>
+</ul>
+
+<!-- ================================================================== -->
+<h2 id="s11">11. Open rulings</h2>
+<table>
+<tr><th>Ruling</th><th>Default in this plan</th><th>Who</th></tr>
+<tr><td>Streams flatten to observe events with one free-text field and a pointer</td><td>Yes</td><td>operator</td></tr>
+<tr><td>Both review bots are streams, no weights</td><td>Yes</td><td>settled 09-03</td></tr>
+<tr><td>First sight, counts rank never gate, budget per pass</td><td>Yes, budget 3 per pass (ADR-0024's number)</td><td>settled 09-03</td></tr>
+<tr><td>Migration is <code>mage migrate</code>, no new verb</td><td>Yes</td><td>settled 09-03</td></tr>
+<tr><td>Migrate may read Claude Code transcripts to recover blocks from before N3</td><td>No. Not needed for clearing. The phase-0 count comes from a one-off grep, as on 09-03.</td><td>operator</td></tr>
+<tr><td>P2 starts only if P0 counts moved</td><td>Yes</td><td>operator</td></tr>
+<tr><td>0.1.0 gate numbers: three fixes, two units, prevented above zero</td><td>Proposed</td><td>operator</td></tr>
+<tr><td>The kit is a Claude Code plugin repo with a settings fragment and installer</td><td>Assumed from claude-kit</td><td>WP-9</td></tr>
+<tr><td>Telemetry ADR after 0.1.0, local ledger only until then</td><td>Yes</td><td>settled 09-03</td></tr>
+</table>
+
+<p class="sub" style="margin-top:40px">Sources: <code>~/ai-context/mage-direction-assessment-2026-09-03.md</code> (sections 1 to 8), <code>mage-functional-inventory-2026-09-03.md</code>, <code>mage-adr-digest-2026-09-03.md</code>, <code>mage-notes-ladder-routing-2026-09-03.md</code>, <code>mage-tracking-issue-draft-2026-09-03.md</code>, ADR-0048 on the branch.</p>
+
+</main>
+</body>
+</html>

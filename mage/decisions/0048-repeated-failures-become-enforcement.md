@@ -13,9 +13,9 @@ sources:
   - decisions/0001-memory-first-product-supersedes-specshub.md
   - decisions/0029-digest-to-agent-capture.md
   - decisions/0046-derived-hub-git-and-merge-ratification.md
-  - file:~/ai-context/mage-direction-assessment-2026-09-03.md
-  - file:~/ai-context/mage-notes-ladder-routing-2026-09-03.md
-  - file:~/ai-context/mage-adr-digest-2026-09-03.md
+  - docs/plans/0048-road-to-0.1.0/mage-direction-assessment-2026-09-03.md
+  - docs/plans/0048-road-to-0.1.0/mage-notes-ladder-routing-2026-09-03.md
+  - docs/plans/0048-road-to-0.1.0/mage-adr-digest-2026-09-03.md
 keywords:
   - charter
   - enforcement-ladder
