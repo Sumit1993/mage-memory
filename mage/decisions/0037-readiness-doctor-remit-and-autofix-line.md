@@ -3,8 +3,8 @@ type: decision
 tags:
   - mage/decisions
 created: "2026-07-02"
-updated: 2026-07-02
-last_reviewed: 2026-07-02
+updated: 2026-09-03
+last_reviewed: 2026-09-03
 status: accepted
 provenance:
   repo: mage-memory
@@ -32,6 +32,7 @@ keywords:
 ---
 
 # 0037 — doctor's remit extends to recall + skills readiness, on a bounded auto-fix line
+> Amended by [ADR-0048](0048-repeated-failures-become-enforcement.md) on 2026-09-03: Drop skills-readiness for graduated skills; add: kit reachable, streams configured, ledger present, commandeer absent.
 
 > **Status: accepted (ratified 2026-07-02).** Output of a 2026-07-02 light grill of
 > [plan-readiness-doctor](../work/plan-readiness-doctor.md), promoted after the first slice

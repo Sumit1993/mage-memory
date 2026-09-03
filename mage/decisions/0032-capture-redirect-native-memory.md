@@ -3,9 +3,9 @@ type: decision
 tags:
   - mage/decisions
 created: "2026-06-25"
-updated: 2026-07-01
-last_reviewed: 2026-07-01
-status: accepted
+updated: 2026-09-03
+last_reviewed: 2026-09-03
+status: superseded
 provenance:
   repo: mage-memory
   work: adr-0032-capture-redirect-native-memory
@@ -34,6 +34,7 @@ keywords:
 ---
 
 # 0032 — Capture-redirect: co-opt the host's native-memory write into mage's git-durable pipeline (relocation where the host allows it, coexist nudge as the floor)
+> Superseded by [ADR-0048](0048-repeated-failures-become-enforcement.md) on 2026-09-03.
 
 > **Status: accepted (ratified 2026-07-01 — impl on `main`, riding 0.0.12).** Output of a grill (2026-06-25). Capture mechanism only; the
 > recall counterpart (projecting mage notes *into* the native store) is split out to a

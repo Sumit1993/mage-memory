@@ -2,8 +2,8 @@
 type: decision
 tags: [mage/decisions]
 created: "2026-05-29"
-updated: "2026-06-01"
-last_reviewed: "2026-06-01"
+updated: "2026-09-03"
+last_reviewed: "2026-09-03"
 status: active
 provenance:
   repo: mage-memory
@@ -11,6 +11,7 @@ provenance:
 ---
 
 # 0005 — Exactly one canonical durable memory (mage); native memories are feeders, not rivals
+> Amended by [ADR-0048](0048-repeated-failures-become-enforcement.md) on 2026-09-03: Native memory is off, not a feeder.
 
 > **Amendment (2026-06-08, distill grill — [ADR-0018](0018-mage-distill-observed-scratch-reader.md)).**
 > The **feeder mechanism is cut.** mage no longer harvests other tools' memory stores

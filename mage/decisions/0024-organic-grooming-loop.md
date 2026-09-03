@@ -3,9 +3,9 @@ type: decision
 tags:
   - mage/decisions
 created: "2026-06-16"
-updated: 2026-07-19
-last_reviewed: 2026-07-19
-status: active
+updated: 2026-09-03
+last_reviewed: 2026-09-03
+status: superseded
 provenance:
   repo: mage-memory
   work: 0.0.12-organic-grooming-loop
@@ -27,6 +27,7 @@ modified: 2026-07-19T17:38:49.623Z
 ---
 
 # 0024 — Organic grooming loop: the lesson path (inline-primary + boundary nudge)
+> Superseded by [ADR-0048](0048-repeated-failures-become-enforcement.md) on 2026-09-03.
 
 mage captures durable **lessons** the way Claude Code's own memory does — a short note minted
 the *first* time something is worth remembering — and routes them through a judged inbox before

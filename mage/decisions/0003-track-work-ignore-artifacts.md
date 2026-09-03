@@ -2,15 +2,16 @@
 type: decision
 tags: [mage/decisions]
 created: "2026-05-29"
-updated: "2026-06-01"
-last_reviewed: "2026-06-01"
-status: active
+updated: "2026-09-03"
+last_reviewed: "2026-09-03"
+status: superseded
 provenance:
   repo: mage-memory
   commit: 1ec8225
 ---
 
 # 0003 — Track work units and notes; git-ignore only artifacts and scratch
+> Superseded by [ADR-0048](0048-repeated-failures-become-enforcement.md) on 2026-09-03.
 
 mage commits the durable knowledge — `notes/`, `decisions/`, `INDEX.md`, `metadata.json`, `.obsidian/`, **and work units' working content** (`work/<slug>/*.md`) — so it travels across machines and to the hub, honoring the founding goal (knowledge that doesn't get lost). Only **`work/<slug>/artifacts/`** (raw/large/binary materials) and **`.learnings/`** (pre-promotion scratch) are git-ignored — durable on disk (never `/tmp`) but local, to keep the repo free of binaries and noise. Rule: anything in an `artifacts/` dir is ignored; everything else is tracked.
 

@@ -53,16 +53,18 @@ log because the observer listens after the call.
 ## Decision
 
 1. **mage is the loop that turns a repeated failure into enforcement.** Streams feed observe
-   events; code counts repeats on identical failure signatures; the agent judges the highest
-   rung the fix can reach; the fix lands by pull request (ADR-0046); a ledger counts how
-   often it fires; what never fires is flagged.
+   events; code narrows on first sight, counts rank the digest and never gate it, a bounded
+   number of proposals per pass; the agent judges the highest rung the fix can reach; the fix
+   lands by pull request (ADR-0046); a ledger counts how often it fires; what never fires is
+   flagged.
 2. **The ladder is doctrine.** Make it impossible (architecture, config, deny rule); a check
    (lint, test, CI, pre-commit); a hook that blocks or rewrites at the moment of the action;
    one line of rule in an AGENTS.md or a skill; a note. A lower rung only when every higher
    rung is shown not to apply.
 3. **A stream is anything that emits observe events** (ADR-0015 schema, additive). Built in:
    the hooks, a PreToolUse attempt event so blocks become visible, operator corrections, and
-   one review-findings puller. Anything else is a one-line contract: emit this JSONL here.
+   one review-findings puller. Streams carry no weights; a finding is real and fits a rung, or
+   it does not. Anything else is a one-line contract: emit this JSONL here.
 4. **A note is admitted only with a named trigger moment and a pointer, and is expected to
    leave**: promoted to a higher rung, or deleted when its trigger stops occurring.
 5. **Outputs land wherever the host harness lets config live**: project scope in the repo,
@@ -71,8 +73,10 @@ log because the observer listens after the call.
 6. **Two numbers gate 0.1.0**: bad actions prevented by a landed fix, and notes that left
    the queue. They replace the a1 gate of ADR-0024 and ADR-0040.
 7. **Native auto-memory is off.** Capture reaches the store only through mage's own hooks.
-8. **A one-time audit is the migration path** for every existing knowledge base: unread
-   notes, repeats by stream, each note routed through the ladder, first fixes proposed.
+8. **Migration is `mage migrate`, no new verb.** For a 0.0.x knowledge base it clears:
+   commandeer off, retired transient state deleted, the AGENTS.md block rewritten, `work/`
+   warned about and left in place. Notes and decisions are untouched. Retired verbs print
+   their replacement and exit 0.
 9. **Plans live in the issue tracker.** `work/` is retired; decisions and notes remain.
 10. **A decision fits on one screen.** Evidence and history go to the issue it names.
 
@@ -91,5 +95,5 @@ log because the observer listens after the call.
 
 Soak, keep-rate, distill, promote and graduate leave the CLI; their code is borrowed, not
 kept. The nudge digest repoints from "chapters unmined" to "repeats and proposals". The
-Obsidian graph stops being a goal. Existing notes migrate through the audit. The docs site
-changes its first sentence.
+Obsidian graph stops being a goal. Existing notes are routed by hand once, per the routing
+table, into issues in the repo where each fix lands. The docs site changes its first sentence.

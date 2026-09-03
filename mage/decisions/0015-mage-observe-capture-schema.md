@@ -2,8 +2,8 @@
 type: decision
 tags: [mage/decisions]
 created: "2026-06-06"
-updated: "2026-06-06"
-last_reviewed: "2026-06-06"
+updated: "2026-09-03"
+last_reviewed: "2026-09-03"
 status: active
 provenance:
   repo: mage-memory
@@ -16,6 +16,7 @@ sources:
 ---
 
 # 0015 — `mage observe`: the capture schema (the keystone `.jsonl`)
+> Amended by [ADR-0048](0048-repeated-failures-become-enforcement.md) on 2026-09-03: Additive: `tool_attempt` event on PreToolUse (tool, paths, detail). Streams contract: any producer of v1 events.
 
 A 2026-06-06 grill locked the `.learnings/*.jsonl` schema that
 [ADR-0013](0013-procedure-skills-self-grooming-loop.md) calls *load-bearing for the
