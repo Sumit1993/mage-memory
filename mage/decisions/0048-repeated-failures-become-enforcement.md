@@ -1,0 +1,95 @@
+---
+type: decision
+tags:
+  - mage/decisions
+created: "2026-09-03"
+updated: 2026-09-03
+last_reviewed: 2026-09-03
+status: proposed
+provenance:
+  repo: mage-memory
+sources:
+  - gh-issue:204
+  - decisions/0001-memory-first-product-supersedes-specshub.md
+  - decisions/0029-digest-to-agent-capture.md
+  - decisions/0046-derived-hub-git-and-merge-ratification.md
+  - file:~/ai-context/mage-direction-assessment-2026-09-03.md
+  - file:~/ai-context/mage-notes-ladder-routing-2026-09-03.md
+  - file:~/ai-context/mage-adr-digest-2026-09-03.md
+keywords:
+  - charter
+  - enforcement-ladder
+  - repeated-failure
+  - streams
+  - note-admission
+  - fire-counter
+  - release-gate
+  - audit
+---
+
+# 0048 — Repeated failures become enforcement; memory is the queue, not the product
+
+> **Status: proposed (2026-09-03).** Changes the charter set by ADR-0001. The plan, evidence
+> and issue list live in the tracking issue (#204, rewritten under this ADR).
+
+## Context
+
+Three months of capture produced 39 notes. 3 of 126 closed chapters in this repo read any
+note; prismalens read 18 notes in 30 sessions; sreforge read none for a month and nothing
+noticed. Routed through an enforcement ladder, 17 notes are programs waiting to be written,
+9 are one-line rules, 5 are dead, 3 are memory. The store was enforcement debt.
+
+Deterministic selection of lessons has been tried three times and killed three times:
+Faultline 0 of 62 (ADR-0027), prose-keyed 0 of 55 (ADR-0028), promote's recurrence fold 115
+buckets and 0 proposals (ADR-0038). What survived is ADR-0029: code narrows, the agent judges,
+the human commits. This decision keeps that shape and changes its target.
+
+Native memory was commandeered (ADR-0032) because it minted lessons when mage's capture
+minted none. Those lessons were then not read. The failure signal is also not where mage
+looks: tool errors are 1.5 percent of calls and almost all crashes, review findings on the
+same repos number in the hundreds, and a block by another plugin never reaches the observe
+log because the observer listens after the call.
+
+## Decision
+
+1. **mage is the loop that turns a repeated failure into enforcement.** Streams feed observe
+   events; code counts repeats on identical failure signatures; the agent judges the highest
+   rung the fix can reach; the fix lands by pull request (ADR-0046); a ledger counts how
+   often it fires; what never fires is flagged.
+2. **The ladder is doctrine.** Make it impossible (architecture, config, deny rule); a check
+   (lint, test, CI, pre-commit); a hook that blocks or rewrites at the moment of the action;
+   one line of rule in an AGENTS.md or a skill; a note. A lower rung only when every higher
+   rung is shown not to apply.
+3. **A stream is anything that emits observe events** (ADR-0015 schema, additive). Built in:
+   the hooks, a PreToolUse attempt event so blocks become visible, operator corrections, and
+   one review-findings puller. Anything else is a one-line contract: emit this JSONL here.
+4. **A note is admitted only with a named trigger moment and a pointer, and is expected to
+   leave**: promoted to a higher rung, or deleted when its trigger stops occurring.
+5. **Outputs land wherever the host harness lets config live**: project scope in the repo,
+   user scope in a kit the user owns and names at connect, local scope as today. The
+   adapter's whole job is that mapping (ADR-0036 still holds; one harness, no seam yet).
+6. **Two numbers gate 0.1.0**: bad actions prevented by a landed fix, and notes that left
+   the queue. They replace the a1 gate of ADR-0024 and ADR-0040.
+7. **Native auto-memory is off.** Capture reaches the store only through mage's own hooks.
+8. **A one-time audit is the migration path** for every existing knowledge base: unread
+   notes, repeats by stream, each note routed through the ladder, first fixes proposed.
+9. **Plans live in the issue tracker.** `work/` is retired; decisions and notes remain.
+10. **A decision fits on one screen.** Evidence and history go to the issue it names.
+
+## Effect on prior decisions
+
+- Superseded: 0003 (work/ retired), 0018 distill, 0019 promote, 0024 organic grooming loop,
+  0032 capture-redirect, 0038 graduate-on-usage, 0041 genre-decides-recall.
+- Amended: 0001 (charter), 0005 (native memory off, not a feeder), 0006 and 0033 (roster
+  bounded to admitted notes), 0013 (skills are one output rung, measured by firing), 0029
+  (digest target is the rung proposal, not the lesson), 0040 (named release stays, gate
+  replaced by decision 6).
+- Unchanged and load-bearing: 0004, 0008, 0009, 0010, 0014, 0015, 0016, 0017, 0021, 0030,
+  0036, 0042 to 0047. 0021 (no phone-home) gets its own ADR after 0.1.0.
+
+## Consequences
+
+Soak, keep-rate, distill, promote and graduate leave the CLI; their code is borrowed, not
+kept. The nudge digest repoints from "chapters unmined" to "repeats and proposals". The
+Obsidian graph stops being a goal. Existing notes migrate through the audit. The docs site
+changes its first sentence.
