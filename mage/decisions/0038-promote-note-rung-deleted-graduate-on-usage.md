@@ -3,9 +3,9 @@ type: decision
 tags:
   - mage/decisions
 created: "2026-07-19"
-updated: 2026-07-19
-last_reviewed: 2026-07-19
-status: accepted
+updated: 2026-09-03
+last_reviewed: 2026-09-03
+status: superseded
 provenance:
   repo: mage-memory
   work: adr-0038-promote-rung-review
@@ -39,6 +39,7 @@ modified: 2026-07-19T08:09:20.741Z
 ---
 
 # 0038 — promote's note-proposal rung is deleted; graduate repoints to note-read usage; recurrence becomes a digest annotation
+> Superseded by [ADR-0048](0048-repeated-failures-become-enforcement.md) on 2026-09-03.
 
 > **Status: accepted (ratified 2026-07-19).** Output of a 2026-07-19 grill, re-run after the
 > first pass mis-framed the problem. Resolves the review that

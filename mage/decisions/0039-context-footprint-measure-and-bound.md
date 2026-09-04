@@ -42,6 +42,8 @@ keywords:
 
 # 0039 — measure the context footprint; bound the generated launch surface
 
+> Amended by [ADR-0048](0048-repeated-failures-become-enforcement.md) on 2026-09-03: the roster is bounded to admitted notes; the promote tally that ranked it is retired, so rank order is admission order.
+
 > **Status: accepted (ratified 2026-07-19).** Output of a 2026-07-19 grill. Implements
 > **FT-18** ([future-thoughts](../work/future-thoughts.md)). Resolves the size-cap policy that
 > [ADR-0033](0033-recall-import-bounded-index.md) §Open-questions deferred, and corrects that

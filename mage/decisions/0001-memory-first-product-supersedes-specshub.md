@@ -2,8 +2,8 @@
 type: decision
 tags: [mage/decisions]
 created: "2026-05-29"
-updated: "2026-06-01"
-last_reviewed: "2026-06-01"
+updated: "2026-09-03"
+last_reviewed: "2026-09-03"
 status: active
 provenance:
   repo: mage-memory
@@ -13,6 +13,7 @@ sources:
 ---
 
 # 0001 — A memory-first product (mage) supersedes specshub
+> Amended by [ADR-0048](0048-repeated-failures-become-enforcement.md) on 2026-09-03: One line under the title: charter sentence now in 0048.
 
 specshub was framed as a spec-driven-development docs hub, but its founding purpose was really **durable, portable, cleanup-resistant memory** for software systems — of which spec-driven development is only one authoring path. Rather than contort a spec-named, spec-positioned repo around a memory-first identity, we start a clean product, **mage**: a knowledge base of notes navigable as an Obsidian graph. (Whether mage forks specshub's existing machinery — in-repo/external/hybrid modes, metadata-driven detection, hub registry, commit hygiene, skills — or starts greenfield is a separate decision, ADR-0002 pending.)
 

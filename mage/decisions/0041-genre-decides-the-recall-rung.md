@@ -3,9 +3,9 @@ type: decision
 tags:
   - mage/decisions
 created: "2026-07-27"
-updated: 2026-07-29
-last_reviewed: 2026-07-29
-status: proposed
+updated: 2026-09-03
+last_reviewed: 2026-09-03
+status: superseded
 provenance:
   repo: mage-memory
   work: adr-0041-genre-recall-rungs
@@ -31,6 +31,7 @@ keywords:
 modified: 2026-07-27T07:41:55.456Z
 ---
 # 0041 — Genre decides the recall rung: one store, three recall paths (amends ADR-0035)
+> Superseded by [ADR-0048](0048-repeated-failures-become-enforcement.md) on 2026-09-03.
 
 > **Status: proposed (grilled 2026-07-27; ratification rides the Wave-B release).**
 > Amends [ADR-0035](0035-decouple-harness-memory-from-notes.md) — keeps its store,

@@ -20,6 +20,8 @@ sources:
 
 # 0031 — Programmatic provenance stamping + the autonomy reject-ledger (Phase 1: stamp at creation)
 
+> Amended by [ADR-0048](0048-repeated-failures-become-enforcement.md) on 2026-09-03: §5's promote chokepoint is retired with staging; the provenance stamp moves to the proposal applier that opens the pull request (ADR-0046).
+
 > Status: **Phase 1 built** (mage's writer stamps `provenance` at note creation). Phase 2
 > (the reject-ledger reconciler) is **sketched here, not built**. Extends
 > [ADR-0030](0030-agent-autonomy-ladder.md) by making its crown signal — the keep-vs-`git

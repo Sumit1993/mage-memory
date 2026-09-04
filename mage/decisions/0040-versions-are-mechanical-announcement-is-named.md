@@ -3,8 +3,8 @@ type: decision
 tags:
   - mage/decisions
 created: "2026-07-19"
-updated: 2026-07-19
-last_reviewed: 2026-07-19
+updated: 2026-09-03
+last_reviewed: 2026-09-03
 status: accepted
 provenance:
   repo: mage-memory
@@ -32,6 +32,7 @@ modified: 2026-07-19T17:33:52.304Z
 ---
 
 # 0040 — version numbers are mechanical; the announcement is a named release backed by evidence
+> Amended by [ADR-0048](0048-repeated-failures-become-enforcement.md) on 2026-09-03: the named release stays; the gate is ADR-0048 decision 6; no evidence ADR per release, the release notes quote the two counts.
 
 > **Status: accepted (ratified 2026-07-19).** Supersedes the "**0.1.0 is the announcement**"
 > clause of [ADR-0024 §8](0024-organic-grooming-loop.md); the rest of ADR-0024 stands, including
