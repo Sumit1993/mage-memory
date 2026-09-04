@@ -59,7 +59,7 @@
 <p class="sub">Plan as of 2026-09-03, mechanics added 2026-09-04 (section 12). Nothing here is applied. PR #206 carries ADR-0048 and this folder. This page is the plan of record; ADR-0048 is the one-screen charter that points here. Every section below is meant to be handed to a cheaper agent as a work package; section 9 lists them with inputs, outputs and verification.</p>
 
 <p class="toc">
-<a href="#s1">1 Where we are</a><a href="#s2">2 The redirection</a><a href="#s3">3 The ladder</a><a href="#s4">4 Where things land</a><a href="#s5">5 Timeline to 0.1.0</a><a href="#s6">6 ADR map</a><a href="#s7">7 Issue and PR map</a><a href="#s8">8 Docs surfaces</a><a href="#s9">9 Work packages</a><a href="#s10">10 Traps</a><a href="#s11">11 Open rulings</a><a href="#s12">12 Mechanics</a><a href="#s13">13 Tickets to file</a>
+<a href="#s1">1 Where we are</a><a href="#s2">2 The redirection</a><a href="#s3">3 The ladder</a><a href="#s4">4 Where things land</a><a href="#s5">5 Timeline to 0.1.0</a><a href="#s6">6 ADR map</a><a href="#s7">7 Issue and PR map</a><a href="#s8">8 Docs surfaces</a><a href="#s9">9 Work packages</a><a href="#s10">10 Traps</a><a href="#s11">11 Open rulings</a><a href="#s12">12 Mechanics</a><a href="#s13">13 Tickets to file</a><a href="#s14">14 Kit, mage, words</a>
 </p>
 
 <div class="pitch">Your agents keep making the same mistakes. mage notices, and turns each one into a hook, a lint, or a rule, by pull request. It keeps a memory only for what cannot be enforced.</div>
@@ -494,33 +494,33 @@
 <p class="sub">Added 2026-09-04 after the loop was walked one stage at a time asking "what code makes this happen". Three operator rulings applied: identities ship in 0.1.0; a check lands as an issue, not a PR; a rule is measured by the corrections and findings tagged with its id. This section is the spec the P1 and P2 tickets point at. ADR-0048 stays one screen and points here. Folds in <code>end-to-end.md</code>.</p>
 
 <h3>12.1 Identities</h3>
-<p>Every landed fix and every admitted note has an id of the form <code>&lt;scope&gt;/&lt;type&gt;/&lt;slug&gt;</code>: <code>kit/deny/webfetch</code>, <code>repo/hook/commit-trailer</code>, <code>repo/rule/no-gate2-bypass</code>, <code>kb/note/npx-runs-published</code>. The id is assigned when the proposal is made and travels with the artifact: a comment line in the settings fragment, a header line in the hook script, a suffix <code>[mage:repo/rule/x]</code> on the rule line, an <code>id</code> field in note frontmatter. The ledger, the seen watermark, the fixes inventory and the stale pass all key on it.</p>
-<p>A signal signature is an exact match on ids, never a fuzzy fold: tool name plus the blocking fix id; the rule id named in a correction or finding; the review bot's rule name plus file path for a finding with no rule id yet. This is how first sight avoids rebuilding the recurrence machinery three gates killed (ADR-0027, 0028, 0038).</p>
+<p>A <b>guard</b> is a landed artifact at rungs 1 to 3: a deny rule, a hook, a check. Every guard and every admitted note has an id of the form <code>&lt;scope&gt;/&lt;type&gt;/&lt;slug&gt;</code>: <code>kit/guard/webfetch</code>, <code>repo/guard/commit-trailer</code>, <code>repo/rule/no-gate2-bypass</code>, <code>kb/note/npx-runs-published</code>. The id is assigned when the proposal is made and travels with the artifact: a comment line in the settings fragment, a header line in the hook script, a suffix <code>[mage:repo/rule/x]</code> on the rule line, an <code>id</code> field in note frontmatter. The ledger, the seen watermark, the guards inventory and the stale pass all key on it.</p>
+<p>A signal signature is an exact match on ids, never a fuzzy fold: tool name plus the blocking guard id; the rule id named in a correction or finding; the review bot's rule name plus file path for a finding with no rule id yet. This is how first sight avoids rebuilding the recurrence machinery three gates killed (ADR-0027, 0028, 0038).</p>
 
 <h3>12.2 Surfacing: every way a lesson appears</h3>
 <table>
 <tr><th>Entry point</th><th>Event</th><th>Mechanical part</th><th>Ticket</th></tr>
-<tr><td>Agent saves a memory (native memory, <code>notes/</code>, <code>/mage:learn</code>)</td><td>Write or Edit under the store</td><td>The ADR-0032 PreToolUse memory hook, repointed: block the write, return the ladder, admit only a note with rung answer, trigger, pointer (12.8)</td><td>M1</td></tr>
+<tr><td>Agent saves a memory (native memory, <code>notes/</code>, <code>/mage:learn</code>)</td><td>Write or Edit under the store</td><td>The ADR-0032 PreToolUse memory hook, repointed: block the write, return the ladder, admit only a note with rung answer, trigger, pointer (12.8)</td><td><a href="https://github.com/Sumit1993/mage-memory/issues/229">#229</a></td></tr>
 <tr><td>Denied or blocked tool call</td><td><code>tool_attempt</code> with no <code>tool_use</code> sharing its <code>call_id</code></td><td>PreToolUse observe arm; both events carry the harness invocation id</td><td>#209</td></tr>
-<tr><td>A kit hook blocks or rewrites</td><td><code>fix_fired</code> {fix_id, tool, detail}</td><td>Self-report: <code>hooks/lib/report.sh</code> pipes one event to <code>mage observe</code> on stdin (Gate-1 holds). An attempt-without-use alone cannot say which hook fired</td><td>M2</td></tr>
+<tr><td>A kit hook blocks or rewrites</td><td><code>guard_fired</code> {guard_id, tool, detail}</td><td>Self-report: <code>hooks/lib/report.sh</code> pipes one event to <code>mage observe</code> on stdin (Gate-1 holds). An attempt-without-use alone cannot say which hook fired</td><td><a href="https://github.com/Sumit1993/mage-memory/issues/230">#230</a></td></tr>
 <tr><td>Review finding on a PR</td><td><code>finding</code> {rule, path, text, pr}</td><td>Puller, operator- or hook-invoked, under the ADR-0021 carve-out</td><td>#217</td></tr>
 <tr><td>Operator correction</td><td><code>user_prompt</code> tagged with a rule id when the agent can name one</td><td>Corrections lens; the id makes rung 4 countable</td><td>#210</td></tr>
 <tr><td>Tool failure</td><td><code>tool_use</code> ok=false</td><td>Exists</td><td>none</td></tr>
-<tr><td>Import of existing notes (adopt, migrate, hub)</td><td>none</td><td>The note schema check (12.8) rejects a note without the admission fields</td><td>M3</td></tr>
-<tr><td>Anyone's PR adds a note</td><td>none</td><td>Same check, run by <code>mage index</code> in CI and the pre-commit gate</td><td>M3</td></tr>
+<tr><td>Import of existing notes (adopt, migrate, hub)</td><td>none</td><td>The note schema check (12.8) rejects a note without the admission fields</td><td><a href="https://github.com/Sumit1993/mage-memory/issues/231">#231</a></td></tr>
+<tr><td>Anyone's PR adds a note</td><td>none</td><td>Same check, run by <code>mage index</code> in CI and the pre-commit gate</td><td><a href="https://github.com/Sumit1993/mage-memory/issues/231">#231</a></td></tr>
 <tr><td>A note read often</td><td><code>note_read</code> count per id</td><td>Stale pass proposes a climb, not only a delete</td><td>#221</td></tr>
 <tr><td>A rule violated repeatedly</td><td>corrections and findings tagged with the rule id</td><td>Stale pass proposes a climb to a hook or check when the count passes the budget</td><td>#221</td></tr>
-<tr><td>A fix that fires very often</td><td>ledger count</td><td>Digest shows the top fires; the agent asks what upstream cause keeps triggering it</td><td>#210</td></tr>
+<tr><td>A guard that fires very often</td><td>ledger count</td><td>Digest shows the top fires; the agent asks what upstream cause keeps triggering it</td><td>#210</td></tr>
 <tr><td>A block inside a subagent</td><td>none today</td><td>Subagent tool calls never reach the main-session hooks. Out of scope for 0.1.0; recorded as a known blind spot in the docs</td><td>after</td></tr>
 </table>
-<p><b>Verify before #209 is specced.</b> What Claude Code emits for a settings deny, a user "no" at the permission prompt, a hook exit-2 block, and a session ending mid-call. Only the first and third are a fix firing. Attribution: a hook block carries a <code>fix_fired</code>; a settings deny is an attempt-without-use whose tool and input match a deny rule mage can read from the settings files; anything else is not counted.</p>
+<p><b>Verify before #209 is specced.</b> What Claude Code emits for a settings deny, a user "no" at the permission prompt, a hook exit-2 block, and a session ending mid-call. Only the first and third are a fix firing. Attribution: a hook block carries a <code>guard_fired</code>; a settings deny is an attempt-without-use whose tool and input match a deny rule mage can read from the settings files; anything else is not counted.</p>
 
 <h3>12.3 Narrow and rank</h3>
-<p>Per unit, under <code>.mage/</code>, append-only and folded on read like every other runtime file (ADR-0025, existing convention): <code>proposals.jsonl</code>. Each signature has one state: <b>new</b>, <b>shown</b> (in a digest, with the chapter), <b>declined</b> (the agent or the human said no, with a reason), <b>pending</b> (a PR url), <b>landed</b> (a fix id), <b>dead</b>. The digest shows only new and shown signatures, ranked by count, and never re-shows declined or pending. Pending is confirmed by reading the PR's state; a PR closed without merge becomes declined. Budget stays 3 proposals per pass.</p>
+<p>Per unit, under <code>.mage/</code>, append-only and folded on read like every other runtime file (ADR-0025, existing convention): <code>proposals.jsonl</code>. Each signature has one state: <b>new</b>, <b>shown</b> (in a digest, with the chapter), <b>declined</b> (the agent or the human said no, with a reason), <b>pending</b> (a PR url), <b>landed</b> (a guard id), <b>dead</b>. The digest shows only new and shown signatures, ranked by count, and never re-shows declined or pending. Pending is confirmed by reading the PR's state; a PR closed without merge becomes declined. Budget stays 3 proposals per pass.</p>
 
 <h3>12.4 Judge</h3>
-<p>Before proposing, the groom skill reads <code>mage fixes</code>: the inventory of landed fixes per scope, derived by scanning the id markers in the settings files, the hook directories, AGENTS.md and the notes. Without it the agent proposes duplicates. The proposal is JSON:</p>
-<pre>{ id, type: deny|hook|check|rule|skill|note|delete, scope: repo|kit,
+<p>Before proposing, the groom skill reads <code>mage guards</code>: the inventory of landed guardes per scope, derived by scanning the id markers in the settings files, the hook directories, AGENTS.md and the notes. Without it the agent proposes duplicates. The proposal is JSON:</p>
+<pre>{ id, type: deny|hook|check|rule|skill|note|delete   // deny, hook and check are guards, scope: repo|kit,
   rung, skipped: [{ rung, reason }],      // one reason per higher rung, required
   trigger, pointer,                        // required when type is note
   artifact: { path, content }, test?: { path, content } }</pre>
@@ -540,10 +540,10 @@
 <p><b>The kit write path.</b> The kit is identified by its remote (committed in the KB's metadata, like <code>hub_repo</code>) and located by a machine binding in <code>settings.local.json</code> (an additive row in ADR-0047's carrier table: derived-but-materialized, like the docs-root grant), because a user's kit checkout is wherever they keep it. Consent to receive PRs is the kit's committed contract file (#216). Landing runs the ADR-0046 machinery in that checkout: branch, commit, push, <code>gh pr create</code>. After merge nothing installs it on a machine until the kit's installer runs; <code>doctor</code> reports a kit checkout behind its remote.</p>
 
 <h3>12.6 Fire and count</h3>
-<p>The ledger is derived, never stored: <code>mage ledger</code> folds observe events per fix id. <b>prevented</b> for a deny is attempts-without-use attributed to its rule; for a hook it is <code>fix_fired</code> rows; for a check it is failed CI jobs whose job name is the fix id, read from the forge. A check that fails for another reason is not a fire, which is why the job name must equal the id. <b>A rule has no fire.</b> Its number is the count of corrections and findings tagged with its id after it landed; a falling count is the rule working, a rising one is a climb candidate. <b>left the queue</b> is note PRs merged that delete or replace a note. Counts are per machine for 0.1.0; the release notes quote the operator's.</p>
+<p>The ledger is derived, never stored: <code>mage ledger</code> folds observe events per guard id. <b>prevented</b> for a deny is attempts-without-use attributed to its rule; for a hook it is <code>guard_fired</code> rows; for a check it is failed CI jobs whose job name is the guard id, read from the forge. A check that fails for another reason is not a fire, which is why the job name must equal the id. <b>A rule has no fire.</b> Its number is the count of corrections and findings tagged with its id after it landed; a falling count is the rule working, a rising one is a climb candidate. <b>left the queue</b> is note PRs merged that delete or replace a note. Counts are per machine for 0.1.0; the release notes quote the operator's.</p>
 
 <h3>12.7 Prune</h3>
-<p>One dial, <code>dream --stale-days</code>, default 90 for fixes. A deny or hook with zero fires in the window is <b>dead</b> and gets a delete proposal. A check with zero fires stays; it costs nothing. A rule with zero tagged repeats is working, not dead; rules leave only by the agent's delete proposal during groom, or by climbing. A note whose trigger has not been observed in the window is dead.</p>
+<p>One dial, <code>dream --stale-days</code>, default 90 for guards. A deny or hook with zero fires in the window is <b>dead</b> and gets a delete proposal. A check with zero fires stays; it costs nothing. A rule with zero tagged repeats is working, not dead; rules leave only by the agent's delete proposal during groom, or by climbing. A note whose trigger has not been observed in the window is dead.</p>
 
 <h3>12.8 The note schema</h3>
 <pre>id: kb/note/&lt;slug&gt;
@@ -564,31 +564,54 @@ pointer: "path, url or command"</pre>
 <ol>
 <li>An agent in prismalens ships a changeset naming four packages the config ignores.</li>
 <li>The review lane leaves a finding. The puller writes a <code>finding</code> event into prismalens-kb's observe log through <code>mage observe</code>.</li>
-<li>Next session start the digest lists it as <b>new</b>. The agent reads <code>mage fixes</code>, sees nothing covers it, judges: a check, in the repo, "changeset packages must exist in config". The proposal carries reasons for skipping impossible and hook.</li>
-<li>Type is check, so it lands as an issue in prismalens with the assertion. The signature becomes <b>pending</b>. A human or the next agent in prismalens writes the test with job name <code>repo/check/changeset-packages</code>.</li>
+<li>Next session start the digest lists it as <b>new</b>. The agent reads <code>mage guards</code>, sees nothing covers it, judges: a check, in the repo, "changeset packages must exist in config". The proposal carries reasons for skipping impossible and hook.</li>
+<li>Type is check, so it lands as an issue in prismalens with the assertion. The signature becomes <b>pending</b>. A human or the next agent in prismalens writes the test with job name <code>repo/guard/changeset-packages</code>.</li>
 <li>The test fails on the next bad changeset. <code>mage ledger</code> reads the failed job by name: one <b>prevented</b>.</li>
-<li>The same story with a WebFetch redirect lands as <code>kit/deny/webfetch</code> by PR in the kit; the next attempt is an attempt-without-use matched to that rule.</li>
+<li>The same story with a WebFetch redirect lands as <code>kit/guard/webfetch</code> by PR in the kit; the next attempt is an attempt-without-use matched to that rule.</li>
 </ol>
 <p>The three repos are the three scopes: each code repo and its KB (project), claude-kit (user), gh-workflows (org, after 0.1.0). mage owns no scope; the opinions live in the kit, the checks live in the repos.</p>
 
 <!-- ================================================================== -->
 <h2 id="s13">13. Tickets to file from section 12</h2>
-<p class="sub">Not filed yet. Filed once the operator has read section 12.</p>
+<p class="sub">Filed 2026-09-04. Kit side of M2 is <a href="https://github.com/Sumit1993/claude-kit/issues/60">claude-kit#60</a>.</p>
 <table>
 <tr><th>Id</th><th>Title</th><th>Phase</th><th>Amends</th></tr>
-<tr><td>M1</td><td>memory hook carries the ladder: block, return rungs, admit only an admitted note (12.2)</td><td>P1</td><td>#207 installs it; #208 skill wording</td></tr>
-<tr><td>M2</td><td>fix ids and the self-report contract for kit hooks, <code>report.sh</code> through <code>mage observe</code> stdin (12.1, 12.2)</td><td>P1</td><td>#216 kit contract; claude-kit issue</td></tr>
-<tr><td>M3</td><td>note schema fields and the <code>mage index</code> check; pre-commit and CI run it (12.8)</td><td>P1</td><td>#213 routing adds the fields</td></tr>
-<tr><td>M4</td><td>verify the deny signal: what Claude Code emits for settings deny, user deny, hook block, mid-call end (12.2)</td><td>P1, before #209</td><td>#209</td></tr>
-<tr><td>M5</td><td>proposal state file: new, shown, declined, pending, landed, dead; PR state read (12.3)</td><td>P2</td><td>#219, #221</td></tr>
-<tr><td>M6</td><td><code>mage fixes</code> inventory from id markers (12.4)</td><td>P2</td><td>#219</td></tr>
-<tr><td>M7</td><td>proposal schema: rung, skipped reasons, test; applier refuses without them; check lands as an issue (12.4, 12.5)</td><td>P2</td><td>replaces #218 text</td></tr>
-<tr><td>M8</td><td>kit write path: remote in metadata, path as machine binding, land in that checkout, doctor reports behind-remote (12.5)</td><td>P2</td><td>#216, #222</td></tr>
-<tr><td>M9</td><td><code>mage ledger</code>: derived counts per fix id, rules by tagged repeats, checks by job name (12.6)</td><td>P2</td><td>replaces #220 text</td></tr>
-<tr><td>M10</td><td>climb proposals: note read often, rule repeated often (12.2, 12.7)</td><td>P2</td><td>#221</td></tr>
-<tr><td>M11</td><td>footprint before and after the PreToolUse arm (12.9)</td><td>P1</td><td>WP-5 verify</td></tr>
+<tr><td>M1 <a href="https://github.com/Sumit1993/mage-memory/issues/229">#229</a></td><td>memory hook carries the ladder: block, return rungs, admit only an admitted note (12.2)</td><td>P1</td><td>#207 installs it; #208 skill wording</td></tr>
+<tr><td>M2 <a href="https://github.com/Sumit1993/mage-memory/issues/230">#230</a></td><td>guard ids and the self-report contract for kit hooks, <code>report.sh</code> through <code>mage observe</code> stdin (12.1, 12.2)</td><td>P1</td><td>#216 kit contract; <a href="https://github.com/Sumit1993/claude-kit/issues/60">claude-kit#60</a></td></tr>
+<tr><td>M3 <a href="https://github.com/Sumit1993/mage-memory/issues/231">#231</a></td><td>note schema fields and the <code>mage index</code> check; pre-commit and CI run it (12.8)</td><td>P1</td><td>#213 routing adds the fields</td></tr>
+<tr><td>M4 <a href="https://github.com/Sumit1993/mage-memory/issues/232">#232</a></td><td>verify the deny signal: what Claude Code emits for settings deny, user deny, hook block, mid-call end (12.2)</td><td>P1, before #209</td><td>#209</td></tr>
+<tr><td>M5 <a href="https://github.com/Sumit1993/mage-memory/issues/233">#233</a></td><td>proposal state file: new, shown, declined, pending, landed, dead; PR state read (12.3)</td><td>P2</td><td>#219, #221</td></tr>
+<tr><td>M6 <a href="https://github.com/Sumit1993/mage-memory/issues/234">#234</a></td><td><code>mage guards</code> inventory from id markers (12.4)</td><td>P2</td><td>#219</td></tr>
+<tr><td>M7 <a href="https://github.com/Sumit1993/mage-memory/issues/235">#235</a></td><td>proposal schema: rung, skipped reasons, test; applier refuses without them; check lands as an issue (12.4, 12.5)</td><td>P2</td><td>replaces #218 text</td></tr>
+<tr><td>M8 <a href="https://github.com/Sumit1993/mage-memory/issues/236">#236</a></td><td>kit write path: remote in metadata, path as machine binding, land in that checkout, doctor reports behind-remote (12.5)</td><td>P2</td><td>#216, #222</td></tr>
+<tr><td>M9 <a href="https://github.com/Sumit1993/mage-memory/issues/237">#237</a></td><td><code>mage ledger</code>: derived counts per guard id, rules by tagged repeats, checks by job name (12.6)</td><td>P2</td><td>replaces #220 text</td></tr>
+<tr><td>M10 <a href="https://github.com/Sumit1993/mage-memory/issues/238">#238</a></td><td>climb proposals: note read often, rule repeated often (12.2, 12.7)</td><td>P2</td><td>#221</td></tr>
+<tr><td>M11 <a href="https://github.com/Sumit1993/mage-memory/issues/239">#239</a></td><td>footprint before and after the PreToolUse arm (12.9)</td><td>P1</td><td>WP-5 verify</td></tr>
 </table>
 
+
+<!-- ================================================================== -->
+<h2 id="s14">14. What stays in the kit, what comes to mage, and the words</h2>
+<p class="sub">Added 2026-09-04. mage owns the loop and no opinions. The kit owns the opinions and no loop.</p>
+<table>
+<tr><th>Stays in claude-kit</th><th>Lives in mage</th></tr>
+<tr><td>AGENTS.md doctrine: rung-4 lines, each with an id</td><td>observe: streams, <code>tool_attempt</code>, the <code>guard_fired</code> intake</td></tr>
+<tr><td>hooks with tests (rung 3), the settings fragment's deny list (rung 1)</td><td>the memory hook that carries the ladder</td></tr>
+<tr><td>process skills (pr-watch, agy-delegate, unslop, ...)</td><td>digest, groom, the proposal schema and applier</td></tr>
+<tr><td>installer, repo registry (<code>plugins/kit/data/repo-meta.json</code>)</td><td>ledger, guards inventory, the note schema check in <code>index</code></td></tr>
+<tr><td>new: a kit contract file (#216); each hook emits its guard id to <code>mage observe</code> when it blocks</td><td>connect, migrate, doctor, landing into the repo or the kit by PR</td></tr>
+</table>
+<p>Nothing moves out of the kit. Two things flow in: the counting of its hooks, which are already rung-3 guards written by hand, and the user-scope rows from the routing tables (the WebFetch deny already on the kit's <code>feat/deny-webfetch</code> branch, the diff-stat check for agy-delegate, the user-scope rule lines). mage's own skills stay with mage; a repo's wing skill stays a project artifact.</p>
+<h3>Words</h3>
+<table>
+<tr><th>Word</th><th>Means</th></tr>
+<tr><td><b>guard</b></td><td>a landed artifact at rungs 1 to 3: a deny rule, a hook, a check. It fires. Ids: <code>kit/guard/webfetch</code>, <code>repo/guard/commit-trailer</code>. New word; "fix" was too vague to count.</td></tr>
+<tr><td><b>rule</b></td><td>a rung-4 line in AGENTS.md or a skill, with an id. It does not fire; it is measured by tagged repeats.</td></tr>
+<tr><td><b>note</b></td><td>a rung-5 memory, admitted with a rung answer, a trigger and a pointer, expected to leave.</td></tr>
+<tr><td><b>hub</b></td><td>unchanged: the shared knowledge repo several projects write into. Now also holds each project's proposal states.</td></tr>
+<tr><td><b>kit</b></td><td>unchanged: the user's portable tools repo. Now also a landing scope and a source of <code>guard_fired</code> events.</td></tr>
+<tr><td><b>stream</b>, <b>rung</b>, <b>ledger</b>, <b>digest</b></td><td>as in sections 2, 3 and 12.</td></tr>
+</table>
 <p class="sub" style="margin-top:40px">Sources: <code>~/ai-context/mage-direction-assessment-2026-09-03.md</code> (sections 1 to 8), <code>mage-functional-inventory-2026-09-03.md</code>, <code>mage-adr-digest-2026-09-03.md</code>, <code>mage-notes-ladder-routing-2026-09-03.md</code>, <code>mage-tracking-issue-draft-2026-09-03.md</code>, ADR-0048 on the branch.</p>
 
 </main>
