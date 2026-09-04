@@ -8,4 +8,4 @@
 
 - **mage** (37 notes · feedback, gotcha, note, pointer, principle, reference) → [_index.mage.md](_index.mage.md)
 
-> 35 accepted decisions govern this repo — read `decisions/` before architectural or scope changes.
+> 36 accepted decisions govern this repo — read `decisions/` before architectural or scope changes.

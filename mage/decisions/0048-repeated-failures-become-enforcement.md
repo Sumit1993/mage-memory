@@ -46,8 +46,8 @@ buckets and 0 proposals (ADR-0038). What survived is ADR-0029: code narrows, the
 the human commits. This decision keeps that shape and changes its target.
 
 Native memory was commandeered (ADR-0032) because it minted lessons when mage's capture
-minted none. Those lessons were then not read. The failure signal is also not where mage
-looks: tool errors are 1.6 percent of calls across all units and almost all crashes, review
+minted none. Those lessons were then not read, and nothing asked whether each one should have
+been a hook or a check instead of a note. The failure signal is also not where mage looks: tool errors are 1.6 percent of calls across all units and almost all crashes, review
 findings on the same repos number in the hundreds, and a block by another plugin never reaches
 the observe log because the observer listens after the call.
 
@@ -89,13 +89,16 @@ the observe log because the observer listens after the call.
    and lives under `.mage/` (ADR-0025); a kit fix counts in whichever unit it fires. Nothing
    new is committed; the release notes quote the counts. Replaces the a1 gate of ADR-0024 and
    ADR-0040.
-7. **Native auto-memory is off** and `autoMemoryDirectory` is never set. Capture reaches the
-   store only through mage's own hooks. The roster (`MEMORY.md`, bounded to admitted notes)
-   reaches the agent through the session-start nudge on startup, resume and compact, in every
-   mode; that replaces the auto-load and `@import` carriers of ADR-0033.
-8. **Migration is `mage migrate`, no new verb.** For a 0.0.x knowledge base it clears:
-   commandeer off, retired transient state deleted, the AGENTS.md block rewritten (#198 first),
-   the PreToolUse observe arm installed, `work/` warned about and left in place with its links.
+7. **The ladder runs before a memory is written.** Native memory stays on and pointed at the
+   store; the moment the agent tries to save a lesson is the trigger. The ADR-0032 PreToolUse
+   memory hook is repointed, not removed: it blocks the write, returns the ladder, and admits
+   only a note that states why no higher rung fits, its trigger moment and its pointer. The
+   same hook fires on direct writes under `notes/`. mage has no runtime; the hook makes the
+   agent judge, it does not judge. The roster loads as before (ADR-0033).
+8. **Migration is `mage migrate`, no new verb.** For a 0.0.x knowledge base it clears
+   retired transient state, rewrites the AGENTS.md block (#198 first), repoints the memory hook
+   to the ladder, installs the PreToolUse observe arm, and leaves
+   `work/` in place with a warning and its links.
    Notes and decisions are untouched. Retired verbs print their replacement and exit 0.
 9. **Plans live in the issue tracker.** `work/` is retired; decisions and notes remain.
 10. **A decision fits on one screen.** Evidence and history go to the issue it names.
@@ -103,15 +106,16 @@ the observe log because the observer listens after the call.
 ## Effect on prior decisions
 
 - Superseded: 0003 (work/ retired), 0018 distill, 0019 promote, 0024 organic grooming loop,
-  0032 capture-redirect, 0038 graduate-on-usage, 0041 genre-decides-recall.
-- Amended: 0001 (charter); 0005 (native memory off, not a feeder); 0006, 0033, 0039 (roster
-  bounded to admitted notes, carried by the nudge); 0013 (skills are one output rung, measured
+  0038 graduate-on-usage, 0041 genre-decides-recall.
+- Amended: 0001 (charter); 0005 (native memory feeds the ladder, not the store); 0006, 0033,
+  0039 (roster bounded to admitted notes); 0032 (the memory hook carries the ladder, not a
+  relocation); 0013 (skills are one output rung, measured
   by firing); 0015 (`tool_attempt` and the invocation id); 0016 (a delete via PR diff is not
-  a hard-delete); 0017 (connect installs the PreToolUse arm, asks for kit and streams); 0021
+  a hard-delete); 0017 (connect installs the PreToolUse arm and the ladder hook, asks for kit and streams); 0021
   (operator-invoked reads of the user's own forge with the user's credentials are not
   phone-home); 0029 (digest target is the rung proposal); 0030 (backlog tally becomes the
   repeats-and-proposals line; graduation clauses lapse); 0031 (the stamping chokepoint moves
-  to the proposal applier); 0034 (adopt's import half moves to migrate); 0035; 0037; 0040
+  to the proposal applier); 0034 (adopt's import half moves to migrate); 0035 (native memory stays a feeder, through the hook); 0037; 0040
   (named release stays, gate is decision 6, evidence goes in the release notes); 0044; 0046
   (a proposal PR may also target the code repo or the kit, under decision 5's consent).
 - Unchanged and load-bearing: 0004, 0008, 0009, 0010, 0014, 0036, 0042 to 0045, 0047. 0021
@@ -120,7 +124,7 @@ the observe log because the observer listens after the call.
 ## Consequences
 
 Soak, keep-rate, distill, promote and graduate leave the CLI; their code is borrowed, not
-kept. The nudge digest repoints from "chapters unmined" to "repeats and proposals" and carries
-the roster. The Obsidian graph stops being a goal. Existing notes are routed by hand once, per
+kept. The nudge digest repoints from "chapters unmined" to "repeats and proposals". The #200
+frontmatter rewrite stays a bug to fix, not a reason to drop the hook. The Obsidian graph stops being a goal. Existing notes are routed by hand once, per
 the routing table, into issues in the repo where each fix lands. The docs site changes its
 first sentence.

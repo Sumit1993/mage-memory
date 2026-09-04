@@ -37,14 +37,14 @@ convention lands in gh-workflows as a reusable workflow. Same loop, different la
 
 Keep as is: init, index, link, unlink, verify, list, status, autonomy, redact, footprint.
 Keep, amended: connect (asks for the kit, installs the PreToolUse observe arm, never
-commandeers), doctor (kit reachable, streams configured, ledger present, no commandeer),
+commandeers), doctor (kit reachable, streams configured, ledger present, ladder hook installed),
 migrate (the 0.0.x clearing), observe (gains tool_attempt), nudge (digest repointed to
 repeats, proposals and stale), dream (health report gains never-fired fixes and silent
 triggers), skills (generator plus the fire metrics; no graduation), groom --propose (gains
 output types and landing scope; the PR path for every rung).
 Decommission: distill, promote, flatten, stage, the dashboard HTML cockpit (Dashboard.md may
 stay as a generated summary), adopt (fold its "import existing notes" half into migrate;
-its "harvest native memory" half has no source once auto-memory is off).
+its "harvest native memory" half is replaced by the ladder hook at write time).
 No new verbs. The ledger is a file that dream and doctor read. A stream is a file that observe
 reads. The review puller is a script, not a verb, and lives in mage only as the OSS default;
 a gh-workflows consumer gets the same events from the telemetry record instead.
@@ -80,7 +80,7 @@ were lane upkeep that should have been zero.
 
 ## Other aspects
 
-- Hubs: prismalens-kb and sreforge-kb migrate first (commandeer off, state cleared), then their
+- Hubs: prismalens-kb and sreforge-kb migrate first (ladder hook installed, state cleared), then their
   routing tables become issues in the code repos, then each hub gets a ledger.
 - Docs site: rewrite around the loop; retired pages become stubs; the drift test is
   regenerated with every CLI change.

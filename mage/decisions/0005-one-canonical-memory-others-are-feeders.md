@@ -11,7 +11,7 @@ provenance:
 ---
 
 # 0005 — Exactly one canonical durable memory (mage); native memories are feeders, not rivals
-> Amended by [ADR-0048](0048-repeated-failures-become-enforcement.md) on 2026-09-03: Native memory is off, not a feeder.
+> Amended by [ADR-0048](0048-repeated-failures-become-enforcement.md) on 2026-09-03: native memory stays a feeder; its write is the trigger for the ladder hook (decision 7), not a path into the store.
 
 > **Amendment (2026-06-08, distill grill — [ADR-0018](0018-mage-distill-observed-scratch-reader.md)).**
 > The **feeder mechanism is cut.** mage no longer harvests other tools' memory stores

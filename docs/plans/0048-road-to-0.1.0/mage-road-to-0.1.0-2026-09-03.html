@@ -109,7 +109,7 @@
 <rect x="390" y="190" width="150" height="50" rx="6" class="dead"/><text x="465" y="210" text-anchor="middle" class="lbl">mage promote</text><text x="465" y="226" text-anchor="middle" class="redt">115 buckets, 0 proposals</text>
 <rect x="590" y="190" width="130" height="50" rx="6" class="dead"/><text x="655" y="210" text-anchor="middle" class="lbl">graduate to skill</text><text x="655" y="226" text-anchor="middle" class="redt">never fired once</text>
 <rect x="770" y="190" width="120" height="50" rx="6" class="dead"/><text x="830" y="210" text-anchor="middle" class="lbl">soak, keep-rate</text><text x="830" y="226" text-anchor="middle" class="redt">unread 33 days</text>
-<rect x="20" y="190" width="130" height="50" rx="6" class="dead"/><text x="85" y="210" text-anchor="middle" class="lbl">CC auto-memory</text><text x="85" y="226" text-anchor="middle" class="redt">commandeered into mage/</text>
+<rect x="20" y="190" width="130" height="50" rx="6" class="box"/><text x="85" y="210" text-anchor="middle" class="lbl">CC auto-memory</text><text x="85" y="226" text-anchor="middle" class="small">write = ladder trigger</text>
 <path d="M85,190 L85,90" class="arrow-red"/>
 <!-- row 3: what never reaches observe -->
 <rect x="20" y="270" width="300" height="44" rx="6" class="dead"/><text x="170" y="288" text-anchor="middle" class="lbl">blocks and redirects by other plugins</text><text x="170" y="304" text-anchor="middle" class="redt">PreToolUse fires before the observer: 0 recorded</text>
@@ -222,7 +222,7 @@
 <text x="754" y="80" class="lbl">.claude/settings.local.json</text>
 <text x="754" y="102" class="lbl">observe hook groups (mage:observe:*)</text>
 <text x="754" y="124" class="lbl">reach grants (additionalDirectories)</text>
-<text x="754" y="146" class="lbl">no commandeer, no autoMemoryDirectory</text>
+<text x="754" y="146" class="lbl">memory hook carries the ladder</text>
 <text x="754" y="190" class="lbl">hub location derived (ADR-0043, 0045)</text>
 <text x="754" y="230" class="small">ADR-0017, 0042, 0047</text>
 </svg>
@@ -251,12 +251,12 @@
 <rect x="890" y="120" width="150" height="90" rx="6" class="box"/><text x="900" y="140" class="lbl" font-weight="600">P3 release</text><text x="900" y="158" class="small">docs rewrite (#114)</text><text x="900" y="174" class="small">ADR flags, 0040 amend</text><text x="900" y="190" class="small">plugin + marketplace text</text><text x="900" y="206" class="small">evidence in the release notes</text>
 </g>
 <text x="30" y="250" class="lbl" font-weight="600">Exit criteria</text>
-<text x="30" y="270" class="small">P1: a 0.0.17 KB runs migrate, ends with commandeer off, no retired state, doctor green. Both hubs migrated. Tests green.</text>
+<text x="30" y="270" class="small">P1: a 0.0.17 KB runs migrate, ends with the ladder hook installed, no retired state, doctor green. Both hubs migrated. Tests green.</text>
 <text x="30" y="286" class="small">P0: three fixes merged in their landing repos; each has a count before and a count after one week; the seam record says which repo took each and why.</text>
 <text x="30" y="302" class="small">P2: one review finding and one blocked call each travelled stream -&gt; digest -&gt; proposal PR -&gt; merge -&gt; ledger row, on a unit that is not this repo.</text>
 <text x="30" y="318" class="small">0.1.0: prevented &gt; 0 for three distinct fixes, at least one on a unit other than mage-memory; left-the-queue &gt; 0; docs describe what ships.</text>
 </svg>
-<figcaption>Versions are release-please's. The names are ours. P0 waits on P1's migrate (commandeer must be off before anything touches a KB, and the PreToolUse arm must be installed before counting); P2 waits on P0's counts.</figcaption>
+<figcaption>Versions are release-please's. The names are ours. P0 waits on P1's migrate (the PreToolUse arm must be installed before counting); P2 waits on P0's counts.</figcaption>
 </figure>
 
 <!-- ================================================================== -->
@@ -270,7 +270,7 @@
 <tr><td>0018 distill</td><td><span class="tag super">supersede</span></td><td>Flag. Verb deprecated in P1, code removed in P2.</td></tr>
 <tr><td>0019 promote</td><td><span class="tag super">supersede</span></td><td>Flag. Same.</td></tr>
 <tr><td>0024 organic grooming loop</td><td><span class="tag super">supersede</span></td><td>Flag. Keep its two survivors by citation in 0048: first-sight, and the anti-flood budget.</td></tr>
-<tr><td>0032 capture-redirect</td><td><span class="tag super">supersede</span></td><td>Flag. Commandeer off; memory-hook and flatten hook groups removed by migrate.</td></tr>
+<tr><td>0032 capture-redirect</td><td><span class="tag amend">amend</span></td><td>Commandeer stays. The PreToolUse memory hook is repointed to carry the ladder: block the write, return the rungs, admit only a note with rung answer, trigger and pointer (decision 7). Ruled 2026-09-04.</td></tr>
 <tr><td>0038 graduate on usage</td><td><span class="tag super">supersede</span></td><td>Flag. Graduate skill removed.</td></tr>
 <tr><td>0041 genre decides recall rung</td><td><span class="tag super">supersede</span></td><td>Flag. Was proposed, never accepted. Its "recall at the moment of need" concern moves to the merged #201 + #174 issue.</td></tr>
 <tr><td>0001 memory-first product</td><td><span class="tag amend">amend</span></td><td>One line under the title: charter sentence now in 0048.</td></tr>
@@ -303,8 +303,8 @@
 <tr><td>#204 tracking: order of work</td><td><span class="tag amend">rewrite</span></td><td>Body replaced by <code>~/ai-context/mage-tracking-issue-draft-2026-09-03.md</code>, updated for first-sight and no-weights. Pin it. Sections: P1, P0, P2, P3, each linking its issues.</td></tr>
 <tr><td>#202 wire pushReachGrantCheck into nudge</td><td><span class="tag keep">keep, P1</span></td><td>A rung-1 fix for the sreforge silence. Small, own PR.</td></tr>
 <tr><td>#201 recall has no mid-task trigger</td><td><span class="tag amend">rescope</span></td><td>Merge with #174 into one design issue: "recall at the moment of need: a rung-5 note names its trigger; the trigger is matched in UserPromptSubmit or PreToolUse". Correct the 91.9 figure in the body. Close #174 into it.</td></tr>
-<tr><td>#200 harness layer rewrites frontmatter</td><td><span class="tag super">close</span></td><td>Root cause removed: commandeer off after migrate. Note the reason.</td></tr>
-<tr><td>#199 flatten drops object-form sources</td><td><span class="tag super">close</span></td><td>Flatten retired with commandeer.</td></tr>
+<tr><td>#200 harness layer rewrites frontmatter</td><td><span class="tag keep">keep, P1</span></td><td>Reopened 2026-09-04. Commandeer stays, so the rewrite must be fixed at the source.</td></tr>
+<tr><td>#199 flatten drops object-form sources</td><td><span class="tag keep">keep</span></td><td>Reopened 2026-09-04. Flatten stays until #200 is fixed.</td></tr>
 <tr><td>#198 link regenerating AGENTS.md block destroys content</td><td><span class="tag keep">keep, P1 blocker</span></td><td>Migrate rewrites that block. Fix first.</td></tr>
 <tr><td>#197, #196, #195, #194, #193, #191</td><td><span class="tag keep">keep</span></td><td>Plumbing bugs under 0043 to 0047. Order as #204 had them. Not redirection work; do not count them as such.</td></tr>
 <tr><td>#177 review-lane memory for a GH Actions consumer</td><td><span class="tag amend">rescope, P2</span></td><td>Becomes "review findings stream": pull PR review comments into observe events. Headless read path stays in the merged #201.</td></tr>
@@ -329,7 +329,7 @@
 <h3>New issues, by phase</h3>
 <table>
 <tr><th>Id</th><th>Title</th><th>Phase</th><th>Notes</th></tr>
-<tr><td>N1</td><td>migrate: 0.0.x clearing (commandeer off, retired state, AGENTS.md block, warnings)</td><td>P1</td><td>Idempotent. Runs in hubs and code repos. Never commits.</td></tr>
+<tr><td>N1</td><td>migrate: 0.0.x clearing (ladder hook installed, retired state, AGENTS.md block, warnings)</td><td>P1</td><td>Idempotent. Runs in hubs and code repos. Never commits.</td></tr>
 <tr><td>N2</td><td>deprecate distill, promote, graduate; skills groom/learn/optimize repointed; commit messages without "!"</td><td>P1</td><td>Verbs print the replacement and exit 0. Code removal is P2.</td></tr>
 <tr><td>N3</td><td>observe: tool_attempt event on PreToolUse (ADR-0015 additive)</td><td>P1</td><td>Makes blocks visible. Add to hook groups and schema docs.</td></tr>
 <tr><td>N4</td><td>nudge: drop backlog tally, keep-rate, dream weekly tick; keep chapter digest</td><td>P1</td><td>Digest wording changes in P2.</td></tr>
@@ -458,7 +458,7 @@
 <ul>
 <li><b>release-please mints 0.1.0 on any breaking marker.</b> <code>bump-minor-pre-major</code> is on. Retirements are deprecations: no <code>!</code>, no <code>BREAKING CHANGE</code> footer. Add a line to CONTRIBUTING.</li>
 <li><b>The docs drift test fails the moment a verb goes.</b> Regenerate the snapshot in the same PR (N5).</li>
-<li><b>Migrate before anything else touches the KB.</b> While commandeer is on, every Write or Edit under mage/ gets its frontmatter rewritten by the harness (#200). Run migrate first, in every unit.</li>
+<li><b>#200 before anything writes notes at scale.</b> Every Write or Edit under mage/ gets its frontmatter rewritten by the harness. Commandeer stays, so fix the rewrite at the source, or run flatten after each batch until then.</li>
 <li><b>Hubs migrate separately.</b> prismalens-kb and sreforge-kb are external-mode stores with their own .mage state and their own hook groups in each code repo. Migrate runs in the hub and in each linked code repo.</li>
 <li><b>The plugin marketplace serves a stale copy.</b> A directory-source marketplace snapshots the tree (existing gotcha). Reinstall after N2 or the old skills keep loading.</li>
 <li><b>Which binary.</b> Bare <code>mage</code> runs the working tree, <code>npx mage</code> runs 0.0.17. Verification commands in every package say which.</li>
