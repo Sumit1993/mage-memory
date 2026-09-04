@@ -16,7 +16,7 @@ sources:
 ---
 
 # 0017 — `mage connect`: the host hook adapter (capture is opt-in)
-> Amended by [ADR-0048](0048-repeated-failures-become-enforcement.md) on 2026-09-03: Installs the PreToolUse observe arm; never installs commandeer; asks for the kit.
+> Amended by [ADR-0048](0048-repeated-failures-become-enforcement.md) on 2026-09-03: connect installs the PreToolUse observe arm and asks which kit and which streams; it never installs commandeer. `mage migrate` installs the arm on units connected before 0.0.19.
 
 A 2026-06-06 grill resolved release **0.0.6**: how `mage observe`
 ([ADR-0015](0015-mage-observe-capture-schema.md)) actually gets fired by a host, and

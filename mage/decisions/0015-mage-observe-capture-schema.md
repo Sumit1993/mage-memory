@@ -16,7 +16,7 @@ sources:
 ---
 
 # 0015 — `mage observe`: the capture schema (the keystone `.jsonl`)
-> Amended by [ADR-0048](0048-repeated-failures-become-enforcement.md) on 2026-09-03: Additive: `tool_attempt` event on PreToolUse (tool, paths, detail). Streams contract: any producer of v1 events.
+> Amended by [ADR-0048](0048-repeated-failures-become-enforcement.md) on 2026-09-03: additive: a `tool_attempt` event on PreToolUse (tool, paths, detail), and both `tool_attempt` and `tool_use` carry the harness invocation id so an attempt with no matching use is a prevented call. Every stream writes through `mage observe` on stdin. No `seq`, unchanged.
 
 A 2026-06-06 grill locked the `.learnings/*.jsonl` schema that
 [ADR-0013](0013-procedure-skills-self-grooming-loop.md) calls *load-bearing for the

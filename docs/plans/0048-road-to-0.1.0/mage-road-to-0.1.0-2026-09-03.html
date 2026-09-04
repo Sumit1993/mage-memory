@@ -168,6 +168,7 @@
 <tr><th>Number</th><th>Definition</th><th>How it is counted</th></tr>
 <tr><td><b>prevented</b></td><td>A landed fix fired: a deny refused a call, a hook blocked or rewrote, a check failed in CI or pre-commit.</td><td>PreToolUse attempt event without a matching PostToolUse (deny); hook exit code; CI job status via gh. Ledger committed in the KB, per fix, per unit.</td></tr>
 <tr><td><b>left the queue</b></td><td>A note promoted to a higher rung or deleted.</td><td>PR merged that removes or replaces a note; ledger row.</td></tr>
+<tr><td colspan="3">The ledger is derived from observe events and lives under <code>.mage/</code> (ADR-0025), never committed. A kit fix counts in whichever unit it fires. <code>tool_attempt</code> and <code>tool_use</code> share the harness invocation id, which is what "matching" means. Ruled 2026-09-04 against the adversarial review.</td></tr>
 <tr><td><i>dead</i> (surfaced, not gated)</td><td>A landed fix with zero fires in 90 days; a note whose trigger has not been observed in 90 days.</td><td>ledger age; observe log scan for the trigger signature.</td></tr>
 </table>
 
@@ -253,9 +254,9 @@
 <text x="30" y="270" class="small">P1: a 0.0.17 KB runs migrate, ends with commandeer off, no retired state, doctor green. Both hubs migrated. Tests green.</text>
 <text x="30" y="286" class="small">P0: three fixes merged in their landing repos; each has a count before and a count after one week; the seam record says which repo took each and why.</text>
 <text x="30" y="302" class="small">P2: one review finding and one blocked call each travelled stream -&gt; digest -&gt; proposal PR -&gt; merge -&gt; ledger row, on a unit that is not this repo.</text>
-<text x="30" y="318" class="small">0.1.0: prevented &gt; 0 for three distinct fixes on two units that are not mage-memory; left-the-queue &gt; 0; docs describe what ships.</text>
+<text x="30" y="318" class="small">0.1.0: prevented &gt; 0 for three distinct fixes, at least one on a unit other than mage-memory; left-the-queue &gt; 0; docs describe what ships.</text>
 </svg>
-<figcaption>Versions are release-please's. The names are ours. P1 and P0 run in parallel; P2 waits on P0's counts.</figcaption>
+<figcaption>Versions are release-please's. The names are ours. P0 waits on P1's migrate (commandeer must be off before anything touches a KB, and the PreToolUse arm must be installed before counting); P2 waits on P0's counts.</figcaption>
 </figure>
 
 <!-- ================================================================== -->
@@ -264,7 +265,7 @@
 
 <table>
 <tr><th>ADR</th><th>Disposition</th><th>Change</th></tr>
-<tr><td>0048 repeated failures become enforcement</td><td><span class="tag new">new</span></td><td>Drafted on the branch. Still to fold in: no weights on streams, first sight not repeats, decision 8 becomes "migration is <code>mage migrate</code>, no new verb", decision 1 drops "counts repeats". Then status stays proposed until P0 counts exist.</td></tr>
+<tr><td>0048 repeated failures become enforcement</td><td><span class="tag new">new</span></td><td>All 09-03 rulings folded. 2026-09-04: the eight merge-blockers of review-2026-09-03.md ruled in decisions 3 to 8 and the effect list. Status stays proposed until P0 counts exist.</td></tr>
 <tr><td>0003 track work units</td><td><span class="tag super">supersede</span></td><td>Flag. <code>work/</code> retired; plans live in the tracker. Existing files move to issue bodies or delete.</td></tr>
 <tr><td>0018 distill</td><td><span class="tag super">supersede</span></td><td>Flag. Verb deprecated in P1, code removed in P2.</td></tr>
 <tr><td>0019 promote</td><td><span class="tag super">supersede</span></td><td>Flag. Same.</td></tr>
@@ -279,15 +280,17 @@
 <tr><td>0015 observe schema</td><td><span class="tag amend">amend</span></td><td>Additive: <code>tool_attempt</code> event on PreToolUse (tool, paths, detail). Streams contract: any producer of v1 events.</td></tr>
 <tr><td>0017 connect</td><td><span class="tag amend">amend</span></td><td>Installs the PreToolUse observe arm; never installs commandeer; asks for the kit.</td></tr>
 <tr><td>0029 digest to agent</td><td><span class="tag amend">amend</span></td><td>Target is the rung proposal, not the lesson. Shape unchanged.</td></tr>
-<tr><td>0030 autonomy ladder</td><td><span class="tag keep">keep</span></td><td>Answers "who ratifies": the merge is the human gate at every level. Later levels may auto-merge rung-1 fixes; not now.</td></tr>
+<tr><td>0030 autonomy ladder</td><td><span class="tag amend">amend</span></td><td>Backlog tally becomes the repeats-and-proposals line; graduation clauses lapse. The merge stays the human gate at every level.</td></tr>
 <tr><td>0035 notes are memories</td><td><span class="tag amend">amend</span></td><td>"One unified store" no longer includes native memory. Flatten retired with it.</td></tr>
 <tr><td>0037 doctor remit</td><td><span class="tag amend">amend</span></td><td>Drop skills-readiness for graduated skills; add: kit reachable, streams configured, ledger present, commandeer absent.</td></tr>
 <tr><td>0040 versions mechanical</td><td><span class="tag amend">amend</span></td><td>Named release stays. Gate is 0048 decision 6. Drop the requirement for an evidence ADR per release; evidence goes in the release notes.</td></tr>
 <tr><td>0044 setup conversation</td><td><span class="tag amend">amend</span></td><td>Two more questions: which kit, which streams.</td></tr>
-<tr><td>0021 no phone-home</td><td><span class="tag keep">keep</span></td><td>Unchanged for 0.1.0. Telemetry ADR (0049) after.</td></tr>
+<tr><td>0021 no phone-home</td><td><span class="tag amend">amend</span></td><td>Carve-out: operator-invoked reads of the user's own forge with the user's credentials are not phone-home (the review-findings puller). Telemetry ADR (0049) after.</td></tr>
 <tr><td>0020 dashboard</td><td><span class="tag keep">keep</span></td><td>Deprioritized. A ledger view is the only addition, later.</td></tr>
-<tr><td>0016, 0031, 0039</td><td><span class="tag keep">keep</span></td><td>Context-match becomes the skill fire counter; provenance stamps the ledger; footprint unchanged.</td></tr>
-<tr><td>0002, 0004, 0007 to 0012, 0014, 0022, 0023, 0025 to 0028, 0034, 0036, 0042, 0043, 0045 to 0047</td><td><span class="tag keep">keep</span></td><td>Nothing.</td></tr>
+<tr><td>0016, 0031, 0039</td><td><span class="tag amend">amend</span></td><td>0016: a delete via PR diff is not a hard-delete. 0031: the stamping chokepoint moves to the proposal applier. 0039: roster ranked by admission order once the tally goes. Context-match becomes the skill fire counter.</td></tr>
+<tr><td>0034 adopt</td><td><span class="tag amend">amend</span></td><td>Import half moves to migrate; verb deprecated.</td></tr>
+<tr><td>0046 branch and PR</td><td><span class="tag amend">amend</span></td><td>Already bannered on the branch: PR may target the code repo or the kit; consent is the committed <code>landing</code> field, never machine-local. 0045 §10 and 0047 hold unamended because of that.</td></tr>
+<tr><td>0002, 0004, 0007 to 0012, 0014, 0022, 0023, 0025 to 0028, 0036, 0042, 0043, 0045, 0047</td><td><span class="tag keep">keep</span></td><td>Nothing.</td></tr>
 <tr><td>0049 telemetry and phone-home</td><td><span class="tag new">later</span></td><td>After 0.1.0. Self-hostable, opt-in, the gh-workflows Worker as prior art.</td></tr>
 </table>
 
@@ -334,12 +337,12 @@
 <tr><td>N6</td><td>hubs: run migrate on prismalens-kb and sreforge-kb, delete ~/ai-context/mage-soak</td><td>P1</td><td>Operator task, recorded.</td></tr>
 <tr><td>H1</td><td>route mage-memory notes: 39 rows to issues in landing repos</td><td>P0</td><td>Spec: the routing table. Output: issue links per row.</td></tr>
 <tr><td>H2</td><td>route prismalens and sreforge hub notes</td><td>P0</td><td>Same prompt as the 09-03 agy run, per hub.</td></tr>
-<tr><td>H3</td><td>land three fixes by hand, with counts</td><td>P0</td><td>WebFetch deny (kit), diff-stat check in agy-delegate (kit), commit-trailer hook (repo). Record the seam.</td></tr>
+<tr><td>H3</td><td>land three fixes by hand, with counts</td><td>P0</td><td>WebFetch deny (kit), diff-stat check in agy-delegate (kit), and one check or hook from the prismalens or sreforge routing table landed in that code repo, so the gate's "one unit other than mage-memory" is met. Needs the PreToolUse arm installed there first (migrate). Record the seam.</td></tr>
 <tr><td>H4</td><td>the kit contract</td><td>P0</td><td>What a user-scope kit is: layout, installer, how connect names it. Written from claude-kit.</td></tr>
 <tr><td>L1</td><td>streams contract + review-findings puller (was #177)</td><td>P2</td><td>gh pull of PR review comments into v1 events. Rate-limit aware.</td></tr>
 <tr><td>L2</td><td>proposal schema: output types + landing scope</td><td>P2</td><td>deny, hook, check, rule, skill, note, delete. Single applier (0016).</td></tr>
 <tr><td>L3</td><td>groom repointed: judge the rung; groom --propose opens PRs per type</td><td>P2</td><td>Extends #182. Budget per pass.</td></tr>
-<tr><td>L4</td><td>fire ledger</td><td>P2</td><td>Definition in section 2. Committed in the KB.</td></tr>
+<tr><td>L4</td><td>fire ledger</td><td>P2</td><td>Derived from observe events, under <code>.mage/</code>, never committed (section 2, decision 6). One command prints the two counts.</td></tr>
 <tr><td>L5</td><td>stale: dream extends to fixes and silent triggers; nudge surfaces it</td><td>P2</td><td>Delete proposals through L3.</td></tr>
 <tr><td>L6</td><td>recall at the moment of need (merged #201 + #174)</td><td>P2</td><td>Design issue first, then a hook.</td></tr>
 <tr><td>L7</td><td>connect asks kit + streams; doctor checks them (0044, 0037 amend)</td><td>P2</td><td></td></tr>

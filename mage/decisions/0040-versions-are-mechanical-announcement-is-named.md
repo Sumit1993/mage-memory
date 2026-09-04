@@ -32,7 +32,7 @@ modified: 2026-07-19T17:33:52.304Z
 ---
 
 # 0040 — version numbers are mechanical; the announcement is a named release backed by evidence
-> Amended by [ADR-0048](0048-repeated-failures-become-enforcement.md) on 2026-09-03: Named release stays. Gate is 0048 decision 6. Drop the requirement for an evidence ADR per release; evidence goes in the release notes.
+> Amended by [ADR-0048](0048-repeated-failures-become-enforcement.md) on 2026-09-03: the named release stays; the gate is ADR-0048 decision 6; no evidence ADR per release, the release notes quote the two counts.
 
 > **Status: accepted (ratified 2026-07-19).** Supersedes the "**0.1.0 is the announcement**"
 > clause of [ADR-0024 §8](0024-organic-grooming-loop.md); the rest of ADR-0024 stands, including

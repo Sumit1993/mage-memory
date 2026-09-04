@@ -31,7 +31,7 @@ keywords:
 ---
 
 # 0033 — Recall: `@import` the bounded root index into the host's auto-loaded context (the capture companion to ADR-0032)
-> Amended by [ADR-0048](0048-repeated-failures-become-enforcement.md) on 2026-09-03: Roster stays, bounded to admitted notes (trigger + pointer).
+> Amended by [ADR-0048](0048-repeated-failures-become-enforcement.md) on 2026-09-03: `autoMemoryDirectory` and the `@import` carrier are retired; the bounded roster reaches the agent through the session-start nudge on startup, resume and compact, in every mode (decision 7).
 
 > **Status: accepted (ratified 2026-07-01 — impl on `main`, riding 0.0.12).** Recall counterpart to [ADR-0032](0032-capture-redirect-native-memory.md)
 > (capture). Output of the 2026-06-25 grill; capture mechanism spike-validated 2026-06-25, recall-load

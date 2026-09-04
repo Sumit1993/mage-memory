@@ -11,7 +11,7 @@ provenance:
 ---
 
 # 0006 — Two-layer recall: per-wing auto-loaded skills + a hierarchical factual index
-> Amended by [ADR-0048](0048-repeated-failures-become-enforcement.md) on 2026-09-03: Roster stays, bounded to admitted notes (trigger + pointer).
+> Amended by [ADR-0048](0048-repeated-failures-become-enforcement.md) on 2026-09-03: the roster stays, bounded to admitted notes (trigger + pointer), and is carried by the session-start nudge (decision 7).
 
 Recall uses two complementary layers:
 1. **Skills** — the procedural/nudge/capability layer: auto-loaded at session start across all skill-capable agents (portable), model-matched to the task, executable. = the lifecycle skills (`learn`, `dream`, awareness) **plus one skill per wing** that is the wing's auto-loaded entry point (its playbooks/gotchas/wayfinding, with details in referenced files via progressive disclosure).
