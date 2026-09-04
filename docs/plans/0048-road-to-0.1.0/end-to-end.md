@@ -1,5 +1,7 @@
 # End to end: the three repos as one product
 
+> Folded into section 12 of `mage-road-to-0.1.0-2026-09-03.html` on 2026-09-04. Kept because `review-2026-09-03.md` cites its line numbers. Where the two differ, section 12 wins.
+
 Written 2026-09-03 after the redirection was agreed. What remains, what gets built, what gets
 decommissioned, across mage, claude-kit and gh-workflows.
 

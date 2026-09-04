@@ -30,7 +30,8 @@ keywords:
 # 0048 — Repeated failures become enforcement; memory is the queue, not the product
 
 > **Status: proposed (2026-09-03).** Changes the charter set by ADR-0001. The plan, evidence
-> and issue list live in the tracking issue (#204, rewritten under this ADR).
+> and issue list live in the tracking issue (#204, rewritten under this ADR). Mechanics (ids,
+> schemas, states, the kit write path) are section 12 of the plan page in `docs/plans/0048-road-to-0.1.0/`.
 
 ## Context
 
