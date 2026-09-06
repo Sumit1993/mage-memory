@@ -110,6 +110,11 @@ export const FORBIDDEN_ENV_MARKERS = [
   "REPLIT",
 ] as const;
 
+/** Generic CI flags (ADR-0045 §7 names them beside the vendor markers). */
+export const CI_FLAGS = ["CI", "CONTINUOUS_INTEGRATION"] as const;
+/** A CI flag read off ANY env-shaped object: `env.CI`, `opts.env.CI`, `process.env.CI`, `env["CI"]`. */
+const CI_ENV_READ = /\benv(?:\.(CI|CONTINUOUS_INTEGRATION)\b|\[["'](CI|CONTINUOUS_INTEGRATION)["']\])/g;
+
 /**
  * Return a line's executable code, carrying block-comment and template-literal state
  * across lines. One quote-aware pass owns every "is this really code" decision: three
@@ -205,6 +210,19 @@ function regexLiteralEnd(line: string, start: number): number {
   return line.length;
 }
 
+/** Whether a reviewed exemption for `relPath` overlaps the violating span [start, end) of the STRIPPED code. */
+function exemptionCovers(relPath: string, code: string, start: number, end: number): boolean {
+  return EXEMPTIONS.some((e) => {
+    if (e.file !== relPath) return false;
+    const flags = e.pattern.flags.includes("g") ? e.pattern.flags : `${e.pattern.flags}g`;
+    for (const m of code.matchAll(new RegExp(e.pattern.source, flags))) {
+      const at = m.index ?? 0;
+      if (at < end && start < at + m[0].length) return true;
+    }
+    return false;
+  });
+}
+
 /**
  * Scan source content for environment rule violations.
  */
@@ -229,12 +247,9 @@ export function scanSource(relPath: string, content: string): Violation[] {
 
     // 1. Check for forbidden environment identity markers
     for (const marker of FORBIDDEN_ENV_MARKERS) {
-      if (code.includes(marker)) {
-        // Check if this line is an explicitly permitted exemption
-        const isExempt = EXEMPTIONS.some(
-          (e) => e.file === relPath && e.pattern.test(rawLine),
-        );
-        if (!isExempt) {
+      let at = code.indexOf(marker);
+      while (at >= 0) {
+        if (!exemptionCovers(relPath, code, at, at + marker.length)) {
           violations.push({
             file: relPath,
             line: lineNum,
@@ -242,20 +257,37 @@ export function scanSource(relPath: string, content: string): Violation[] {
             reason: `Branching or referencing environment identity marker '${marker}' (ADR-0045 §7)`,
           });
         }
+        at = code.indexOf(marker, at + 1);
       }
     }
 
     // 2. Check for unexempt process.env reads in TypeScript / JS
-    if (isTypeScript && code.includes("process.env")) {
-      const isExempt = EXEMPTIONS.some(
-        (e) => e.file === relPath && e.pattern.test(rawLine),
-      );
-      if (!isExempt) {
+    if (isTypeScript) {
+      let at = code.indexOf("process.env");
+      while (at >= 0) {
+        if (!exemptionCovers(relPath, code, at, at + "process.env".length)) {
+          violations.push({
+            file: relPath,
+            line: lineNum,
+            lineContent: rawLine.trim(),
+            reason: "Unexempt process.env access; move to adapter layer with injected default (ADR-0045 §7)",
+          });
+        }
+        at = code.indexOf("process.env", at + 1);
+      }
+    }
+
+    // 2b. Check for a CI flag read off any env-shaped object (env.CI, opts.env.CI, env["CI"]) in TypeScript / JS
+    if (isTypeScript) {
+      for (const m of code.matchAll(CI_ENV_READ)) {
+        const name = m[1] ?? m[2] ?? "CI";
+        const start = m.index ?? 0;
+        if (exemptionCovers(relPath, code, start, start + m[0].length)) continue;
         violations.push({
           file: relPath,
           line: lineNum,
           lineContent: rawLine.trim(),
-          reason: "Unexempt process.env access; move to adapter layer with injected default (ADR-0045 §7)",
+          reason: `Branching on CI flag '${name}' via an env read (ADR-0045 §7)`,
         });
       }
     }
@@ -268,14 +300,16 @@ export function scanSource(relPath: string, content: string): Violation[] {
         const matches = code.matchAll(/\$\{?([A-Z0-9_]+)/g);
         for (const match of matches) {
           const varName = match[1];
+          if (varName === undefined) continue;
           if (
-            varName === "CI" ||
-            varName === "CONTINUOUS_INTEGRATION" ||
+            (CI_FLAGS as readonly string[]).includes(varName) ||
             FORBIDDEN_ENV_MARKERS.includes(varName as typeof FORBIDDEN_ENV_MARKERS[number])
           ) {
+            const start = (match.index ?? 0) + match[0].indexOf(varName);
+            const end = start + varName.length;
             // The shell path honours EXEMPTIONS like the TypeScript paths do; without
             // this a shipped script has no way to record a reviewed exception.
-            if (EXEMPTIONS.some((e) => e.file === relPath && e.pattern.test(rawLine))) continue;
+            if (exemptionCovers(relPath, code, start, end)) continue;
             violations.push({
               file: relPath,
               line: lineNum,
@@ -482,6 +516,59 @@ describe("ADR-0045 §7 — Environment Rule Guard", () => {
       const findings = scanSource("scripts/deploy.sh", script);
       expect(findings.length).toBeGreaterThan(0);
       expect(findings.some((f) => f.reason.includes("CI"))).toBe(true);
+    });
+
+    it("detects an injected env.CI read in TypeScript (F1)", () => {
+      const code = 'export function run(env: NodeJS.ProcessEnv) {\n  if (env.CI) return "ci";\n}';
+      const findings = scanSource("src/example.ts", code);
+      expect(findings).toHaveLength(1);
+      expect(findings[0]?.reason).toMatch(/CI/);
+    });
+
+    it("detects env.CONTINUOUS_INTEGRATION (F1)", () => {
+      const code =
+        'export function run(env: NodeJS.ProcessEnv) {\n  if (env.CONTINUOUS_INTEGRATION) return "ci";\n}';
+      const findings = scanSource("src/example.ts", code);
+      expect(findings).toHaveLength(1);
+      expect(findings[0]?.reason).toMatch(/CI/);
+    });
+
+    it('detects the bracket form env["CI"] (F1)', () => {
+      const code = 'const x = env["CI"];';
+      const findings = scanSource("src/example.ts", code);
+      expect(findings).toHaveLength(1);
+      expect(findings[0]?.reason).toMatch(/CI/);
+    });
+
+    it("does not flag CITY, CIRCLE_RADIUS or precision (F1 false-positive guard)", () => {
+      const code = "const city = env.CITY; const r = env.CIRCLE_RADIUS; const p = opts.precision;";
+      expect(scanSource("src/example.ts", code)).toHaveLength(0);
+    });
+
+    it("an exempted pattern inside a trailing comment does not launder a real violation (F2)", () => {
+      const code = "const t = process.env.VITEST; // see process.env.MAGE_HOME";
+      const findings = scanSource("src/hub-url.ts", code);
+      expect(findings.length).toBeGreaterThanOrEqual(1);
+      expect(findings.some((f) => f.reason.includes("VITEST"))).toBe(true);
+    });
+
+    it("an exemption covers only the token it names, not the whole line (F2)", () => {
+      const code = "const base = process.env.MAGE_HOME ?? process.env.VITEST;";
+      const findings = scanSource("src/hub-url.ts", code);
+      expect(findings.some((f) => f.reason.includes("VITEST"))).toBe(true);
+      expect(findings.some((f) => f.reason.includes("Unexempt process.env"))).toBe(true);
+    });
+
+    it("the hub-url exemption still silences its own read (F2 positive control)", () => {
+      const code = "const base = process.env.MAGE_HOME;";
+      expect(scanSource("src/hub-url.ts", code)).toHaveLength(0);
+    });
+
+    it("a shell exemption is per variable, not per line (F2)", () => {
+      const script = 'if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ] && [ -n "$CI" ]; then';
+      const findings = scanSource("scripts/cloud-setup.sh", script);
+      expect(findings).toHaveLength(1);
+      expect(findings[0]?.reason).toMatch(/\$CI/);
     });
   });
 
