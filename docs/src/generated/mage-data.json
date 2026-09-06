@@ -227,7 +227,7 @@
         },
         {
           "flags": "--force-agents-md",
-          "description": "regenerate the mage block in AGENTS.md even when it carries hand edits (they are lost)"
+          "description": "regenerate the mage block in AGENTS.md even when it carries hand edits or predates hash stamps (edits inside the block are lost)"
         }
       ]
     },
@@ -539,7 +539,7 @@
         },
         {
           "flags": "--force-agents-md",
-          "description": "regenerate the mage block in AGENTS.md even when it carries hand edits (they are lost)"
+          "description": "regenerate the mage block in AGENTS.md even when it carries hand edits or predates hash stamps (edits inside the block are lost)"
         }
       ]
     },

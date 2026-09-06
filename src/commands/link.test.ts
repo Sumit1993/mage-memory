@@ -115,6 +115,21 @@ describe("mage link", () => {
     expect(current).toContain("hand-written");
   });
 
+  it("link reports kept-unstamped for a legacy block", async () => {
+    const hub = await makeHub();
+    const code = await emptyRepo();
+    await init({ mode: "in-repo", yes: true, codeRepo: code, project: "web" });
+    const original = await readFile(join(code, "AGENTS.md"), "utf8");
+    const stripped = original.replace(/^<!-- mage-block-hash: [0-9a-f]{12} -->\n/m, "");
+    const legacy = stripped.replace("mage:groom", "/mage-groom");
+    expect(legacy).not.toBe(original);
+    await writeFile(join(code, "AGENTS.md"), legacy);
+    const r = await link(hub, { codeRepo: code, project: "web", yes: true, connect: false });
+    expect(r.agentsMd).toBe("kept-unstamped");
+    const current = await readFile(join(code, "AGENTS.md"), "utf8");
+    expect(current).toContain("/mage-groom");
+  });
+
   it("link --force-agents-md regenerates", async () => {
     const hub = await makeHub();
     const code = await emptyRepo();

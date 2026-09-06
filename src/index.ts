@@ -5,8 +5,11 @@ export {
   type AgentsMdOptions,
   type AgentsMdWriteResult,
   KEPT_HAND_EDITS_MARKER,
+  KEPT_UNSTAMPED_MARKER,
   blockHash,
   keptHandEditsWarning,
+  keptUnstampedWarning,
+  keptWarning,
   writeAgentsMd,
 } from "./agents-md.js";
 export { buildProgram } from "./cli-program.js";

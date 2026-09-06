@@ -99,7 +99,7 @@ export function buildProgram(): Command {
     )
     .option(
       "--force-agents-md",
-      "regenerate the mage block in AGENTS.md even when it carries hand edits (they are lost)",
+      "regenerate the mage block in AGENTS.md even when it carries hand edits or predates hash stamps (edits inside the block are lost)",
     )
     .action(async (name: string | undefined, opts) => {
       const mode = modeFromOpts(opts);
@@ -409,7 +409,7 @@ export function buildProgram(): Command {
     .option("--no-connect", "skip auto-wiring capture hooks after link")
     .option(
       "--force-agents-md",
-      "regenerate the mage block in AGENTS.md even when it carries hand edits (they are lost)",
+      "regenerate the mage block in AGENTS.md even when it carries hand edits or predates hash stamps (edits inside the block are lost)",
     )
     .action(
       async (

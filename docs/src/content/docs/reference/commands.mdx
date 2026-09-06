@@ -254,7 +254,7 @@ mage footprint --quiet
 If your durable knowledge lives in a hub, `mage link <hub-path>` registers this
 code repo with it. `mage unlink` removes the linkage again.
 
-The `AGENTS.md` block regenerates only when mage wrote it and nobody edited it; a hand-edited block is kept with a warning; `--force-agents-md` overrides.
+The `AGENTS.md` block regenerates only when its hash stamp proves mage wrote it and nobody edited it. A hand-edited block is kept with a warning. A block written by a mage release before hash stamps is also kept, with a different warning, because mage cannot tell whether it was edited; `--force-agents-md` regenerates either and stamps the result.
 
 ```console
 $ mage link /path/to/hub --project x --no-connect --yes
@@ -266,6 +266,34 @@ Linking:
 
 ✓ Appended project 'x' to /path/to/hub/metadata.json
 ⚠ /path/to/repo/AGENTS.md: the mage block between <!-- BEGIN mage --> and <!-- END mage --> has hand edits and was left as is. Re-run with --force-agents-md to regenerate it (your edits in the block will be lost).
+✓ Wrote /path/to/repo/mage/metadata.json
+
+✓ Linked code repo 'x' to hub 'hub'.
+
+$ mage link /path/to/hub --project x --no-connect --yes --force-agents-md
+Linking:
+  code repo:  /path/to/repo
+  hub:        /path/to/hub
+  project:    x
+  storage:    repo-owned  (auto-detected: existing metadata stores locally (mode=hybrid))
+
+✓ Updated existing project 'x' in /path/to/hub/metadata.json
+  Refreshed /path/to/repo/AGENTS.md (hybrid — local KB + hub ref)
+✓ Wrote /path/to/repo/mage/metadata.json
+
+✓ Linked code repo 'x' to hub 'hub'.
+```
+
+```console
+$ mage link /path/to/hub --project x --no-connect --yes
+Linking:
+  code repo:  /path/to/repo
+  hub:        /path/to/hub
+  project:    x
+  storage:    repo-owned  (auto-detected: existing metadata stores locally (mode=in-repo))
+
+✓ Appended project 'x' to /path/to/hub/metadata.json
+⚠ /path/to/repo/AGENTS.md: the mage block between <!-- BEGIN mage --> and <!-- END mage --> predates hash stamps and was left as is. mage cannot tell whether you edited it. Re-run with --force-agents-md once to regenerate it (any edits inside the block are lost); the regenerated block is stamped and refreshes on its own from then on.
 ✓ Wrote /path/to/repo/mage/metadata.json
 
 ✓ Linked code repo 'x' to hub 'hub'.

@@ -1,7 +1,7 @@
 import { confirm, select } from "@inquirer/prompts";
 import { mkdir, readdir, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
-import { keptHandEditsWarning, writeAgentsMd } from "../agents-md.js";
+import { keptWarning, writeAgentsMd } from "../agents-md.js";
 import { getRemoteOriginUrl, gitInit, hasGh, isGitRepo } from "../git.js";
 import { ensureGitignored } from "../gitignore.js";
 import { logger } from "../logger.js";
@@ -208,8 +208,9 @@ async function initInRepo(codeRepo: string, project: string, forceAgentsMd?: boo
     { kind: "repo", mode: "in-repo", docsRel: "mage" },
     { force: forceAgentsMd },
   );
-  if (agentsResult.agents === "kept-hand-edits") {
-    logger.warn(keptHandEditsWarning(agentsResult.path));
+  const kept = keptWarning(agentsResult);
+  if (kept) {
+    logger.warn(kept);
   }
 
   logger.blank();
@@ -359,8 +360,9 @@ async function initStandaloneHub(args: HubArgs): Promise<string> {
     { kind: "hub", docsRel: "." },
     { force: args.forceAgentsMd },
   );
-  if (hubAgentsResult.agents === "kept-hand-edits") {
-    logger.warn(keptHandEditsWarning(hubAgentsResult.path));
+  const kept = keptWarning(hubAgentsResult);
+  if (kept) {
+    logger.warn(kept);
   }
 
   logger.blank();
