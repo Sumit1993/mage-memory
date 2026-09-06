@@ -166,11 +166,9 @@ async function childKbCount(dir: string): Promise<number> {
 }
 
 /**
- * Per-project liveness rollup for a hub (Decision 11B). For each registered project:
- * is its code repo present on THIS machine, and is capture wired there
- * (`<code_repo>/.claude/settings.local.json` carrying mage hooks)? Advisory — a code
- * repo may simply not be cloned here, and an unconnected project is a nudge, not a
- * hub failure. Reads each project's settings once; never throws.
+ * Per-project check for a hub: counts registered projects by storage type and
+ * verifies that each hub-owned project has its `projects/<name>/` directory.
+ * Advisory — stays optional.
  */
 async function pushHubProjectsCheck(checks: DoctorCheck[], hub: string): Promise<void> {
   const meta = await readHubMetadata(hub).catch(() => null);
@@ -185,32 +183,27 @@ async function pushHubProjectsCheck(checks: DoctorCheck[], hub: string): Promise
     return;
   }
 
-  let present = 0;
-  let connected = 0;
+  let hubOwned = 0;
+  let repoOwned = 0;
   const issues: string[] = [];
   for (const p of projects) {
-    if (!p.code_repo_path || !(await exists(p.code_repo_path))) {
-      issues.push(`${p.name} (code repo absent here)`);
-      continue;
-    }
-    present += 1;
-    const read = await readClaudeSettings(resolveSettingsTarget({ cwd: p.code_repo_path }).path);
-    if (diffMageHooks(read.settings).connected) {
-      connected += 1;
+    if (p.storage === "hub-owned") {
+      hubOwned += 1;
+      if (!(await exists(join(hub, "projects", p.name)))) {
+        issues.push(`${p.name} (projects/${p.name}/ missing — re-run \`mage link <hub>\` from that repo)`);
+      }
     } else {
-      issues.push(`${p.name} (not connected)`);
+      repoOwned += 1;
     }
   }
 
-  const summary = `${projects.length} registered · ${present} present · ${connected} connected`;
+  const summary = `${projects.length} registered · ${hubOwned} hub-owned · ${repoOwned} repo-owned`;
   const ok = issues.length === 0;
   checks.push({
     name: "hub projects",
     ok,
     optional: true,
-    detail: ok
-      ? summary
-      : `${summary} — ${issues.join("; ")} (run \`mage connect --all-projects\` from the hub)`,
+    detail: ok ? summary : `${summary} — ${issues.join("; ")}`,
   });
 }
 
