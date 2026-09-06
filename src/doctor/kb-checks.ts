@@ -30,6 +30,7 @@ import {
   explainNoDocsRoot,
   externalDocsRoot,
   findCodeRepoRoot,
+  hubProjectPath,
   learningsPath,
   looksLikeHub,
   outOfRepoKbTargets,
@@ -189,7 +190,14 @@ async function pushHubProjectsCheck(checks: DoctorCheck[], hub: string): Promise
   for (const p of projects) {
     if (p.storage === "hub-owned") {
       hubOwned += 1;
-      if (!(await exists(join(hub, "projects", p.name)))) {
+      let projDir: string;
+      try {
+        projDir = hubProjectPath(hub, p.name);
+      } catch {
+        issues.push(`${p.name || "<empty>"} (unsafe project name)`);
+        continue;
+      }
+      if (!(await exists(projDir))) {
         issues.push(`${p.name} (projects/${p.name}/ missing — re-run \`mage link <hub>\` from that repo)`);
       }
     } else {

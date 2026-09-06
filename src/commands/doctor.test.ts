@@ -1162,6 +1162,34 @@ describe("doctor — bare-parent + hub liveness", () => {
     const r = await doctor({ cwd: dir });
     expect(check(r.checks, "hub projects")).toBeUndefined();
   });
+
+  it("flags a hub-owned project with a traversal-shaped name as an issue and does not probe outside projects/", async () => {
+    const hub = await freshDir();
+    await mkdir(join(hub, "projects", "valid"), { recursive: true });
+    // Directory outside hub/projects/ that would cause an unguarded path join to report false "ok"
+    await mkdir(join(hub, "outside"), { recursive: true });
+    const meta = {
+      schema: METADATA_SCHEMA,
+      name: "h",
+      created_at: "",
+      projects: [
+        { name: "valid", storage: "hub-owned", code_repo_url: "" },
+        { name: "../outside", storage: "hub-owned", code_repo_url: "" },
+        { name: "ghost", storage: "hub-owned", code_repo_url: "" },
+        { name: "web", storage: "repo-owned", code_repo_url: "" },
+      ],
+    };
+    await writeFile(join(hub, "metadata.json"), `${JSON.stringify(meta, null, 2)}\n`);
+
+    const r = await doctor({ cwd: hub });
+    const hp = check(r.checks, "hub projects");
+    expect(hp).toBeDefined();
+    expect(hp?.ok).toBe(false);
+    expect(hp?.detail).toMatch(/4 registered · 3 hub-owned · 1 repo-owned/);
+    expect(hp?.detail).toMatch(/\.\.\/outside \(unsafe project name\)/);
+    expect(hp?.detail).toMatch(/ghost \(projects\/ghost\/ missing/);
+    expect(hp?.detail).not.toMatch(/valid/);
+  });
 });
 
 // ─── recall + skills readiness (plan-readiness-doctor) ────────────────────────
