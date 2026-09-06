@@ -35,7 +35,16 @@ import { type KeepRateSummary, reconcileKeepRate, summarizeKeepRate } from "../.
 import { measureFootprint } from "../../metrics/footprint.js";
 import { appendTrendRow, type FootprintTrendRow } from "../../metrics/footprint-trend.js";
 import type { ObserveEvent } from "../../observe/types.js";
-import { type ResolvedDocsRoot, absolutePath, learningsPath, resolveDocsRoot } from "../../paths.js";
+import {
+  type ResolvedDocsRoot,
+  absolutePath,
+  externalDocsRoot,
+  findCodeRepoRoot,
+  hubUnreachableMessage,
+  learningsPath,
+  redactUrl,
+  resolveDocsRoot,
+} from "../../paths.js";
 import {
   cacheTally,
   cachedTally,
@@ -104,7 +113,28 @@ export async function nudgeCmd(opts: NudgeOptions): Promise<NudgeResult> {
   // Only compact/startup/resume reflect + nudge; `clear` (and any other source) is a no-op.
   if (!opts.source || !FIRING_SOURCES.has(opts.source)) return NONE;
 
-  const resolved = await resolveDocsRoot(absolutePath(opts.cwd ?? process.cwd())).catch(() => null);
+  const abs = absolutePath(opts.cwd ?? process.cwd());
+  const codeRepo = await findCodeRepoRoot(abs).catch(() => null);
+  if (codeRepo) {
+    const external = await externalDocsRoot(codeRepo).catch(() => null);
+    if (external?.kind === "hub-unreachable") {
+      // ADR-0045 §6: an unreachable hub surfaces immediately on both channels
+      // without backlog throttling, warning the agent before it acts.
+      const target = external.expectedAddress ? redactUrl(external.expectedAddress) : external.expectedPath;
+      const notice = target
+        ? `mage · external hub is unreachable: ${target}`
+        : "mage · external hub is unreachable";
+      return {
+        ran: true,
+        drafted: 0,
+        pending: 0,
+        nudge: hubUnreachableMessage(external, { forAgent: true }),
+        notice,
+      };
+    }
+  }
+
+  const resolved = await resolveDocsRoot(abs).catch(() => null);
   if (!resolved) return NONE;
 
   try {

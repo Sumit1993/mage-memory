@@ -539,28 +539,37 @@ export interface UnresolvedDocsRoot {
 }
 
 /** The remedy per reason, per ADR-0044 §4: name the command that OBTAINS the hub. */
-function hubUnreachableMessage(r: ExternalDocsRootResult & { kind: "hub-unreachable" }): string {
+export function hubUnreachableMessage(
+  r: ExternalDocsRootResult & { kind: "hub-unreachable" },
+  opts?: { forAgent?: boolean },
+): string {
   const at = r.expectedPath ? ` at ${r.expectedPath}` : "";
   const addr = r.expectedAddress ? ` (address ${redactUrl(r.expectedAddress)})` : "";
   const head = "This repo is in external mode, so its knowledge base lives in a hub — but the hub is unreachable";
-  const dontInit = "Do NOT run `mage init` here: it would mint a SECOND knowledge base.";
+  const forAgent = opts?.forAgent === true;
+  const dontInit = " Do NOT run `mage init` here: it would mint a SECOND knowledge base.";
   switch (r.reason) {
-    case "hub-absent":
-      return `${head}: no hub${at}${addr}. Run \`mage connect\` to clone it there (or \`mage init --local <name>\` for a local-only hub). ${dontInit}`;
+    case "hub-absent": {
+      const obtain = forAgent
+        ? "Run `mage connect` to clone it there."
+        : "Run `mage connect` to clone it there (or `mage init --local <name>` for a local-only hub).";
+      return `${head}: no hub${at}${addr}. ${obtain}${dontInit}`;
+    }
     case "hub-corrupted":
-      return `${head}: something exists${at}${addr} but is not a mage hub (no projects/ + metadata.json). Move or remove it, then run \`mage connect\`. ${dontInit}`;
+      return `${head}: something exists${at}${addr} but is not a mage hub (no projects/ + metadata.json). Move or remove it, then run \`mage connect\`.${dontInit}`;
     case "hub-mismatch":
-      return `${head}: ${r.detail ?? `hub origin mismatch${at}`}. ${dontInit}`;
+      return `${head}: ${r.detail ?? `hub origin mismatch${at}`}.${dontInit}`;
     case "hub-origin-unreadable":
-      return `${head}: ${r.detail ?? `could not read the origin remote${at}`}. ${dontInit}`;
+      return `${head}: ${r.detail ?? `could not read the origin remote${at}`}.${dontInit}`;
     case "no-hub-target":
-      return `${head}: mage/metadata.json records no usable hub address. Run \`mage link <address>\` to record one, then \`mage connect\`. ${dontInit}`;
+      return `${head}: mage/metadata.json records no usable hub address. Run \`mage link <address>\` to record one, then \`mage connect\`.${dontInit}`;
     case "malformed-config":
-      return `${head}: mage/metadata.json is mode=external but names no project. Run \`mage link <address>\` to re-register this repo. ${dontInit}`;
+      return `${head}: mage/metadata.json is mode=external but names no project. Run \`mage link <address>\` to re-register this repo.${dontInit}`;
     default:
-      return `${head}: an unexpected failure occurred while resolving the external hub. Check permissions, or re-register with \`mage link <address>\`. ${dontInit}`;
+      return `${head}: an unexpected failure occurred while resolving the external hub. Check permissions, or re-register with \`mage link <address>\`.${dontInit}`;
   }
 }
+
 
 /**
  * Explain a `null` from {@link resolveDocsRoot}, which means BOTH "there is no KB
