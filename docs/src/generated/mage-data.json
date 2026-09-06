@@ -224,6 +224,10 @@
         {
           "flags": "--no-connect",
           "description": "skip auto-wiring capture hooks after an in-repo init"
+        },
+        {
+          "flags": "--force-agents-md",
+          "description": "regenerate the mage block in AGENTS.md even when it carries hand edits (they are lost)"
         }
       ]
     },
@@ -532,6 +536,10 @@
         {
           "flags": "--no-connect",
           "description": "skip auto-wiring capture hooks after link"
+        },
+        {
+          "flags": "--force-agents-md",
+          "description": "regenerate the mage block in AGENTS.md even when it carries hand edits (they are lost)"
         }
       ]
     },
