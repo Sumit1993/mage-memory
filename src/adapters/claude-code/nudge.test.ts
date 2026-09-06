@@ -637,6 +637,45 @@ describe("mage nudge — KB access grant (#202)", () => {
     );
   }
 
+  async function hybridRepo(opts: { hubExists: boolean }): Promise<{
+    code: string;
+    hub: string;
+  }> {
+    const hub = await tmpDir("mage-reachdr-hybrid-hub-");
+    const code = await tmpDir("mage-reachdr-hybrid-code-");
+    const hubPath = opts.hubExists ? hub : join(hub, "gone");
+    if (opts.hubExists) {
+      await mkdir(join(hub, "projects", "engine", "notes"), { recursive: true });
+      await writeFile(
+        join(hub, "metadata.json"),
+        JSON.stringify({ schema: METADATA_SCHEMA, name: "h", created_at: "", projects: [] }),
+      );
+    }
+    await mkdir(join(code, "mage", "notes"), { recursive: true });
+    await writeFile(join(code, "mage", "notes", "overview.md"), "# Engine\n");
+    await writeFile(
+      join(code, "mage", "metadata.json"),
+      JSON.stringify({
+        schema: METADATA_SCHEMA,
+        mode: "hybrid",
+        project: "engine",
+        hub_path: null,
+        hub_repo: null,
+        hub_refs: [
+          {
+            hub_path: hubPath,
+            hub_repo: null,
+            project: "engine",
+            storage: "repo-owned",
+            linked_at: "",
+          },
+        ],
+        linked_at: "",
+      }),
+    );
+    return { code, hub: hubPath };
+  }
+
   it("hub present, no grant → both channels name the grant and mage connect, on startup and again on resume", async () => {
     const { code, hub } = await externalRepo({ hubExists: true });
     const r = await nudgeCmd({ cwd: code, source: "startup", sessionId: "s1" });
@@ -648,6 +687,19 @@ describe("mage nudge — KB access grant (#202)", () => {
 
     const rResume = await nudgeCmd({ cwd: code, source: "resume", sessionId: "s1" });
     expect(rResume.notice).toBe(r.notice);
+  });
+
+  it("hybrid mode: hub present, no grant → names only external hub as unreachable; in-repo notes are readable", async () => {
+    const { code, hub } = await hybridRepo({ hubExists: true });
+    const r = await nudgeCmd({ cwd: code, source: "startup", sessionId: "s1" });
+    expect(r.ran).toBe(true);
+    expect(r.notice).toMatch(/access grant/);
+    expect(r.notice).toContain(hub);
+    expect(r.nudge).toMatch(/in-repo notes.*readable/i);
+    expect(r.nudge).toMatch(/only the external hub is unreachable/i);
+    expect(r.nudge).not.toContain("cannot read a single note");
+    expect(r.nudge).toMatch(/mage connect/);
+    expect(r.nudge).toMatch(/NOT run `mage init`/);
   });
 
   it("grant present → no grant text", async () => {

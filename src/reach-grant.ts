@@ -1,5 +1,6 @@
 import {
   findCodeRepoRoot,
+  normalizeMetadata,
   outOfRepoKbTargets,
   readMetadata,
   resolveHubGrant,
@@ -11,19 +12,22 @@ import {
 
 export type ReachGrantStatus =
   | { kind: "not-applicable" }               // no external hub configured, in-repo KB, or resolve threw
-  | { kind: "absent"; roots: string[] }      // external hub configured but directory does not exist on disk
-  | { kind: "mismatch"; details: string[] }  // external hub directory exists but points to a different remote
-  | { kind: "missing"; roots: string[] }     // hub present, no grant in either settings scope
-  | { kind: "granted"; roots: string[] };
+  | { kind: "absent"; roots: string[]; mode: "external" | "hybrid" }      // external hub configured but directory does not exist on disk
+  | { kind: "mismatch"; details: string[]; mode: "external" | "hybrid" }  // external hub directory exists but points to a different remote
+  | { kind: "missing"; roots: string[]; mode: "external" | "hybrid" }     // hub present, no grant in either settings scope
+  | { kind: "granted"; roots: string[]; mode: "external" | "hybrid" };
 
 /** The same resolution `connect` grants and `doctor` checks (ADR-0043 §5), read across both settings scopes. */
 export async function reachGrantStatus(cwd: string): Promise<ReachGrantStatus> {
   let resolutions: Awaited<ReturnType<typeof resolveHubGrant>>[] = [];
   let targets: ReturnType<typeof outOfRepoKbTargets> = [];
+  let mode: "external" | "hybrid" = "external";
   try {
     const codeRepo = await findCodeRepoRoot(cwd);
-    const meta = codeRepo ? await readMetadata(codeRepo) : null;
+    const rawMeta = codeRepo ? await readMetadata(codeRepo) : null;
+    const meta = rawMeta ? normalizeMetadata(rawMeta) : null;
     targets = meta && codeRepo ? outOfRepoKbTargets(meta, codeRepo) : [];
+    if (meta?.mode === "hybrid") mode = "hybrid";
     // Mirror connect's gate EXACTLY — resolveHubGrant, the same function connect
     // uses to decide what to grant AND what path it grants (ADR-0043 §5's
     // one-shared-function rule). Reporting a target connect would never grant as
@@ -59,13 +63,13 @@ export async function reachGrantStatus(cwd: string): Promise<ReachGrantStatus> {
   }
 
   if (mismatched.length > 0) {
-    return { kind: "mismatch", details: mismatched };
+    return { kind: "mismatch", details: mismatched, mode };
   }
   if (missing.length > 0) {
-    return { kind: "missing", roots: missing };
+    return { kind: "missing", roots: missing, mode };
   }
   if (absent.length > 0) {
-    return { kind: "absent", roots: absent };
+    return { kind: "absent", roots: absent, mode };
   }
-  return { kind: "granted", roots: resolutions.map((r) => r.root as string) };
+  return { kind: "granted", roots: resolutions.map((r) => r.root as string), mode };
 }

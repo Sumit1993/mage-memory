@@ -170,6 +170,12 @@ async function grantNudge(cwd: string): Promise<{ notice: string; context: strin
     case "granted":
       return null;
     case "missing":
+      if (status.mode === "hybrid") {
+        return {
+          notice: `mage · the harness has no access grant for the external hub at ${status.roots.join(", ")} — run \`mage connect\``,
+          context: `This repo references an external hub at ${status.roots.join(", ")}, and Claude Code's permissions.additionalDirectories carries no grant for it in either settings scope. In-repo notes under mage/ are readable, and only the external hub is unreachable. Ask the user to run \`mage connect\` in this repo; that is the only fix. Do NOT run \`mage init\` here: it would mint a SECOND knowledge base.`,
+        };
+      }
       return {
         notice: `mage · the harness has no access grant for the knowledge base at ${status.roots.join(", ")} — run \`mage connect\``,
         context: `This repo's knowledge base lives outside the project root at ${status.roots.join(", ")}, and Claude Code's permissions.additionalDirectories carries no grant for it in either settings scope, so you cannot read a single note. Ask the user to run \`mage connect\` in this repo; that is the only fix. Do NOT run \`mage init\` here: it would mint a SECOND knowledge base.`,

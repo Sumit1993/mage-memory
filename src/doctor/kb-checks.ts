@@ -661,8 +661,10 @@ async function pushReachGrantCheck(checks: DoctorCheck[], opts: DoctorOptions): 
         name: "KB access grant",
         ok: false,
         detail:
-          `the KB lives outside this repo but the harness has no grant for ` +
-          `${status.roots.join(", ")} — the agent cannot read it; run \`mage connect\``,
+          status.mode === "hybrid"
+            ? `the harness has no grant for referenced hub ${status.roots.join(", ")} — in-repo notes are readable, but the hub is unreachable; run \`mage connect\``
+            : `the KB lives outside this repo but the harness has no grant for ` +
+              `${status.roots.join(", ")} — the agent cannot read it; run \`mage connect\``,
       });
       return;
     case "absent":
