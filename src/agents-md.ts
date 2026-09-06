@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
@@ -6,13 +7,73 @@ import {
   DECISIONS_DIR,
   INDEX_FILE,
   NOTES_DIR,
+  absolutePath,
   assertSafeName,
   exists,
 } from "./paths.js";
 
-const BEGIN = "<!-- BEGIN mage -->";
-const END = "<!-- END mage -->";
+export const BEGIN = "<!-- BEGIN mage -->";
+export const END = "<!-- END mage -->";
 const CLAUDE_IMPORT = "@AGENTS.md";
+
+export const KEPT_HAND_EDITS_MARKER = "has hand edits and was left as is";
+
+export function keptHandEditsWarning(path: string): string {
+  return `${path}: the mage block between <!-- BEGIN mage --> and <!-- END mage --> ${KEPT_HAND_EDITS_MARKER}. Re-run with --force-agents-md to regenerate it (your edits in the block will be lost).`;
+}
+
+export const KEPT_UNSTAMPED_MARKER = "predates hash stamps and was left as is";
+
+export function keptUnstampedWarning(path: string): string {
+  return `${path}: the mage block between <!-- BEGIN mage --> and <!-- END mage --> ${KEPT_UNSTAMPED_MARKER}. mage cannot tell whether you edited it. Re-run with --force-agents-md once to regenerate it (any edits inside the block are lost); the regenerated block is stamped and refreshes on its own from then on.`;
+}
+
+/** The warning to print for a kept block, or null when nothing was kept. */
+export function keptWarning(result: AgentsMdWriteResult): string | null {
+  if (result.agents === "kept-hand-edits") return keptHandEditsWarning(result.path);
+  if (result.agents === "kept-unstamped") return keptUnstampedWarning(result.path);
+  return null;
+}
+
+export function blockHash(body: string): string {
+  return createHash("sha256").update(body).digest("hex").slice(0, 12);
+}
+
+const STAMP_RE = /^<!-- mage-block-hash: ([0-9a-f]{12}) -->\r?\n/;
+
+function innerOf(block: string): string {
+  const b = block.indexOf(BEGIN);
+  const e = block.indexOf(END);
+  if (b >= 0 && e > b) {
+    const afterBegin = block.indexOf("\n", b);
+    if (afterBegin >= 0 && afterBegin < e) {
+      let beforeEnd = e;
+      if (beforeEnd > 0 && block[beforeEnd - 1] === "\n") {
+        beforeEnd--;
+        if (beforeEnd > 0 && block[beforeEnd - 1] === "\r") {
+          beforeEnd--;
+        }
+      }
+      return block.slice(afterBegin + 1, beforeEnd);
+    }
+  }
+  return block;
+}
+
+export function stampOf(block: string): string | null {
+  const inner = innerOf(block);
+  const m = inner.match(STAMP_RE);
+  return m?.[1] ?? null;
+}
+
+export function bodyOf(block: string): string {
+  const inner = innerOf(block);
+  return inner.replace(STAMP_RE, "");
+}
+
+function stampedBlock(body: string): string {
+  return `${BEGIN}\n<!-- mage-block-hash: ${blockHash(body)} -->\n${body}\n${END}`;
+}
 
 /**
  * Which AGENTS.md block to write, discriminated on the reconciled `kind`
@@ -41,6 +102,18 @@ export interface HubAgentsMd {
 }
 export type AgentsMdOptions = RepoAgentsMd | HubAgentsMd;
 
+export interface AgentsMdWriteResult {
+  /** What happened to AGENTS.md. `kept-hand-edits`: the block on disk was edited by hand and was left alone. `kept-unstamped`: the block has no hash stamp and differs from the template, so it may or may not be hand-edited; left alone. */
+  agents:
+    | "created"
+    | "written"
+    | "unchanged"
+    | "kept-hand-edits"
+    | "kept-unstamped";
+  /** Absolute path of the AGENTS.md examined. */
+  path: string;
+}
+
 function rel(docsRel: string, child: string): string {
   return docsRel === "." ? child : `${docsRel}/${child}`;
 }
@@ -59,8 +132,7 @@ function externalBlock(opts: RepoAgentsMd): string {
   const projIndex = `${hub}/_index.${project}.md`;
   const hubIndex = `${hub}/${INDEX_FILE}`;
   const hubDecisions = `${hub}/${DECISIONS_DIR}/`;
-  return `${BEGIN}
-## mage knowledge base (hub-linked)
+  return `## mage knowledge base (hub-linked)
 
 This repository's durable knowledge lives in a **mage hub** at
 \`${hub}\`, where this repo is the **${project}** project. mage is a portable,
@@ -89,8 +161,7 @@ confirm; you batch-review the drafts later with \`mage:groom\`. Don't wait for a
 session boundary — capture at first sight.
 
 **Commit hygiene:** mage never commits for you. It suggests \`git\` commands; you
-run them.
-${END}`;
+run them.`;
 }
 
 function mageBlock(opts: AgentsMdOptions): string {
@@ -99,8 +170,7 @@ function mageBlock(opts: AgentsMdOptions): string {
   const notesPath = rel(opts.docsRel, `${NOTES_DIR}/`);
   const decisionsPath = rel(opts.docsRel, `${DECISIONS_DIR}/`);
   const kbDesc = kbDescription(opts);
-  return `${BEGIN}
-## mage knowledge base
+  return `## mage knowledge base
 
 ${kbDesc} mage is a portable, file-based knowledge base of notes — insight,
 procedure, and pointers (not copies of sources) — navigable as an Obsidian graph.
@@ -128,8 +198,7 @@ confirm; you batch-review the drafts later with \`mage:groom\`. Don't wait for a
 session boundary — capture at first sight.
 
 **Commit hygiene:** mage never commits for you. It suggests \`git\` commands; you
-run them.
-${END}`;
+run them.`;
 }
 
 /**
@@ -148,35 +217,85 @@ function kbDescription(opts: AgentsMdOptions): string {
   return `This repository has a **mage** knowledge base at \`${opts.docsRel}/\`.`;
 }
 
-/** Insert-or-replace the mage block in AGENTS.md, and ensure CLAUDE.md imports it. */
-export async function writeAgentsMd(root: string, opts: AgentsMdOptions): Promise<void> {
-  await upsertAgentsFile(join(root, AGENTS_FILE), opts);
-  await ensureClaudeImport(join(root, CLAUDE_FILE));
+function renderBlock(opts: AgentsMdOptions): string {
+  const body = mageBlock(opts);
+  return stampedBlock(body);
 }
 
-async function upsertAgentsFile(path: string, opts: AgentsMdOptions): Promise<void> {
-  const block = mageBlock(opts);
+/** Insert-or-replace the mage block in AGENTS.md, and ensure CLAUDE.md imports it. */
+export async function writeAgentsMd(
+  root: string,
+  opts: AgentsMdOptions,
+  write: { force?: boolean } = {},
+): Promise<AgentsMdWriteResult> {
+  const filePath = absolutePath(join(root, AGENTS_FILE));
+  const agents = await upsertAgentsFile(filePath, opts, write);
+  await ensureClaudeImport(join(root, CLAUDE_FILE));
+  return { agents, path: filePath };
+}
+
+async function upsertAgentsFile(
+  path: string,
+  opts: AgentsMdOptions,
+  write: { force?: boolean } = {},
+): Promise<AgentsMdWriteResult["agents"]> {
+  const rendered = renderBlock(opts);
   if (!(await exists(path))) {
     await writeFile(
       path,
-      `# AGENTS.md\n\nInstructions for AI coding agents working in this repository.\n\n${block}\n`,
+      `# AGENTS.md\n\nInstructions for AI coding agents working in this repository.\n\n${rendered}\n`,
     );
-    return;
+    return "created";
   }
   const current = await readFile(path, "utf8");
   const start = current.indexOf(BEGIN);
   const end = current.indexOf(END);
-  let next: string;
-  if (start >= 0 && end > start) {
-    next = current.slice(0, start) + block + current.slice(end + END.length);
-  } else if (start >= 0) {
-    // Orphaned BEGIN (END missing or truncated) — replace from BEGIN to EOF
-    // rather than appending a second block.
-    next = `${current.slice(0, start)}${block}\n`;
-  } else {
-    next = `${current.replace(/\n*$/, "")}\n\n${block}\n`;
+
+  if (start < 0) {
+    // File without BEGIN: append as today, written
+    const next = `${current.replace(/\n*$/, "")}\n\n${rendered}\n`;
+    await writeFile(path, next);
+    return "written";
   }
-  if (next !== current) await writeFile(path, next);
+
+  if (end < 0 || end <= start) {
+    // BEGIN present, END absent (orphan)
+    if (write.force) {
+      const next = `${current.slice(0, start)}${rendered}\n`;
+      await writeFile(path, next);
+      return "written";
+    }
+    return "kept-hand-edits";
+  }
+
+  // Block present. Let onDisk be the BEGIN..END block inclusive and rendered the new stamped block.
+  const onDisk = current.slice(start, end + END.length);
+  const onDiskBody = bodyOf(onDisk);
+  const renderedBody = bodyOf(rendered);
+  const onDiskStamp = stampOf(onDisk);
+
+  if (onDiskBody === renderedBody) {
+    if (onDisk === rendered) {
+      return "unchanged";
+    }
+    const next = current.slice(0, start) + rendered + current.slice(end + END.length);
+    await writeFile(path, next);
+    return "written";
+  }
+
+  if (onDiskStamp !== null && onDiskStamp === blockHash(onDiskBody)) {
+    const next = current.slice(0, start) + rendered + current.slice(end + END.length);
+    await writeFile(path, next);
+    return "written";
+  }
+
+  if (write.force) {
+    const next = current.slice(0, start) + rendered + current.slice(end + END.length);
+    await writeFile(path, next);
+    return "written";
+  }
+
+  return onDiskStamp === null ? "kept-unstamped" : "kept-hand-edits";
 }
 
 async function ensureClaudeImport(path: string): Promise<void> {

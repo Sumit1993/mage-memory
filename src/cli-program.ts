@@ -97,6 +97,10 @@ export function buildProgram(): Command {
       "--no-connect",
       "skip auto-wiring capture hooks after an in-repo init",
     )
+    .option(
+      "--force-agents-md",
+      "regenerate the mage block in AGENTS.md even when it carries hand edits or predates hash stamps (edits inside the block are lost)",
+    )
     .action(async (name: string | undefined, opts) => {
       const mode = modeFromOpts(opts);
       if (name && opts.inRepo) {
@@ -114,6 +118,7 @@ export function buildProgram(): Command {
         project: opts.project,
         yes: opts.yes,
         connect: opts.connect,
+        forceAgentsMd: opts.forceAgentsMd,
       });
     });
 
@@ -402,6 +407,10 @@ export function buildProgram(): Command {
     )
     .option("-y, --yes", "non-interactive: auto-confirm prompts")
     .option("--no-connect", "skip auto-wiring capture hooks after link")
+    .option(
+      "--force-agents-md",
+      "regenerate the mage block in AGENTS.md even when it carries hand edits or predates hash stamps (edits inside the block are lost)",
+    )
     .action(
       async (
         hubPath: string,
@@ -410,6 +419,7 @@ export function buildProgram(): Command {
           storage?: string;
           yes?: boolean;
           connect?: boolean;
+          forceAgentsMd?: boolean;
         },
       ) => {
         await link(hubPath, {
@@ -417,6 +427,7 @@ export function buildProgram(): Command {
           storage: coerceStorage(opts.storage),
           yes: opts.yes,
           connect: opts.connect,
+          forceAgentsMd: opts.forceAgentsMd,
         });
         // Setup self-verifies: surface recall+skills drift (e.g. plugin not installed) now.
         await readinessFooter(process.cwd());

@@ -1335,6 +1335,7 @@ describe("doctor — recall + skills readiness", () => {
     expect(c?.ok).toBe(false);
     expect(c?.optional).toBe(true);
     expect(c?.detail).toMatch(/\/mage-learn/);
+    expect(c?.detail).toContain("--force-agents-md");
   });
   it("AGENTS awareness: current `mage:learn` → ok", async () => {
     const dir = await freshDir();

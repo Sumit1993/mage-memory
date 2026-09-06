@@ -1,4 +1,4 @@
-import { mkdir, readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { tmpDir, withKb } from "../../test/fixtures/kb.js";
@@ -99,5 +99,47 @@ describe("mage link", () => {
     const skipped = await link(hub, { codeRepo: code2, project: "y", yes: true, connect: false });
     expect(skipped.connectResult).toBeUndefined();
     expect(await exists(join(code2, ".claude", "settings.local.json"))).toBe(false);
+  });
+
+  it("link keeps a hand-edited block and reports it", async () => {
+    const hub = await makeHub();
+    const code = await emptyRepo();
+    await init({ mode: "in-repo", yes: true, codeRepo: code, project: "web" });
+    const original = await readFile(join(code, "AGENTS.md"), "utf8");
+    const edited = original.replace(/^2\. .*$/m, "## Cross-link, don't just file\n\nhand-written");
+    expect(edited).not.toBe(original);
+    await writeFile(join(code, "AGENTS.md"), edited);
+    const r = await link(hub, { codeRepo: code, project: "web", yes: true, connect: false });
+    expect(r.agentsMd).toBe("kept-hand-edits");
+    const current = await readFile(join(code, "AGENTS.md"), "utf8");
+    expect(current).toContain("hand-written");
+  });
+
+  it("link reports kept-unstamped for a legacy block", async () => {
+    const hub = await makeHub();
+    const code = await emptyRepo();
+    await init({ mode: "in-repo", yes: true, codeRepo: code, project: "web" });
+    const original = await readFile(join(code, "AGENTS.md"), "utf8");
+    const stripped = original.replace(/^<!-- mage-block-hash: [0-9a-f]{12} -->\n/m, "");
+    const legacy = stripped.replace("mage:groom", "/mage-groom");
+    expect(legacy).not.toBe(original);
+    await writeFile(join(code, "AGENTS.md"), legacy);
+    const r = await link(hub, { codeRepo: code, project: "web", yes: true, connect: false });
+    expect(r.agentsMd).toBe("kept-unstamped");
+    const current = await readFile(join(code, "AGENTS.md"), "utf8");
+    expect(current).toContain("/mage-groom");
+  });
+
+  it("link --force-agents-md regenerates", async () => {
+    const hub = await makeHub();
+    const code = await emptyRepo();
+    await init({ mode: "in-repo", yes: true, codeRepo: code, project: "web" });
+    const original = await readFile(join(code, "AGENTS.md"), "utf8");
+    const edited = original.replace(/^2\. .*$/m, "## Cross-link, don't just file\n\nhand-written");
+    await writeFile(join(code, "AGENTS.md"), edited);
+    const r = await link(hub, { codeRepo: code, project: "web", yes: true, connect: false, forceAgentsMd: true } as any);
+    expect(r.agentsMd).toBe("written");
+    const current = await readFile(join(code, "AGENTS.md"), "utf8");
+    expect(current).not.toContain("hand-written");
   });
 });
