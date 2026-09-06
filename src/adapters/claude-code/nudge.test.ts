@@ -10,7 +10,7 @@ import {
   type EventBase,
 } from "../../observe/events.js";
 import type { ObserveEvent } from "../../observe/types.js";
-import { learningsPath, stagingPath } from "../../paths.js";
+import { chosenHubRoot, learningsPath, stagingPath } from "../../paths.js";
 import { emitNudge, nudgeCmd } from "./nudge.js";
 import * as footprintModule from "../../metrics/footprint.js";
 import { buildNudgeCommand } from "./nudge.js";
@@ -515,3 +515,70 @@ describe("mage nudge — CLI command parsing", () => {
     }
   });
 });
+
+describe("mage nudge — unreachable external hub (ADR-0045 §6)", () => {
+  async function setupUnreachable(hubRepo = "https://github.com/acme/docs.git"): Promise<{ dir: string; derivedPath: string }> {
+    const code = await tmpDir("mage-nudge-unreach-code-");
+    await mkdir(join(code, "mage"), { recursive: true });
+    await writeFile(
+      join(code, "mage", "metadata.json"),
+      JSON.stringify({
+        schema: "mage.v2",
+        mode: "external",
+        project: "engine",
+        hub_path: null,
+        hub_repo: hubRepo,
+        hub_refs: [],
+        linked_at: "2026-08-24T00:00:00.000Z",
+      }),
+      "utf8",
+    );
+    const chosen = chosenHubRoot(hubRepo, null);
+    return { dir: code, derivedPath: chosen?.root ?? "" };
+  }
+
+  it("unreachable hub on startup → both channels non-null, agent text contains derived path", async () => {
+    const { dir, derivedPath } = await setupUnreachable();
+    const r = await nudgeCmd({ cwd: dir, source: "startup" });
+    expect(r.ran).toBe(true);
+    expect(r.notice).not.toBeNull();
+    expect(r.notice).toContain("mage · external hub is unreachable:");
+    expect(r.notice).toContain("https://github.com/acme/docs.git");
+    expect(r.nudge).not.toBeNull();
+    expect(r.nudge).toContain(derivedPath);
+    expect(r.nudge).toContain("mage connect");
+  });
+
+  it("unreachable hub twice in a row inside the throttle window → message appears both times", async () => {
+    const { dir } = await setupUnreachable();
+    const first = await nudgeCmd({ cwd: dir, source: "startup" });
+    expect(first.ran).toBe(true);
+    expect(first.notice).not.toBeNull();
+    expect(first.nudge).not.toBeNull();
+
+    const second = await nudgeCmd({ cwd: dir, source: "startup" });
+    expect(second.ran).toBe(true);
+    expect(second.notice).toBe(first.notice);
+    expect(second.nudge).toBe(first.nudge);
+  });
+
+  it("resolved hub → byte-identical output to today (no regression)", async () => {
+    const { dir, root } = await withKb();
+    await seedChapter(learningsPath(root), "s1", "alpha");
+    const r = await nudgeCmd({ cwd: dir, source: "startup", force: true });
+    expect(r.ran).toBe(true);
+    expect(r.nudge).toContain("Raw material, NOT lessons");
+    expect(r.notice).toContain("mage · recent work:");
+  });
+
+  it("the agent text carries the mage init prohibition, never the instruction", async () => {
+    const { dir } = await setupUnreachable();
+    const r = await nudgeCmd({ cwd: dir, source: "startup" });
+    expect(r.nudge).not.toBeNull();
+    // The prohibition is exactly what the agent channel must carry; only the
+    // `mage init --local` ALTERNATIVE is an instruction, and only that is dropped.
+    expect(r.nudge).toContain("Do NOT run `mage init` here");
+    expect(r.nudge).not.toContain("mage init --local");
+  });
+});
+

@@ -55,11 +55,11 @@ describe("unreachable external hub — the capture hot path stays fail-open (#15
     expect(decision.kind).toBe("pass");
   });
 
-  it("the boundary nudge no-ops instead of breaking session start", async () => {
+  it("the boundary nudge surfaces the unreachable-hub message (ADR-0045 §6)", async () => {
     const code = await unreachableExternalRepo();
     const r = await nudgeCmd({ cwd: code, source: "startup", sessionId: "s1" });
-    expect(r.ran).toBe(false);
-    expect(r.nudge).toBeNull();
+    expect(r.ran).toBe(true);
+    expect(r.nudge).not.toBeNull();
   });
 
   it("the Gate-2 staged scan opens the gate instead of blocking a commit", async () => {
