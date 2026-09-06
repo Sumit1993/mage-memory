@@ -32,14 +32,13 @@ import {
   findCodeRepoRoot,
   learningsPath,
   looksLikeHub,
-  outOfRepoKbTargets,
   ownedDocsRoots,
   readGenreOverrides,
   readHubMetadata,
   readMetadata,
-  resolveHubGrant,
   type resolveDocsRoot,
 } from "../paths.js";
+import { reachGrantStatus } from "../reach-grant.js";
 import { genreOf } from "../scanner/genre-map.js";
 import { run } from "../shell.js";
 import { scanNotes } from "../scan.js";
@@ -646,81 +645,45 @@ async function pushExternalHubCheck(checks: DoctorCheck[], opts: DoctorOptions):
  */
 async function pushReachGrantCheck(checks: DoctorCheck[], opts: DoctorOptions): Promise<void> {
   const cwd = opts.cwd ?? process.cwd();
-  let resolutions: Awaited<ReturnType<typeof resolveHubGrant>>[] = [];
-  let targets: ReturnType<typeof outOfRepoKbTargets> = [];
-  try {
-    const codeRepo = await findCodeRepoRoot(cwd);
-    const meta = codeRepo ? await readMetadata(codeRepo) : null;
-    targets = meta && codeRepo ? outOfRepoKbTargets(meta, codeRepo) : [];
-    // Mirror connect's gate EXACTLY — resolveHubGrant, the same function connect
-    // uses to decide what to grant AND what path it grants (ADR-0043 §5's
-    // one-shared-function rule). Reporting a target connect would never grant as
-    // "missing" would nag for a fix connect will never make; checking the WRONG
-    // path (e.g. the derived root when connect actually fell back to hub_path)
-    // would report a real grant as missing.
-    resolutions = await Promise.all(targets.map((t) => resolveHubGrant(t)));
-  } catch {
-    return; // unreadable/foreign metadata — schema drift check owns that story
+  const status = await reachGrantStatus(cwd);
+  switch (status.kind) {
+    case "not-applicable":
+      return;
+    case "mismatch":
+      checks.push({
+        name: "KB access grant",
+        ok: false,
+        detail: `hub mismatch — never reused, never clobbered: ${status.details.join("; ")}`,
+      });
+      return;
+    case "missing":
+      checks.push({
+        name: "KB access grant",
+        ok: false,
+        detail:
+          `the KB lives outside this repo but the harness has no grant for ` +
+          `${status.roots.join(", ")} — the agent cannot read it; run \`mage connect\``,
+      });
+      return;
+    case "absent":
+      // Optional-ok is right HERE: a hub that is not cloned yet is recoverable and
+      // `connect` offers to clone it. Whether that absence has ALSO killed this
+      // repo's only KB is the "external hub" check's story, not this one (#158).
+      checks.push({
+        name: "KB access grant",
+        ok: true,
+        optional: true,
+        detail: `no mage hub at ${status.roots.join(", ")} on this machine yet — nothing to grant yet`,
+      });
+      return;
+    case "granted":
+      checks.push({
+        name: "KB access grant",
+        ok: true,
+        detail: `granted: ${status.roots.join(", ")}`,
+      });
+      return;
   }
-  if (resolutions.length === 0) return; // in-repo KB: nothing lives outside the project root
-
-  const granted = new Set<string>();
-  for (const t of [resolveSettingsTarget({ cwd }), resolveSettingsTarget({ user: true })]) {
-    const r = await readClaudeSettings(t.path).catch(() => null);
-    const dirs = r?.settings?.permissions?.additionalDirectories;
-    if (Array.isArray(dirs)) for (const d of dirs) if (typeof d === "string") granted.add(d);
-  }
-
-  const missing: string[] = [];
-  const mismatched: string[] = [];
-  const absent: string[] = [];
-  for (const [i, resolution] of resolutions.entries()) {
-    if (resolution.reason === "mismatch") {
-      mismatched.push(resolution.detail ?? "hub mismatch");
-      continue;
-    }
-    if (resolution.reason === "absent") {
-      absent.push(targets[i]?.root ?? "the derived hub path");
-      continue;
-    }
-    if (!granted.has(resolution.root as string)) missing.push(resolution.root as string);
-  }
-
-  if (mismatched.length > 0) {
-    checks.push({
-      name: "KB access grant",
-      ok: false,
-      detail: `hub mismatch — never reused, never clobbered: ${mismatched.join("; ")}`,
-    });
-    return;
-  }
-  if (missing.length > 0) {
-    checks.push({
-      name: "KB access grant",
-      ok: false,
-      detail:
-        `the KB lives outside this repo but the harness has no grant for ` +
-        `${missing.join(", ")} — the agent cannot read it; run \`mage connect\``,
-    });
-    return;
-  }
-  if (absent.length > 0) {
-    // Optional-ok is right HERE: a hub that is not cloned yet is recoverable and
-    // `connect` offers to clone it. Whether that absence has ALSO killed this
-    // repo's only KB is the "external hub" check's story, not this one (#158).
-    checks.push({
-      name: "KB access grant",
-      ok: true,
-      optional: true,
-      detail: `no mage hub at ${absent.join(", ")} on this machine yet — nothing to grant yet`,
-    });
-    return;
-  }
-  checks.push({
-    name: "KB access grant",
-    ok: true,
-    detail: `granted: ${resolutions.map((r) => r.root).join(", ")}`,
-  });
 }
 
 /**

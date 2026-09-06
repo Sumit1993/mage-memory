@@ -45,6 +45,7 @@ import {
   redactUrl,
   resolveDocsRoot,
 } from "../../paths.js";
+import { reachGrantStatus } from "../../reach-grant.js";
 import {
   cacheTally,
   cachedTally,
@@ -137,6 +138,8 @@ export async function nudgeCmd(opts: NudgeOptions): Promise<NudgeResult> {
   const resolved = await resolveDocsRoot(abs).catch(() => null);
   if (!resolved) return NONE;
 
+  const grant = await grantNudge(abs).catch(() => null); // fail-open: a broken grant must never break a session
+
   try {
     const session = opts.sessionId && opts.sessionId.trim().length > 0 ? opts.sessionId.trim() : "unknown";
     const footprint = await measureFootprint(resolved.root);
@@ -154,7 +157,34 @@ export async function nudgeCmd(opts: NudgeOptions): Promise<NudgeResult> {
     // Fail open: sampler MUST NOT throw, MUST NOT block, MUST NOT change hook output.
   }
 
-  return await digestNudge(resolved, opts.source, opts.force === true);
+  const r = await digestNudge(resolved, opts.source, opts.force === true);
+  if (!grant) return r;
+  return { ...r, ran: true, notice: joinNotice(grant.notice, r.notice), nudge: composeContext(grant.context, r.nudge ?? "") };
+}
+
+async function grantNudge(cwd: string): Promise<{ notice: string; context: string } | null> {
+  const status = await reachGrantStatus(cwd);
+  switch (status.kind) {
+    case "not-applicable":
+    case "absent":
+    case "granted":
+      return null;
+    case "missing":
+      return {
+        notice: `mage · the harness has no access grant for the knowledge base at ${status.roots.join(", ")} — run \`mage connect\``,
+        context: `This repo's knowledge base lives outside the project root at ${status.roots.join(", ")}, and Claude Code's permissions.additionalDirectories carries no grant for it in either settings scope, so you cannot read a single note. Ask the user to run \`mage connect\` in this repo; that is the only fix. Do NOT run \`mage init\` here: it would mint a SECOND knowledge base.`,
+      };
+    case "mismatch":
+      return {
+        notice: `mage · hub mismatch — never reused, never clobbered: ${status.details.join("; ")}`,
+        context: `The hub this repo points at resolves to a clone of a different remote (${status.details.join("; ")}). mage will not reuse or overwrite it. Ask the user to fix that clone's remote or re-run \`mage link <address>\` here. Do NOT run \`mage init\`.`,
+      };
+  }
+}
+
+function joinNotice(...parts: (string | null | undefined)[]): string | null {
+  const present = parts.filter((p): p is string => typeof p === "string" && p.length > 0);
+  return present.length > 0 ? present.join("\n") : null;
 }
 
 // ─── the digest + backlog nudge (ADR-0029 / ADR-0030) ───────────────────────────
