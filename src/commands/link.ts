@@ -1,6 +1,6 @@
 import { mkdir, readdir } from "node:fs/promises";
 import { basename, dirname } from "node:path";
-import { writeAgentsMd } from "../agents-md.js";
+import { type AgentsMdWriteResult, keptHandEditsWarning, writeAgentsMd } from "../agents-md.js";
 import { getRemoteOriginUrl } from "../git.js";
 import { logger } from "../logger.js";
 import { connect, type ConnectResult } from "./connect.js";
@@ -34,6 +34,8 @@ export interface LinkOptions {
   yes?: boolean;
   /** Wire capture hooks after link (Decision 5). Default true; `--no-connect` sets false. */
   connect?: boolean;
+  /** Force regeneration of AGENTS.md even if it has hand edits. */
+  forceAgentsMd?: boolean;
 }
 
 export interface LinkResult {
@@ -44,6 +46,7 @@ export interface LinkResult {
   hubMetadataAction: "created" | "updated" | "appended-project";
   /** What `connect` wired, when auto-connect ran (Decision 5); absent if skipped. */
   connectResult?: ConnectResult;
+  agentsMd: AgentsMdWriteResult["agents"];
 }
 
 /**
@@ -151,20 +154,37 @@ export async function link(hubPathInput: string, opts: LinkOptions = {}): Promis
   });
 
   // ─── refresh the code-repo AGENTS.md for the resulting shape ───────────
+  let agentsResult: AgentsMdWriteResult;
   if (storage === "hub-owned") {
     // hub-owned = external: the hub owns this project's docs.
     await mkdir(hubProjectDocsRoot(hub, project), { recursive: true });
     logger.success(`Created empty stub: projects/${project}/`);
     // Route this code repo's agents to the hub's per-project entry (ADR-0011 §6).
-    await writeAgentsMd(codeRepo, { kind: "repo", mode: "external", docsRel: "mage", hubPath: hub, project });
-    logger.detail(`Wrote ${codeRepo}/AGENTS.md (external → ${hub}/_index.${project}.md)`);
+    agentsResult = await writeAgentsMd(
+      codeRepo,
+      { kind: "repo", mode: "external", docsRel: "mage", hubPath: hub, project },
+      { force: opts.forceAgentsMd },
+    );
+    if (agentsResult.agents === "kept-hand-edits") {
+      logger.warn(keptHandEditsWarning(agentsResult.path));
+    } else {
+      logger.detail(`Wrote ${codeRepo}/AGENTS.md (external → ${hub}/_index.${project}.md)`);
+    }
   } else {
     // repo-owned = hybrid: the repo keeps its local docs AND registers with this
     // hub. The AGENTS.md was written as a plain in-repo block at `mage init`; refresh
     // it to the hybrid template so agents are told both stores exist (Decision 11A —
     // previously the hybrid block was reachable-by-type but no caller emitted it).
-    await writeAgentsMd(codeRepo, { kind: "repo", mode: "hybrid", docsRel: "mage", hubPath: hub, project });
-    logger.detail(`Refreshed ${codeRepo}/AGENTS.md (hybrid — local KB + hub ref)`);
+    agentsResult = await writeAgentsMd(
+      codeRepo,
+      { kind: "repo", mode: "hybrid", docsRel: "mage", hubPath: hub, project },
+      { force: opts.forceAgentsMd },
+    );
+    if (agentsResult.agents === "kept-hand-edits") {
+      logger.warn(keptHandEditsWarning(agentsResult.path));
+    } else {
+      logger.detail(`Refreshed ${codeRepo}/AGENTS.md (hybrid — local KB + hub ref)`);
+    }
   }
 
   // ─── write/update code-repo-side metadata ──────────────────────────────
@@ -210,7 +230,7 @@ export async function link(hubPathInput: string, opts: LinkOptions = {}): Promis
     }
   }
 
-  return { codeRepo, hub, project, storage, hubMetadataAction, connectResult };
+  return { codeRepo, hub, project, storage, hubMetadataAction, connectResult, agentsMd: agentsResult.agents };
 }
 
 // ─── hub-side metadata upsert ───────────────────────────────────────────
