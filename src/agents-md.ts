@@ -22,6 +22,19 @@ export function keptHandEditsWarning(path: string): string {
   return `${path}: the mage block between <!-- BEGIN mage --> and <!-- END mage --> ${KEPT_HAND_EDITS_MARKER}. Re-run with --force-agents-md to regenerate it (your edits in the block will be lost).`;
 }
 
+export const KEPT_UNSTAMPED_MARKER = "predates hash stamps and was left as is";
+
+export function keptUnstampedWarning(path: string): string {
+  return `${path}: the mage block between <!-- BEGIN mage --> and <!-- END mage --> ${KEPT_UNSTAMPED_MARKER}. mage cannot tell whether you edited it. Re-run with --force-agents-md once to regenerate it (any edits inside the block are lost); the regenerated block is stamped and refreshes on its own from then on.`;
+}
+
+/** The warning to print for a kept block, or null when nothing was kept. */
+export function keptWarning(result: AgentsMdWriteResult): string | null {
+  if (result.agents === "kept-hand-edits") return keptHandEditsWarning(result.path);
+  if (result.agents === "kept-unstamped") return keptUnstampedWarning(result.path);
+  return null;
+}
+
 export function blockHash(body: string): string {
   return createHash("sha256").update(body).digest("hex").slice(0, 12);
 }
@@ -90,8 +103,13 @@ export interface HubAgentsMd {
 export type AgentsMdOptions = RepoAgentsMd | HubAgentsMd;
 
 export interface AgentsMdWriteResult {
-  /** What happened to AGENTS.md. `kept-hand-edits`: the block on disk was edited by hand and was left alone. */
-  agents: "created" | "written" | "unchanged" | "kept-hand-edits";
+  /** What happened to AGENTS.md. `kept-hand-edits`: the block on disk was edited by hand and was left alone. `kept-unstamped`: the block has no hash stamp and differs from the template, so it may or may not be hand-edited; left alone. */
+  agents:
+    | "created"
+    | "written"
+    | "unchanged"
+    | "kept-hand-edits"
+    | "kept-unstamped";
   /** Absolute path of the AGENTS.md examined. */
   path: string;
 }
@@ -277,7 +295,7 @@ async function upsertAgentsFile(
     return "written";
   }
 
-  return "kept-hand-edits";
+  return onDiskStamp === null ? "kept-unstamped" : "kept-hand-edits";
 }
 
 async function ensureClaudeImport(path: string): Promise<void> {

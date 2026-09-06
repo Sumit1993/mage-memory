@@ -315,7 +315,7 @@ const RETIRED_SKILL_TOKENS = [
  * Recall readiness: the mage-owned AGENTS.md block must not steer the agent at retired
  * command names. The 2026-07-02 soak found prismalens's block still saying `/mage-learn`
  * (now `mage:learn`), so the agent invoked a command that no longer exists. Advisory —
- * re-run `mage link`/`mage init` to refresh. (A full template-drift compare rides the
+ * re-run `mage link --force-agents-md`/`mage init --force-agents-md` to refresh (edits inside the block are lost). (A full template-drift compare rides the
  * version-stamp enabler; see plan-readiness-doctor.) Fail-open on a missing/unreadable file.
  */
 async function pushAgentsBlockCheck(checks: DoctorCheck[], opts: DoctorOptions): Promise<void> {
@@ -338,7 +338,7 @@ async function pushAgentsBlockCheck(checks: DoctorCheck[], opts: DoctorOptions):
           name: "AGENTS.md awareness",
           ok: false,
           optional: true,
-          detail: `STALE — block uses retired command name(s) ${retired.join(", ")} → re-run \`mage link\`/\`mage init\` to refresh`,
+          detail: `STALE — block uses retired command name(s) ${retired.join(", ")} → re-run \`mage link --force-agents-md\`/\`mage init --force-agents-md\` to refresh (edits inside the block are lost)`,
         },
   );
 }

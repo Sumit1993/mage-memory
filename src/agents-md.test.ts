@@ -2,7 +2,15 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { tmpDir } from "../test/fixtures/kb.js";
-import { KEPT_HAND_EDITS_MARKER, blockHash, keptHandEditsWarning, writeAgentsMd } from "./agents-md.js";
+import {
+  KEPT_HAND_EDITS_MARKER,
+  KEPT_UNSTAMPED_MARKER,
+  blockHash,
+  keptHandEditsWarning,
+  keptUnstampedWarning,
+  keptWarning,
+  writeAgentsMd,
+} from "./agents-md.js";
 
 const BEGIN = "<!-- BEGIN mage -->";
 const END = "<!-- END mage -->";
@@ -192,6 +200,51 @@ describe("writeAgentsMd — KB shape blocks (kind repo/hub · mode in-repo/hybri
     expect(r2.agents).toBe("unchanged");
   });
 
+  it("a legacy unstamped block whose body differs is kept and reports kept-unstamped", async () => {
+    const repo = await tmpDir();
+    const opts = {
+      kind: "repo" as const,
+      mode: "external" as const,
+      docsRel: "mage",
+      hubPath: "/abs/hub",
+      project: "engine",
+    };
+    await writeAgentsMd(repo, opts);
+    const withStamp = await readAgents(repo);
+    const stripped = withStamp.replace(/^<!-- mage-block-hash: [0-9a-f]{12} -->\n/m, "");
+    const legacy = stripped.replace("mage:groom", "/mage-groom");
+    expect(legacy).not.toBe(withStamp);
+    await writeFile(join(repo, "AGENTS.md"), legacy);
+    const r = await writeAgentsMd(repo, opts);
+    expect(r.agents).toBe("kept-unstamped");
+    const current = await readAgents(repo);
+    expect(current).toBe(legacy);
+  });
+
+  it("force regenerates a legacy unstamped block and stamps it", async () => {
+    const repo = await tmpDir();
+    const opts = {
+      kind: "repo" as const,
+      mode: "external" as const,
+      docsRel: "mage",
+      hubPath: "/abs/hub",
+      project: "engine",
+    };
+    await writeAgentsMd(repo, opts);
+    const withStamp = await readAgents(repo);
+    const stripped = withStamp.replace(/^<!-- mage-block-hash: [0-9a-f]{12} -->\n/m, "");
+    const legacy = stripped.replace("mage:groom", "/mage-groom");
+    expect(legacy).not.toBe(withStamp);
+    await writeFile(join(repo, "AGENTS.md"), legacy);
+    const r1 = await writeAgentsMd(repo, opts, { force: true });
+    expect(r1.agents).toBe("written");
+    const afterForce = await readAgents(repo);
+    expect(afterForce).toContain("<!-- mage-block-hash: ");
+    expect(afterForce).not.toContain("/mage-groom");
+    const r2 = await writeAgentsMd(repo, opts);
+    expect(r2.agents).toBe("unchanged");
+  });
+
   it("an orphaned BEGIN with text after it is kept unless forced", async () => {
     const repo = await tmpDir();
     const content = `# AGENTS.md\n\n<!-- BEGIN mage -->\nhand text\n`;
@@ -221,6 +274,14 @@ describe("writeAgentsMd — KB shape blocks (kind repo/hub · mode in-repo/hybri
     expect(msg).toContain(KEPT_HAND_EDITS_MARKER);
     expect(msg).toBe(
       "/some/path/AGENTS.md: the mage block between <!-- BEGIN mage --> and <!-- END mage --> has hand edits and was left as is. Re-run with --force-agents-md to regenerate it (your edits in the block will be lost).",
+    );
+    expect(KEPT_UNSTAMPED_MARKER).toBe("predates hash stamps and was left as is");
+    expect(keptUnstampedWarning("/some/path/AGENTS.md")).toBe(
+      "/some/path/AGENTS.md: the mage block between <!-- BEGIN mage --> and <!-- END mage --> predates hash stamps and was left as is. mage cannot tell whether you edited it. Re-run with --force-agents-md once to regenerate it (any edits inside the block are lost); the regenerated block is stamped and refreshes on its own from then on.",
+    );
+    expect(keptWarning({ agents: "unchanged", path: "/p" })).toBeNull();
+    expect(keptWarning({ agents: "kept-unstamped", path: "/p" })).toBe(
+      keptUnstampedWarning("/p"),
     );
   });
 });

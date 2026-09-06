@@ -1,6 +1,6 @@
 import { mkdir, readdir } from "node:fs/promises";
 import { basename, dirname } from "node:path";
-import { type AgentsMdWriteResult, keptHandEditsWarning, writeAgentsMd } from "../agents-md.js";
+import { type AgentsMdWriteResult, keptWarning, writeAgentsMd } from "../agents-md.js";
 import { getRemoteOriginUrl } from "../git.js";
 import { logger } from "../logger.js";
 import { connect, type ConnectResult } from "./connect.js";
@@ -165,8 +165,9 @@ export async function link(hubPathInput: string, opts: LinkOptions = {}): Promis
       { kind: "repo", mode: "external", docsRel: "mage", hubPath: hub, project },
       { force: opts.forceAgentsMd },
     );
-    if (agentsResult.agents === "kept-hand-edits") {
-      logger.warn(keptHandEditsWarning(agentsResult.path));
+    const kept = keptWarning(agentsResult);
+    if (kept) {
+      logger.warn(kept);
     } else {
       logger.detail(`Wrote ${codeRepo}/AGENTS.md (external → ${hub}/_index.${project}.md)`);
     }
@@ -180,8 +181,9 @@ export async function link(hubPathInput: string, opts: LinkOptions = {}): Promis
       { kind: "repo", mode: "hybrid", docsRel: "mage", hubPath: hub, project },
       { force: opts.forceAgentsMd },
     );
-    if (agentsResult.agents === "kept-hand-edits") {
-      logger.warn(keptHandEditsWarning(agentsResult.path));
+    const kept = keptWarning(agentsResult);
+    if (kept) {
+      logger.warn(kept);
     } else {
       logger.detail(`Refreshed ${codeRepo}/AGENTS.md (hybrid — local KB + hub ref)`);
     }
