@@ -17,7 +17,6 @@ async function hub(names: string[]): Promise<string> {
     projects: names.map((name) => ({
       name,
       storage: "hub-owned",
-      code_repo_path: "",
       code_repo_url: "",
     })),
   });

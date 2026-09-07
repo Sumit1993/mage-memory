@@ -227,11 +227,10 @@ async function upsertHubProject(
   hub: string,
   args: UpsertHubProjectArgs,
 ): Promise<{ hubMeta: HubMetadata; hubMetadataAction: LinkResult["hubMetadataAction"] }> {
-  const codeRepoUrl = (await getRemoteOriginUrl(args.codeRepo)) ?? args.codeRepo;
+  const codeRepoUrl = (await getRemoteOriginUrl(args.codeRepo)) ?? "";
   const newEntry: HubProject = {
     name: args.project,
     storage: args.storage,
-    code_repo_path: args.codeRepo,
     code_repo_url: codeRepoUrl,
   };
 

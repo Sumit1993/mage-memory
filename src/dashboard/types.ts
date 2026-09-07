@@ -190,10 +190,6 @@ export interface DashboardRegistryEntry {
   name: string;
   /** The member's code-repo URL (empty string when unknown). */
   repoUrl: string;
-  /** The member's local code-repo path. */
-  codePath: string;
-  /** True iff that local path currently exists on disk (a cheap presence check). */
-  cloned: boolean;
 }
 
 /**

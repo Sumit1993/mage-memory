@@ -35,7 +35,6 @@ import { readNote, type NoteFrontmatter } from "../note.js";
 import {
   type HubMetadata,
   type HubProject,
-  exists,
   learningsPath,
   readHubMetadata,
 } from "../paths.js";
@@ -487,20 +486,15 @@ async function readHubMetadataSafe(root: string): Promise<HubMetadata | null> {
 }
 
 /**
- * Build the hub registry-pointer rows (ADR-0020 §4) — names, repo URLs, local
- * code paths, and a cheap `cloned` presence check. POINTERS only; never remote
- * content. Empty when there's no hub metadata.
+ * Build the hub registry-pointer rows (ADR-0020 §4) — names and repo URLs.
+ * POINTERS only; never remote content. Empty when there's no hub metadata.
  */
 async function buildRegistry(hubMeta: HubMetadata | null): Promise<DashboardRegistryEntry[]> {
   const projects: HubProject[] = hubMeta?.projects ?? [];
-  const rows = await Promise.all(
-    projects.map(async (p) => ({
-      name: p.name,
-      repoUrl: p.code_repo_url ?? "",
-      codePath: p.code_repo_path ?? "",
-      cloned: p.code_repo_path ? await exists(p.code_repo_path) : false,
-    })),
-  );
+  const rows: DashboardRegistryEntry[] = projects.map((p) => ({
+    name: p.name,
+    repoUrl: p.code_repo_url ?? "",
+  }));
   return rows.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
 }
 
