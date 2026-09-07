@@ -108,6 +108,16 @@ Two design rules matter for trust:
 - **Capture rides the host, with no runtime daemon.** There is no separate process
   to start, supervise, or leak. The hooks are the entire runtime surface.
 
+### Guard events
+
+Hooks that block or rewrite tool calls, such as claude-kit guards, can pipe a guard event directly to `mage observe` on stdin:
+
+```text
+$ echo '{"guard_id":"kit/guard/no-haiku","tool":"Agent","detail":"model=haiku"}' | mage observe
+```
+
+The event is admitted by the presence of a `guard_id` key or by specifying `--event guard_fired`. It validates the `<scope>/guard/<slug>` format, scrubs any detail string, and appends a single `guard_fired` event to the scratch.
+
 ## The boundary nudge
 
 The one capture-adjacent hook that does more than append is
