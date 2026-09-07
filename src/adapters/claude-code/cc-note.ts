@@ -45,6 +45,9 @@ const MAGE_KEY_ORDER = [
   "keywords",
 ] as const;
 
+/** The same keys, as a lookup set — a mage field found under `metadata` is contamination. */
+const MAGE_FRONTMATTER_KEYS = new Set<string>(MAGE_KEY_ORDER);
+
 /** A CC native-memory note's frontmatter (either on-disk shape — raw native or post-renorm). */
 export interface CcFrontmatter extends NoteFrontmatter {
   /** kebab slug (raw native) or "" (post-renormalization, blanked by CC). */
@@ -99,14 +102,23 @@ export function deKebab(name: string): string {
 }
 
 /**
- * True iff this frontmatter is a Claude Code capture — i.e. it carries CC's
- * `metadata.node_type: memory` discriminator. A hand-authored mage note (no nested
- * `metadata`) NEVER matches. The single CC-capture gate, shared by the inbox ingest,
- * the durable-boundary flatten, and dream's restamp-skip.
+ * True iff this frontmatter is a Claude Code capture — i.e. it carries CC's restamp
+ * shape: a `metadata` wrapper burying mage's own frontmatter. Keys on the SHAPE of the
+ * contamination, not on `metadata.node_type: memory` alone — the harness has stopped
+ * sending that discriminator on some captures while still nesting everything else under
+ * `metadata`, and a predicate that required it went dark on exactly those files. True
+ * when `metadata` is a non-null, non-array object AND either it still carries
+ * `node_type: memory` (the old signal, still honoured) or it carries at least one key
+ * mage itself writes (see {@link MAGE_KEY_ORDER}) — never on a bare `name`/`description`
+ * pair, which a hand-authored note could legitimately carry. A hand-authored mage note
+ * (no nested `metadata`) NEVER matches. The single CC-capture gate, shared by the inbox
+ * ingest, the durable-boundary flatten, and dream's restamp-skip.
  */
 export function isCcShaped(fm: NoteFrontmatter): boolean {
   const meta = (fm as CcFrontmatter).metadata;
-  return !!meta && typeof meta === "object" && meta.node_type === CC_MEMORY_NODE_TYPE;
+  if (!meta || typeof meta !== "object" || Array.isArray(meta)) return false;
+  if (meta.node_type === CC_MEMORY_NODE_TYPE) return true;
+  return Object.keys(meta).some((k) => MAGE_FRONTMATTER_KEYS.has(k));
 }
 
 // ─── capture identity (dedup key; the SCOPE — within-run vs cross-run — is the caller's) ──
@@ -142,15 +154,26 @@ export function captureKey(sessionId: string, slug: string): string {
   return `${sessionId}::${slug}`;
 }
 
-/** Merge an existing `sources` array with a `cc-session:<id>` pointer, de-duped, order-stable. */
-export function mergeCcSource(existing: unknown, sessionId: string | undefined): string[] | undefined {
-  const out: string[] = [];
+/**
+ * Merge an existing `sources` array with a `cc-session:<id>` pointer, de-duped,
+ * order-stable. A `sources` entry mage does not recognise (an object form, e.g.
+ * `{ issue: "org/repo#1" }`) is carried through unchanged, in its original position —
+ * this runs unattended in a Stop hook and in pre-commit, so dropping what it does not
+ * understand is worse than passing it through untouched (#199). Only `null`/`undefined`
+ * are dropped, since they carry nothing. Non-string entries dedupe on a stable
+ * serialisation rather than object identity, so two structurally identical entries fold
+ * to one.
+ */
+export function mergeCcSource(existing: unknown, sessionId: string | undefined): unknown[] | undefined {
+  const out: unknown[] = [];
   const seen = new Set<string>();
   const push = (s: unknown) => {
-    if (typeof s === "string" && s.length > 0 && !seen.has(s)) {
-      seen.add(s);
-      out.push(s);
-    }
+    if (s === null || s === undefined) return;
+    if (typeof s === "string" && s.length === 0) return;
+    const key = typeof s === "string" ? s : JSON.stringify(s);
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(s);
   };
   if (Array.isArray(existing)) for (const s of existing) push(s);
   if (sessionId) push(ccSource(sessionId));
@@ -212,7 +235,7 @@ export function recoverCcFrontmatter(fm: NoteFrontmatter): {
   if (status !== undefined) out.status = status as NoteFrontmatter["status"];
   const provenance = recover("provenance");
   if (provenance !== undefined) out.provenance = provenance as NoteFrontmatter["provenance"];
-  if (sources) out.sources = sources;
+  if (sources) out.sources = sources as NoteFrontmatter["sources"];
   const keywords = recover("keywords");
   if (keywords !== undefined) out.keywords = keywords as string[];
 

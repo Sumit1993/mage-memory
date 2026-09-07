@@ -6,6 +6,7 @@ import {
   deKebab,
   isCcShaped,
   mapType,
+  mergeCcSource,
   recoverCcFrontmatter,
   rewriteWikilinks,
 } from "./cc-note.js";
@@ -63,6 +64,28 @@ describe("isCcShaped", () => {
     expect(isCcShaped({ metadata: { node_type: "other" } } as never)).toBe(false);
     expect(isCcShaped({} as never)).toBe(false);
   });
+  it("matches the real contaminated shape — metadata carries a mage field, no node_type (#200)", () => {
+    expect(
+      isCcShaped({ name: "x", description: "y", metadata: { type: "feedback" } } as never),
+    ).toBe(true);
+  });
+  it("rejects a hand-authored mage note with flat frontmatter and no metadata", () => {
+    expect(isCcShaped({ type: "feedback", tags: ["mage/x"] } as never)).toBe(false);
+  });
+  it("rejects a non-object, null, or array metadata", () => {
+    expect(isCcShaped({ metadata: null } as never)).toBe(false);
+    expect(isCcShaped({ metadata: [] } as never)).toBe(false);
+    expect(isCcShaped({ metadata: "x" } as never)).toBe(false);
+  });
+  it("rejects a bare name/description with no metadata wrapper — a note can legitimately carry those", () => {
+    expect(isCcShaped({ name: "x", description: "y" } as never)).toBe(false);
+  });
+  it("round-trips the real contaminated frontmatter to exactly {type: feedback}", () => {
+    const fm = { name: "x", description: "y", metadata: { type: "feedback" } } as never;
+    expect(isCcShaped(fm)).toBe(true);
+    const { frontmatter } = recoverCcFrontmatter(fm);
+    expect(frontmatter).toEqual({ type: "feedback" });
+  });
 });
 
 describe("capture identity", () => {
@@ -76,6 +99,33 @@ describe("capture identity", () => {
   });
   it("captureKey pairs session AND slug (never session alone)", () => {
     expect(captureKey("abc", "my-note")).toBe("abc::my-note");
+  });
+});
+
+describe("mergeCcSource", () => {
+  it("carries an object-form entry through unchanged (#199)", () => {
+    expect(mergeCcSource([{ issue: "prismalens/prismalens#244" }], undefined)).toEqual([
+      { issue: "prismalens/prismalens#244" },
+    ]);
+  });
+  it("keeps mixed string and object entries in their original relative order", () => {
+    const existing = ["url:x", { issue: "a#1" }, "url:y"];
+    expect(mergeCcSource(existing, undefined)).toEqual(["url:x", { issue: "a#1" }, "url:y"]);
+  });
+  it("dedupes two structurally identical object entries to one", () => {
+    const existing = [{ issue: "a#1" }, { issue: "a#1" }];
+    expect(mergeCcSource(existing, undefined)).toEqual([{ issue: "a#1" }]);
+  });
+  it("drops null and undefined entries", () => {
+    expect(mergeCcSource(["url:x", null, undefined, "url:y"], undefined)).toEqual([
+      "url:x",
+      "url:y",
+    ]);
+  });
+  it("still dedupes strings and appends the cc-session: entry last, unchanged from before", () => {
+    expect(mergeCcSource(["url:x", "url:x"], "s1")).toEqual(["url:x", "cc-session:s1"]);
+    expect(mergeCcSource(undefined, "s1")).toEqual(["cc-session:s1"]);
+    expect(mergeCcSource([], undefined)).toBeUndefined();
   });
 });
 

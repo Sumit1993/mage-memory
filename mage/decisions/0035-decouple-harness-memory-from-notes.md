@@ -158,3 +158,11 @@ Whether a guard is a file is unruled ([#249](https://github.com/Sumit1993/mage-m
 
 Both checks execute in report mode during `mage index` and exit 0 until backfills in [#213](https://github.com/Sumit1993/mage-memory/issues/213) and [#214](https://github.com/Sumit1993/mage-memory/issues/214) populate the fields across existing notes.
 
+## Amendment (2026-09-07) - the detector keys on the metadata wrapper, not on node_type
+
+`isCcShaped`, the predicate flatten uses to find CC-contaminated notes, required `metadata.node_type: memory`. The harness stopped sending that field on some captures while still burying mage's frontmatter under `metadata` and adding `name` and `description`. The predicate returned false on every one of those files, so `flatten --all` printed nothing and exited 0, which reads exactly like a clean knowledge base ([#200](https://github.com/Sumit1993/mage-memory/issues/200)).
+
+The predicate now keys on the shape of the contamination: `metadata` is a non-null, non-array object, and it carries either `node_type: memory` (still honoured) or at least one key mage itself writes to frontmatter (`type`, `tags`, `created`, `updated`, `last_reviewed`, `status`, `provenance`, `sources`, `keywords`). A bare `name`/`description` pair with no `metadata` wrapper is not enough on its own, since a hand-authored note can legitimately carry those.
+
+Separately, `mergeCcSource` (part of the same recovery path) dropped any `sources` entry that was not a plain string, such as an object-form `{ issue: "org/repo#1" }` ([#199](https://github.com/Sumit1993/mage-memory/issues/199)). It now carries non-string entries through unchanged, in their original position, and dedupes them on a stable serialisation instead of dropping them. `null` and `undefined` entries are still dropped, since they carry nothing. Preserving rather than failing was the deliberate choice: flatten runs unattended in a Stop hook and in pre-commit, so refusing to normalise a whole knowledge base over one unfamiliar entry would be worse than the original bug.
+
