@@ -321,3 +321,11 @@ so it must:
 - relates_to [ADR-0031 — programmatic provenance stamp](0031-programmatic-provenance-stamp.md)
 - extends [ADR-0006 — two-layer recall](0006-two-layer-recall-per-wing-skills.md)
 - companion [ADR-0033 — recall via the host's auto-loaded index](0033-recall-import-bounded-index.md)
+
+## Amendment (2026-09-07): note admission check on writes under the notes folder
+
+The Gate-0 PreToolUse hook now inspects writes and edits directed to the notes folder. A note is admitted only when its frontmatter carries the four admission fields: `rung`, `skipped`, `trigger`, and `pointer` ([#229](https://github.com/Sumit1993/mage-memory/issues/229), [#231](https://github.com/Sumit1993/mage-memory/issues/231)). The `id` field validated during indexing is omitted here.
+
+When any of the four fields is missing or invalid, the hook denies the write once per session using an eight-line plain-text response that names the higher rungs and asks for a proposal or a rewrite. Subsequent attempts on the same target within the same session are not denied again. Nothing in the codebase yet marks a file as a proposal, so no such file is exempted; the gate is the notes folder alone.
+
+The case where the host itself rewrites the file after the write is deliberately left to [#200](https://github.com/Sumit1993/mage-memory/issues/200).
