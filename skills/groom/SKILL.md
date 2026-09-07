@@ -3,8 +3,8 @@ name: groom
 description: |
   Groom mage's own observed scratch (`.mage/learnings/*.jsonl`) into durable notes —
   the judgment tier of the self-grooming loop. Runs the two deterministic engines
-  in sequence: `mage distill` (FIRST SIGHT — a striking insight earns a note the
-  first time it is seen) then `mage promote` (GRADUATION — fold note-read usage
+  in sequence: `mage groom` (FIRST SIGHT — a striking insight earns a note the
+  first time it is seen) then `mage groom` (GRADUATION — fold note-read usage
   into proposals for proven notes to become auto-loadable skills).
   Fires at session boundaries, after a PreCompact, or when the user says
   "groom", "distill", "promote", "mine the learnings", or "what did we learn".
@@ -26,14 +26,14 @@ model lives in mage** (ADR-0009). The engines count and cluster; you decide what
 is note-worthy. They run in sequence, catching durable knowledge through two
 complementary gates:
 
-- **Phase 1 — first sight (`mage distill`)** — a single vivid finding earns a
+- **Phase 1 — first sight (`mage groom`)** — a single vivid finding earns a
   note the *first* time it is seen.
-- **Phase 2 — graduation routing (`mage promote`)** — a note already proven by
+- **Phase 2 — graduation routing (`mage groom`)** — a note already proven by
   recurrence is routed to `/mage:graduate`. It does **not** propose new notes
   (ADR-0038); Phase 1 and `/mage:learn` are the only paths into the note base.
 
 **Phase 0 — pending inline drafts (`mage groom`, 0.0.12).** Before the two mining
-phases, dispose of lessons captured INLINE during work. `mage stage` parks short,
+phases, dispose of lessons captured INLINE during work. `mage observe` parks short,
 redacted drafts in `.mage/staging/` with no per-note confirm (and the boundary nudge
 distills forgotten ones there too); your job is the batch human-confirm:
 
@@ -124,11 +124,11 @@ groom just the hub root and skip the fan-out.
 
 ---
 
-## Phase 1 — first sight (`mage distill`)
+## Phase 1 — first sight (`mage groom`)
 
 1. **Run the deterministic reader.**
    ```bash
-   mage distill --json
+   mage groom --json
    ```
    It reads mage's own `.mage/learnings/*.jsonl` from the **last watermark forward**,
    chops un-distilled events at `compact`/session boundaries (the natural
@@ -172,7 +172,7 @@ groom just the hub root and skip the fan-out.
 
 4. **Advance the Phase-1 watermark — only after the human dispositions the batch.**
    ```bash
-   mage distill --seen <session>:<offset>   # one per session, from manifest.cursors
+   mage groom --seen <session>:<offset>   # one per session, from manifest.cursors
    ```
    This moves mage's per-session bookmark **past everything the human just
    reviewed** — kept notes *and* skipped clusters (advancing past a skip is
@@ -184,7 +184,7 @@ groom just the hub root and skip the fan-out.
 
 ---
 
-## Phase 2 — route proven notes to graduation (`mage promote`)
+## Phase 2 — route proven notes to graduation (`mage groom`)
 
 Phase 1 captures first sight. **Phase 2 is no longer a catch-net.**
 
@@ -198,7 +198,7 @@ go looking for missed lessons in recurrence counts; there is nothing there.
 
 5. **Run the deterministic reader.**
    ```bash
-   mage promote --json
+   mage groom --json
    ```
    It folds every CLOSED `.mage/learnings/` segment from the last watermark forward,
    persists the tally, and emits a `PromoteManifest`:

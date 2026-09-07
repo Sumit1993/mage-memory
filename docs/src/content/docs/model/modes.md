@@ -238,8 +238,8 @@ $ mage doctor
 ✓ KB access grant     : granted: ~/.mage/hubs/github.com/acme/my-hub
 ```
 
-The other interactive commands say the same thing in their own voice — `mage
-skills` and `mage dashboard` refuse with that message rather than the generic
+The other interactive commands say the same thing in their own voice: `mage
+index` refuses with that message rather than the generic
 "no knowledge base found", `mage connect` says why it skipped the commandeer
 tier, and `mage adopt` reports such an origin as `origin-hub-unreachable`
 rather than `origin-has-no-kb`.

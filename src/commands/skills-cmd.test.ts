@@ -4,6 +4,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { tmpDir } from "../../test/fixtures/kb.js";
 import { init } from "./init.js";
 import { skills } from "./skills-cmd.js";
+import { buildProgram } from "../cli-program.js";
+import { RETIRED_VERB_MESSAGES } from "./retired.js";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -503,5 +505,23 @@ describe("mage skills — an unreachable external hub is not a missing KB (#158)
     await expect(skills({ dir: code })).rejects.toThrow(/external mode/);
     await expect(skills({ dir: code })).rejects.toThrow(/mage connect/);
     await expect(skills({ dir: code })).rejects.toThrow(/Do NOT run `mage init`/);
+  });
+});
+
+describe("mage skills signpost", () => {
+  it("prints that skills has retired and exits 0", async () => {
+    const program = buildProgram();
+    program.exitOverride();
+    const lines: string[] = [];
+    const origLog = console.log;
+    console.log = (...msgs: unknown[]) => {
+      lines.push(msgs.map((m) => String(m)).join(" "));
+    };
+    try {
+      await program.parseAsync(["skills"], { from: "user" });
+      expect(lines.join("\n")).toBe(RETIRED_VERB_MESSAGES.skills);
+    } finally {
+      console.log = origLog;
+    }
   });
 });

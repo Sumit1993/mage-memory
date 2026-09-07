@@ -7,7 +7,7 @@ sidebar:
 
 The [lesson path](./stage-groom.md) catches what is striking the *first* time you see it. The **graduation path** catches the opposite: lessons that have proven themselves through continued usage. A deterministic engine counts that usage; you judge what is worth graduating.
 
-While the command is still named `mage promote` for historical reasons, it now exclusively drives **graduation** — when a proven procedural note earns its own auto-loadable skill. (An older version of this path used to propose new notes based on keyword recurrence; that was deleted in ADR-0038 because deterministic note-selection proved too noisy.)
+Procedure skill proposals are reviewed and applied through `mage groom`. (An older version of this path used to propose new notes based on keyword recurrence; that was deleted in ADR-0038 because deterministic note-selection proved too noisy.)
 
 ## It counts chapters, not sessions
 
@@ -25,7 +25,7 @@ Graduation is driven by the `/mage:graduate` skill. It reads the deterministic e
 
 ```bash
 # (Plumbing the /mage:graduate skill runs for you.) Surface graduate candidates:
-mage promote --json
+mage groom --json
 ```
 
 ### A worked example
@@ -62,7 +62,7 @@ The two `SKILL.md` files are the minted skill, written into both skill directori
 
 ## Note-read usage gates graduation
 
-Be precise about what gates what. **Note-read usage** (the M chapter counts) gates graduation. A not-yet-graduated note loads no skill, so the only usage signal available is how often the agent independently reaches for the note's markdown file while working. The deterministic engine (`mage promote`) counts those distinct reads.
+Be precise about what gates what. **Note-read usage** (the M chapter counts) gates graduation. A not-yet-graduated note loads no skill, so the only usage signal available is how often the agent independently reaches for the note's markdown file while working. The deterministic engine (`mage groom`) counts those distinct reads.
 
 Context-match is a *different* signal that only exists *after* a skill graduates, and it governs reword and demote — never graduation. That is the next page: [Optimize](./optimize.md).
 

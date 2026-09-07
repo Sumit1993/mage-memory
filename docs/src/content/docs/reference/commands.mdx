@@ -7,8 +7,8 @@ sidebar:
 
 import CommandsTable from '../../../components/CommandsTable.astro';
 
-The `mage` CLI is one binary with two audiences. There are **verbs you type** —
-`init`, `connect`, `skills`, `dream`, `dashboard`, and friends — and there is
+The `mage` CLI is one binary with two audiences. There are **verbs you type** (such as
+`init`, `connect`, `index`, `doctor`, `dream`) and there is
 **hidden plumbing** that mage's hooks and `mage:*` skills run for you. You never
 type the plumbing by hand; it is listed below for transparency so you can see
 exactly what the machinery does on your behalf.
@@ -39,9 +39,9 @@ The `mage` binary above is only part of the surface — there are agent skills t
 | `/mage:graduate` | elevate a proven procedural note into a loadable skill |
 | `/mage:optimize` | sharpen a skill's trigger — reword or demote weak ones |
 
-**B · CLI commands you type** — the terminal verbs for setup and housekeeping that doesn't belong inside the agent (`init`, `link`, `connect`, `doctor`, `dashboard`, `dream`, and friends). The rest of this page is their reference.
+**B · CLI commands you type** — the terminal verbs for setup and housekeeping that doesn't belong inside the agent (`init`, `link`, `connect`, `index`, `doctor`, `dream`, and friends). The rest of this page is their reference.
 
-**C · Plumbing** — hidden CLI verbs you never type by hand (`observe`, `distill`, `promote`, `stage`, `nudge`, `memory-hook`, `redact`, `ingest`, `flatten`, and friends). A skill or a host hook runs them for you; the complete, generated set is in [the full inventory](#the-full-inventory) — that table, not this list, is the authoritative roster.
+**C · Plumbing** — hidden CLI verbs you never type by hand (`observe`, `groom`, `nudge`, `memory-hook`, `redact`, `flatten`, and friends). A skill or a host hook runs them for you; the complete, generated set is in [the full inventory](#the-full-inventory) — that table, not this list, is the authoritative roster.
 
 **The rhythm:** skills (A) when you curate · CLI (B) at setup and check-ups · plumbing (C) never by hand. **The one hybrid:** `groom` is both the `/mage:groom` skill (what you use) and a hidden `mage groom` CLI verb (what the skill calls) — every other name is cleanly one channel.
 
@@ -49,7 +49,7 @@ The `mage` binary above is only part of the surface — there are agent skills t
 flowchart LR
   setup["set up — CLI<br/>init · link · connect"] --> work["work — automatic<br/>observe · Gate-0 · nudge"]
   work --> curate["curate — skills<br/>/mage:groom · /mage:learn"]
-  curate --> health["check up — CLI<br/>doctor · dashboard · dream"]
+  curate --> health["check up — CLI<br/>doctor · index · dream"]
   health --> work
 ```
 
@@ -133,37 +133,30 @@ distinct failing check when the clone found at the derived location doesn't matc
 `hub_repo`'s origin (a hard error, never silently reused). See
 [Modes and storage](../model/modes.md#where-a-hub-actually-lives--derived-not-recorded).
 
-## Regenerating the index and skills
+## Regenerating the index and navigation skills
 
 Two generated artifacts keep agents oriented. `mage index` rebuilds both recall
-surfaces — `mage/INDEX.md`, the full one-line-per-note index of every
+surfaces: `mage/INDEX.md`, the full one-line-per-note index of every
 **memory-genre** note, and `mage/MEMORY.md`, the ranked, budget-bounded roster
-the host pushes at session launch (idempotent — never hand-edit either output;
+the host pushes at session launch (idempotent; never hand-edit either output;
 see [The two recall surfaces](../model/graph.md#the-two-recall-surfaces)).
-`mage skills` regenerates the **per-wing `mage-wing-*` skills** — one
-auto-loaded skill per wing, into `.claude/skills/` and `.agents/skills/` — so agents
-discover your knowledge base.
+Generating navigation skills is folded into `index` (`mage skills` has retired).
 
-There are two classes of generated skill, and only one of them is `mage skills`'
-business:
+There are two classes of generated skill:
 
-- **Per-wing skills (`mage-wing-*`)** are *derived from your notes*, exactly like
-  the index. `mage skills` is their writer; re-running it rebuilds them from the
-  current wings, deterministically.
+- **Per-wing skills (`mage-wing-*`)** are derived from notes, exactly like
+  the index. `mage index` is their writer; re-running it rebuilds them
+  deterministically.
 - **Graduated skills (`mage-skill-*`)** come out of the grooming loop, when a
   proven procedural note earns its own skill. `mage dream --apply` is the
   **single writer** that mints those, and the ceilings it enforces are the reason
-  it is the only one. `mage skills` never creates, edits, or deletes a graduated
-  skill. See [Promote and graduate](../loop/promote-graduate.md).
+  it is the only one. See [Promote and graduate](../loop/promote-graduate.md).
 
-Each generated wing skill includes a "Governing decisions" section listing the accepted, non-superseded decision records (ADRs) that the wing's **memory-genre** notes link to — per-ADR recall rides linking memories, so an ADR reachable only from another ADR's Relations list does not govern (ADR-0041 §4). The section is capped at the 12 most recent decisions, with the remainder folded into one "…and N more in decisions/" line; the recall/footprint ceilings stay as a whole-file backstop (use `mage footprint`/`mage doctor` to diagnose breaches).
+Each generated wing skill includes a "Governing decisions" section listing the accepted, non-superseded decision records (ADRs) that the wing's **memory-genre** notes link to. The recall/footprint ceilings stay as a whole-file backstop (use `mage doctor` to diagnose breaches).
 
 ```bash
-# Rebuild both recall surfaces after adding or editing notes
+# Rebuild recall surfaces and navigation skills
 mage index
-
-# Regenerate the per-wing skills (run this after a new wing appears)
-mage skills
 ```
 
 ### At a hub root, `index` fans out
@@ -181,28 +174,25 @@ project's pair and nothing else (no recursion, and it never reaches back up to
 the hub root). See [Set up a hub and external
 mode](../guides/hub-and-external-mode.md).
 
-`mage/INDEX.md` (along with `MEMORY.md`, and `Dashboard.md` from `mage
-dashboard`) is **generated _and_ committed**, so on a team it will sometimes
-conflict on a merge — that is expected, not a mistake. Treat these like build
-output: after merging a branch that touched notes, re-run `mage index` (and
-`mage dashboard`, if you use it) to regenerate the file rather than
+`mage/INDEX.md` (along with `MEMORY.md`, and `Dashboard.md`) is **generated and committed**, so on a team it will sometimes
+conflict on a merge. That is expected, not a mistake. Treat these like build
+output: after merging a branch that touched notes, re-run `mage index` to regenerate the file rather than
 hand-resolving the conflict. That goes double for `MEMORY.md`: its roster order
 consults local usage metrics, so two machines with identical notes can
-legitimately produce different orderings — regenerate, never hand-merge.
+legitimately produce different orderings: regenerate, never hand-merge.
 
 `mage index` is a visible, typeable command — you can run it yourself any time.
-The hooks and the `/mage:learn` flow (the deliberate-capture skill that drafts a
-note for you and writes it after you confirm) also run it for you
-automatically, so you rarely need to. `mage skills` also carries a read-only metrics
+The hooks and the `/mage:learn` flow also run it for you
+automatically, so you rarely need to run it manually. `mage index` also carries a read-only metrics
 mode that reports context-match (whether the skills that auto-loaded matched the
 work that followed):
 
 ```bash
 # Read-only context-match report for your generated skills
-mage skills --metrics
+mage index --metrics
 
 # Same report as JSON, for tooling
-mage skills --metrics --json
+mage index --metrics --json
 ```
 
 See [Optimize](../loop/optimize.md) for how those match rates drive reword and
@@ -233,17 +223,11 @@ single-writer seam the grooming skills drive. You do not type those by hand; the
 are covered under the plumbing table below and in
 [Promote and graduate](../loop/promote-graduate.md).
 
-`mage footprint` reports your context footprint and recall economics. It measures the byte and line occupancy of the generated auto-memory file against the host agent's recall budget (e.g., 25,600 bytes or 200 lines). A recall-budget breach means the host will silently truncate the file, dropping your earliest memories. When this happens, `mage doctor` will point you at `mage footprint` to investigate.
+Context footprint diagnostics are folded into `mage doctor` (`mage footprint` has retired). `mage doctor` measures the byte and line occupancy of the generated auto-memory file against the host agent's recall budget (such as 25,600 bytes or 200 lines). A recall-budget breach means the host will silently truncate the file, dropping your earliest memories.
 
 ```bash
-# Report context footprint and pointer leverage
-mage footprint
-
-# Output as JSON for tooling
-mage footprint --json
-
-# Suppress output; for a failing exit code on breach, use `mage doctor` instead
-mage footprint --quiet
+# Diagnose context footprint and recall economics
+mage doctor
 ```
 
 
@@ -280,18 +264,11 @@ mage status /path/to/repo
 
 ## Generating the dashboard
 
-`mage dashboard` renders the knowledge base for a human — without a server. It is
-a generated artifact, not a service.
+Graph and dashboard generation are folded into `mage index` (`mage dashboard` has retired). It renders the knowledge base for a human without a server as a generated artifact, not a service.
 
 ```bash
-# Generate Dashboard.md + an Obsidian-core Knowledge.base
-mage dashboard
-
-# Also generate the self-contained dashboard.html cockpit
-mage dashboard --html
-
-# Print the command to open the generated html
-mage dashboard --open
+# Generate recall surfaces, navigation skills, and dashboard
+mage index
 ```
 
 ## Diagnosing and migrating
@@ -317,6 +294,21 @@ mage doctor --report
 # Upgrade this KB's metadata to the current schema
 mage migrate
 ```
+
+## Retired verbs
+
+Eight verbs stop doing their work and print signposts to their replacements:
+
+| Retired verb | Prints | Note |
+|---|---|---|
+| `distill` | `mage groom` | Candidate distillation is folded into groom. |
+| `promote` | `mage groom` | Promotion proposals are folded into groom. |
+| `graduate` | `mage groom` | Procedure skill proposals are reviewed and applied through groom. |
+| `skills` | `mage index` | Generating navigation skills is folded into index. |
+| `dashboard` | `mage index` | Graph and dashboard generation are folded into index. |
+| `footprint` | `mage doctor` | Context footprint diagnostics are folded into doctor. |
+| `ingest` | `mage groom` | Source enumeration is folded into groom. |
+| `stage` | `mage observe`, as a `finding` event | Direct capture will route through observe, but the finding event is not built yet. |
 
 ## The full inventory
 
