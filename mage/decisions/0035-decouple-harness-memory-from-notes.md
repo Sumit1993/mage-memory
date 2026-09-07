@@ -149,3 +149,12 @@ that stays portable across a team on mixed harnesses and across one person using
 - companion [ADR-0033 — recall: `@import` the bounded index](0033-recall-import-bounded-index.md)
 - relates [ADR-0034 — adopt: onboarding pre-existing knowledge](0034-adopt-preexisting-knowledge.md) (adopt = folding pre-existing memories into the one store)
 - grounded_in [ADR-0008 — a visible `mage/` dir](0008-visible-mage-dir-for-obsidian.md)
+
+## Amendment (2026-09-07) - admission schema and readability check at index time
+
+Notes in memory receive five admission fields ([#231](https://github.com/Sumit1993/mage-memory/issues/231)): `id` (`<unit>/<rung>/<slug>`), `rung` (`note`), `skipped` (reasons for skipping rungs above `note`), `trigger`, and `pointer`. Notes must also satisfy three readability rules ([#253](https://github.com/Sumit1993/mage-memory/issues/253)): body under 40 lines and under 350 words, self-contained references with no unlinked documents, and plain words with no unslop words or em dashes.
+
+Whether a guard is a file is unruled ([#249](https://github.com/Sumit1993/mage-memory/issues/249)).
+
+Both checks execute in report mode during `mage index` and exit 0 until backfills in [#213](https://github.com/Sumit1993/mage-memory/issues/213) and [#214](https://github.com/Sumit1993/mage-memory/issues/214) populate the fields across existing notes.
+
