@@ -196,7 +196,6 @@ describe("mage dream — info-tier drift signals (never failures)", () => {
   const project = (name: string, storage: HubProject["storage"]): HubProject => ({
     name,
     storage,
-    code_repo_path: "/code",
     code_repo_url: "/code",
   });
   const hubMeta = (projects: HubProject[]): HubMetadata => ({

@@ -507,7 +507,7 @@ describe("doctor — link integrity", () => {
 
   async function makeHub(
     hub: string,
-    projects: Array<{ name: string; code_repo_path: string }>,
+    projects: Array<{ name: string }>,
   ): Promise<void> {
     await mkdir(join(hub, "projects"), { recursive: true });
     const meta = {
@@ -517,7 +517,6 @@ describe("doctor — link integrity", () => {
       projects: projects.map((p) => ({
         name: p.name,
         storage: "hub-owned",
-        code_repo_path: p.code_repo_path,
         code_repo_url: "",
       })),
     };
@@ -541,24 +540,10 @@ describe("doctor — link integrity", () => {
   it("passes when an external repo's two-way link is consistent", async () => {
     const hub = await freshDir("mage-hub-");
     const repo = await freshDir("mage-ext-");
-    await makeHub(hub, [{ name: "engine", code_repo_path: repo }]);
+    await makeHub(hub, [{ name: "engine" }]);
     await makeExternalRepo(repo, hub, "engine");
     const r = await doctor({ cwd: repo });
     expect(check(r.checks, "link integrity")?.ok).toBe(true);
-  });
-
-  it("flags a stale hub back-reference and repairs it with --fix", async () => {
-    const hub = await freshDir("mage-hub-");
-    const repo = await freshDir("mage-ext-");
-    await makeHub(hub, [{ name: "engine", code_repo_path: "/old/moved/away" }]);
-    await makeExternalRepo(repo, hub, "engine");
-
-    expect(check((await doctor({ cwd: repo })).checks, "link integrity")?.ok).toBe(false);
-
-    const after = await doctor({ cwd: repo, fix: true });
-    expect(check(after.checks, "link integrity")?.ok).toBe(true);
-    const hubMeta = JSON.parse(await readFile(join(hub, "metadata.json"), "utf8"));
-    expect(hubMeta.projects[0].code_repo_path).toBe(repo); // healed to the real path
   });
 
   it("flags a moved/unreachable hub (not auto-fixable)", async () => {
@@ -567,14 +552,6 @@ describe("doctor — link integrity", () => {
     const c = check((await doctor({ cwd: repo })).checks, "link integrity");
     expect(c?.ok).toBe(false);
     expect(c?.detail).toContain("not a reachable hub");
-  });
-
-  it("from a hub, warns (advisory) about a project whose code repo is missing", async () => {
-    const hub = await freshDir("mage-hub-");
-    await makeHub(hub, [{ name: "engine", code_repo_path: "/gone/repo" }]);
-    const c = check((await doctor({ cwd: hub })).checks, "link integrity");
-    expect(c?.ok).toBe(false);
-    expect(c?.optional).toBe(true);
   });
 
   it("flags an origin mismatch and leaves metadata.json at derived root byte-identical even with --fix", async () => {
@@ -588,7 +565,7 @@ describe("doctor — link integrity", () => {
       expect(chosen?.source).toBe("derived");
       const derivedRoot = chosen!.root;
 
-      await makeHub(derivedRoot, [{ name: "engine", code_repo_path: "/old/moved/away" }]);
+      await makeHub(derivedRoot, [{ name: "engine" }]);
       await gitInit(derivedRoot);
       await writeFile(
         join(derivedRoot, ".git", "config"),
@@ -1104,7 +1081,7 @@ describe("doctor — metadata schema drift", () => {
       schema: METADATA_SCHEMA_V1,
       name: "h",
       created_at: "",
-      projects: [{ name: "engine", storage: "in-repo", code_repo_path: hub, code_repo_url: "" }],
+      projects: [{ name: "engine", storage: "in-repo", code_repo_url: "" }],
     };
     await writeFile(join(hub, "metadata.json"), `${JSON.stringify(meta, null, 2)}\n`);
 
@@ -1126,7 +1103,7 @@ describe("doctor — metadata schema drift", () => {
       schema: METADATA_SCHEMA_V1,
       name: "h",
       created_at: "",
-      projects: [{ name: "engine", storage: "hub-owned", code_repo_path: repo, code_repo_url: "" }],
+      projects: [{ name: "engine", storage: "hub-owned", code_repo_url: "" }],
     };
     await writeFile(join(hub, "metadata.json"), `${JSON.stringify(hubMeta, null, 2)}\n`);
     await mkdir(join(repo, "mage"), { recursive: true });
@@ -1191,23 +1168,17 @@ describe("doctor — bare-parent + hub liveness", () => {
     expect(kb?.detail).toMatch(/No mage KB here/);
   });
 
-  it("at a hub, rolls up per-project liveness (present + connected, flags the rest)", async () => {
+  it("at a hub, counts by storage and flags a hub-owned project with no projects/<name>/ dir", async () => {
     const hub = await freshDir();
-    await mkdir(join(hub, "projects"), { recursive: true });
-    // alpha: present + connected (mage hooks wired in its local settings)
-    const alpha = await freshDir();
-    await mkdir(join(alpha, ".claude"), { recursive: true });
-    await writeFile(
-      join(alpha, ".claude", "settings.local.json"),
-      `${JSON.stringify(upsertMageHooks(null).settings, null, 2)}\n`,
-    );
+    await mkdir(join(hub, "projects", "alpha"), { recursive: true });
     const meta = {
       schema: METADATA_SCHEMA,
       name: "h",
       created_at: "",
       projects: [
-        { name: "alpha", storage: "hub-owned", code_repo_path: alpha, code_repo_url: "" },
-        { name: "ghost", storage: "hub-owned", code_repo_path: "/no/such/repo", code_repo_url: "" },
+        { name: "alpha", storage: "hub-owned", code_repo_url: "" },
+        { name: "ghost", storage: "hub-owned", code_repo_url: "" },
+        { name: "web", storage: "repo-owned", code_repo_url: "" },
       ],
     };
     await writeFile(join(hub, "metadata.json"), `${JSON.stringify(meta, null, 2)}\n`);
@@ -1216,10 +1187,12 @@ describe("doctor — bare-parent + hub liveness", () => {
     const hp = check(r.checks, "hub projects");
     expect(hp).toBeDefined();
     expect(hp?.optional).toBe(true);
-    expect(hp?.detail).toMatch(/2 registered/);
-    expect(hp?.detail).toMatch(/1 present/);
-    expect(hp?.detail).toMatch(/1 connected/);
+    expect(hp?.detail).toMatch(/3 registered/);
+    expect(hp?.detail).toMatch(/2 hub-owned/);
+    expect(hp?.detail).toMatch(/1 repo-owned/);
     expect(hp?.detail).toMatch(/ghost/);
+    expect(hp?.detail).toMatch(/projects\/ghost\//);
+    expect(hp?.detail).not.toMatch(/connected/);
   });
 
   it("an in-repo KB (not a hub) gets NO hub-projects check", async () => {
@@ -1227,6 +1200,34 @@ describe("doctor — bare-parent + hub liveness", () => {
     await makeInRepoKb(dir, { gitignoreSinks: true });
     const r = await doctor({ cwd: dir });
     expect(check(r.checks, "hub projects")).toBeUndefined();
+  });
+
+  it("flags a hub-owned project with a traversal-shaped name as an issue and does not probe outside projects/", async () => {
+    const hub = await freshDir();
+    await mkdir(join(hub, "projects", "valid"), { recursive: true });
+    // Directory outside hub/projects/ that would cause an unguarded path join to report false "ok"
+    await mkdir(join(hub, "outside"), { recursive: true });
+    const meta = {
+      schema: METADATA_SCHEMA,
+      name: "h",
+      created_at: "",
+      projects: [
+        { name: "valid", storage: "hub-owned", code_repo_url: "" },
+        { name: "../outside", storage: "hub-owned", code_repo_url: "" },
+        { name: "ghost", storage: "hub-owned", code_repo_url: "" },
+        { name: "web", storage: "repo-owned", code_repo_url: "" },
+      ],
+    };
+    await writeFile(join(hub, "metadata.json"), `${JSON.stringify(meta, null, 2)}\n`);
+
+    const r = await doctor({ cwd: hub });
+    const hp = check(r.checks, "hub projects");
+    expect(hp).toBeDefined();
+    expect(hp?.ok).toBe(false);
+    expect(hp?.detail).toMatch(/4 registered · 3 hub-owned · 1 repo-owned/);
+    expect(hp?.detail).toMatch(/\.\.\/outside \(unsafe project name\)/);
+    expect(hp?.detail).toMatch(/ghost \(projects\/ghost\/ missing/);
+    expect(hp?.detail).not.toMatch(/valid/);
   });
 });
 

@@ -46,7 +46,7 @@ describe("withKb — each shape builds a resolvable KB", () => {
   it("hub: registers projects", async () => {
     const { repo } = await withKb({
       kind: "hub",
-      projects: [{ name: "x", storage: "hub-owned", code_repo_path: "/tmp/x", code_repo_url: "" }],
+      projects: [{ name: "x", storage: "hub-owned", code_repo_url: "" }],
     });
     expect((await readHubMetadata(repo))?.projects?.[0]?.name).toBe("x");
   });
