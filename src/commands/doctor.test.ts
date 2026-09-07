@@ -447,6 +447,45 @@ describe("doctor env checks still run", () => {
       else process.env.HOME = origHome;
     }
   });
+
+  it("behaves identically whether under VITEST or not (ADR-0045 §7 environment rule)", async () => {
+    const dir = await freshDir();
+    const home = await freshDir("mage-home-");
+    const origHome = process.env.HOME;
+    const origVitest = process.env.VITEST;
+    process.env.HOME = home;
+    try {
+      process.env.VITEST = "true";
+      const withVitest = await doctor({ cwd: dir });
+
+      delete process.env.VITEST;
+      const withoutVitest = await doctor({ cwd: dir });
+
+      expect(withVitest.passed).toBe(withoutVitest.passed);
+      expect(withVitest.checks).toEqual(withoutVitest.checks);
+
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+        ok: true,
+        status: 200,
+      } as Response);
+
+      process.env.VITEST = "true";
+      const netWithVitest = await doctor({ cwd: dir, network: true });
+
+      delete process.env.VITEST;
+      const netWithoutVitest = await doctor({ cwd: dir, network: true });
+
+      expect(check(netWithVitest.checks, "github reachable")?.ok).toBe(true);
+      expect(netWithVitest.checks).toEqual(netWithoutVitest.checks);
+
+      fetchSpy.mockRestore();
+    } finally {
+      if (origHome === undefined) delete process.env.HOME;
+      else process.env.HOME = origHome;
+      if (origVitest === undefined) delete process.env.VITEST;
+      else process.env.VITEST = origVitest;
+    }
+  });
 });
 
 // ─── link integrity (code-repo <-> hub references; --fix heals a moved repo) ────
