@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildGuardFired,
   buildSessionEnd,
   buildSessionStart,
   buildToolUse,
@@ -8,7 +9,7 @@ import {
   extractPaths,
   triggerHash,
 } from "./events.js";
-import { DETAIL_MAX, OBSERVE_SCHEMA_VERSION } from "./types.js";
+import { DETAIL_MAX, isGuardId, OBSERVE_SCHEMA_VERSION } from "./types.js";
 
 const BASE: EventBase = { ts: "2026-06-06T00:00:00.000Z", session: "sess-1" };
 
@@ -55,6 +56,18 @@ describe("event builders (ADR-0015 §1–§4)", () => {
     expect("reason" in e).toBe(false);
     const withReason = buildSessionEnd(BASE, "clear");
     expect(withReason.reason).toBe("clear");
+  });
+
+  it("buildGuardFired stamps v:1, ts/session, and fields", () => {
+    const e = buildGuardFired(BASE, "kit/guard/no-haiku", "Agent", "model=haiku");
+    expect(e.v).toBe(OBSERVE_SCHEMA_VERSION);
+    expect(e.v).toBe(1);
+    expect(e.ts).toBe(BASE.ts);
+    expect(e.session).toBe(BASE.session);
+    expect(e.type).toBe("guard_fired");
+    expect(e.guard_id).toBe("kit/guard/no-haiku");
+    expect(e.tool).toBe("Agent");
+    expect(e.detail).toBe("model=haiku");
   });
 });
 
@@ -146,3 +159,20 @@ describe("triggerHash (§3 / ADR-0016 §1 held-out gate)", () => {
     expect(triggerHash("anything")).toMatch(/^[0-9a-f]{64}$/);
   });
 });
+
+describe("isGuardId validator", () => {
+  it("accepts valid <scope>/guard/<slug> IDs", () => {
+    expect(isGuardId("kit/guard/no-haiku")).toBe(true);
+    expect(isGuardId("mage/guard/gate-2")).toBe(true);
+  });
+
+  it("rejects malformed guard IDs", () => {
+    expect(isGuardId("kit/guard/")).toBe(false);
+    expect(isGuardId("/guard/x")).toBe(false);
+    expect(isGuardId("Kit/guard/x")).toBe(false);
+    expect(isGuardId("kit/hook/x")).toBe(false);
+    expect(isGuardId("kit//guard//x")).toBe(false);
+    expect(isGuardId("kit/guard/no--haiku")).toBe(false);
+  });
+});
+
