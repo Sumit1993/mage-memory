@@ -7,7 +7,7 @@ import { REDACT_HOOK_MARKER, resolveHooksDir } from "../git-hooks.js";
 import { upsertMageHooks } from "../adapters/claude-code/settings.js";
 import { canonicalizeHubRepo } from "../hub-url.js";
 import { logger } from "../logger.js";
-import { connect, connectAllProjects } from "./connect.js";
+import { connect } from "./connect.js";
 import { disconnect } from "./disconnect.js";
 
 async function freshDir(): Promise<string> {
@@ -393,61 +393,6 @@ describe("connect", () => {
   });
 });
 
-describe("connect --all-projects (Decision 11C)", () => {
-  async function makeHubWithProjects(
-    projects: Array<{ name: string; code_repo_path: string }>,
-  ): Promise<string> {
-    const { dir } = await withKb({
-      kind: "hub",
-      projects: projects.map((p) => ({
-        name: p.name,
-        storage: "hub-owned",
-        code_repo_path: p.code_repo_path,
-        code_repo_url: "",
-      })),
-    });
-    return dir;
-  }
-
-  it("wires every registered project's code repo (repo-local each)", async () => {
-    const a = await freshDir();
-    const b = await freshDir();
-    const hub = await makeHubWithProjects([
-      { name: "alpha", code_repo_path: a },
-      { name: "beta", code_repo_path: b },
-    ]);
-    const r = await connectAllProjects({ cwd: hub, yes: true, gitHook: false });
-    expect(r.wired).toBe(2);
-    expect(await exists(localPath(a))).toBe(true);
-    expect(await exists(localPath(b))).toBe(true);
-  });
-
-  it("skips a project whose code repo is absent here, wires the rest", async () => {
-    const a = await freshDir();
-    const hub = await makeHubWithProjects([
-      { name: "alpha", code_repo_path: a },
-      { name: "ghost", code_repo_path: "/no/such/repo/here" },
-    ]);
-    const r = await connectAllProjects({ cwd: hub, yes: true, gitHook: false });
-    expect(r.wired).toBe(1);
-    expect(r.projects.find((p) => p.project === "ghost")?.skipped).toMatch(/not present/);
-    expect(await exists(localPath(a))).toBe(true);
-  });
-
-  it("a hub with no projects wires nothing (no throw)", async () => {
-    const hub = await makeHubWithProjects([]);
-    const r = await connectAllProjects({ cwd: hub, yes: true, gitHook: false });
-    expect(r.wired).toBe(0);
-    expect(r.projects).toEqual([]);
-  });
-
-  it("throws when not run from a hub", async () => {
-    const notHub = await freshDir();
-    await expect(connectAllProjects({ cwd: notHub, yes: true })).rejects.toThrow(
-      /must run from a mage hub/,
-    );
-  });
-});
 
 // ─── commandeer-coverage (ADR-0034 §6-7) ──────────────────────────────────────
 describe("connect commandeer-coverage", () => {

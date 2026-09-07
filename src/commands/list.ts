@@ -18,7 +18,6 @@ export interface ProjectInfo {
   name: string;
   storage: "hub-owned" | "repo-owned" | "unknown";
   path: string;
-  codeRepo: string | null;
   fileCount: number;
   /** Last modification time across any file (hub-owned only — repo-owned lives elsewhere). */
   lastModified: Date | null;
@@ -54,7 +53,6 @@ export async function list(opts: ListOptions = {}): Promise<ListResult> {
         name: p.name,
         storage: p.storage,
         path: dir,
-        codeRepo: p.code_repo_path,
         fileCount: count,
         lastModified: lastMs > 0 ? new Date(lastMs) : null,
       });
@@ -72,7 +70,6 @@ export async function list(opts: ListOptions = {}): Promise<ListResult> {
           name: e.name,
           storage: "unknown",
           path: dir,
-          codeRepo: null,
           fileCount: count,
           lastModified: lastMs > 0 ? new Date(lastMs) : null,
         });

@@ -20,15 +20,12 @@ import { logger } from "../logger.js";
 import {
   type HubTarget,
   type ResolvedDocsRoot,
-  absolutePath,
   exists,
   explainNoDocsRoot,
   findCodeRepoRoot,
   hubsRoot,
-  looksLikeHub,
   outOfRepoKbTargets,
   ownedDocsRoots,
-  readHubMetadata,
   readMetadata,
   resolveDocsRoot,
   resolveHubGrant,
@@ -124,12 +121,12 @@ export async function connect(opts: ConnectOptions): Promise<ConnectResult> {
   // gitignored settings.local.json, never a shared/global file (`--user`).
   const kb = await resolveDocsRoot(opts.cwd ?? process.cwd());
   const commandeer =
-    isAutoMemoryEnabled(r.settings, process.env) && kb !== null && target.scope === "local";
+    isAutoMemoryEnabled(r.settings) && kb !== null && target.scope === "local";
   // (b) failing is the ONE arm that is invisible otherwise: `resolveDocsRoot`
   // returns a bare null for both "no KB" and "external hub unreachable" (#158), so
   // say which, and say what the silent decline costs. The other two arms are the
   // user's own explicit choices (auto-memory off; `--user`/global scope).
-  if (!commandeer && kb === null && target.scope === "local" && isAutoMemoryEnabled(r.settings, process.env)) {
+  if (!commandeer && kb === null && target.scope === "local" && isAutoMemoryEnabled(r.settings)) {
     const why = await explainNoDocsRoot(opts.cwd ?? process.cwd());
     logger.warn(
       `Skipping the commandeer tier (autoMemoryDirectory stays where it is): ${why.message}`,
@@ -465,76 +462,3 @@ async function installHook(repo: string): Promise<{ installed: boolean; reason?:
   return { installed: r.installed, reason: r.reason };
 }
 
-// ─── connect --all-projects (Decision 11C) ───────────────────────────────────
-
-/** One project's outcome in {@link connectAllProjects}. */
-export interface ConnectProjectOutcome {
-  project: string;
-  codeRepo: string;
-  /** The wiring result, when connect ran for this project. */
-  result?: ConnectResult;
-  /** Why this project was skipped (code repo absent here, or a connect failure). */
-  skipped?: string;
-}
-
-/** Result of {@link connectAllProjects}. */
-export interface ConnectAllResult {
-  hub: string;
-  projects: ConnectProjectOutcome[];
-  wired: number;
-}
-
-/**
- * From a HUB, wire mage capture hooks into every registered project's CODE REPO
- * (Decision 11C). Each project is connected through the single-repo {@link connect}
- * (repo-local settings + the redaction hook). Best-effort and resilient: a project
- * whose code repo is not present on this machine, or whose connect throws (e.g. a
- * malformed settings.local.json), is skipped with a warning — one bad repo never
- * aborts the sweep. Always targets each repo's LOCAL settings (never `--user` — a
- * fleet-wide wire of one global file is not the intent). Throws only when not run
- * from a hub.
- */
-export async function connectAllProjects(
-  opts: { cwd?: string; yes?: boolean; gitHook?: boolean } = {},
-): Promise<ConnectAllResult> {
-  const hub = absolutePath(opts.cwd ?? process.cwd());
-  if (!(await looksLikeHub(hub))) {
-    throw new Error(
-      `\`mage connect --all-projects\` must run from a mage hub — ${hub} is not one ` +
-        "(a hub has a projects/ dir + a top-level metadata.json). Run it from the hub root.",
-    );
-  }
-
-  const meta = await readHubMetadata(hub).catch(() => null);
-  const projects = meta?.projects ?? [];
-  const out: ConnectAllResult = { hub, projects: [], wired: 0 };
-
-  if (projects.length === 0) {
-    logger.info(`Hub ${hub} has no registered projects yet — run \`mage link <hub>\` from each code repo.`);
-    return out;
-  }
-
-  for (const p of projects) {
-    if (!p.code_repo_path || !(await exists(p.code_repo_path))) {
-      const reason = "code repo not present on this machine";
-      out.projects.push({ project: p.name, codeRepo: p.code_repo_path || "(unset)", skipped: reason });
-      logger.warn(`Skipped '${p.name}': ${reason} (${p.code_repo_path || "unset"}).`);
-      continue;
-    }
-    logger.blank();
-    logger.info(`Wiring '${p.name}' (${p.code_repo_path})…`);
-    try {
-      const result = await connect({ cwd: p.code_repo_path, yes: opts.yes, gitHook: opts.gitHook });
-      out.projects.push({ project: p.name, codeRepo: p.code_repo_path, result });
-      out.wired += 1;
-    } catch (err) {
-      const reason = (err as Error).message;
-      out.projects.push({ project: p.name, codeRepo: p.code_repo_path, skipped: reason });
-      logger.warn(`Skipped '${p.name}': ${reason}`);
-    }
-  }
-
-  logger.blank();
-  logger.success(`connect --all-projects: wired ${out.wired}/${projects.length} project code repo(s) from hub ${hub}.`);
-  return out;
-}

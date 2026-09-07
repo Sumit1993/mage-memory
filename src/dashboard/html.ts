@@ -14,7 +14,6 @@
 // containing `</script>` cannot break out. No data is ever string-concatenated into
 // executable JS.
 
-import { basename } from "node:path";
 import { join as posixJoin } from "node:path/posix";
 import { GRAPH_LIB_JS } from "./graph-lib.generated.js";
 import { commandReference, computeNudges } from "./nudges.js";
@@ -89,18 +88,14 @@ export function escapeHtml(value: unknown): string {
 
 /**
  * Build a shallow, sanitized copy of the snapshot for the JSON island. The UI
- * never displays absolute filesystem paths, so we strip the ones the island would
- * otherwise leak: `meta.root` (the absolute KB path) and each
- * `registry[].codePath` (absolute member paths → basename only). Everything the
+ * never displays absolute filesystem paths, so we strip the one the island would
+ * otherwise leak: `meta.root` (the absolute KB path). Everything the
  * UI renders is kept. The input object is NEVER mutated (immutability).
  */
 function sanitizeForIsland(data: DashboardData): DashboardData {
   return {
     ...data,
     meta: { ...data.meta, root: "" },
-    ...(data.registry
-      ? { registry: data.registry.map((r) => ({ ...r, codePath: basename(r.codePath) })) }
-      : {}),
   };
 }
 
@@ -893,18 +888,16 @@ function renderSoak(data: DashboardData, connectionNudge: string, ladderNudge: s
     const rows = registry
       .map((r) => {
         const repo = r.repoUrl ? escapeHtml(r.repoUrl) : `<span class="muted">&mdash;</span>`;
-        const cloned = r.cloned ? "cloned" : "not cloned";
         return `<tr>
   <td>${escapeHtml(r.name)}</td>
   <td class="muted">${repo}</td>
-  <td>${escapeHtml(cloned)}</td>
 </tr>`;
       })
       .join("");
     registryHtml = `<section class="panel">
   <h3>Hub registry <span class="caption-inline">(pointers only &mdash; never remote content)</span></h3>
   <table class="data-table">
-    <thead><tr><th>member</th><th>repo</th><th>local</th></tr></thead>
+    <thead><tr><th>member</th><th>repo</th></tr></thead>
     <tbody>${rows}</tbody>
   </table>
 </section>`;

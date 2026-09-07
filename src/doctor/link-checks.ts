@@ -1,16 +1,11 @@
 // Link-integrity checks for `mage doctor` (0.0.9 setup-integrity). A code repo and
-// its hub keep TWO cross-references — the code repo's `mage/metadata.json.hub_repo`
+// its hub keep cross-references — the code repo's `mage/metadata.json.hub_repo`
 // (forward; derived per ADR-0043, with the deprecated `hub_path` read only as a
-// fallback) and the hub registry's `projects[].code_repo_path` (back). A stale
-// back-reference breaks hub→repo tools (the soak digest, `dream`) SILENTLY —
-// they can't find the repo. `mage connect` never touches these — only `mage link`
-// (or this repair) does.
+// fallback) and the hub registry's project entry.
 //
-// What `--fix` can safely auto-repair: the hub's stale BACK-reference when run from
-// the code repo (the repo knows its own true location). What it can only DETECT: a
-// hub absent at its derived location, an origin mismatch between that clone and
-// `hub_repo` (never reused, never clobbered — ADR-0043 §2), or a missing project
-// registration — all three need an explicit `mage link <hub>` or a manual clone/move.
+// What doctor validates: hub reachability at its derived location, origin match
+// between that clone and `hub_repo` (never reused, never clobbered — ADR-0043 §2),
+// and project registration — all needing an explicit `mage link <hub>` or a manual clone/move.
 
 import { dirname, join } from "node:path";
 import type { DoctorCheck, DoctorOptions } from "../commands/doctor.js";
@@ -21,22 +16,16 @@ import {
   absolutePath,
   chosenHubRoot,
   exists,
-  looksLikeHub,
   readHubMetadata,
   readMetadata,
   resolveHubGrant,
-  writeHubMetadata,
 } from "../paths.js";
 
 const CHECK = "link integrity";
 
 /**
- * Append the link-integrity check. Two shapes, by where doctor runs:
- *  - from a linked EXTERNAL code repo → validate forward (hub reachable + project
- *    registered) and back (hub's code_repo_path matches); `--fix` heals a stale
- *    back-reference.
- *  - from a HUB → flag any project whose code repo has moved/vanished (advisory:
- *    it may simply not be cloned on this machine).
+ * Append the link-integrity check from a linked EXTERNAL code repo → validate forward
+ * (hub reachable + project registered).
  * In-repo (no hub) and non-KB dirs append nothing.
  */
 export async function pushLinkChecks(checks: DoctorCheck[], opts: DoctorOptions): Promise<void> {
@@ -49,10 +38,6 @@ export async function pushLinkChecks(checks: DoctorCheck[], opts: DoctorOptions)
       await checkExternalLink(checks, opts, codeRepo, meta.hub_repo, meta.hub_path, meta.project);
     }
     return; // in-repo: no hub link to validate.
-  }
-
-  if (await looksLikeHub(startDir)) {
-    await checkHubBackrefs(checks, startDir);
   }
 }
 
@@ -75,8 +60,8 @@ async function findCodeRepo(startDir: string): Promise<string | null> {
  */
 async function checkExternalLink(
   checks: DoctorCheck[],
-  opts: DoctorOptions,
-  codeRepo: string,
+  _opts: DoctorOptions,
+  _codeRepo: string,
   hubRepo: string | null,
   hubPathField: string | null,
   project: string,
@@ -132,60 +117,9 @@ async function checkExternalLink(
     return;
   }
 
-  if (entry.code_repo_path === codeRepo) {
-    checks.push({ name: CHECK, ok: true, detail: `external link to '${hubMeta.name}' (project '${project}') consistent` });
-    return;
-  }
-
-  // Stale BACK-reference: this repo moved. We know the truth (codeRepo), so heal it.
-  if (opts.fix) {
-    const repaired = {
-      ...hubMeta,
-      projects: hubMeta.projects.map((p) => (p.name === project ? { ...p, code_repo_path: codeRepo } : p)),
-    };
-    await writeHubMetadata(hubPath, repaired);
-    checks.push({
-      name: CHECK,
-      ok: true,
-      detail: `repaired hub back-reference for '${project}': ${entry.code_repo_path} -> ${codeRepo}`,
-    });
-    return;
-  }
-
   checks.push({
     name: CHECK,
-    ok: false,
-    detail:
-      `hub back-reference for '${project}' is stale (records ${entry.code_repo_path}, repo is ${codeRepo}) — ` +
-      "run `mage doctor --fix`",
-  });
-}
-
-/** From a hub: flag any registered project whose code repo has moved/vanished. */
-async function checkHubBackrefs(checks: DoctorCheck[], hub: string): Promise<void> {
-  const hubMeta = await readHubMetadata(hub).catch(() => null);
-  const projects = hubMeta?.projects ?? [];
-  if (projects.length === 0) return;
-
-  const missing: string[] = [];
-  for (const p of projects) {
-    if (!p.code_repo_path || !(await exists(p.code_repo_path))) {
-      missing.push(`${p.name} (${p.code_repo_path || "unset"})`);
-    }
-  }
-
-  if (missing.length === 0) {
-    checks.push({ name: CHECK, ok: true, detail: `${projects.length} project code repo(s) present` });
-    return;
-  }
-
-  checks.push({
-    name: CHECK,
-    ok: false,
-    // Advisory: a code repo may simply not be cloned on this machine.
-    optional: true,
-    detail:
-      `project code repo(s) missing/moved: ${missing.join(", ")} — ` +
-      "re-run `mage link` from the moved repo (or `mage doctor --fix` there)",
+    ok: true,
+    detail: `external link to '${hubMeta.name}' (project '${project}') consistent`,
   });
 }

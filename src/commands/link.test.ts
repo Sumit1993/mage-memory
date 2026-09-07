@@ -142,4 +142,22 @@ describe("mage link", () => {
     const current = await readFile(join(code, "AGENTS.md"), "utf8");
     expect(current).not.toContain("hand-written");
   });
+
+  it("link records no " + ["code", "repo", "path"].join("_") + " in the hub registry", async () => {
+    const hub = await makeHub();
+    const codeRepo = await emptyRepo();
+    await link(hub, { codeRepo, project: "engine", yes: true, connect: false });
+    const raw = await readFile(join(hub, "metadata.json"), "utf8");
+    expect(raw).not.toContain(["code", "repo", "path"].join("_"));
+  });
+
+  it("a remote-less code repo records an empty code_repo_url, never its path", async () => {
+    const hub = await makeHub();
+    const codeRepo = await emptyRepo();
+    await link(hub, { codeRepo, project: "engine", yes: true, connect: false });
+    const meta = await readHubMetadata(hub);
+    expect(meta?.projects.find((p) => p.name === "engine")?.code_repo_url).toBe("");
+    const raw = await readFile(join(hub, "metadata.json"), "utf8");
+    expect(raw).not.toContain(codeRepo);
+  });
 });

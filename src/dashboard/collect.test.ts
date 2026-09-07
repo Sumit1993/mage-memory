@@ -267,13 +267,11 @@ describe("collectDashboardData — hub KB (registry)", () => {
           {
             name: "svc-b",
             storage: "in-repo",
-            code_repo_path: "/nonexistent/svc-b",
             code_repo_url: "https://github.com/me/svc-b",
           },
           {
             name: "svc-a",
             storage: "hub-owned",
-            code_repo_path: "/nonexistent/svc-a",
             code_repo_url: "",
           },
         ],
@@ -289,7 +287,5 @@ describe("collectDashboardData — hub KB (registry)", () => {
     expect(data.registry?.map((r) => r.name)).toEqual(["svc-a", "svc-b"]); // sorted.
     const svcB = data.registry?.find((r) => r.name === "svc-b");
     expect(svcB?.repoUrl).toBe("https://github.com/me/svc-b");
-    expect(svcB?.codePath).toBe("/nonexistent/svc-b");
-    expect(svcB?.cloned).toBe(false); // path doesn't exist → not cloned.
   });
 });

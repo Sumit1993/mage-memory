@@ -193,19 +193,15 @@ async function verifyProjectsAgainstRegistry(
         logger.warn(`${p.name}  (hub-owned) — 0 notes (info — add notes or re-run \`mage link\`)`);
       }
     } else {
-      // in-repo storage — notes aren't here; metadata says they're at code_repo_path.
-      const codeRepoExists = await exists(p.code_repo_path);
-      const state = codeRepoExists ? "code repo reachable" : "code repo path missing on this machine";
+      // repo-owned storage — notes aren't here; they live in the code repo.
+      const url = p.code_repo_url;
+      const detail = `repo-owned — notes live in its code repo${url ? ` (${url})` : ""}; run \`mage doctor\` there`;
       result.projectChecks.push({
         project: p.name,
-        ok: codeRepoExists,
-        detail: `in-repo at ${p.code_repo_path} — ${state}`,
+        ok: true,
+        detail,
       });
-      if (codeRepoExists) {
-        logger.success(`${p.name}  (in-repo at ${p.code_repo_path})`);
-      } else {
-        logger.warn(`${p.name}  (in-repo at ${p.code_repo_path}) — path not reachable here`);
-      }
+      logger.success(`${p.name}  (${detail})`);
     }
   }
 
