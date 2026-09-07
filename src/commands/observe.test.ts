@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import * as redactMod from "../redact.js";
 import { buildObserveCommand, observeCmd } from "./observe.js";
 import { STATE_DIR, LEARNINGS_DIR } from "../paths.js";
-import type { ObserveEvent } from "../observe/types.js";
+import { DETAIL_MAX, GUARD_ID_MAX, type ObserveEvent } from "../observe/types.js";
 import { tmpDir, withKb } from "../../test/fixtures/kb.js";
 
 const SECRET = "ghp_0123456789abcdefghijklmnopqrstuvwx";
@@ -583,3 +583,179 @@ describe("observe CLI wiring (buildObserveCommand)", () => {
     ).rejects.toThrow();
   });
 });
+
+describe("observeCmd — guard_fired event (#230)", () => {
+  it("guard_id payload on stdin yields exactly ONE row with guard_fired type, envelope, and fields", async () => {
+    const repo = await mkRepo();
+    await run(
+      JSON.stringify({
+        guard_id: "kit/guard/no-haiku",
+        tool: "Agent",
+        detail: "model=haiku",
+        session_id: "s1",
+      }),
+      { cwd: repo },
+    );
+    const events = await readEvents(repo, "s1");
+    expect(events).toHaveLength(1);
+    const [e] = events;
+    expect(e?.type).toBe("guard_fired");
+    if (e?.type === "guard_fired") {
+      expect(e.v).toBe(1);
+      expect(typeof e.ts).toBe("string");
+      expect(e.session).toBe("s1");
+      expect(e.guard_id).toBe("kit/guard/no-haiku");
+      expect(e.tool).toBe("Agent");
+      expect(e.detail).toBe("model=haiku");
+    }
+  });
+
+  it("the same payload with no detail key yields detail: null", async () => {
+    const repo = await mkRepo();
+    await run(
+      JSON.stringify({
+        guard_id: "kit/guard/no-haiku",
+        tool: "Agent",
+        session_id: "s1",
+      }),
+      { cwd: repo },
+    );
+    const events = await readEvents(repo, "s1");
+    expect(events).toHaveLength(1);
+    const [e] = events;
+    expect(e?.type).toBe("guard_fired");
+    if (e?.type === "guard_fired") {
+      expect(e.detail).toBeNull();
+    }
+  });
+
+  it("a detail longer than DETAIL_MAX is truncated to DETAIL_MAX", async () => {
+    const repo = await mkRepo();
+    const longDetail = "x".repeat(DETAIL_MAX + 50);
+    await run(
+      JSON.stringify({
+        guard_id: "kit/guard/no-haiku",
+        tool: "Agent",
+        detail: longDetail,
+        session_id: "s1",
+      }),
+      { cwd: repo },
+    );
+    const [e] = await readEvents(repo, "s1");
+    expect(e?.type).toBe("guard_fired");
+    if (e?.type === "guard_fired") {
+      expect(e.detail).toHaveLength(DETAIL_MAX);
+      expect(e.detail).toBe("x".repeat(DETAIL_MAX));
+    }
+  });
+
+  it("a detail carrying a secret is scrubbed", async () => {
+    const repo = await mkRepo();
+    await run(
+      JSON.stringify({
+        guard_id: "kit/guard/no-haiku",
+        tool: "Agent",
+        detail: `token: ${SECRET}`,
+        session_id: "s1",
+      }),
+      { cwd: repo },
+    );
+    const [e] = await readEvents(repo, "s1");
+    expect(e?.type).toBe("guard_fired");
+    if (e?.type === "guard_fired") {
+      expect(e.detail).not.toContain(SECRET);
+      expect(e.detail).toContain("[REDACTED:");
+    }
+  });
+
+  it("each rejection rule writes NOTHING and does not throw: bad guard_id shape, missing tool, empty tool, over-length guard_id", async () => {
+    const repo = await mkRepo();
+
+    // Bad guard_id shape ("no-haiku", no /guard/ segment)
+    await run(
+      JSON.stringify({
+        guard_id: "no-haiku",
+        tool: "Agent",
+        session_id: "rej1",
+      }),
+      { cwd: repo },
+    );
+    await expect(readEvents(repo, "rej1")).rejects.toThrow();
+
+    // Bad guard_id shape (missing scope: "/guard/x")
+    await run(
+      JSON.stringify({
+        guard_id: "/guard/x",
+        tool: "Agent",
+        session_id: "rej2",
+      }),
+      { cwd: repo },
+    );
+    await expect(readEvents(repo, "rej2")).rejects.toThrow();
+
+    // Missing tool
+    await run(
+      JSON.stringify({
+        guard_id: "kit/guard/no-haiku",
+        session_id: "rej3",
+      }),
+      { cwd: repo },
+    );
+    await expect(readEvents(repo, "rej3")).rejects.toThrow();
+
+    // Empty tool (empty string)
+    await run(
+      JSON.stringify({
+        guard_id: "kit/guard/no-haiku",
+        tool: "",
+        session_id: "rej4",
+      }),
+      { cwd: repo },
+    );
+    await expect(readEvents(repo, "rej4")).rejects.toThrow();
+
+    // Empty tool after trim
+    await run(
+      JSON.stringify({
+        guard_id: "kit/guard/no-haiku",
+        tool: "   ",
+        session_id: "rej5",
+      }),
+      { cwd: repo },
+    );
+    await expect(readEvents(repo, "rej5")).rejects.toThrow();
+
+    // Over-length guard_id
+    const longGuardId = "kit/guard/" + "a".repeat(GUARD_ID_MAX + 10);
+    await run(
+      JSON.stringify({
+        guard_id: longGuardId,
+        tool: "Agent",
+        session_id: "rej6",
+      }),
+      { cwd: repo },
+    );
+    await expect(readEvents(repo, "rej6")).rejects.toThrow();
+  });
+
+  it("--event guard_fired on a payload without inference still produces the row", async () => {
+    const repo = await mkRepo();
+    await run(
+      JSON.stringify({
+        guard_id: "kit/guard/no-haiku",
+        tool: "Agent",
+        detail: "model=haiku",
+        session_id: "s1",
+      }),
+      { cwd: repo, event: "guard_fired" as ObserveEvent["type"] },
+    );
+    const [e] = await readEvents(repo, "s1");
+    expect(e?.type).toBe("guard_fired");
+    if (e?.type === "guard_fired") {
+      expect(e.guard_id).toBe("kit/guard/no-haiku");
+      expect(e.tool).toBe("Agent");
+      expect(e.detail).toBe("model=haiku");
+    }
+  });
+});
+

@@ -167,3 +167,20 @@ is [ADR-0016](0016-context-match-confidence-ladder-applier.md).
 - read_by [ADR-0016 — context-match, the confidence ladder, and the single applier](0016-context-match-confidence-ladder-applier.md)
 - mines ECC `continuous-learning-v2` (`observations.jsonl`), mem0, Microsoft SkillOpt, Claude Code hook stdin
 - sequenced_by [release sequence](../work/plan-release-sequence.md)
+
+## Amendment (2026-09-07): accept a guard_fired event on stdin
+
+Add an eighth event type, `guard_fired`, recorded when a guard (such as a claude-kit deny rule, hook, or check) blocks or rewrites a tool call.
+
+The event carries three fields beyond the shared envelope:
+- `guard_id` (string): formatted as `<scope>/guard/<slug>` (lowercase letters, digits, and single hyphens per segment, up to 200 characters). Validated at the boundary.
+- `tool` (string): the tool name verbatim (for example `Bash`, `Agent`), up to 100 characters.
+- `detail` (string | null): optional salient detail, scrubbed for secrets and capped at 200 characters (`DETAIL_MAX`), or null when absent, empty, or non-string.
+
+There are two admission paths:
+1. Inference: any incoming payload carrying a `guard_id` string key maps to `guard_fired`. This check runs before `hook_event_name` inference so external hooks do not need to pass an explicit flag.
+2. Explicit: passing `--event guard_fired` forces admission through the same validation path.
+
+Malformed payloads (invalid or over-length `guard_id`, missing or empty `tool`, or over-length `tool`) are rejected as silent no-ops, writing nothing and exiting 0 to preserve the fail-open contract.
+
+The schema envelope stays at `v: 1` because adding a new event `type` is additive under the evolution rules of this decision.
