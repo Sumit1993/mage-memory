@@ -152,8 +152,8 @@ export function buildProgram(): Command {
       "--quiet",
       "metrics mode: fold + write the rollup silently (the Stop-hook path)",
     )
-    .action(async () => {
-      printRetiredVerb("skills");
+    .action(async (opts) => {
+      printRetiredVerb("skills", !!opts.quiet);
     });
 
   // ─── footprint ─────────────────────────────────────────────────────────────
@@ -162,8 +162,8 @@ export function buildProgram(): Command {
     .description("Retired signpost: use `mage doctor` instead")
     .option("--json", "emit the measurement as JSON instead of the table")
     .option("--quiet", "render nothing but still return the result")
-    .action(async () => {
-      printRetiredVerb("footprint");
+    .action(async (opts) => {
+      printRetiredVerb("footprint", !!opts.quiet);
     });
 
 
@@ -210,7 +210,7 @@ export function buildProgram(): Command {
     .argument("<dir>", "directory to scan for ingestable sources")
     .option("--json", "emit the manifest as JSON to stdout (machine-readable)")
     .action(async () => {
-      printRetiredVerb("ingest");
+      printRetiredVerb("ingest", false);
     });
 
   // ─── distill ─────────────────────────────────────────────────────────────────
@@ -227,7 +227,7 @@ export function buildProgram(): Command {
       "advance the distill watermark after a batch is dispositioned",
     )
     .action(async () => {
-      printRetiredVerb("distill");
+      printRetiredVerb("distill", false);
     });
 
   // ─── promote ─────────────────────────────────────────────────────────────────
@@ -244,7 +244,7 @@ export function buildProgram(): Command {
       "advance the promote offset after a batch is dispositioned",
     )
     .action(async () => {
-      printRetiredVerb("promote");
+      printRetiredVerb("promote", false);
     });
 
   // ─── graduate ────────────────────────────────────────────────────────────────
@@ -254,7 +254,7 @@ export function buildProgram(): Command {
     .argument("[args...]")
     .allowUnknownOption()
     .action(async () => {
-      printRetiredVerb("graduate");
+      printRetiredVerb("graduate", false);
     });
 
   // ─── stage ─────────────────────────────────────────────────────────────────────
@@ -278,7 +278,7 @@ export function buildProgram(): Command {
     .option("--body <text>", "lesson body (else read from stdin)")
     .option("--json", "emit the result as JSON")
     .action(async () => {
-      printRetiredVerb("stage");
+      printRetiredVerb("stage", false);
     });
 
   // ─── groom ───────────────────────────────────────────────────────────────────────
@@ -557,7 +557,7 @@ export function buildProgram(): Command {
         .default("file"),
     )
     .action(async () => {
-      printRetiredVerb("dashboard");
+      printRetiredVerb("dashboard", false);
     });
 
   // ─── connect ──────────────────────────────────────────────────────────────
