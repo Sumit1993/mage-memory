@@ -28,13 +28,13 @@ async function exists(p: string): Promise<boolean> {
 }
 
 describe("connect", () => {
-  it("connect into a fresh dir creates settings.local.json with all 11 mage groups", async () => {
+  it("connect into a fresh dir creates settings.local.json with all 12 mage groups", async () => {
     const dir = await freshDir();
     const r = await connect({ cwd: dir, yes: true });
 
     expect(r.scope).toBe("local");
     expect(r.path).toBe(localPath(dir));
-    expect(r.wired).toBe(11);
+    expect(r.wired).toBe(12);
 
     const settings = JSON.parse(await readFile(r.path, "utf8")) as {
       hooks: Record<string, Array<{ id?: string }>>;
@@ -43,7 +43,7 @@ describe("connect", () => {
       .flat()
       .map((g) => g.id)
       .filter((id): id is string => typeof id === "string" && id.startsWith("mage:"));
-    expect(ids).toHaveLength(11);
+    expect(ids).toHaveLength(12);
     expect(new Set(ids)).toEqual(
       new Set([
         "mage:observe:SessionStart",
@@ -56,6 +56,7 @@ describe("connect", () => {
         "mage:observe:SessionEnd",
         "mage:metrics:Stop",
         "mage:observe:Stop",
+        "mage:nudge:Stop",
         "mage:observe:SubagentStop",
       ]),
     );
@@ -63,11 +64,11 @@ describe("connect", () => {
 
   // ─── commandeer tier (ADR-0032) ──────────────────────────────────────────────
 
-  it("commandeers in a KB with auto-memory on: wires 14 + sets autoMemoryDirectory", async () => {
+  it("commandeers in a KB with auto-memory on: wires 15 + sets autoMemoryDirectory", async () => {
     const { dir, root } = await withKb({ kind: "repo" });
     const r = await connect({ cwd: dir, yes: true, gitHook: false });
     expect(r.commandeer).toBe(true);
-    expect(r.wired).toBe(14);
+    expect(r.wired).toBe(15);
     const settings = JSON.parse(await readFile(r.path, "utf8")) as {
       autoMemoryDirectory?: string;
       hooks: Record<string, Array<{ id?: string; matcher?: string }>>;
@@ -79,13 +80,13 @@ describe("connect", () => {
     expect(pre.find((g) => g.id === "mage:memory:PreToolUse")?.matcher).toBe("Write|Edit");
   });
 
-  it("does NOT commandeer when auto-memory is disabled (11 groups, no autoMemoryDirectory)", async () => {
+  it("does NOT commandeer when auto-memory is disabled (12 groups, no autoMemoryDirectory)", async () => {
     const { dir } = await withKb({ kind: "repo" });
     await mkdir(join(dir, ".claude"), { recursive: true });
     await writeFile(localPath(dir), JSON.stringify({ autoMemoryEnabled: false }));
     const r = await connect({ cwd: dir, yes: true, gitHook: false });
     expect(r.commandeer).toBe(false);
-    expect(r.wired).toBe(11);
+    expect(r.wired).toBe(12);
     const settings = JSON.parse(await readFile(r.path, "utf8")) as {
       autoMemoryDirectory?: string;
       hooks: Record<string, unknown[]>;
@@ -97,7 +98,7 @@ describe("connect", () => {
   it("does NOT commandeer in a fresh non-KB dir (no docs root resolves)", async () => {
     const r = await connect({ cwd: await freshDir(), yes: true });
     expect(r.commandeer).toBe(false);
-    expect(r.wired).toBe(11);
+    expect(r.wired).toBe(12);
   });
 
   it("stashes a user's own autoMemoryDirectory before displacing it", async () => {
@@ -182,7 +183,7 @@ describe("connect", () => {
     await writeFile(localPath(dir), `${JSON.stringify(pre, null, 2)}\n`);
 
     const r = await connect({ cwd: dir, yes: true });
-    expect(r.wired).toBe(11);
+    expect(r.wired).toBe(12);
     expect(r.backedUp).toBe(true);
 
     // .bak preserves the original verbatim
@@ -211,16 +212,16 @@ describe("connect", () => {
     const r2 = await connect({ cwd: dir, yes: true });
     const after2 = await readFile(localPath(dir), "utf8");
 
-    expect(r2.wired).toBe(11);
+    expect(r2.wired).toBe(12);
     expect(after2).toBe(after1);
 
-    // still exactly 11 mage groups (no duplication)
+    // still exactly 12 mage groups (no duplication)
     const settings = JSON.parse(after2) as { hooks: Record<string, Array<{ id?: string }>> };
     const ids = Object.values(settings.hooks)
       .flat()
       .map((g) => g.id)
       .filter((id): id is string => typeof id === "string" && id.startsWith("mage:"));
-    expect(ids).toHaveLength(11);
+    expect(ids).toHaveLength(12);
   });
 
   it("--user targets the user path", async () => {
@@ -259,7 +260,7 @@ describe("connect", () => {
   it("in a non-repo dir, connect installs no hook (result.hook reports not-a-repo)", async () => {
     const dir = await freshDir();
     const r = await connect({ cwd: dir, yes: true });
-    expect(r.wired).toBe(11);
+    expect(r.wired).toBe(12);
     expect(r.hook).toEqual({ installed: false, reason: "not-a-repo" });
   });
 
@@ -309,7 +310,7 @@ describe("connect", () => {
     await gitInit(dir);
 
     const r = await connect({ cwd: dir, yes: true, gitHook: false });
-    expect(r.wired).toBe(11);
+    expect(r.wired).toBe(12);
     expect(r.hook).toBeUndefined();
 
     const hooksDir = await resolveHooksDir(dir);
@@ -389,7 +390,7 @@ describe("connect", () => {
     const dir = await freshDir();
     // No mage/, no projects/ → resolveDocsRoot returns null → self-heal skipped.
     const r = await connect({ cwd: dir, yes: true, gitHook: false });
-    expect(r.wired).toBe(11);
+    expect(r.wired).toBe(12);
 
     // No .gitignore created for the capture sinks.
     expect(await exists(join(dir, ".gitignore"))).toBe(false);
@@ -498,9 +499,9 @@ describe("reach tier — connect grants out-of-repo KB access (ADR-0042)", () =>
     const { code } = await externalRepo({ hubExists: false });
     const r = await connect({ cwd: code, yes: true, gitHook: false });
 
-    // 11 base hooks: resolveDocsRoot returns null when hub is absent, so commandeer
+    // 12 base hooks: resolveDocsRoot returns null when hub is absent, so commandeer
     // tier does not gate on (autoMemoryDirectory not set to repo mage/). The point is that connect COMPLETES.
-    expect(r.wired).toBe(11);
+    expect(r.wired).toBe(12);
     expect(r.commandeer).toBe(false);
     const s = JSON.parse(await readFile(r.path, "utf8"));
     expect(s.hooks?.SessionStart?.some((g: { id?: string }) => g.id === "mage:observe:SessionStart")).toBe(
@@ -890,10 +891,10 @@ describe("connect — legacy orphan reaping (#150)", () => {
     expect(await readHooks(dir).then((h) => h.Stop)).toEqual([mixed]);
   });
 
-  it("the live dark state — 33 id-less orphans BESIDE 11 tagged groups — collapses to exactly 11", async () => {
+  it("the live dark state — 36 id-less orphans BESIDE 12 tagged groups — collapses to exactly 12", async () => {
     const dir = await freshDir();
     // Measured shape of ~/.claude/settings.json on 2026-08-22: a pre-id mage's groups
-    // never reaped, so 44 registrations fire where 11 should.
+    // never reaped, so 48 registrations fire where 12 should.
     const tagged = upsertMageHooks(null).settings;
     const seeded: Record<string, unknown[]> = {};
     for (const [event, groups] of Object.entries(tagged.hooks ?? {})) {
@@ -906,13 +907,13 @@ describe("connect — legacy orphan reaping (#150)", () => {
       seeded[event] = [...orphans, ...groups];
     }
     await seed(dir, { hooks: seeded });
-    expect(Object.values(seeded).flat()).toHaveLength(44);
+    expect(Object.values(seeded).flat()).toHaveLength(48);
 
     const r = await connect({ cwd: dir, yes: true, gitHook: false });
-    expect(r.reaped).toBe(33);
+    expect(r.reaped).toBe(36);
 
     const after = Object.values(await readHooks(dir)).flat();
-    expect(after).toHaveLength(11);
+    expect(after).toHaveLength(12);
     expect(after.filter((g) => !g.id?.startsWith("mage:"))).toEqual([]);
   });
 });

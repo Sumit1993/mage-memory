@@ -109,7 +109,7 @@ describe("diffMageHooks", () => {
   });
 
   it("ignores commandeer rows by default — a base block still matches", () => {
-    const base = upsertMageHooks(null).settings; // 11 base rows, no commandeer
+    const base = upsertMageHooks(null).settings; // 12 base rows, no commandeer
     const d = diffMageHooks(base); // default: commandeer not expected
     expect(d.matches).toBe(true);
     expect(d.missingIds).toEqual([]);
@@ -430,8 +430,8 @@ describe("doctor env checks still run", () => {
     }
   });
 
-  it("MAGE_HOOKS length is the expected hook count (11 base + 3 commandeer)", () => {
-    expect(MAGE_HOOKS.length).toBe(14);
+  it("MAGE_HOOKS length is the expected hook count (12 base + 3 commandeer)", () => {
+    expect(MAGE_HOOKS.length).toBe(15);
   });
 
   it("skips the GitHub network probe under test (no 5s fetch → no timeout flake)", async () => {
@@ -837,7 +837,7 @@ describe("doctor --fix — hook-block drift refresh", () => {
     return { hooks };
   }
 
-  it("the live dark state (33 id-less BESIDE 11 tagged) reports red and actionable, not `hooks current`", async () => {
+  it("the live dark state (36 id-less BESIDE 12 tagged) reports red and actionable, not `hooks current`", async () => {
     const dir = await freshDir();
     await makeInRepoKb(dir, { gitignoreSinks: true });
     await writeLocalSettings(dir, darkState());
@@ -846,11 +846,11 @@ describe("doctor --fix — hook-block drift refresh", () => {
     const conn = check(r.checks, "connection");
     expect(conn?.ok).toBe(false);
     expect(conn?.detail).not.toMatch(/hooks current/);
-    expect(conn?.detail).toMatch(/duplicate-registrations=33/);
+    expect(conn?.detail).toMatch(/duplicate-registrations=36/);
     expect(conn?.detail).toMatch(/mage connect/); // actionable
   });
 
-  it("--fix collapses the dark state to exactly 11 tagged groups", async () => {
+  it("--fix collapses the dark state to exactly 12 tagged groups", async () => {
     const dir = await freshDir();
     await makeInRepoKb(dir, { gitignoreSinks: true });
     await writeLocalSettings(dir, darkState());
@@ -862,7 +862,7 @@ describe("doctor --fix — hook-block drift refresh", () => {
       await readFile(join(dir, ".claude", "settings.local.json"), "utf8"),
     ) as ClaudeSettings;
     const groups = Object.values(onDisk.hooks ?? {}).flat();
-    expect(groups).toHaveLength(11);
+    expect(groups).toHaveLength(12);
     expect(groups.filter((g) => typeof g.id !== "string")).toEqual([]);
   });
 
@@ -872,17 +872,16 @@ describe("doctor --fix — hook-block drift refresh", () => {
     const dark = darkState();
     // Drop every registration of one id → duplicates AND a missing id together,
     // the common upgrade shape the old early-return branch could never reach.
-    for (const ev of Object.keys(dark.hooks ?? {})) {
-      dark.hooks![ev] = (dark.hooks?.[ev] ?? []).filter(
-        (g) => g.hooks?.[0]?.command !== "mage nudge",
-      );
-    }
+    // `mage nudge` runs on SessionStart and Stop (#210), so drop only the SessionStart row.
+    dark.hooks!.SessionStart = (dark.hooks?.SessionStart ?? []).filter(
+      (g) => g.hooks?.[0]?.command !== "mage nudge",
+    );
     await writeLocalSettings(dir, dark);
 
     const conn = check((await doctor({ cwd: dir })).checks, "connection");
     expect(conn?.ok).toBe(false);
     expect(conn?.detail).toMatch(/missing=\[mage:nudge:SessionStart\]/);
-    expect(conn?.detail).toMatch(/duplicate-registrations=30/);
+    expect(conn?.detail).toMatch(/duplicate-registrations=33/);
   });
 
   it("#151 regression direction: a genuinely disconnected repo still reports DISCONNECTED", async () => {
