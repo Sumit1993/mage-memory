@@ -164,16 +164,27 @@ export function captureKey(sessionId: string, slug: string): string {
  * serialisation rather than object identity, so two structurally identical entries fold
  * to one.
  */
-export function mergeCcSource(existing: unknown, sessionId: string | undefined): unknown[] | undefined {
-  const out: unknown[] = [];
+export function mergeCcSource(
+  existing: unknown,
+  sessionId: string | undefined,
+): NoteFrontmatter["sources"] {
+  const out: NonNullable<NoteFrontmatter["sources"]> = [];
   const seen = new Set<string>();
   const push = (s: unknown) => {
-    if (s === null || s === undefined) return;
-    if (typeof s === "string" && s.length === 0) return;
-    const key = typeof s === "string" ? s : JSON.stringify(s);
+    // A string pointer or an object form (`- issue: "org/repo#1"`) is kept. Anything
+    // else — null, undefined, an empty string, a bare number — carries no pointer, and
+    // the pre-#199 code dropped it too.
+    if (typeof s === "string") {
+      if (s.length === 0 || seen.has(s)) return;
+      seen.add(s);
+      out.push(s);
+      return;
+    }
+    if (typeof s !== "object" || s === null || Array.isArray(s)) return;
+    const key = JSON.stringify(s);
     if (seen.has(key)) return;
     seen.add(key);
-    out.push(s);
+    out.push(s as Record<string, unknown>);
   };
   if (Array.isArray(existing)) for (const s of existing) push(s);
   if (sessionId) push(ccSource(sessionId));
@@ -235,7 +246,7 @@ export function recoverCcFrontmatter(fm: NoteFrontmatter): {
   if (status !== undefined) out.status = status as NoteFrontmatter["status"];
   const provenance = recover("provenance");
   if (provenance !== undefined) out.provenance = provenance as NoteFrontmatter["provenance"];
-  if (sources) out.sources = sources as NoteFrontmatter["sources"];
+  if (sources) out.sources = sources;
   const keywords = recover("keywords");
   if (keywords !== undefined) out.keywords = keywords as string[];
 

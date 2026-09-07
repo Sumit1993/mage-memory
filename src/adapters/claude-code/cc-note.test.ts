@@ -159,3 +159,15 @@ describe("recoverCcFrontmatter", () => {
     expect(frontmatter.tags).toEqual(["real/wing"]);
   });
 });
+
+describe("mergeCcSource: entries that carry no pointer", () => {
+  it("drops a bare number and a boolean, keeps the string and the object beside them", () => {
+    const out = mergeCcSource(["notes/a.md", 42, true, { issue: "org/repo#1" }], undefined);
+    expect(out).toEqual(["notes/a.md", { issue: "org/repo#1" }]);
+  });
+
+  it("drops a nested array, which is not a pointer shape", () => {
+    const out = mergeCcSource([["notes/a.md"], "notes/b.md"], undefined);
+    expect(out).toEqual(["notes/b.md"]);
+  });
+});
