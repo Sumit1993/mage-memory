@@ -1,5 +1,8 @@
+import { execFile } from "node:child_process";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 import { tmpDir } from "../../test/fixtures/kb.js";
 import {
@@ -1260,4 +1263,52 @@ describe("mage index — recall surface filtering & metadata genre overrides (AD
     // The root recall surface does not advertise the document-only wing.
     expect(await readIndex(join(dir, "mage"))).not.toContain("**paperwork**");
   });
+
+  describe("admission and readability checks", () => {
+    it("report mode writes the index and returns non-zero problem counts", async () => {
+      const dir = await vault();
+      // Note without admission fields
+      await note(dir, "unadmitted.md", "---\ntype: gotcha\ntags: [core/test]\n---\n# Unadmitted Note\n");
+      const r = await index({ dir });
+      expect(r.written.length).toBeGreaterThan(0);
+      expect(r.admissionProblems).toBeGreaterThan(0);
+      expect(typeof r.readabilityProblems).toBe("number");
+    });
+
+    it("strict mode writes nothing when admission or readability problems exist", async () => {
+      const dir = await vault();
+      await note(dir, "failing.md", "---\ntype: gotcha\ntags: [core/test]\n---\n# Failing Note\n");
+      const r = await index({ dir, strictAdmission: true });
+      expect(r.written).toEqual([]);
+      expect(r.passed).toBe(false);
+      expect(r.admissionProblems).toBeGreaterThan(0);
+    });
+
+    it("quiet suppresses the report but still counts problems", async () => {
+      const dir = await vault();
+      await note(dir, "silent.md", "---\ntype: gotcha\ntags: [core/test]\n---\n# Silent Note\n");
+      const r = await index({ dir, quiet: true });
+      expect(r.written.length).toBeGreaterThan(0);
+      expect(r.admissionProblems).toBeGreaterThan(0);
+      expect(typeof r.readabilityProblems).toBe("number");
+    });
+
+    it("CLI: --strict-admission exits non-zero on admission failure", async () => {
+      const dir = await vault();
+      await note(dir, "failing.md", "---\ntype: gotcha\ntags: [core/test]\n---\n# Failing Note\n");
+      const repoRoot = resolve(fileURLToPath(new URL(".", import.meta.url)), "../..");
+      const cliBin = join(repoRoot, "dist", "cli.js");
+      try {
+        await promisify(execFile)(process.execPath, [cliBin, "index", "--strict-admission", "-d", dir]);
+        expect.unreachable("expected index --strict-admission to exit non-zero");
+      } catch (err: any) {
+        expect(err.code).toBe(1);
+      }
+
+      // Proves that without --strict-admission, the same failing note reports problems but exits 0
+      const ok = await promisify(execFile)(process.execPath, [cliBin, "index", "-d", dir]);
+      expect(ok.stdout).toContain("problem(s)");
+    });
+  });
 });
+

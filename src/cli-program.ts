@@ -127,8 +127,13 @@ export function buildProgram(): Command {
       "-d, --dir <path>",
       "where to look for the knowledge base (default: cwd; walks up for in-repo)",
     )
+    .addOption(new Option("--strict-admission").hideHelp())
     .action(async (opts) => {
-      await index({ dir: opts.dir });
+      const result = await index({
+        dir: opts.dir,
+        strictAdmission: opts.strictAdmission === true,
+      });
+      if (!result.passed) process.exit(1);
     });
 
   // ─── skills ──────────────────────────────────────────────────────────────────

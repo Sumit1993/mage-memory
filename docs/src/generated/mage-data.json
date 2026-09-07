@@ -236,6 +236,10 @@
         {
           "flags": "-d, --dir <path>",
           "description": "where to look for the knowledge base (default: cwd; walks up for in-repo)"
+        },
+        {
+          "flags": "--strict-admission",
+          "description": ""
         }
       ]
     },

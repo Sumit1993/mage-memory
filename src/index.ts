@@ -53,6 +53,18 @@ export {
   index,
 } from "./commands/index-cmd.js";
 export {
+  type AdmissionFields,
+  type AdmissionProblem,
+  type Rung,
+  RUNGS,
+  checkAdmission,
+} from "./scanner/admission.js";
+export {
+  type ReadabilityProblem,
+  checkReadability,
+} from "./scanner/readability.js";
+
+export {
   type IngestCmdOptions,
   ingestCmd,
 } from "./commands/ingest.js";

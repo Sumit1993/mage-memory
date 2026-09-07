@@ -99,6 +99,44 @@ The lifecycle-relevant fields:
 
 The note's **title** is simply its first markdown `# H1`, falling back to the filename. You do not set a title in frontmatter.
 
+## Admission fields and readability rules
+
+Notes carry five admission fields checked during `mage index` ([#231](https://github.com/Sumit1993/mage-memory/issues/231)): `id` (`<unit>/<rung>/<slug>`), `rung` (`note`), `skipped` (reasons for skipping rungs above `note`), `trigger` (when to consult this guard), and `pointer` (a markdown link). Notes must also satisfy three readability rules ([#253](https://github.com/Sumit1993/mage-memory/issues/253)): length under 40 lines and 350 words, self-contained references with no unlinked documents, and plain words with no unslop words or em dashes.
+
+Both checks run in report mode today and exit 0. They will reject only after the backfill in [#213](https://github.com/Sumit1993/mage-memory/issues/213) and [#214](https://github.com/Sumit1993/mage-memory/issues/214) lands.
+
+Passing example:
+
+```markdown
+---
+id: repo/note/soak-monitor-blind-spots
+rung: note
+skipped:
+  impossible: "needs runtime context"
+  check: "behavioral, not static"
+  hook: "cannot observe cross-session"
+  rule: "agent ignored instruction"
+trigger: "when soak monitor misses an incident"
+pointer: "[issue #231](https://github.com/Sumit1993/mage-memory/issues/231)"
+---
+# Soak monitor blind spots
+
+Monitor logs for missed incidents.
+```
+
+Failing example:
+
+```markdown
+---
+id: repo/rule/mismatch
+rung: note
+trigger: ""
+---
+# Failing note
+
+Consult section 12.3 for details.
+```
+
 ## Notes are point-in-time
 
 A note records what was true *when it was written*. Code moves on; a note can quietly go wrong. mage treats every note as a snapshot, not a live truth, and gives you signals to catch drift:
