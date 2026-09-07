@@ -486,6 +486,7 @@
 <tr><td>A rule is measured by corrections and findings tagged with its id</td><td>Yes</td><td>settled 09-04</td></tr>
 <tr><td>Hard cap on admitted notes per unit, on top of the trigger rule (Reflexion caps stored reflections at 1 to 3)</td><td>Proposed: 12</td><td>operator</td></tr>
 <tr><td>Subagent blocks stay invisible in 0.1.0</td><td>Yes, documented blind spot</td><td>operator</td></tr>
+<tr><td>Who judges the rung, and how the judge is graded</td><td>The agent running groom judges; graded only by declines read back (#247); the human merge is consent, not review</td><td>operator</td></tr>
 <tr><td>The kit is a Claude Code plugin repo with a settings fragment and installer</td><td>Assumed from claude-kit</td><td>WP-9</td></tr>
 <tr><td>Telemetry ADR after 0.1.0, local ledger only until then</td><td>Yes</td><td>settled 09-03</td></tr>
 </table>
@@ -513,6 +514,7 @@
 <tr><td>A rule violated repeatedly</td><td>corrections and findings tagged with the rule id</td><td>Stale pass proposes a climb to a hook or check when the count passes the budget</td><td>#221</td></tr>
 <tr><td>A guard that fires very often</td><td>ledger count</td><td>Digest shows the top fires; the agent asks what upstream cause keeps triggering it</td><td>#210</td></tr>
 <tr><td>A block inside a subagent</td><td>none today</td><td>Subagent tool calls never reach the main-session hooks. Out of scope for 0.1.0; recorded as a known blind spot in the docs</td><td>after</td></tr>
+<tr><td>A planner or human adjudication</td><td><code>finding</code> {rule, path, text, pr}</td><td>An Agent-completion arm reads the subagent's final message and pipes marked findings to <code>mage observe</code> on stdin; a reviewer without a subagent pipes the same table by hand. Deferred until the P0 counts exist</td><td><a href="https://github.com/Sumit1993/mage-memory/issues/246">#246</a></td></tr>
 </table>
 <p><b>Verify before #209 is specced.</b> What Claude Code emits for a settings deny, a user "no" at the permission prompt, a hook exit-2 block, and a session ending mid-call. Only the first and third are a fix firing. Attribution: a hook block carries a <code>guard_fired</code>; a settings deny is an attempt-without-use whose tool and input match a deny rule mage can read from the settings files; anything else is not counted.</p>
 
@@ -550,7 +552,7 @@
 <p>The ledger is derived, never stored: <code>mage ledger</code> folds observe events per guard id. <b>prevented</b> for a deny is attempts-without-use attributed to its rule; for a hook it is <code>guard_fired</code> rows; for a check it is failed CI jobs whose job name is the guard id, read from the forge. A check that fails for another reason is not a fire, which is why the job name must equal the id. <b>A rule has no fire.</b> Its number is the count of corrections and findings tagged with its id after it landed; a falling count is the rule working, a rising one is a climb candidate. <b>left the queue</b> is note PRs merged that delete or replace a note. Counts are per machine for 0.1.0; the release notes quote the operator's.</p>
 
 <h3>12.7 Prune</h3>
-<p>One dial, <code>dream --stale-days</code>, default 90 for guards. A deny or hook with zero fires in the window is <b>dead</b> and gets a delete proposal. A check with zero fires stays; it costs nothing. A rule with zero tagged repeats is working, not dead; rules leave only by the agent's delete proposal during groom, or by climbing. A note whose trigger has not been observed in the window is dead.</p>
+<p>One dial, <code>dream --stale-days</code>, default 90 for guards. A deny or hook with zero fires in the window is <b>dead</b> and gets a delete proposal. A check with zero fires stays; it costs nothing. A rule with zero tagged repeats is working, not dead; rules leave only by the agent's delete proposal during groom, or by climbing. A note whose trigger has not been observed in the window is dead. The stale pass also reports declines per source rule and per proposal type (12.3); that is the only measure the loop keeps of its own judge (<a href="https://github.com/Sumit1993/mage-memory/issues/247">#247</a>, after the P0 counts).</p>
 
 <h3>12.8 The note schema</h3>
 <pre>id: repo/note/&lt;slug&gt;

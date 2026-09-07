@@ -128,3 +128,10 @@ kept. The nudge digest repoints from "chapters unmined" to "repeats and proposal
 frontmatter rewrite stays a bug to fix, not a reason to drop the hook. The Obsidian graph stops being a goal. Existing notes are routed by hand once, per
 the routing table, into issues in the repo where each fix lands. The docs site changes its
 first sentence.
+
+## Open, decided after the P0 counts
+
+- Adjudication as a stream: a planner's or a human reviewer's findings reach the loop as
+  `finding` events, not only a bot's. #246.
+- The judge is unmeasured: the loop grades guards and the queue; `declined` (12.3) is the only
+  judgement signal it keeps and nothing reads it back. #247.
