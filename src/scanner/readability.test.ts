@@ -156,3 +156,23 @@ The option is verified.
     expect(plainWords).toEqual([]);
   });
 });
+
+describe("readability: link matching stays linear (CodeQL js/polynomial-redos)", () => {
+  it("a line of 60000 open brackets finishes fast and reports nothing", () => {
+    // Measured: the old `[^\\]]*` link regex takes 1932ms on this input, the new one 1ms.
+    const body = `${"[".repeat(60_000)} section 12.3`;
+    const start = Date.now();
+    const problems = checkReadability(`---\ntype: note\n---\n\n${body}\n`);
+    const elapsed = Date.now() - start;
+    // Quadratic matching on this input takes seconds; linear takes milliseconds.
+    expect(elapsed).toBeLessThan(1000);
+    // The bare "section 12.3" is still caught, so the fix did not disable rule 2.
+    expect(problems.some((p) => /section/i.test(p.message))).toBe(true);
+  });
+
+  it("a normal markdown link still exempts the reference it carries", () => {
+    const body = "See [section 12.3](https://example.com/plan.html) for the detail.";
+    const problems = checkReadability(`---\ntype: note\n---\n\n${body}\n`);
+    expect(problems.filter((p) => /section/i.test(p.message))).toHaveLength(0);
+  });
+});

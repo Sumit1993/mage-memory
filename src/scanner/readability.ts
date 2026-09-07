@@ -122,7 +122,11 @@ export function checkReadability(rawFile: string): ReadabilityProblem[] {
     // Rule 2: Self-contained references
     // Find all markdown link spans on this line: [text](target)
     const linkRanges: [number, number][] = [];
-    const linkRegex = /\[[^\]]*\]\([^)]*\)/g;
+    // `[^\][]*` rather than `[^\]]*`: excluding `[` from the link-text class stops the
+    // scan restarting at every `[`, which is quadratic on a line of `[[[[[` (CodeQL
+    // js/polynomial-redos). `mage index` runs in CI on third-party PRs, so the input
+    // is not always ours. Cost: link text holding an unescaped `[` no longer matches.
+    const linkRegex = /\[[^\][]*\]\([^()]*\)/g;
     let lm: RegExpExecArray | null;
     while ((lm = linkRegex.exec(line)) !== null) {
       linkRanges.push([lm.index, lm.index + lm[0].length]);
