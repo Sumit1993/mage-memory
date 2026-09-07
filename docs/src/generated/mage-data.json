@@ -245,7 +245,7 @@
     },
     {
       "name": "skills",
-      "summary": "(Re)generate one auto-loaded skill per wing into .claude/skills/ and .agents/skills/",
+      "summary": "Retired signpost: use `mage index` instead",
       "aliases": [],
       "hidden": false,
       "options": [
@@ -269,7 +269,7 @@
     },
     {
       "name": "footprint",
-      "summary": "report mage's context-window cost: launch surfaces, yield, pointer leverage",
+      "summary": "Retired signpost: use `mage doctor` instead",
       "aliases": [],
       "hidden": false,
       "options": [
@@ -317,7 +317,7 @@
     },
     {
       "name": "ingest",
-      "summary": "Enumerate + classify ingestable sources under <dir> (read-only) — what `mage:learn --from` distills.",
+      "summary": "Retired signpost: use `mage groom` instead",
       "aliases": [],
       "hidden": true,
       "options": [
@@ -329,7 +329,7 @@
     },
     {
       "name": "distill",
-      "summary": "Read observed .mage/learnings into note candidates (plumbing behind mage:groom Phase 1)",
+      "summary": "Retired signpost: use `mage groom` instead",
       "aliases": [],
       "hidden": true,
       "options": [
@@ -349,7 +349,7 @@
     },
     {
       "name": "promote",
-      "summary": "Fold note-read usage into graduate proposals (plumbing behind mage:graduate)",
+      "summary": "Retired signpost: use `mage groom` instead",
       "aliases": [],
       "hidden": true,
       "options": [
@@ -368,8 +368,15 @@
       ]
     },
     {
+      "name": "graduate",
+      "summary": "Retired signpost: use `mage groom` instead",
+      "aliases": [],
+      "hidden": true,
+      "options": []
+    },
+    {
       "name": "stage",
-      "summary": "Stage a short lesson draft into .mage/staging/ (frictionless inline capture — the organic grooming loop)",
+      "summary": "Retired signpost: use `mage observe` instead",
       "aliases": [],
       "hidden": true,
       "options": [
@@ -660,7 +667,7 @@
     },
     {
       "name": "dashboard",
-      "summary": "Generate this KB's dashboard (Dashboard.md + Knowledge.base; --html adds the interactive cockpit)",
+      "summary": "Retired signpost: use `mage index` instead",
       "aliases": [],
       "hidden": false,
       "options": [
