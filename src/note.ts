@@ -42,8 +42,13 @@ export interface NoteFrontmatter {
   updated?: string;
   /** For staleness / re-verification. */
   provenance?: Provenance;
-  /** POINTERS to canonical sources (url | ticket | file:line) — never copies (ADR-0004). */
-  sources?: string[];
+  /**
+   * POINTERS to canonical sources (url | ticket | file:line) — never copies (ADR-0004).
+   * A hand-written note may use the object form (`- issue: "org/repo#1"`); flatten
+   * carries those through rather than dropping them (#199), so readers must narrow
+   * before treating an entry as a string.
+   */
+  sources?: (string | Record<string, unknown>)[];
   status?: NoteStatus;
   /** Cheap staleness signal. */
   last_reviewed?: string;
