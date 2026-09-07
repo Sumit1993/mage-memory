@@ -19,6 +19,8 @@ export const RETIRED_VERB_MESSAGES = {
 
 export type RetiredVerb = keyof typeof RETIRED_VERB_MESSAGES;
 
-export function printRetiredVerb(verb: RetiredVerb): void {
+export function printRetiredVerb(verb: RetiredVerb, quiet: boolean): void {
+  if (quiet) return;
   console.log(RETIRED_VERB_MESSAGES[verb]);
 }
+
