@@ -3,8 +3,8 @@ type: decision
 tags:
   - mage/decisions
 created: "2026-06-21"
-updated: 2026-08-22
-last_reviewed: 2026-08-22
+updated: 2026-09-07
+last_reviewed: 2026-09-07
 status: active
 provenance:
   repo: mage-memory
@@ -221,6 +221,26 @@ This closes the "non-compacting user never sees a keeper" gap while preserving t
   recurrence internals change; the compact path, the backlog count line, and its 4h throttle are
   unchanged — and the shared read fixes a latent staleness where a compact's appended chapter could miss
   the cached tally.
+
+## Amendment (2026-09-07): session receipt moves to Stop, SessionStart goes quiet
+
+**Problem.** Earlier iterations placed chapter digests and backlog tallies on `SessionStart` (ADR-0029 and the 2026-07-10 amendment). In daily use, greeting the developer with backlog tallies and chapter digests at session startup introduced unwanted cognitive load and friction. Startup should be fast, quiet, and unobtrusive. Meanwhile, when a turn ends or the session stops, the developer has no concise feedback on whether guards fired, corrections happened, or failure signatures were observed.
+
+**Decision:**
+
+1. **Stop hook emits a session receipt.** A new hook registration (`mage:nudge:Stop` calling `mage nudge`) runs on the `Stop` event. It tallies session-scoped events from the scratch log:
+   - `denied`: guard-blocked actions (`guard_fired` events).
+   - `corrected`: substantive user correction prompts following tool use or assistant messages.
+   - `new signatures`: distinct failure signatures observed during the session.
+   - `guard fires`: count of `guard_fired` rows.
+   The receipt is emitted as a single line:
+   `mage: <N> denied · <N> corrected · <N> new signatures · <N> guard fires`
+   If all four counts are zero, or if the directory lacks a knowledge base, `Stop` prints nothing.
+
+2. **SessionStart goes quiet.** The chapter digest, backlog tally, keep-rate calculation, and weekly dream-health tick are removed from `SessionStart`. `SessionStart` now prints nothing unless:
+   - Proposals are waiting: it prints a single line (`mage · 1 proposal is waiting` or plural).
+   - A linked hub or grant check fails: it prints a single status warning.
+   Otherwise, startup is completely silent.
 
 ## Relations
 
