@@ -63,7 +63,7 @@ describe("mage migrate", () => {
         schema: "mage.v1",
         name: "h",
         created_at: "t",
-        projects: [{ name: "a", storage: "in-repo", code_repo_path: "/a", code_repo_url: "u" }],
+        projects: [{ name: "a", storage: "in-repo", code_repo_url: "u" }],
       }),
     );
     const result = await mageMigrate({ dir: hub });
@@ -177,8 +177,8 @@ describe("mage migrate — state fold (ADR-0025)", () => {
       kind: "hub",
       schema: 2,
       projects: [
-        { name: "alpha", storage: "repo-owned", code_repo_path: "/a", code_repo_url: "u" },
-        { name: "beta", storage: "repo-owned", code_repo_path: "/b", code_repo_url: "u" },
+        { name: "alpha", storage: "repo-owned", code_repo_url: "u" },
+        { name: "beta", storage: "repo-owned", code_repo_url: "u" },
       ],
     });
     const alpha = join(hub, "projects", "alpha");
@@ -207,7 +207,7 @@ describe("mage migrate — state fold (ADR-0025)", () => {
       kind: "hub",
       schema: 2,
       projects: [
-        { name: "alpha", storage: "repo-owned", code_repo_path: "/a", code_repo_url: "u" },
+        { name: "alpha", storage: "repo-owned", code_repo_url: "u" },
       ],
     });
     const alpha = join(hub, "projects", "alpha");

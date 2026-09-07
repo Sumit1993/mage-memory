@@ -89,9 +89,9 @@ per-repo:
 Because those settings are local and gitignored, a fresh clone or a new worktree
 of the same repo starts without them — run `mage connect` again there.
 
-If you already have several repos registered, `mage connect --all-projects` run
-from the hub wires each registered project's code repo in turn (still repo-local
-each).
+Each registered repo is wired by running `mage connect` inside it, and
+`mage link` already does that for the repo it links; there is no hub-side sweep
+because the hub does not record where its projects' checkouts live (ADR-0047 §4).
 
 ## 4. Verify with `mage doctor`
 

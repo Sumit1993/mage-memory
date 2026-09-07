@@ -316,17 +316,6 @@ describe("renderCockpitHtml — JSON island minimisation", () => {
     expect(html).not.toContain("/abs/repo/mage");
   });
 
-  it("reduces hub registry codePath to a basename (no absolute member paths)", () => {
-    const d = cold();
-    d.meta = { ...d.meta, kind: "hub", kbName: "the-hub" };
-    d.registry = [
-      { name: "member-a", repoUrl: "git@example:member-a.git", codePath: "/abs/code/member-a", cloned: true },
-    ];
-    const html = renderCockpitHtml(d);
-    expect(html).not.toContain("/abs/code/member-a"); // absolute path stripped.
-    expect(html).toContain("member-a"); // basename / name still present.
-  });
-
   it("does not mutate the input snapshot when sanitising the island", () => {
     const d = populated();
     const before = d.meta.root;
@@ -379,8 +368,8 @@ describe("renderCockpitHtml — cold state", () => {
     const d = cold();
     d.meta = { ...d.meta, kind: "hub", kbName: "the-hub" };
     d.registry = [
-      { name: "member-a", repoUrl: "git@example:member-a.git", codePath: "/code/a", cloned: true },
-      { name: "member-b", repoUrl: "", codePath: "/code/b", cloned: false },
+      { name: "member-a", repoUrl: "git@example:member-a.git" },
+      { name: "member-b", repoUrl: "" },
     ];
     expect(() => renderCockpitHtml(d)).not.toThrow();
     const html = renderCockpitHtml(d);
