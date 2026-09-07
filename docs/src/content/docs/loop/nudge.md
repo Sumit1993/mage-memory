@@ -7,7 +7,7 @@ sidebar:
 
 Inline capture is the primary lesson path: as you work, the agent stages a lesson the first time something is worth remembering. But agents forget. The **boundary nudge** is the safety-net for what inline capture missed. It is the command `mage nudge`, and it fires at the chapter boundary, surfacing what the chapter left behind so the host agent can mine it.
 
-The nudge **writes nothing**. It is a read-only artifact injected into your host agent's session ([ADR-0029](https://github.com/Sumit1993/mage-memory/blob/main/mage/decisions/0029-digest-to-agent-capture.md)): mage narrows and templates, the host agent judges and writes, your `git commit` confirms. The engine never calls a model and never stages a draft of its own — the agent does that with `mage stage` when it recognizes a lesson.
+The nudge **writes nothing**. It is a read-only artifact injected into your host agent's session ([ADR-0029](https://github.com/Sumit1993/mage-memory/blob/main/mage/decisions/0029-digest-to-agent-capture.md)): mage narrows and templates, the host agent judges and writes, your `git commit` confirms. The engine never calls a model and never captures a proposal of its own: the agent routes capture toward `mage observe` when it recognizes durable signal.
 
 ## When it fires
 
@@ -39,7 +39,7 @@ On a firing source, `mage nudge` composes up to two parts and emits them as `add
 
 ### 1. The fresh-chapter digest
 
-On a firing start, mage reads the last-closed chapter from the captured scratch (`.mage/learnings/`) — on `compact` the chapter that just closed; on `startup`/`resume` the prior session's final one, with an offer-first note appended — and renders an **earned-signal inventory** — the failures, external commands, and corrections it observed, in the order they happened. The artifact is explicitly framed as *raw material, not lessons*: mage is not claiming any line is worth keeping, and most are noise. The host agent reads it, recognizes any durable lesson, and captures it with `mage stage`. The digest carries no time window — it is deduped once per chapter, so a chapter already surfaced never surfaces again.
+On a firing start, mage reads the last-closed chapter from the captured scratch (`.mage/learnings/`) — on `compact` the chapter that just closed; on `startup`/`resume` the prior session's final one, with an offer-first note appended — and renders an **earned-signal inventory** — the failures, external commands, and corrections it observed, in the order they happened. The artifact is explicitly framed as *raw material, not lessons*: mage is not claiming any line is worth keeping, and most are noise. The host agent reads it, recognizes durable signal, and routes capture toward `mage observe`. The digest carries no time window — it is deduped once per chapter, so a chapter already surfaced never surfaces again.
 
 ### 2. The autonomy-scaled backlog mandate
 

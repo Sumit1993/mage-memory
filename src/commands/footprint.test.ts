@@ -4,6 +4,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { tmpDir } from "../../test/fixtures/kb.js";
 import { init } from "./init.js";
 import { footprint } from "./footprint.js";
+import { buildProgram } from "../cli-program.js";
+import { RETIRED_VERB_MESSAGES } from "./retired.js";
 import { AUTO_MEMORY_MAX_BYTES } from "../adapters/claude-code/constants.js";
 
 afterEach(() => {
@@ -190,5 +192,23 @@ describe("mage footprint", () => {
     const out = lines.join("\n");
     
     expect(out.toLowerCase()).not.toContain("saved");
+  });
+});
+
+describe("mage footprint signpost", () => {
+  it("prints that footprint has retired and exits 0", async () => {
+    const program = buildProgram();
+    program.exitOverride();
+    const lines: string[] = [];
+    const origLog = console.log;
+    console.log = (...msgs: unknown[]) => {
+      lines.push(msgs.map((m) => String(m)).join(" "));
+    };
+    try {
+      await program.parseAsync(["footprint"], { from: "user" });
+      expect(lines.join("\n")).toBe(RETIRED_VERB_MESSAGES.footprint);
+    } finally {
+      console.log = origLog;
+    }
   });
 });

@@ -38,11 +38,13 @@ describe("integration: release smoke (deterministic)", () => {
     expect(skills).toEqual(["graduate", "groom", "guide", "learn", "optimize"]);
   });
 
-  it("distill --json emits valid JSON on a fresh KB", async () => {
+  it("distill --json prints the retired message and exits 0", async () => {
     const { dir } = await initKb();
     const { stdout, code } = await runMage(["distill", "--json"], { cwd: dir });
     expect(code).toBe(0);
-    expect(() => JSON.parse(stdout)).not.toThrow();
+    expect(stdout.trim()).toBe(
+      "mage distill has retired. Use `mage groom` instead.\nCandidate distillation is folded into groom.",
+    );
   });
 
   it("the Gate-0 hook command fails OPEN on malformed stdin (never crashes the host)", async () => {

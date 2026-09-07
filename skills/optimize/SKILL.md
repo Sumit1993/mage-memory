@@ -5,7 +5,7 @@ description: |
   half of the self-grooming loop. Fires when the user says "optimize", "are my
   skills firing right", "tune my triggers", or periodically once context-match has
   enough loads to judge. Reads the read-only context-match report
-  (`mage skills --metrics --json`), and for each weak trigger judges a sharper
+  (`mage index --metrics --json`), and for each weak trigger judges a sharper
   one-line `description` and applies a bounded reword — or, when a skill never
   fits, a demote — by piping a Proposal to `mage dream --apply`. Nudge-invoked,
   human-confirmed, never auto-committed.
@@ -39,7 +39,7 @@ applier is the choke point that refuses anyway.
 
 ## reword vs demote — read the row, not your gut
 
-`mage skills --metrics --json` emits one advisory row per skill, worst-first:
+`mage index --metrics --json` emits one advisory row per skill, worst-first:
 
 ```jsonc
 { "skill": "mage-skill-<slug>", "trigger_hash": "<hash>", "loads": 12, "matchRate": 0.18, "status": "demote-suggested" }
@@ -67,7 +67,7 @@ trigger has no signal to optimize against yet.
 
 2. **Read the context-match report (read-only).**
    ```bash
-   mage skills --metrics --json
+   mage index --metrics --json
    ```
    It folds the git-ignored `.mage/metrics/` rollup and prints the rows above
    (worst-first). It **never** edits a skill — it only flags. If every row is
@@ -106,7 +106,7 @@ trigger has no signal to optimize against yet.
    commits.
 
 5. **Watch the fresh window, and ratchet back if worse.** A reworded trigger
-   starts a clean bucket. Re-run `mage skills --metrics --json` after the next
+   starts a clean bucket. Re-run `mage index --metrics --json` after the next
    stretch of work; if the new trigger's rate is **worse** than the old one, the
    reword was a mistake — back it off:
    ```bash
@@ -148,7 +148,7 @@ trigger has no signal to optimize against yet.
 
 ## Worked example — a trigger that kept mis-firing
 
-`mage skills --metrics --json` returns (worst-first):
+`mage index --metrics --json` returns (worst-first):
 
 ```jsonc
 [

@@ -9,7 +9,7 @@ Once a note [graduates](./promote-graduate.md) into a `mage-skill-<slug>`, that 
 
 A generated skill auto-loads on its frontmatter `description:` trigger. **Context-match** measures whether the work that *followed* a load actually touched that skill's wing, keywords, or files. It is a real predicate, not a usage counter — a skill that loads constantly but never matches the following work is pure cost with no payoff.
 
-The match data is rolled up by a hook: `mage:metrics:Stop` runs `mage skills --metrics --quiet` at the end of each turn, folding the context-match signal into a git-ignored `.mage/metrics/` rollup. (See the [Hooks reference](../reference/hooks.mdx).) Optimize reads that rollup.
+The match data is rolled up by a hook: `mage:metrics:Stop` runs `mage index --metrics --quiet` at the end of each turn, folding the context-match signal into a git-ignored `.mage/metrics/` rollup. (See the [Hooks reference](../reference/hooks.mdx).) Optimize reads that rollup.
 
 ## Two moves: reword, or demote
 
@@ -20,7 +20,7 @@ Optimize is driven by the `/mage:optimize` skill. It reads the read-only context
 
 ```bash
 # (Plumbing the /mage:optimize skill reads for you.) The read-only report:
-mage skills --metrics --json
+mage index --metrics --json
 ```
 
 The report does the threshold math and emits a `status` per skill (`ok`, `reword-suggested`, or `demote-suggested`), worst-first. You trust the status rather than re-deriving the rate.

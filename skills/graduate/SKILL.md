@@ -4,7 +4,7 @@ description: |
   Push a proven procedural note up into its own auto-loadable Procedure skill.
   Fires when the user says "graduate", "make this a skill", or when
   `mage:groom` surfaces a proven note that saw continued usage (was read across enough distinct chapters).
-  Reads the deterministic graduation reader (`mage promote --json`) for
+  Reads the deterministic graduation reader (`mage groom --json`) for
   `action: "graduate"` proposals, shows the human the backing note plus the
   note-read usage evidence, and on confirm pipes the graduate Proposal JSON to
   `mage dream --apply` — the single writer that mints `mage-skill-<slug>`,
@@ -42,7 +42,7 @@ write through the single applier.
 
 2. **Run the deterministic graduation reader.**
    ```bash
-   mage promote --json
+   mage groom --json
    ```
    It emits a `PromoteManifest`. Every proposal is now `action: "graduate"` —
    ADR-0038 deleted the `action: "note"` rung, so there is no other kind to filter out:
@@ -103,7 +103,7 @@ write through the single applier.
 
 ## Worked example — a proven gotcha graduates
 
-`/mage:groom` surfaced, and you ran `mage promote --json`, which returned:
+`/mage:groom` surfaced, and you ran `mage groom --json`, which returned:
 
 ```jsonc
 {
