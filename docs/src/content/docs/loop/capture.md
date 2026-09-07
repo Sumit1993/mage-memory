@@ -61,6 +61,71 @@ Like `mage observe`, Gate-0 is **fail-open**: any stdin/parse/redact/filesystem 
 
 For the exact event names, hook ids, and the command each runs, see the [Hooks reference](../reference/hooks.mdx).
 
+## Note admission under the notes folder
+
+When a write or edit targets a file under the `notes/` directory, Gate-0 runs an admission check on the frontmatter before bytes reach disk.
+
+A note must explain why it belongs on the note rung rather than a higher rung. It provides this explanation through four frontmatter fields:
+
+- `rung`: the rung name (such as `note`).
+- `skipped`: a map stating why each higher rung was skipped (for `note`: `impossible`, `check`, `hook`, and `rule`).
+- `trigger`: a single line describing the condition that brings this note back.
+- `pointer`: a markdown link pointing to the issue, pull request, or file behind the note.
+
+The hook evaluates writes along this decision path:
+
+1. **Target check**: If the target sits outside `notes/`, the write passes untouched. Nothing in the codebase yet marks a file as a proposal, so this check is the only gate; a proposal-file exemption is future work, not implemented here.
+2. **Session history**: If the target was already refused once during the current session, the hook stays silent and does not refuse again.
+3. **Admission validation**: If all four fields are present and valid, the write proceeds through the normal path. If any of the four fields is missing or invalid, the hook refuses the write with a fixed plain-text reply.
+
+### Worked example: passing frontmatter
+
+This note supplies all four admission fields, so the hook admits it:
+
+```markdown
+---
+rung: note
+skipped:
+  impossible: cannot be ruled out by types
+  check: behavioral, not static
+  hook: cannot observe across sessions
+  rule: agent needs a lesson
+trigger: when soak monitor misses an incident
+pointer: "[issue #229](https://github.com/Sumit1993/mage-memory/issues/229)"
+---
+# Soak monitor blind spots
+
+Body text.
+```
+
+### Worked example: refused frontmatter
+
+This note lacks `rung`, `skipped`, `trigger`, and `pointer`:
+
+```markdown
+---
+title: Soak monitor blind spots
+tags:
+  - monitoring
+---
+# Soak monitor blind spots
+
+Body text.
+```
+
+Gate-0 refuses this write with the following reply:
+
+```
+mage:mage/guard/note-admission
+
+This write was stopped because the note does not say why it is a note.
+A note is the last rung. Four rungs sit above it: impossible, check,
+hook, rule. Say in one line each why this cannot be one of those, in a
+`skipped:` block, and add `rung:`, `trigger:` and `pointer:`.
+
+Then write it again, or open a proposal instead.
+```
+
 ## What happens to the scratch
 
 Capture only writes the trail. The later stages read it:
