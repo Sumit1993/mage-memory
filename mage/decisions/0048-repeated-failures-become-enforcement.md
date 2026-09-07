@@ -84,11 +84,11 @@ the observe log because the observer listens after the call.
    Memory works in every mode without any of this; the loop needs one writable scope.
 6. **Two numbers gate 0.1.0.** `prevented`: a landed fix fired (a denied call, a hook block or
    rewrite, a failed check). `left the queue`: a note promoted or deleted. The gate is
-   `prevented` above zero for three distinct fixes, at least one on a unit other than
-   mage-memory, and `left the queue` above zero. The ledger is derived from observe events
-   and lives under `.mage/` (ADR-0025); a kit fix counts in whichever unit it fires. Nothing
-   new is committed; the release notes quote the counts. Replaces the a1 gate of ADR-0024 and
-   ADR-0040.
+   `prevented` above zero for three distinct guards (landed fixes at rungs 1 to 3), at
+   least one on a unit other than mage-memory, and `left the queue` above zero. The ledger
+   is derived from observe events and lives under `.mage/` (ADR-0025); a kit fix counts in
+   whichever unit it fires. Nothing new is committed; the release notes quote the counts.
+   Replaces the a1 gate of ADR-0024 and ADR-0040.
 7. **The ladder runs before a memory is written.** Native memory stays on and pointed at the
    store; the moment the agent tries to save a lesson is the trigger. The ADR-0032 PreToolUse
    memory hook is repointed, not removed: it blocks the write, returns the ladder, and admits
@@ -118,7 +118,7 @@ the observe log because the observer listens after the call.
   to the proposal applier); 0034 (adopt's import half moves to migrate); 0035 (native memory stays a feeder, through the hook); 0037; 0040
   (named release stays, gate is decision 6, evidence goes in the release notes); 0044; 0046
   (a proposal PR may also target the code repo or the kit, under decision 5's consent).
-- Unchanged and load-bearing: 0004, 0008, 0009, 0010, 0014, 0036, 0042 to 0045, 0047. 0021
+- Unchanged and load-bearing: 0004, 0008, 0009, 0010, 0014, 0036, 0042, 0043, 0045, 0047. 0021
   gets its own telemetry ADR after 0.1.0.
 
 ## Consequences

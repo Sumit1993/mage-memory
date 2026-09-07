@@ -15,6 +15,7 @@ supersedes: ADRs this supersedes (if any)
 
 Branch: docs/adr-0048-enforcement-redirection.
 ADR count verified against ls mage/decisions/*.md | wc -l = 48.
+Statuses reflect the tree at PR #206's head; the ADR files are authoritative.
 
 ---
 
@@ -38,12 +39,12 @@ supersedes: none
 
 ### 0003 - Track work units and notes; git-ignore only artifacts and scratch
 date:       2026-05-29
-status:     active
+status:     superseded
 because:    mage's founding goal is "durable portable knowledge that doesn't get lost," which fails if in-progress work units are ignored.
 decides:    commit notes/, decisions/, work/*.md; git-ignore only work/*/artifacts/ (raw/large/binary) and .mage/learnings/ (pre-promotion scratch).
 constrains: .gitignore, mage/work/, mage/notes/.
 amends:     none
-supersedes: none
+supersedes: superseded by ADR-0048
 
 ### 0004 - Capture insight, procedure, and pointers -- not copies of sources
 date:       2026-05-29
@@ -60,7 +61,7 @@ status:     active
 because:    two competing "durable" stores produce a split-brain where neither is trustworthy.
 decides:    mage is the canonical source of truth for durable knowledge; CC native auto-memory stays on as a feeder but is not canonical or portable; mage:learn harvests insights from it.
 constrains: src/adapters/claude-code/, metadata.json, skills/learn/SKILL.md.
-amends:     amended by ADR-0048 (native memory is off, not a feeder)
+amends:     amended by ADR-0048 (native memory stays a feeder; its write triggers the ladder hook)
 supersedes: none
 
 ### 0006 - Two-layer recall: per-wing auto-loaded skills + a hierarchical factual index
@@ -173,21 +174,21 @@ supersedes: none
 
 ### 0018 - mage distill: the observed-scratch reader (capture, on first sight)
 date:       2026-06-08
-status:     active
+status:     superseded
 because:    the raw .learnings/ event stream is too noisy for a host agent to mine manually; a deterministic reader must filter and cluster before the agent judges.
 decides:    mage distill --json is pure plumbing: reads .mage/learnings/ from the per-session watermark forward, clusters un-distilled CLOSED segments, emits a DistillManifest; mage:groom is the judgment skill layered on top; watermark advances only on explicit --seen.
 constrains: src/distill/, src/commands/distill-cmd.ts, skills/groom/SKILL.md (Phase 1).
-amends:     amended by ADR-0048 (distill leaves the CLI)
-supersedes: none
+amends:     none
+supersedes: superseded by ADR-0048
 
 ### 0019 - mage promote: self-grooming (recurrence, graduation, merge/split)
 date:       2026-06-08
-status:     active
+status:     superseded
 because:    a note proven by recurrence across many sessions earns auto-loading as a skill without manual curation.
 decides:    mage promote --json is a second deterministic fold over .mage/learnings/: per-pattern (wing+tags) recurrence tally, distinct-session counting; proposals are only action: "graduate" (ADR-0038 deleted the note-proposal rung); notes at or above M chapter-reads with type procedure/gotcha become graduate proposals.
 constrains: src/grooming/, src/commands/promote-cmd.ts, .mage/metrics/tally.json.
 amends:     amended by ADR-0024 (graduation deferred in 0.0.12), ADR-0038 (note-proposal rung deleted)
-supersedes: none
+supersedes: superseded by ADR-0048
 
 ### 0020 - The dashboard: a per-KB, no-server generated view (option D)
 date:       2026-06-09
@@ -227,12 +228,12 @@ supersedes: none
 
 ### 0024 - Organic grooming loop: the lesson path (inline-primary + boundary nudge)
 date:       2026-06-16
-status:     active
+status:     superseded
 because:    three months of capture-only design produced zero organic note creations; CC memory over the same period minted real first-sight lessons, proving the "lesson path" (first-sight -> note) matters more than the "procedure path" (recurrence -> skill).
 decides:    three epistemic states (.learnings/ raw, .staging/ judged drafts, notes/ committed); inline-primary via mage stage + always-on AGENTS.md instruction; boundary safety-net via mage nudge on SessionStart(compact); no embedded judge (model-free); anti-flood budget of 3 drafts per pass + reject ledger.
 constrains: src/commands/stage-cmd.ts, src/commands/groom-cmd.ts, src/adapters/claude-code/nudge.ts, src/grooming/staging.ts.
 amends:     ADR-0013 (batch confirm bends the per-note confirm), ADR-0019 (graduation deferred in 0.0.12)
-supersedes: none
+supersedes: superseded by ADR-0048
 
 ### 0025 - One transient-state home (.mage/) + redact config in metadata.json
 date:       2026-06-16
@@ -303,8 +304,8 @@ status:     accepted
 because:    the host agent writes lessons to its own native memory at the moment of discovery; intercepting that write is the lowest-friction capture path.
 decides:    when CC auto-memory is on and a docs root resolves, commandeer autoMemoryDirectory to the KB docs root; Gate-0 (memory-hook PreToolUse) scrubs topic note writes in-flight and denies writes to generated indexes; Gate-0 does not reshape frontmatter (CC overrides it post-write; flatten owns the durable normalization).
 constrains: src/adapters/claude-code/memory-hook.ts, src/adapters/claude-code/settings.ts, src/commands/connect.ts (commandeer tier).
-amends:     none
-supersedes: ADR-0048 supersedes this
+amends:     amended by ADR-0048 (the memory hook carries the ladder)
+supersedes: none
 
 ### 0033 - Recall: @import the bounded root index into the host's auto-loaded context
 date:       2026-06-25
@@ -353,12 +354,12 @@ supersedes: none
 
 ### 0038 - promote's note-proposal rung is deleted; graduate repoints to note-read usage
 date:       2026-07-19
-status:     accepted
+status:     superseded
 because:    a live soak across four KB roots produced ~115 recurrence buckets and 0 durable proposals; the note-proposal rung was the killed deterministic-selection pattern from ADR-0029 one step further removed.
 decides:    delete the action: "note" rung from promote; every proposal is now action: "graduate"; graduation gating switches from context-match to note-read usage across distinct chapters; context-match governs only reword/demote post-graduation.
 constrains: src/commands/promote-cmd.ts, src/grooming/note-reads.ts, src/grooming/tally.ts, skills/groom/SKILL.md (Phase 2).
 amends:     ADR-0019 (note-proposal rung deleted), ADR-0016 (context-match scope narrowed to post-graduation)
-supersedes: none
+supersedes: superseded by ADR-0048
 
 ### 0039 - Measure the context footprint; bound the generated launch surface
 date:       2026-07-19
@@ -380,12 +381,12 @@ supersedes: none
 
 ### 0041 - Genre decides the recall rung: one store, three recall paths
 date:       2026-07-27
-status:     proposed
+status:     superseded
 because:    the existing type vocabulary mixed note types that should be auto-loaded with types that should only be recalled on demand, causing INDEX.md bloat.
 decides:    one store, three recall rungs: Rung 1 skill (context-triggered, graduated notes), Rung 2 index line (always loaded, MEMORY.md-eligible, memory-genre only), Rung 3 on demand (note body, every note); genre is derived from a closed type: vocabulary exported from src/scanner/ -- no second field.
 constrains: src/scan.ts (genre map), src/commands/index-cmd.ts (MEMORY.md filter), skills/guide/SKILL.md (type table).
 amends:     ADR-0035 (genre filter added to recall)
-supersedes: ADR-0048 supersedes this
+supersedes: superseded by ADR-0048
 
 ### 0042 - The reach tier: mage grants the harness access to an out-of-repo knowledge base
 date:       2026-07-27
@@ -445,10 +446,10 @@ supersedes: none
 date:       2026-09-03
 status:     proposed
 because:    three months of capture produced 39 notes of which 3 chapters in this repo read any note; routed through an enforcement ladder, 17 notes were programs waiting to be written and 9 were one-line rules -- the store was enforcement debt, not memory.
-decides:    mage is the loop that turns a repeated failure into enforcement by proposing the highest-rung fix (architecture > check > hook > rule > note) and landing it by pull request; a note is admitted only with a named trigger moment and is expected to leave when the trigger is fixed; native auto-memory is off; two numbers gate 0.1.0: bad actions prevented by a landed fix, and notes that left the queue.
+decides:    mage is the loop that turns a repeated failure into enforcement by proposing the highest-rung fix (architecture > check > hook > rule > note) and landing it by pull request; a note is admitted only with a named trigger moment and is expected to leave when the trigger is fixed; native memory stays on and its write triggers the ladder hook; two numbers gate 0.1.0: bad actions prevented by a landed fix, and notes that left the queue.
 constrains: all prior ADRs (see Effect on prior decisions in the ADR file).
-amends:     ADR-0001 (charter), ADR-0005 (native memory off), ADR-0006 (roster bounded), ADR-0013 (skills measured by firing), ADR-0033 (roster bounded)
-supersedes: ADR-0018, ADR-0019, ADR-0024, ADR-0029, ADR-0032, ADR-0038, ADR-0041
+amends:     ADR-0001, 0005, 0006, 0013, 0015, 0016, 0017, 0021, 0029, 0030, 0031, 0032, 0033, 0034, 0035, 0037, 0039, 0040, 0044, 0046 (per the ADR's effect ledger)
+supersedes: ADR-0003, ADR-0018, ADR-0019, ADR-0024, ADR-0038, ADR-0041
 
 ---
 

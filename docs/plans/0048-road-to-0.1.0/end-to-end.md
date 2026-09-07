@@ -38,13 +38,13 @@ convention lands in gh-workflows as a reusable workflow. Same loop, different la
 ## mage: CLI
 
 Keep as is: init, index, link, unlink, verify, list, status, autonomy, redact, footprint.
-Keep, amended: connect (asks for the kit, installs the PreToolUse observe arm, never
-commandeers), doctor (kit reachable, streams configured, ledger present, ladder hook installed),
+Keep, amended: connect (asks for the kit, installs the PreToolUse observe arm and the
+ladder memory hook), doctor (kit reachable, streams configured, ledger present, ladder hook installed),
 migrate (the 0.0.x clearing), observe (gains tool_attempt), nudge (digest repointed to
 repeats, proposals and stale), dream (health report gains never-fired fixes and silent
 triggers), skills (generator plus the fire metrics; no graduation), groom --propose (gains
 output types and landing scope; the PR path for every rung).
-Decommission: distill, promote, flatten, stage, the dashboard HTML cockpit (Dashboard.md may
+Decommission: distill, promote, stage, the dashboard HTML cockpit (Dashboard.md may
 stay as a generated summary), adopt (fold its "import existing notes" half into migrate;
 its "harvest native memory" half is replaced by the ladder hook at write time).
 No new verbs. The ledger is a file that dream and doctor read. A stream is a file that observe
@@ -63,7 +63,7 @@ reword-or-demote pass folds into groom's stale pass, driven by the same fire met
 The kit already is the proof that enforcement works: delegate-check, organizer-seat, no-haiku,
 no-broad-agy-kill, pr-created, release-docs-gate are rung-3 fixes written by hand for repeated
 failures. What is missing is the count. Build first, before any mage code: a tiny shared
-`hooks/lib/report.sh` that appends one observe event to the current repo's `.mage/learnings/`
+`hooks/lib/report.sh` that pipes one observe event to `mage observe` on stdin (Gate-1 holds)
 when a kit hook blocks or rewrites. Every existing hook becomes measurable in one afternoon,
 and "prevented" gets its first real rows without waiting for mage's loop.
 Also in the kit: the deny list in the settings fragment grows as rung-1 fixes land (WebFetch
@@ -89,7 +89,7 @@ were lane upkeep that should have been zero.
 - npm and the marketplace: one deprecation release (0.0.19) where retired verbs print their
   replacement; description sentences updated; the marketplace reinstalled locally because a
   directory-source plugin serves a stale snapshot.
-- Telemetry: local ledger in git until 0.1.0; ADR-0049 afterwards for opt-in export to a
+- Telemetry: ledger under git-ignored `.mage/`, never committed, until 0.1.0; ADR-0049 after for opt-in export to a
   self-hosted worker, gh-workflows as the reference.
 - The operator's own habit: when something is learned, the first question is "which rung",
   not "which note". The guide skill asks it; the learn skill enforces it.
