@@ -196,19 +196,19 @@ export async function index(opts: IndexOptions = {}): Promise<IndexResult> {
 // ─── registry decoration (ADR-0011 §3, ADR-0012 §2) ──────────────────────────
 
 interface RegistryView {
-  /** wing name → code-repo reference (url ?? path), for heading decoration. */
+  /** wing name → code-repo URL, for heading decoration. */
   decorationByWing: Map<string, string>;
   /** in-repo members: notes live in their own repo; shown as a pointer, never empty. */
-  inRepoMembers: Array<{ name: string; codeRepoPath: string }>;
+  inRepoMembers: Array<{ name: string; codeRepoUrl: string }>;
 }
 
 function buildRegistryView(projects: HubProject[]): RegistryView {
   const decorationByWing = new Map<string, string>();
   for (const p of projects)
-    decorationByWing.set(p.name, p.code_repo_url || p.code_repo_path);
+    decorationByWing.set(p.name, p.code_repo_url);
   const inRepoMembers = projects
     .filter((p) => p.storage === "repo-owned")
-    .map((p) => ({ name: p.name, codeRepoPath: p.code_repo_path }))
+    .map((p) => ({ name: p.name, codeRepoUrl: p.code_repo_url }))
     .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
   return { decorationByWing, inRepoMembers };
 }
@@ -234,7 +234,7 @@ function pushLinkedRepos(lines: string[], reg: RegistryView): void {
   lines.push("## Linked repositories", "");
   for (const m of reg.inRepoMembers) {
     lines.push(
-      `- **${m.name}** — notes live in \`${m.codeRepoPath}/mage\` → open its INDEX (in-repo member)`,
+      `- **${m.name}** — notes live in that repo's \`mage/\`${m.codeRepoUrl ? ` (\`${m.codeRepoUrl}\`)` : ""} → open its INDEX (in-repo member)`,
     );
   }
   lines.push("");

@@ -624,8 +624,8 @@ describe("paths — schema migration (Dec 9 / v1 → v2)", () => {
         name: "h",
         created_at: "t",
         projects: [
-          { name: "a", storage: "in-repo", code_repo_path: "/a", code_repo_url: "ua" },
-          { name: "b", storage: "hub-owned", code_repo_path: "/b", code_repo_url: "ub" },
+          { name: "a", storage: "in-repo", code_repo_url: "ua" },
+          { name: "b", storage: "hub-owned", code_repo_url: "ub" },
         ],
       }),
     );
@@ -659,7 +659,7 @@ describe("paths — schema migration (Dec 9 / v1 → v2)", () => {
       schema: "mage.v2",
       name: "h",
       created_at: "t",
-      projects: [{ name: "a", storage: "hub-owned", code_repo_path: "/a", code_repo_url: "u" }],
+      projects: [{ name: "a", storage: "hub-owned", code_repo_url: "u" }],
     };
     expect(normalizeHubMetadata(hub)).toBe(hub);
   });
@@ -694,7 +694,6 @@ describe("paths — schema migration (Dec 9 / v1 → v2)", () => {
       const projects = names.map((name) => ({
         name,
         storage: "hub-owned",
-        code_repo_path: "",
         code_repo_url: "",
       }));
       await writeFile(

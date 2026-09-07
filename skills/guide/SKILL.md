@@ -189,4 +189,4 @@ Code-repo side (`<repo>/mage/metadata.json`):
 }
 ```
 
-Hub side (`<hub>/metadata.json`, at the root): `{ schema, name, created_at, projects: [{ name, storage, code_repo_path, code_repo_url }] }`.
+Hub side (`<hub>/metadata.json`, at the root): `{ schema, name, created_at, projects: [{ name, storage, code_repo_url }] }`.
