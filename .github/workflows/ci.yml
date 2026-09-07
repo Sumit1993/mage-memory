@@ -54,6 +54,13 @@ jobs:
       - name: Test
         run: pnpm test
 
+      # The integration suite exercises the built CLI against a real filesystem
+      # and git. Measured at ~8s including the build (#243). MAGE_LIVE is unset,
+      # so the billed live tests skip themselves.
+      - name: Integration tests
+        if: matrix.node-version == 22
+        run: pnpm test:integration
+
       - name: Pack the publishable tarball
         if: matrix.node-version == 22
         run: |

@@ -7,6 +7,7 @@ import { createHash } from "node:crypto";
 import {
   type AssistantMsgEvent,
   type CompactEvent,
+  type GuardFiredEvent,
   OBSERVE_SCHEMA_VERSION,
   PATH_MAX,
   type SessionEndEvent,
@@ -74,6 +75,23 @@ export function buildSessionEnd(base: EventBase, reason?: string): SessionEndEve
   const e: SessionEndEvent = { v: OBSERVE_SCHEMA_VERSION, ts: base.ts, session: base.session, type: "session_end" };
   // Omit `reason` entirely when absent (consumers tolerate absence, §2).
   return reason === undefined ? e : { ...e, reason };
+}
+
+export function buildGuardFired(
+  base: EventBase,
+  guardId: string,
+  tool: string,
+  detail: string | null,
+): GuardFiredEvent {
+  return {
+    v: OBSERVE_SCHEMA_VERSION,
+    ts: base.ts,
+    session: base.session,
+    type: "guard_fired",
+    guard_id: guardId,
+    tool,
+    detail,
+  };
 }
 
 // ─── deterministic per-tool path extraction (§5) ─────────────────────────────

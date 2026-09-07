@@ -10,6 +10,7 @@ import { Command } from "commander";
 import {
   buildAssistantMsg,
   buildCompact,
+  buildGuardFired,
   buildSessionEnd,
   buildSessionStart,
   buildSkillLoad,
@@ -27,6 +28,9 @@ import {
   ASSISTANT_MSG_MAX,
   DETAIL_MAX,
   ERROR_SUMMARY_MAX,
+  GUARD_ID_MAX,
+  GUARD_TOOL_MAX,
+  isGuardId,
   isObserveEventType,
   type ObserveEvent,
   type ObserveEventType,
@@ -172,7 +176,23 @@ async function mapEvent(
       const reason = str(payload.reason);
       return reason === undefined ? buildSessionEnd(base) : buildSessionEnd(base, reason);
     }
+
+    case "guard_fired":
+      return mapGuardFired(payload, base);
   }
+}
+
+function mapGuardFired(payload: Record<string, unknown>, base: EventBase): ObserveEvent | null {
+  const guardId = payload.guard_id;
+  if (typeof guardId !== "string" || guardId.length > GUARD_ID_MAX || !isGuardId(guardId)) {
+    return null;
+  }
+  const tool = payload.tool;
+  if (typeof tool !== "string" || tool.trim().length === 0 || tool.length > GUARD_TOOL_MAX) {
+    return null;
+  }
+  const detail = scrubField(str(payload.detail) ?? null, DETAIL_MAX);
+  return buildGuardFired(base, guardId, tool, detail);
 }
 
 /**
@@ -186,6 +206,9 @@ async function mapEvent(
  * (the subagent transcript) is the one capture seam for autonomous work.
  */
 function inferType(payload: Record<string, unknown>): ObserveEventType | null {
+  if (typeof payload.guard_id === "string") {
+    return "guard_fired";
+  }
   const hook = str(payload.hook_event_name);
   switch (hook) {
     case "SessionStart":
