@@ -1,6 +1,6 @@
 import { appendFile, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { tmpDir, withKb } from "../../../test/fixtures/kb.js";
 import { readStagedDrafts } from "../../grooming/staging.js";
 import {
@@ -10,9 +10,10 @@ import {
   type EventBase,
 } from "../../observe/events.js";
 import type { ObserveEvent } from "../../observe/types.js";
-import { chosenHubRoot, learningsPath, stagingPath } from "../../paths.js";
+import { METADATA_SCHEMA, chosenHubRoot, learningsPath, stagingPath } from "../../paths.js";
 import { emitNudge, nudgeCmd } from "./nudge.js";
 import * as footprintModule from "../../metrics/footprint.js";
+import * as reachGrantModule from "../../reach-grant.js";
 import { buildNudgeCommand } from "./nudge.js";
 import { readTrend } from "../../metrics/footprint-trend.js";
 
@@ -582,3 +583,156 @@ describe("mage nudge — unreachable external hub (ADR-0045 §6)", () => {
   });
 });
 
+describe("mage nudge — KB access grant (#202)", () => {
+  // Isolate HOME: the check unions LOCAL + USER scope (CC concatenates array settings
+  // across scopes), so a real ~/.claude grant would mask a missing local one.
+  let home: string;
+  let origHome: string | undefined;
+
+  beforeEach(async () => {
+    home = await tmpDir("mage-reachhome-");
+    origHome = process.env.HOME;
+    process.env.HOME = home;
+  });
+  afterEach(() => {
+    if (origHome === undefined) delete process.env.HOME;
+    else process.env.HOME = origHome;
+  });
+
+  async function externalRepo(opts: { hubExists: boolean }): Promise<{
+    code: string;
+    hub: string;
+  }> {
+    const hub = await tmpDir("mage-reachdr-hub-");
+    const code = await tmpDir("mage-reachdr-code-");
+    const hubPath = opts.hubExists ? hub : join(hub, "gone");
+    if (opts.hubExists) {
+      await mkdir(join(hub, "projects", "engine", "notes"), { recursive: true });
+      await writeFile(
+        join(hub, "metadata.json"),
+        JSON.stringify({ schema: METADATA_SCHEMA, name: "h", created_at: "", projects: [] }),
+      );
+    }
+    await mkdir(join(code, "mage"), { recursive: true });
+    await writeFile(
+      join(code, "mage", "metadata.json"),
+      JSON.stringify({
+        schema: METADATA_SCHEMA,
+        mode: "external",
+        project: "engine",
+        hub_path: hubPath,
+        hub_repo: null,
+        hub_refs: [],
+        linked_at: "",
+      }),
+    );
+    return { code, hub: hubPath };
+  }
+
+  async function writeLocalGrant(code: string, dirs: string[]): Promise<void> {
+    await mkdir(join(code, ".claude"), { recursive: true });
+    await writeFile(
+      join(code, ".claude", "settings.local.json"),
+      `${JSON.stringify({ permissions: { additionalDirectories: dirs } }, null, 2)}\n`,
+    );
+  }
+
+  async function hybridRepo(opts: { hubExists: boolean }): Promise<{
+    code: string;
+    hub: string;
+  }> {
+    const hub = await tmpDir("mage-reachdr-hybrid-hub-");
+    const code = await tmpDir("mage-reachdr-hybrid-code-");
+    const hubPath = opts.hubExists ? hub : join(hub, "gone");
+    if (opts.hubExists) {
+      await mkdir(join(hub, "projects", "engine", "notes"), { recursive: true });
+      await writeFile(
+        join(hub, "metadata.json"),
+        JSON.stringify({ schema: METADATA_SCHEMA, name: "h", created_at: "", projects: [] }),
+      );
+    }
+    await mkdir(join(code, "mage", "notes"), { recursive: true });
+    await writeFile(join(code, "mage", "notes", "overview.md"), "# Engine\n");
+    await writeFile(
+      join(code, "mage", "metadata.json"),
+      JSON.stringify({
+        schema: METADATA_SCHEMA,
+        mode: "hybrid",
+        project: "engine",
+        hub_path: null,
+        hub_repo: null,
+        hub_refs: [
+          {
+            hub_path: hubPath,
+            hub_repo: null,
+            project: "engine",
+            storage: "repo-owned",
+            linked_at: "",
+          },
+        ],
+        linked_at: "",
+      }),
+    );
+    return { code, hub: hubPath };
+  }
+
+  it("hub present, no grant → both channels name the grant and mage connect, on startup and again on resume", async () => {
+    const { code, hub } = await externalRepo({ hubExists: true });
+    const r = await nudgeCmd({ cwd: code, source: "startup", sessionId: "s1" });
+    expect(r.ran).toBe(true);
+    expect(r.notice).toMatch(/access grant/);
+    expect(r.notice).toContain(hub);
+    expect(r.nudge).toMatch(/mage connect/);
+    expect(r.nudge).toMatch(/NOT run `mage init`/);
+
+    const rResume = await nudgeCmd({ cwd: code, source: "resume", sessionId: "s1" });
+    expect(rResume.notice).toBe(r.notice);
+  });
+
+  it("hybrid mode: hub present, no grant → names only external hub as unreachable; in-repo notes are readable", async () => {
+    const { code, hub } = await hybridRepo({ hubExists: true });
+    const r = await nudgeCmd({ cwd: code, source: "startup", sessionId: "s1" });
+    expect(r.ran).toBe(true);
+    expect(r.notice).toMatch(/access grant/);
+    expect(r.notice).toContain(hub);
+    expect(r.nudge).toMatch(/in-repo notes.*readable/i);
+    expect(r.nudge).toMatch(/only the external hub is unreachable/i);
+    expect(r.nudge).not.toContain("cannot read a single note");
+    expect(r.nudge).toMatch(/mage connect/);
+    expect(r.nudge).toMatch(/NOT run `mage init`/);
+  });
+
+  it("grant present → no grant text", async () => {
+    const { code, hub } = await externalRepo({ hubExists: true });
+    await writeLocalGrant(code, [hub]);
+    const r = await nudgeCmd({ cwd: code, source: "startup", sessionId: "s1" });
+    expect(r.notice ?? "").not.toMatch(/access grant/);
+    expect(r.nudge ?? "").not.toMatch(/access grant/);
+  });
+
+  it("in-repo KB → no grant text", async () => {
+    const { dir } = await withKb({ kind: "repo" });
+    const r = await nudgeCmd({ cwd: dir, source: "startup", sessionId: "s1" });
+    expect(r.notice ?? "").not.toMatch(/access grant/);
+    expect(r.nudge ?? "").not.toMatch(/access grant/);
+  });
+
+  it("hub absent → the unreachable-hub message speaks, not the grant line", async () => {
+    const { code } = await externalRepo({ hubExists: false });
+    const r = await nudgeCmd({ cwd: code, source: "startup", sessionId: "s1" });
+    expect(r.notice).toMatch(/unreachable/);
+    expect(r.notice).not.toMatch(/access grant/);
+  });
+
+  it("a throwing grant check leaves the nudge intact (fail-open)", async () => {
+    const { code } = await externalRepo({ hubExists: true });
+    const baseline = await nudgeCmd({ cwd: code, source: "startup", sessionId: "s1" });
+
+    vi.spyOn(reachGrantModule, "reachGrantStatus").mockRejectedValue(new Error("boom"));
+
+    const r = await nudgeCmd({ cwd: code, source: "startup", sessionId: "s1" });
+    expect(r.ran).toBe(baseline.ran);
+    expect(r.drafted).toBe(baseline.drafted);
+    expect(r.pending).toBe(baseline.pending);
+  });
+});

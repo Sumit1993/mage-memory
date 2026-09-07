@@ -1427,6 +1427,46 @@ describe("doctor — KB access grant, the reach tier (ADR-0042)", () => {
     expect(r.passed).toBe(false);
   });
 
+  it("hybrid mode: hub present but no grant → FAILS, noting in-repo notes are readable", async () => {
+    const hub = await tmpDir("mage-reachdr-hybrid-hub-");
+    const code = await tmpDir("mage-reachdr-hybrid-code-");
+    await mkdir(join(hub, "projects", "engine", "notes"), { recursive: true });
+    await writeFile(
+      join(hub, "metadata.json"),
+      JSON.stringify({ schema: METADATA_SCHEMA, name: "h", created_at: "", projects: [] }),
+    );
+    await mkdir(join(code, "mage", "notes"), { recursive: true });
+    await writeFile(join(code, "mage", "notes", "index.md"), "# Local\n");
+    await writeFile(
+      join(code, "mage", "metadata.json"),
+      JSON.stringify({
+        schema: METADATA_SCHEMA,
+        mode: "hybrid",
+        project: "engine",
+        hub_path: null,
+        hub_repo: null,
+        hub_refs: [
+          {
+            hub_path: hub,
+            hub_repo: null,
+            project: "engine",
+            storage: "repo-owned",
+            linked_at: "",
+          },
+        ],
+        linked_at: "",
+      }),
+    );
+    const r = await doctor({ cwd: code });
+    const c = check(r.checks, "KB access grant");
+    expect(c?.ok).toBe(false);
+    expect(c?.detail).toContain(hub);
+    expect(c?.detail).toMatch(/in-repo notes are readable/);
+    expect(c?.detail).toMatch(/hub is unreachable/);
+    expect(c?.detail).toMatch(/mage connect/);
+    expect(r.passed).toBe(false);
+  });
+
   it("grant present → passes", async () => {
     const { code, hub } = await externalRepo({ hubExists: true });
     await writeLocalGrant(code, [hub]);
