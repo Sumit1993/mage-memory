@@ -155,6 +155,8 @@ const HOOK_PURPOSE: Record<string, string> = {
   "mage:nudge:SessionStart":
     "The boundary nudge: on a post-compaction SessionStart, surface the just-closed chapter's earned-signal digest (failures, external commands, corrections) as additionalContext for the agent to mine and `mage stage` (ADR-0029). The additionalContext is scaled by the per-KB autonomy level (Operator/Approver/Overseer, ADR-0030): at Operator it is a reminder; at Approver/Overseer it becomes the agent's mandate to groom and write durable notes into the working tree (uncommitted, Gate-2 enforced). It also carries a deterministic capped backlog tally — staged drafts, unmined closed chapters (capped at 9+), and graduation-eligible signatures from the persisted promote tally — rendered as one work-list line. Fires on SessionStart source compact/startup/resume (clear stays a fast no-op); the backlog scan is mtime-gated so a no-new-scratch startup/resume stays ~instant.",
   "mage:observe:UserPromptSubmit": "Capture the prompt's intent.",
+  "mage:observe:PreToolUse":
+    "Capture a tool_attempt — a call was requested. Paired with the tool_use it produces by tool_use_id; an attempt with no matching use means the call was blocked (#209).",
   "mage:observe:PostToolUse": "Capture each tool use — which tool, which files, which skill loaded.",
   "mage:observe:PostToolUseFailure": "Capture tool failures (a distinct salient signal).",
   "mage:observe:PreCompact": "Mark the chapter boundary just before the host compacts.",
