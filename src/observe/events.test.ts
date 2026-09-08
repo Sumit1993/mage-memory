@@ -3,13 +3,14 @@ import {
   buildGuardFired,
   buildSessionEnd,
   buildSessionStart,
+  buildToolAttempt,
   buildToolUse,
   type EventBase,
   extractDetail,
   extractPaths,
   triggerHash,
 } from "./events.js";
-import { DETAIL_MAX, isGuardId, OBSERVE_SCHEMA_VERSION } from "./types.js";
+import { DETAIL_MAX, isGuardId, isObserveEventType, OBSERVE_SCHEMA_VERSION } from "./types.js";
 
 const BASE: EventBase = { ts: "2026-06-06T00:00:00.000Z", session: "sess-1" };
 
@@ -34,9 +35,10 @@ describe("event builders (ADR-0015 §1–§4)", () => {
     expect(e.source).toBe("SessionStart");
   });
 
-  it("buildToolUse for Read → paths carries the file, detail null, ok true", () => {
+  it("buildToolUse for Read → paths carries the file, detail null, ok true, tool_use_id carried through", () => {
     const e = buildToolUse(BASE, {
       tool: "Read",
+      tool_use_id: "toolu_01B4RKqNsR8Skqv7BpgzBGdX",
       paths: ["/abs/file.ts"],
       detail: null,
       ok: true,
@@ -44,6 +46,7 @@ describe("event builders (ADR-0015 §1–§4)", () => {
     });
     expect(e.type).toBe("tool_use");
     expect(e.tool).toBe("Read");
+    expect(e.tool_use_id).toBe("toolu_01B4RKqNsR8Skqv7BpgzBGdX");
     expect(e.paths).toEqual(["/abs/file.ts"]);
     expect(e.detail).toBeNull();
     expect(e.ok).toBe(true);
@@ -68,6 +71,32 @@ describe("event builders (ADR-0015 §1–§4)", () => {
     expect(e.guard_id).toBe("kit/guard/no-haiku");
     expect(e.tool).toBe("Agent");
     expect(e.detail).toBe("model=haiku");
+  });
+
+  it("buildToolUse with no tool_use_id still writes the key as null (#209)", () => {
+    // The pairing key must be present on every row, so a reader can tell
+    // "the host sent none" from "this row predates the field".
+    const e = buildToolUse(BASE, { tool: "Read", paths: [], detail: null, ok: true, error_summary: null });
+    expect("tool_use_id" in e).toBe(true);
+    expect(e.tool_use_id).toBeNull();
+  });
+
+  it("buildToolAttempt stamps v:1, ts/session, and fields", () => {
+    const e = buildToolAttempt(BASE, {
+      tool: "Bash",
+      tool_use_id: "toolu_01B4RKqNsR8Skqv7BpgzBGdX",
+      paths: [],
+      detail: "uname -a",
+    });
+    expect(e.v).toBe(OBSERVE_SCHEMA_VERSION);
+    expect(e.v).toBe(1);
+    expect(e.ts).toBe(BASE.ts);
+    expect(e.session).toBe(BASE.session);
+    expect(e.type).toBe("tool_attempt");
+    expect(e.tool).toBe("Bash");
+    expect(e.tool_use_id).toBe("toolu_01B4RKqNsR8Skqv7BpgzBGdX");
+    expect(e.paths).toEqual([]);
+    expect(e.detail).toBe("uname -a");
   });
 });
 
@@ -173,6 +202,16 @@ describe("isGuardId validator", () => {
     expect(isGuardId("kit/hook/x")).toBe(false);
     expect(isGuardId("kit//guard//x")).toBe(false);
     expect(isGuardId("kit/guard/no--haiku")).toBe(false);
+  });
+});
+
+describe("isObserveEventType validator", () => {
+  it("accepts tool_attempt (#209)", () => {
+    expect(isObserveEventType("tool_attempt")).toBe(true);
+  });
+
+  it("rejects a bogus type", () => {
+    expect(isObserveEventType("nonsense")).toBe(false);
   });
 });
 

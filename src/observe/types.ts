@@ -15,7 +15,8 @@ export type ObserveEventType =
   | "tool_use"
   | "compact"
   | "session_end"
-  | "guard_fired";
+  | "guard_fired"
+  | "tool_attempt";
 
 /** The event-type literals as a runtime set, for boundary validation. */
 const OBSERVE_EVENT_TYPES: ReadonlySet<string> = new Set<ObserveEventType>([
@@ -27,6 +28,7 @@ const OBSERVE_EVENT_TYPES: ReadonlySet<string> = new Set<ObserveEventType>([
   "compact",
   "session_end",
   "guard_fired",
+  "tool_attempt",
 ]);
 
 /**
@@ -119,6 +121,8 @@ export interface ToolUseEvent extends ObserveEnvelope {
   type: "tool_use";
   /** tool_name verbatim (e.g. "Bash", "Read"). */
   tool: string;
+  /** Shared with the matching tool_attempt; null on rows written before this field existed. */
+  tool_use_id: string | null;
   /** Structured-input path extraction only (§5); [] for Bash. */
   paths: string[];
   /** Per-tool salient field, scrubbed, ≤ DETAIL_MAX; null when paths carry it. */
@@ -152,6 +156,19 @@ export interface GuardFiredEvent extends ObserveEnvelope {
   detail: string | null;
 }
 
+/** tool_attempt — a tool call was requested. A matching tool_use means it ran. */
+export interface ToolAttemptEvent extends ObserveEnvelope {
+  type: "tool_attempt";
+  /** tool_name verbatim. */
+  tool: string;
+  /** The harness invocation id, shared with the matching tool_use. */
+  tool_use_id: string;
+  /** Structured-input path extraction only; [] for Bash. */
+  paths: string[];
+  /** Per-tool salient field, scrubbed, ≤ DETAIL_MAX; null when paths carry it. */
+  detail: string | null;
+}
+
 export type ObserveEvent =
   | SessionStartEvent
   | UserPromptEvent
@@ -160,7 +177,8 @@ export type ObserveEvent =
   | ToolUseEvent
   | CompactEvent
   | SessionEndEvent
-  | GuardFiredEvent;
+  | GuardFiredEvent
+  | ToolAttemptEvent;
 
 // ─── bounds (named, exported) ────────────────────────────────────────────────
 
