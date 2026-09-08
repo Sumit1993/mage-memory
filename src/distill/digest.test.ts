@@ -15,10 +15,10 @@ import type { ObserveEvent } from "../observe/types.js";
 
 let seq = 0;
 function bash(detail: string, ok = true, error_summary: string | null = null): ObserveEvent {
-  return { v: 1, ts: `t${seq++}`, session: "s", type: "tool_use", tool: "Bash", paths: [], detail, ok, error_summary: ok ? null : error_summary };
+  return { v: 1, ts: `t${seq++}`, session: "s", type: "tool_use", tool: "Bash", tool_use_id: null, paths: [], detail, ok, error_summary: ok ? null : error_summary };
 }
 function fail(error_summary: string, tool = "Bash"): ObserveEvent {
-  return { v: 1, ts: `t${seq++}`, session: "s", type: "tool_use", tool, paths: [], detail: null, ok: false, error_summary };
+  return { v: 1, ts: `t${seq++}`, session: "s", type: "tool_use", tool, tool_use_id: null, paths: [], detail: null, ok: false, error_summary };
 }
 function prompt(text: string): ObserveEvent {
   return { v: 1, ts: `t${seq++}`, session: "s", type: "user_prompt", text };
