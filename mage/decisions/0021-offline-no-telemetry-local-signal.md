@@ -16,6 +16,8 @@ sources:
 
 # 0021 — mage stays offline: no phone-home telemetry; signal is local + voluntarily shared
 
+> Amended by [ADR-0048](0048-repeated-failures-become-enforcement.md) on 2026-09-03: a read of the user's own forge with the user's own credentials, invoked by the operator or a hook and never in the background, is not phone-home; the review-findings puller runs under that carve-out. Telemetry gets its own ADR after 0.1.0.
+
 A 2026-06-09 grill asked whether to add telemetry so the project could "make better
 enhancements." mage's whole identity — **offline · user-owned · no server · privacy-first**,
 with *metrics never enter git* and redaction as a **security boundary** ("a miss becomes

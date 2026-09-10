@@ -2,9 +2,9 @@
 type: decision
 tags: [mage/decisions]
 created: "2026-06-08"
-updated: "2026-06-08"
-last_reviewed: "2026-06-08"
-status: active
+updated: "2026-09-03"
+last_reviewed: "2026-09-03"
+status: superseded
 provenance:
   repo: mage-memory
   work: grill-distill-0.0.7
@@ -17,6 +17,7 @@ sources:
 ---
 
 # 0018 — `mage distill`: the observed-scratch reader (capture, on first sight)
+> Superseded by [ADR-0048](0048-repeated-failures-become-enforcement.md) on 2026-09-03.
 
 A 2026-06-08 grill locked **distill** — release 0.0.7, the stage that turns the
 keystone `.learnings/*.jsonl` ([ADR-0015](0015-mage-observe-capture-schema.md)) into

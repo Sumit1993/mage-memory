@@ -2,8 +2,8 @@
 type: decision
 tags: [mage/decisions]
 created: "2026-06-20"
-updated: "2026-06-20"
-last_reviewed: "2026-06-20"
+updated: "2026-09-03"
+last_reviewed: "2026-09-03"
 status: active
 provenance:
   repo: mage-memory
@@ -22,6 +22,7 @@ sources:
 ---
 
 # 0029 — Digest-to-agent capture: deterministic narrowing, agent judgment (supersedes prose-keyed)
+> Amended by [ADR-0048](0048-repeated-failures-become-enforcement.md) on 2026-09-03: Target is the rung proposal, not the lesson. Shape unchanged.
 
 > Status: supersedes [ADR-0028](0028-prose-keyed-capture.md) (prose-keyed, gate-KILLED 0/55) and,
 > transitively, [ADR-0027](0027-faultline-friction-capture-trigger.md) (Faultline, gate-KILLED 0/62).

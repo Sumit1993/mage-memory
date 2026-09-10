@@ -3,8 +3,8 @@ type: decision
 tags:
   - mage/decisions
 created: "2026-06-28"
-updated: 2026-07-01
-last_reviewed: 2026-07-01
+updated: 2026-09-03
+last_reviewed: 2026-09-03
 status: accepted
 provenance:
   repo: mage-memory
@@ -33,6 +33,7 @@ keywords:
 ---
 
 # 0035 — Notes are memories: one unified store; embrace the harness format at rest, normalize at the durable boundary
+> Amended by [ADR-0048](0048-repeated-failures-become-enforcement.md) on 2026-09-03: native memory remains inside the unified store as a feeder, gated by the ladder hook (decision 7). Flatten stays until #200 is fixed at the source.
 
 > **Status: accepted (ratified 2026-07-01 — impl on `main`, riding 0.0.12).** Amends [ADR-0032](0032-capture-redirect-native-memory.md). Output of the
 > 2026-06-28 comparative study (18 harnesses + memory systems) and a grill that surfaced the

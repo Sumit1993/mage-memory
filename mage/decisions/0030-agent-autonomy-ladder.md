@@ -25,6 +25,8 @@ sources:
 
 # 0030 — Opt-in agent autonomy ladder for the grooming loop (Operator / Approver / Overseer)
 
+> Amended by [ADR-0048](0048-repeated-failures-become-enforcement.md) on 2026-09-03: §2's backlog tally becomes one line of repeats and proposals; the graduation clauses in §1 and §6 lapse with ADR-0038. The merge stays the human gate at every level.
+
 > Status: extends the [ADR-0029](0029-digest-to-agent-capture.md) digest→agent loop with an **opt-in,
 > per-KB autonomy dial**. Realizes the "loosening over time" [ADR-0009](0009-no-runtime-automation-rides-host-hooks.md)
 > explicitly anticipated ("starts human-confirm; graduates to auto-promote — the homunculus ladder"),

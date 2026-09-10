@@ -14,6 +14,8 @@ sources:
 
 # 0016 — Context-match, the confidence ladder, and the single applier
 
+> Amended by [ADR-0048](0048-repeated-failures-become-enforcement.md) on 2026-09-03: a note or fix deletion that lands only as a reviewed pull request diff (ADR-0046) is not the hard-delete §3 forbids; on-disk deletion by the applier stays forbidden.
+
 The 2026-06-06 grill that fixed the capture schema
 ([ADR-0015](0015-mage-observe-capture-schema.md)) also locked the *compute* that reads
 it — the part [ADR-0013](0013-procedure-skills-self-grooming-loop.md) §3/§4/§6 named

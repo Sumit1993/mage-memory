@@ -3,8 +3,8 @@ type: decision
 tags:
   - mage/decisions
 created: "2026-07-31"
-updated: 2026-08-22
-last_reviewed: 2026-08-22
+updated: 2026-09-03
+last_reviewed: 2026-09-03
 status: accepted
 provenance:
   repo: mage-memory
@@ -35,6 +35,7 @@ keywords:
 ---
 
 # 0044 — Setup is a conversation over one address (ADR-C, Wave C of ADR-0041)
+> Amended by [ADR-0048](0048-repeated-failures-become-enforcement.md) on 2026-09-03: Two more questions: which kit, which streams.
 
 > **Status: accepted (2026-08-22; grilled 2026-07-31).** This is the ADR-C that
 > [ADR-0041](0041-genre-decides-the-recall-rung.md)'s wave plan named and never

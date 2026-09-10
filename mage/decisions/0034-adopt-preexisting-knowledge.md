@@ -39,6 +39,8 @@ keywords:
 
 # 0034 — Adopt: a dispatcher for onboarding pre-existing knowledge
 
+> Amended by [ADR-0048](0048-repeated-failures-become-enforcement.md) on 2026-09-03: `adopt`'s import half moves into `mage migrate`; the dispatcher verb is deprecated in 0.0.19 and removed after.
+
 > **Status: accepted (ratified 2026-07-01 — impl on `main`, dogfooded, riding 0.0.12).** Output of the 2026-06-27 grill ([grill-with-docs]), which reshaped a
 > CC-memory-specific strawman into a general **onboarding dispatcher**. The *backfill* third to
 > [ADR-0032](0032-capture-redirect-native-memory.md) (capture, going forward) and

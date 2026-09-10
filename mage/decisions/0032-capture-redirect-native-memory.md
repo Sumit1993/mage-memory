@@ -3,8 +3,8 @@ type: decision
 tags:
   - mage/decisions
 created: "2026-06-25"
-updated: 2026-07-01
-last_reviewed: 2026-07-01
+updated: 2026-09-03
+last_reviewed: 2026-09-03
 status: accepted
 provenance:
   repo: mage-memory
@@ -34,6 +34,7 @@ keywords:
 ---
 
 # 0032 — Capture-redirect: co-opt the host's native-memory write into mage's git-durable pipeline (relocation where the host allows it, coexist nudge as the floor)
+> Amended by [ADR-0048](0048-repeated-failures-become-enforcement.md) on 2026-09-03: the commandeer tier stays. Its PreToolUse hook is repointed to carry the ladder (decision 7): it blocks the memory write, returns the rungs, and admits only a note that names its rung answer, trigger and pointer. Relocation of the store is unchanged.
 
 > **Status: accepted (ratified 2026-07-01 — impl on `main`, riding 0.0.12).** Output of a grill (2026-06-25). Capture mechanism only; the
 > recall counterpart (projecting mage notes *into* the native store) is split out to a

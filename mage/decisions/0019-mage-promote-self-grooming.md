@@ -2,9 +2,9 @@
 type: decision
 tags: [mage/decisions]
 created: "2026-06-08"
-updated: "2026-06-08"
-last_reviewed: "2026-06-08"
-status: active
+updated: "2026-09-03"
+last_reviewed: "2026-09-03"
+status: superseded
 provenance:
   repo: mage-memory
   work: grill-promote-0.0.8
@@ -16,6 +16,7 @@ sources:
 ---
 
 # 0019 — `mage promote`: self-grooming (recurrence, graduation, merge/split)
+> Superseded by [ADR-0048](0048-repeated-failures-become-enforcement.md) on 2026-09-03.
 
 A 2026-06-08 grill locked **self-grooming** — release 0.0.8, the stage that turns
 distill's notes ([ADR-0018](0018-mage-distill-observed-scratch-reader.md)) into a

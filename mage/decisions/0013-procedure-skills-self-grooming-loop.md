@@ -2,8 +2,8 @@
 type: decision
 tags: [mage/decisions]
 created: "2026-06-05"
-updated: "2026-08-22"
-last_reviewed: "2026-06-05"
+updated: "2026-09-03"
+last_reviewed: "2026-09-03"
 status: active
 provenance:
   repo: mage-memory
@@ -16,6 +16,7 @@ sources:
 ---
 
 # 0013 — Procedure skills and the self-grooming loop
+> Amended by [ADR-0048](0048-repeated-failures-become-enforcement.md) on 2026-09-03: A skill is one output rung, measured by firing (0016). No graduation path from notes.
 
 A 2026-06-05 grill-with-docs session ("mega grill") wove eight new idea-clusters
 into the roadmap and resolved **how mage learns and grooms its own skills**. mage
