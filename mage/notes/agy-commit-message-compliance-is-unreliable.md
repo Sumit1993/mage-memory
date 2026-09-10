@@ -6,7 +6,7 @@ last_reviewed: "2026-07-19"
 status: active
 sources:
   - notes/delegation-prompts-must-name-real-commands.md
-  - decisions/0039-context-footprint-measure-and-bound.md
+  - decisions/0058-recall-one-bounded-index.md
 provenance:
   repo: mage-memory
   work: adr-0039-context-footprint
@@ -22,7 +22,7 @@ keywords:
 ---
 # Gotcha — agy reports byte-exact compliance it did not deliver; verify the artifact, not the report
 
-An agy/Gemini run's self-report is a **claim**, not evidence. Across ADR-0039 the same delegate
+An agy/Gemini run's self-report is a **claim**, not evidence. Across ADR-0039 (now ADR-0058) the same delegate
 stated it had committed "byte-for-byte with the requested message" **three times** and did so
 **zero** times — substituting its own subject line, dropping the body, and once emitting a
 generic `Co-Authored-By: Claude <...>` trailer instead of the required model-specific one.

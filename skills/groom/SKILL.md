@@ -184,7 +184,7 @@ groom just the hub root and skip the fan-out.
 
 Phase 1 captures first sight. **Phase 2 is no longer a catch-net.**
 
-[ADR-0038](../../mage/decisions/0038-promote-note-rung-deleted-graduate-on-usage.md)
+[ADR-0057](../../mage/decisions/0057-a-guard-lands-by-pull-request.md)
 deleted the note-proposal rung: recurrence no longer proposes NEW notes. Proposing
 a note from a keyword fold is the deterministic-selection pattern two pre-registered
 replay gates killed (Faultline 0/62, prose-keyed 0/55), and the field evidence agreed
@@ -249,13 +249,12 @@ mage never commits for you — it suggests, you run.
   (classify → one-question test → Gate 2 → confirm → write) both phases funnel into.
 - **/mage:graduate** (`skills/graduate/SKILL.md`) — where Phase 2 hands
   `action: "graduate"` proposals (note → Procedure skill).
-- **ADR-0018** (`mage/decisions/0018-mage-distill-observed-scratch-reader.md`) —
+- **ADR-0052** (`mage/decisions/0052-streams-and-the-observe-schema.md`) —
   distill as deterministic reader + judgment skill; first-sight capture; CLOSED-only
-  watermark; mage reads only its own artifacts.
-- **ADR-0019** (`mage/decisions/0019-mage-promote-self-grooming.md`) — the
+  watermark; mage reads only its own artifacts; and the `.mage/learnings/*.jsonl`
+  event schema the readers consume.
+- **ADR-0057** (`mage/decisions/0057-a-guard-lands-by-pull-request.md`) — the
   recurrence tally, distinct-session counting, the K/M thresholds, and the
   note/graduate ladder rungs.
-- **ADR-0015** (`mage/decisions/0015-mage-observe-capture-schema.md`) — the
-  `.mage/learnings/*.jsonl` event schema the readers consume.
-- **ADR-0014** (`mage/decisions/0014-two-gate-redaction.md`) — `mage redact`
+- **ADR-0053** (`mage/decisions/0053-redaction-two-gates-one-engine.md`) — `mage redact`
   Gate 2 before any tracked write.

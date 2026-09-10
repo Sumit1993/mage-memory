@@ -12,20 +12,20 @@ sources:
   - src/commands/nudge.ts
   - src/distill/reader.ts
   - src/observe/types.ts
-  - mage/decisions/0024-organic-grooming-loop.md
+  - mage/decisions/0057-a-guard-lands-by-pull-request.md
 ---
 
 # Faultline — friction/derivation capture trigger (Phase 1 plan)
 
 > Status: **TWO deterministic detectors BUILT, GATED, KILLED → pivot to digest→agent.** This note
 > opened the arc; the honest record now spans three ADRs:
-> 1. **[ADR-0027 Faultline](../decisions/0027-faultline-friction-capture-trigger.md)** — tool-transition
+> 1. **[ADR-0027 (now ADR-0052) Faultline](../decisions/0052-streams-and-the-observe-schema.md)** — tool-transition
 >    detector, built (`feat/faultline-detector`, 42 tests), gate **KILLED 0/62** (captured friction
 >    *position*, discarded *content*).
-> 2. **[ADR-0028 prose-keyed](../decisions/0028-prose-keyed-capture.md)** — correction prose +
+> 2. **[ADR-0028 (now ADR-0052) prose-keyed](../decisions/0052-streams-and-the-observe-schema.md)** — correction prose +
 >    recurrent-failure strings, built (`feat/prose-keyed-capture`, 33 tests), gate **KILLED 0/55** (kept
 >    *content*, surfaced the wrong *unit* — conversational steering; starved the failure/command arcs).
-> 3. **[ADR-0029 digest→agent](../decisions/0029-digest-to-agent-capture.md)** — GOVERNING. The two
+> 3. **[ADR-0029 (now ADR-0052) digest→agent](../decisions/0052-streams-and-the-observe-schema.md)** — GOVERNING. The two
 >    kills triangulated that durable lessons are single-session friction/derivation ARCS in the
 >    failure + external-command stream, needing model synthesis + judgment a deterministic core cannot
 >    do; the recall agents (models reading the digest) FOUND them. So the boundary nudge stops *selecting*
@@ -40,7 +40,7 @@ sources:
 
 mage's recurrence signal is ~93% workflow-lens — "you repeated a tool" — which is
 *activity, not lessons* (see [plan-0.0.12](plan-0.0.12-organic-grooming-loop.md) and
-[ADR-0024](../decisions/0024-organic-grooming-loop.md)). The durable knowledge worth
+[ADR-0024 (now ADR-0057)](../decisions/0057-a-guard-lands-by-pull-request.md)). The durable knowledge worth
 storing is **earned**: expensive to re-derive (paid in tool-failures, trial-and-error, or
 a human correction), captured the FIRST time, not after K recurrences. The proving run
 confirmed the recurrence path mints noise and the distill path mints grab-bags. Faultline
@@ -68,7 +68,7 @@ signal that already flows through the nudge:
 Everything downstream — `.mage/staging/`, `composeDraft`, `lessonCoveringNote` dedup, the reject
 ledger, the throttle, `mage:groom` — is **reused unchanged**.
 
-## 1. The detector (`src/distill/faultline.ts`, pure, ADR-0009-clean)
+## 1. The detector (`src/distill/faultline.ts`, pure, ADR-0009 (now ADR-0054)-clean)
 
 `computeFrictionArcs(events: ObserveEvent[], opts): FrictionArc[]` — a pure fold over the same
 closed region `computeDistillClusters` reads.
@@ -168,7 +168,7 @@ work) AND adapted raw transcripts from ops/infra projects (sreforge SRE, prismal
 ## Pointers
 
 - [plan-0.0.12-organic-grooming-loop](plan-0.0.12-organic-grooming-loop.md) — the loop this extends.
-- [ADR-0024](../decisions/0024-organic-grooming-loop.md) — "no embedded judge"; Phase 0 grounds it.
+- [ADR-0024](../decisions/0057-a-guard-lands-by-pull-request.md) — "no embedded judge"; Phase 0 grounds it.
 - `src/commands/nudge.ts` — the integration point (`readDistill` swap).
 - `src/distill/reader.ts` — `computeDistillClusters` (the chapter-cluster grab-bag this replaces).
 - `src/observe/types.ts` — the `ObserveEvent` / `ToolUseEvent {ok, error_summary, detail, paths}` schema.

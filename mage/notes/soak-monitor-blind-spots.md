@@ -12,8 +12,8 @@ provenance:
 sources:
   - notes/soak-targets.md
   - work/plan-adr-0041-waves.md
-  - decisions/0041-genre-decides-the-recall-rung.md
-  - decisions/0031-programmatic-provenance-stamp.md
+  - decisions/0058-recall-one-bounded-index.md
+  - decisions/0057-a-guard-lands-by-pull-request.md
   - file:~/ai-context/mage-soak/soak-report.mjs
 keywords:
   - soak
@@ -39,7 +39,7 @@ keywords:
 **A soak that silently drops a unit looks exactly like a soak that is passing.**
 Two were true of mage's monitor on 2026-07-31, and a third surfaced on
 2026-08-12; together the first two made
-[ADR-0041](../decisions/0041-genre-decides-the-recall-rung.md)'s ratification gate
+[ADR-0041 (now ADR-0058)](../decisions/0058-recall-one-bounded-index.md)'s ratification gate
 unjudgeable for an entire observation window that everyone believed was running.
 Check all three before trusting any soak-derived evidence.
 
@@ -65,13 +65,13 @@ whatever survived resolution, so it is exactly the number that cannot reveal an
 absence.
 
 **Why it recurs:** an absolute machine-specific path in a git-tracked file is the
-same smell [ADR-0043](../decisions/0043-hub-addressed-by-remote-located-by-derivation.md)
+same smell [ADR-0043 (now ADR-0056)](../decisions/0056-hubs-addressed-by-remote-located-by-derivation.md)
 retires for `hub_path` — and `code_repo_path` is the *same shape of field that
 ADR-0043 does not cover*. Expect this class again until it is derived too.
 
 ## Blind spot 2 — a footer that says "not computed" long after it is computable
 
-Every digest ended with *"**Keep-rate not computed** — needs the ADR-0031 Phase 2
+Every digest ended with *"**Keep-rate not computed** — needs the ADR-0031 (now ADR-0057) Phase 2
 reconciler + a `provenance.source` capture-vs-adopt split."* That sentence was
 **self-perpetuating documentation of a fixed bug**: ADR-0031 Phase 2 had shipped
 (`src/grooming/reconcile.ts`, with `.mage/metrics/keep-rate.json` present in all
@@ -129,6 +129,6 @@ twelve days" says nothing about the evidence; it says the reader was never run.
 - The gate this blocked, and its 2026-07-31 judgment:
   [plan-adr-0041-waves](../work/plan-adr-0041-waves.md)
 - The reconciler that makes keep-rate computable:
-  [ADR-0031](../decisions/0031-programmatic-provenance-stamp.md) Phase 2
+  [ADR-0031](../decisions/0057-a-guard-lands-by-pull-request.md) Phase 2
 - Same absolute-path smell, decided against for hubs:
-  [ADR-0043](../decisions/0043-hub-addressed-by-remote-located-by-derivation.md)
+  [ADR-0043](../decisions/0056-hubs-addressed-by-remote-located-by-derivation.md)

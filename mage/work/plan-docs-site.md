@@ -14,7 +14,7 @@ keywords: [documentation, website, docs-site, astro, starlight, generated-docs, 
 # mage — hosted documentation website (GRILLED, ready to build)
 
 **Status: GRILLED 2026-06-18 — decisions locked below; ready to build.** Promotes to
-[ADR-0026](../decisions/0026-hosted-docs-website.md) (now accepted). A prototype on `feat/docs-site`
+[ADR-0026 (now ADR-0059)](../decisions/0059-versions-are-mechanical-the-release-is-two-counts.md) (now accepted). A prototype on `feat/docs-site`
 (uncommitted) proved the anti-drift mechanism (the drift test catches a tampered value).
 
 ## Problem
@@ -35,7 +35,7 @@ is an onboarding + credibility gap right as 0.1.0 (the announcement) approaches.
    **not** gate the code cut. The 0.1.0 tag / a1 bake stay behavior gates. Build now off `main`; publish
    the site when 0.0.12 hits npm so docs match the installable version. "Site live" is a prerequisite
    for *announcing* 0.1.0, not for tagging it.
-3. **Stack: Astro Starlight** → static HTML → GitHub Pages (no-server, ADR-0020). Isolated under
+3. **Stack: Astro Starlight** → static HTML → GitHub Pages (no-server, ADR-0020 (now ADR-0054)). Isolated under
    `docs/` with its own `package.json`/lockfile; **never in the published npm package** (`files[]` ships
    `dist/skills/.claude-plugin/assets` only), so the CLI supply chain is untouched. MDX islands cover
    the "interactive" ask (React/Svelte/Vue where useful); Starlight's built-in search/nav/dark-mode/
@@ -98,6 +98,6 @@ custom domain (future-proofed, not bought).
 ## Relations
 
 - extends [release sequence](plan-release-sequence.md) — a 0.1.0 credibility-push track.
-- promotes_to [ADR-0026 — a hosted docs website](../decisions/0026-hosted-docs-website.md)
-- motivated_by README drift (the pre-0.0.12 loop section) + [ADR-0024](../decisions/0024-organic-grooming-loop.md) (the lesson path the README omits)
-- hosts_like [ADR-0020 — no-server, generated artifacts](../decisions/0020-no-server-tiered-dashboards.md)
+- promotes_to [ADR-0026 — a hosted docs website](../decisions/0059-versions-are-mechanical-the-release-is-two-counts.md)
+- motivated_by README drift (the pre-0.0.12 loop section) + [ADR-0024 (now ADR-0057)](../decisions/0057-a-guard-lands-by-pull-request.md) (the lesson path the README omits)
+- hosts_like [ADR-0020 — no-server, generated artifacts](../decisions/0054-files-in-the-repo-no-runtime-no-server.md)

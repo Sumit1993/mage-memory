@@ -32,7 +32,7 @@ keywords:
 
 # mage — the readiness doctor: catch recall/skills drift, not just plumbing
 
-**Status: grilled 2026-07-02 → [ADR-0037](../decisions/0037-readiness-doctor-remit-and-autofix-line.md) (accepted).**
+**Status: grilled 2026-07-02 → [ADR-0037 (now ADR-0055)](../decisions/0055-connect-doctor-migrate.md) (accepted).**
 First slice shipped (PR #54: three checks + the setup footer). The three [open
 questions](#open-questions-for-a-grill) below are resolved in ADR-0037.
 
@@ -79,7 +79,7 @@ just capture. `init`/`link`/`connect` stay setup commands; doctor stays the drif
 |---|---|---|
 | index note-count / mtime vs notes on disk | stale index (the 9-line one) | `--fix` → `mage index` |
 | `AGENTS.md` block version vs current template | retired command names (`/mage-learn`) | `--fix` → rewrite the mage-owned block |
-| MEMORY twin present + points at the real index | recall-import ([ADR-0033](../decisions/0033-recall-import-bounded-index.md)) not wired | `--fix` → regenerate |
+| MEMORY twin present + points at the real index | recall-import ([ADR-0033 (now ADR-0058)](../decisions/0058-recall-one-bounded-index.md)) not wired | `--fix` → regenerate |
 | `mage@` in host `installed_plugins.json` / skills-dir | skills unreachable | **print** `/plugin install mage@mage`, do NOT auto-run |
 | commandeer (`autoMemoryDirectory`) points at this KB | capture leaks to the default host dir | `--fix` → re-run `connect` |
 
@@ -90,7 +90,7 @@ just capture. `init`/`link`/`connect` stay setup commands; doctor stays the drif
 - **Detect-and-instruct for user-driven / global drift**: installing a plugin into
   `~/.claude` is a global act the README frames as "pick one of two ways". Doctor prints the
   exact command and stops — it never reaches into global host config silently. Same restraint
-  as Gate-2 and the [autonomy ladder](../decisions/0030-agent-autonomy-ladder.md): the
+  as Gate-2 and the [autonomy ladder](../decisions/0057-a-guard-lands-by-pull-request.md): the
   irreducible acts stay with the human.
 
 ## Make setup self-verifying (where init/link/connect help)
@@ -117,10 +117,10 @@ Then staleness is a comparison: "block v1, current v3 → stale"; "index reflect
 
 ## Open questions for a grill
 
-Grilled 2026-07-02 → resolved in [ADR-0037](../decisions/0037-readiness-doctor-remit-and-autofix-line.md);
+Grilled 2026-07-02 → resolved in [ADR-0037](../decisions/0055-connect-doctor-migrate.md);
 kept here as the record of what was pressure-tested.
 
-1. **Is inspecting `~/.claude/plugins` mage's job?** [ADR-0009](../decisions/0009-no-runtime-automation-rides-host-hooks.md)
+1. **Is inspecting `~/.claude/plugins` mage's job?** [ADR-0009 (now ADR-0054)](../decisions/0054-files-in-the-repo-no-runtime-no-server.md)
    says "no runtime of our own." Reading host config to check "is my plugin installed"
    brushes that line. Precedent: doctor already reads host hook settings. Decide deliberately.
 2. **Where exactly is the auto-fix safety line?** Which drift mage silently repairs vs only
@@ -136,11 +136,11 @@ Fixed live: installed `mage@mage` (user scope, 5 skills); regenerated hub indexe
 then-current `mage doctor`.
 
 ## Relations
-- verifies [ADR-0032 — capture-redirect native memory](../decisions/0032-capture-redirect-native-memory.md)
-- verifies [ADR-0033 — recall: import the bounded index](../decisions/0033-recall-import-bounded-index.md)
-- bounded_by [ADR-0009 — no runtime; automation rides host hooks](../decisions/0009-no-runtime-automation-rides-host-hooks.md)
-- ethos_from [ADR-0030 — opt-in agent autonomy ladder](../decisions/0030-agent-autonomy-ladder.md)
+- verifies [ADR-0032 (now ADR-0051) — capture-redirect native memory](../decisions/0051-the-ladder-runs-before-anything-is-remembered.md)
+- verifies [ADR-0033 — recall: import the bounded index](../decisions/0058-recall-one-bounded-index.md)
+- bounded_by [ADR-0009 — no runtime; automation rides host hooks](../decisions/0054-files-in-the-repo-no-runtime-no-server.md)
+- ethos_from [ADR-0030 (now ADR-0057) — opt-in agent autonomy ladder](../decisions/0057-a-guard-lands-by-pull-request.md)
 - precedent [Gotcha — connect doesn't ensure the sink is gitignored](../notes/connect-doesnt-ensure-ignores.md)
 - surfaced_by [mage soak — the dogfood targets + monitor](../notes/soak-targets.md)
-- promoted_to [ADR-0037 — doctor's remit + the auto-fix line](../decisions/0037-readiness-doctor-remit-and-autofix-line.md)
+- promoted_to [ADR-0037 — doctor's remit + the auto-fix line](../decisions/0055-connect-doctor-migrate.md)
 - sequenced_in [release sequence](plan-release-sequence.md)

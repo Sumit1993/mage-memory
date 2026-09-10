@@ -5,7 +5,7 @@ created: "2026-07-19"
 last_reviewed: "2026-07-19"
 status: active
 sources:
-  - decisions/0039-context-footprint-measure-and-bound.md
+  - decisions/0058-recall-one-bounded-index.md
   - src/metrics/footprint.ts
   - src/adapters/claude-code/constants.ts
 provenance:
@@ -26,7 +26,7 @@ A named constant is not wired just because it exists. If nothing imports it, the
 uses some other default — and **the test suite stays green, because tests usually pass the value
 explicitly.**
 
-**Hit twice in one branch (2026-07-19, ADR-0039):**
+**Hit twice in one branch (2026-07-19, ADR-0039 (now ADR-0058)):**
 
 1. `AUTO_MEMORY_MAX_BYTES = 25_600` was added to the Claude Code adapter and **never imported**.
    `measureFootprint` fell through to a 16 KB default, so the tool reported `state: "warn"` on a

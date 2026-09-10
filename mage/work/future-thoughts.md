@@ -104,7 +104,7 @@ the note set goes **flat and hard to navigate**. These five circle that.
 
 #### FT-01 — a home for one-time, decided-and-done activities · (orig #1)
 **Status:** raw
-**Touches:** [ADR-0019 — mage promote/demote](../decisions/0019-mage-promote-self-grooming.md)
+**Touches:** [ADR-0019 (now ADR-0057) — mage promote/demote](../decisions/0057-a-guard-lands-by-pull-request.md)
 **Sequence:** unsequenced
 How should we organize ideas that are **one-time activities** — decided, done, and
 safe to forget — versus long-term decisions? Should we even build for this, given
@@ -118,7 +118,7 @@ distinct status/room, or is it just `archived`?
 
 #### FT-02 — categorize skills & notes: general vs domain vs human · (orig #5)
 **Status:** raw
-**Touches:** [ADR-0006 — two-layer recall / per-wing skills](../decisions/0006-two-layer-recall-per-wing-skills.md)
+**Touches:** [ADR-0006 (now ADR-0058) — two-layer recall / per-wing skills](../decisions/0058-recall-one-bounded-index.md)
 **Sequence:** unsequenced
 Need a way to categorize skills and notes by **scope**: some are *general*, some
 *domain-specific*, some *human-specific* (one person's habits/preferences). Today
@@ -129,7 +129,7 @@ wings categorize by domain only.
 
 #### FT-03 — hierarchical skills vs wings: are they the same thing? · (orig #6)
 **Status:** exploring
-**Touches:** [ADR-0006 — per-wing skills](../decisions/0006-two-layer-recall-per-wing-skills.md), [ADR-0019 — promote](../decisions/0019-mage-promote-self-grooming.md), [ADR-0012 — wings optional](../decisions/0012-wings-optional-convention-standalone-hubs.md)
+**Touches:** [ADR-0006 — per-wing skills](../decisions/0058-recall-one-bounded-index.md), [ADR-0019 — promote](../decisions/0057-a-guard-lands-by-pull-request.md), [ADR-0012 (now ADR-0056) — wings optional](../decisions/0056-hubs-addressed-by-remote-located-by-derivation.md)
 **Sequence:** extends 0.0.8 self-grooming (graduation)
 I have a repo with **20+ domain skills in groups of 2–3 per domain**, yet only one
 wing — I never saw a relationship between "many skills" and "one wing", which is
@@ -138,13 +138,13 @@ about **hierarchical skills**: decomposing each domain group into separate skill
 files with a parent "domain group" skill pointing at them. That pattern is *exactly*
 wings-as-skills. **Am I confusing two things that are actually the same?**
 **mage angle:** strong hunch — yes, these collapse. "Hierarchical skill group →
-member files" *is* the wing → per-wing-skill structure ([ADR-0006](../decisions/0006-two-layer-recall-per-wing-skills.md)).
+member files" *is* the wing → per-wing-skill structure ([ADR-0006](../decisions/0058-recall-one-bounded-index.md)).
 Resolve before building anything: is "hierarchical skills" a new feature or just
 applying wings + promote to a skill-heavy repo? Likely the latter.
 
 #### FT-04 — fight note-pileup with examples, templates & grouping nudges · (orig #13, #15)
 **Status:** raw
-**Touches:** [ADR-0006 — per-wing skills](../decisions/0006-two-layer-recall-per-wing-skills.md), [ADR-0004 — capture insight, not copies](../decisions/0004-capture-insight-not-copies.md)
+**Touches:** [ADR-0006 — per-wing skills](../decisions/0058-recall-one-bounded-index.md), [ADR-0004 (now ADR-0051) — capture insight, not copies](../decisions/0051-the-ladder-runs-before-anything-is-remembered.md)
 **Sequence:** unsequenced (0.1.0 credibility-push adjacent)
 From experience: notes + wings are fine for a new/small project, but for a large
 enough KB notes **pile up, look flat, and get hard to read/navigate**. Provide
@@ -158,7 +158,7 @@ gallery of well-shaped KBs, (b) a grouping-advisor that the host agent fires whe
 template wings** for generic patterns *(orig #15, folded in)* — seed notes a user
 drops in; `mage index`/`mage skills` regenerate the wing index + auto-loaded wing
 skill. The "SDLC/SDD" framing there was illustrative, *not* a call to undo
-[ADR-0022](../decisions/0022-remove-sdd-skills.md) (that removed workflow skills;
+[ADR-0022 (now ADR-0050)](../decisions/0050-mage-turns-a-repeated-failure-into-enforcement.md) (that removed workflow skills;
 these are loop-native notes) — ADR-0022 only re-enters if a template ships SDD
 *content* **and** advertises it.
 
@@ -170,11 +170,11 @@ SDLC/SDD illustrative. The full thought + the ADR-0022 caveat now live in **FT-0
 
 #### FT-19 — are notes over-weighted vs `decisions/` & `work/`?  ·  (soak; raw author note #2)
 **Status:** raw
-**Touches:** [ADR-0003 — track work and notes](../decisions/0003-track-work-ignore-artifacts.md), [ADR-0035 — notes are memories; one unified store](../decisions/0035-decouple-harness-memory-from-notes.md)
+**Touches:** [ADR-0003 (now ADR-0054) — track work and notes](../decisions/0054-files-in-the-repo-no-runtime-no-server.md), [ADR-0035 (now ADR-0051) — notes are memories; one unified store](../decisions/0051-the-ladder-runs-before-anything-is-remembered.md)
 **Sequence:** unsequenced (taxonomy)
 Are we **overly dependent on notes**? We have `decisions/` and `work/` directories too — are they
 getting less importance because notes absorb everything?
-**mage angle:** [ADR-0035](../decisions/0035-decouple-harness-memory-from-notes.md) ("notes are
+**mage angle:** [ADR-0035](../decisions/0051-the-ladder-runs-before-anything-is-remembered.md) ("notes are
 memories; one unified store") deliberately pulled weight toward notes — worth checking it didn't
 *starve* the `decisions/` (ADR) and `work/` lanes. Open question: are decisions/work first-class
 destinations the grooming loop routes to, or notes' poor cousins? Probably a routing/guidance gap,
@@ -182,7 +182,7 @@ not new machinery — the loop could learn to propose an ADR or a work-unit, not
 
 #### FT-21 — formalize directory structure as the KB scales (dirs vs tags)  ·  (soak; raw author note #4)
 **Status:** raw
-**Touches:** [ADR-0008 — visible mage/ dir for Obsidian](../decisions/0008-visible-mage-dir-for-obsidian.md), [ADR-0006 — two-layer recall / per-wing skills](../decisions/0006-two-layer-recall-per-wing-skills.md), [ADR-0023 — hub owns notes; flat projects](../decisions/0023-hub-own-notes-and-flat-projects.md)
+**Touches:** [ADR-0008 (now ADR-0054) — visible mage/ dir for Obsidian](../decisions/0054-files-in-the-repo-no-runtime-no-server.md), [ADR-0006 — two-layer recall / per-wing skills](../decisions/0058-recall-one-bounded-index.md), [ADR-0023 (now ADR-0056) — hub owns notes; flat projects](../decisions/0056-hubs-addressed-by-remote-located-by-derivation.md)
 **Sequence:** unsequenced (scaling track — pairs with FT-04)
 For a human reader, **flat notes categorized only by wing/room tags inside the file stop working as
 the KB scales**. **Directories** are the natural way forward, but it must be made formal: should
@@ -198,18 +198,18 @@ them, or **coexist** (tags stay the query layer, dirs the human-reading layer). 
 
 #### FT-06 — run internal commands from the dashboard · (orig #2)
 **Status:** raw
-**Touches:** [ADR-0020 — no-server tiered dashboards](../decisions/0020-no-server-tiered-dashboards.md)
+**Touches:** [ADR-0020 (now ADR-0054) — no-server tiered dashboards](../decisions/0054-files-in-the-repo-no-runtime-no-server.md)
 **Sequence:** extends 0.0.9 dashboard (Option D)
 Let the dashboard **run** internal commands, not just **show** the commands a user
 *may* run.
-**mage angle:** ⚠️ collides with the no-server constraint ([ADR-0020](../decisions/0020-no-server-tiered-dashboards.md)):
+**mage angle:** ⚠️ collides with the no-server constraint ([ADR-0020](../decisions/0054-files-in-the-repo-no-runtime-no-server.md)):
 the dashboard is a static `dashboard.html` with no backend, so it cannot execute
 CLI commands directly. This needs the deferred `--serve` / hosted-mage rung, or a
 copy-to-clipboard / deep-link-to-terminal half-measure. Grill the boundary.
 
 #### FT-07 — Leiden community detection on the dashboard graph · (orig #8)
 **Status:** raw
-**Touches:** [ADR-0020 — dashboards](../decisions/0020-no-server-tiered-dashboards.md)
+**Touches:** [ADR-0020 — dashboards](../decisions/0054-files-in-the-repo-no-runtime-no-server.md)
 **Sequence:** extends 0.0.9 dashboard
 Should we run something like the **Leiden algorithm** (as Graphify uses) over our
 graph on the dashboard, to auto-detect note communities/clusters?
@@ -218,7 +218,7 @@ FT-04 (grouping) and FT-02 (categorization). Client-side only, to respect no-ser
 
 #### FT-08 — evaluate Graphify / "understand anything"; overlap & threat · (orig #7)
 **Status:** raw
-**Touches:** [ADR-0007 — mine agentmemory's design, don't depend](../decisions/0007-mine-agentmemory-design-not-depend.md), [ADR-0021 — offline, no telemetry](../decisions/0021-offline-no-telemetry-local-signal.md)
+**Touches:** [ADR-0007 (now ADR-0050) — mine agentmemory's design, don't depend](../decisions/0050-mage-turns-a-repeated-failure-into-enforcement.md), [ADR-0021 (now ADR-0054) — offline, no telemetry](../decisions/0054-files-in-the-repo-no-runtime-no-server.md)
 **Sequence:** 0.1.0 credibility-push (mage-evals / differences)
 Should we integrate with — or learn from — something like **Graphify** / "understand
 anything"? **How much do we overlap? Do they defeat our purpose by being bigger and
@@ -230,7 +230,7 @@ release sequence frames agentmemory: *mine the design, state the differences*
 
 #### FT-09 — export to HTML / JSON / Obsidian (Graphify-style) · (orig #9)
 **Status:** raw
-**Touches:** [ADR-0008 — visible .mage dir for Obsidian](../decisions/0008-visible-mage-dir-for-obsidian.md), [ADR-0020 — dashboards](../decisions/0020-no-server-tiered-dashboards.md)
+**Touches:** [ADR-0008 — visible .mage dir for Obsidian](../decisions/0054-files-in-the-repo-no-runtime-no-server.md), [ADR-0020 — dashboards](../decisions/0054-files-in-the-repo-no-runtime-no-server.md)
 **Sequence:** extends 0.0.9 dashboard tiers
 We already ship **Obsidian integration ~out of the box**. I like how Graphify has
 an **export** function for HTML, JSON, and Obsidian.
@@ -240,13 +240,13 @@ Cheap, on-brand (file-as-truth), and complements FT-12 (queryable) and FT-08.
 
 #### FT-17 — dashboard interactivity ceiling → React? · (soak 2026-06-23)
 **Status:** raw
-**Touches:** [ADR-0020 — no-server tiered dashboards](../decisions/0020-no-server-tiered-dashboards.md)
+**Touches:** [ADR-0020 — no-server tiered dashboards](../decisions/0054-files-in-the-repo-no-runtime-no-server.md)
 **Sequence:** revisits the 0.0.9 dashboard (Option D, the interactive cockpit)
 The generated `dashboard.html` keeps hitting an interactivity wall in real use: the graph
 renders as a static "big circle" (no hover/click affordances, no per-node-type colors), the
 per-page cards feel inert, and repeated asks for animations / modern CSS went unmet — reaching
 the point of **considering a switch to React** for the cockpit.
-**mage angle:** ⚠️ tensions with [ADR-0020](../decisions/0020-no-server-tiered-dashboards.md)'s
+**mage angle:** ⚠️ tensions with [ADR-0020](../decisions/0054-files-in-the-repo-no-runtime-no-server.md)'s
 no-server / no-build / single-file stance — a React cockpit implies a build step + bundle. Open
 question: can vanilla HTML+CSS+SVG (hover handlers, type-keyed node colors, light animation) reach
 "good enough", or must the top tier break the no-build rule? Cheap win regardless: **color graph
@@ -256,35 +256,35 @@ nodes by note type** + basic hover highlight.
 
 #### FT-10 — ingest external KBs, rough notes, domain skills · (orig #3)
 **Status:** raw
-**Touches:** [ADR-0004 — capture insight, not copies](../decisions/0004-capture-insight-not-copies.md), [ADR-0005 — one canonical memory; others feed](../decisions/0005-one-canonical-memory-others-are-feeders.md)
+**Touches:** [ADR-0004 — capture insight, not copies](../decisions/0051-the-ladder-runs-before-anything-is-remembered.md), [ADR-0005 (now ADR-0051) — one canonical memory; others feed](../decisions/0051-the-ladder-runs-before-anything-is-remembered.md)
 **Sequence:** extends 0.0.4 (`mage learn --from` ingest)
 Allow **ingesting external KBs**, or a user's **rough notes / ideas / domain skills**
 they already have.
 **mage angle:** partially built — `mage learn --from` already ingests skills/prose
 (0.0.4). Open scope: *rough/unstructured* notes and *whole external KBs* (vs single
-sources), distilled to insight-not-copies per [ADR-0004](../decisions/0004-capture-insight-not-copies.md).
-**Update (soak 2026-06-30):** `mage adopt` ([ADR-0034](../decisions/0034-adopt-preexisting-knowledge.md))
+sources), distilled to insight-not-copies per [ADR-0004](../decisions/0051-the-ladder-runs-before-anything-is-remembered.md).
+**Update (soak 2026-06-30):** `mage adopt` ([ADR-0034 (now ADR-0055)](../decisions/0055-connect-doctor-migrate.md))
 now dispatches pre-existing knowledge — *in-shape* notes get **placed**, *out-of-shape* sources get
 **distilled** — so the in-shape "existing skills/notes/KBs" case is mostly handled; the open scope
 narrows to **bulk / whole-KB** ingest. *(folds in raw author note #1.)*
 
 #### FT-11 — hybrid: in-repo KBs for A & B + an external KB about A+B together · (orig #11)
 **Status:** exploring  (author note: **answered — yes, supported**)
-**Touches:** [ADR-0012 — wings optional; standalone hubs](../decisions/0012-wings-optional-convention-standalone-hubs.md), [ADR-0023 — hub owns notes; flat projects](../decisions/0023-hub-own-notes-and-flat-projects.md), [ADR-0010 — durable memory, not coordination](../decisions/0010-durable-memory-not-coordination-layer.md)
+**Touches:** [ADR-0012 — wings optional; standalone hubs](../decisions/0056-hubs-addressed-by-remote-located-by-derivation.md), [ADR-0023 — hub owns notes; flat projects](../decisions/0056-hubs-addressed-by-remote-located-by-derivation.md), [ADR-0010 (now ADR-0050) — durable memory, not coordination](../decisions/0050-mage-turns-a-repeated-failure-into-enforcement.md)
 **Sequence:** unsequenced (existing hybrid capability)
 Does the mage **hybrid architecture** allow: service A and service B each keep an
 **in-repo KB**, *and* a separate **external KB** holds knowledge about working with
 **A and B together**? — **Yes.**
-**mage angle:** this is exactly the hub/standalone-hub model ([ADR-0012](../decisions/0012-wings-optional-convention-standalone-hubs.md)
-/ [ADR-0023](../decisions/0023-hub-own-notes-and-flat-projects.md)) — the cross-cutting
+**mage angle:** this is exactly the hub/standalone-hub model ([ADR-0012](../decisions/0056-hubs-addressed-by-remote-located-by-derivation.md)
+/ [ADR-0023](../decisions/0056-hubs-addressed-by-remote-located-by-derivation.md)) — the cross-cutting
 KB federates the two repo KBs via registry pointers, *without* merging graphs
-(bounded by [ADR-0010](../decisions/0010-durable-memory-not-coordination-layer.md)).
+(bounded by [ADR-0010](../decisions/0050-mage-turns-a-repeated-failure-into-enforcement.md)).
 Mostly a **docs/example** need (FT-04), not new machinery.
 
 #### FT-12 — a guided-authoring skill for the manual (no-chokepoint) note path · (orig #16)
 **Status:** exploring
-**Touches:** [ADR-0013 — procedure skills + self-grooming loop](../decisions/0013-procedure-skills-self-grooming-loop.md), [ADR-0030 — agent autonomy ladder](../decisions/0030-agent-autonomy-ladder.md)
-**Sequence:** unsequenced — lands **on top of** the forthcoming central frontmatter-builder (ADR-0031)
+**Touches:** [ADR-0013 (now ADR-0057) — procedure skills + self-grooming loop](../decisions/0057-a-guard-lands-by-pull-request.md), [ADR-0030 (now ADR-0057) — agent autonomy ladder](../decisions/0057-a-guard-lands-by-pull-request.md)
+**Sequence:** unsequenced — lands **on top of** the forthcoming central frontmatter-builder (ADR-0031 (now ADR-0057))
 Provide a skill that helps a human (or agent) **hand-author** a note or skill the mage
 way — guided authoring, distinct from the automated capture loop. The sharpened framing
 (2026-06-22): mage writes notes through **two paths that need different enforcement
@@ -301,28 +301,28 @@ relations.
 conventions. This is the *right* home for the "programmatic + skill" marriage, **precisely
 because** the manual path has no other enforcement point — whereas the automated path must
 **not** route its stamp through a skill (that re-introduces the "agent forgets" failure
-[ADR-0030](../decisions/0030-agent-autonomy-ladder.md) exists to kill). Pairs with FT-04's
+[ADR-0030](../decisions/0057-a-guard-lands-by-pull-request.md) exists to kill). Pairs with FT-04's
 examples.
 
 #### FT-20 — a global, user-level hub (personal cross-system memory)  ·  (soak; raw author note #3)
 **Status:** raw
-**Touches:** [ADR-0011 — a hub is one vault; projects are wings](../decisions/0011-recursive-scan-hub-projects.md), [ADR-0012 — wings optional; standalone hubs](../decisions/0012-wings-optional-convention-standalone-hubs.md), [ADR-0005 — one canonical memory; others feed](../decisions/0005-one-canonical-memory-others-are-feeders.md)
+**Touches:** [ADR-0011 (now ADR-0056) — a hub is one vault; projects are wings](../decisions/0056-hubs-addressed-by-remote-located-by-derivation.md), [ADR-0012 — wings optional; standalone hubs](../decisions/0056-hubs-addressed-by-remote-located-by-derivation.md), [ADR-0005 — one canonical memory; others feed](../decisions/0051-the-ladder-runs-before-anything-is-remembered.md)
 **Sequence:** unsequenced
 A **user-level hub** — memories/knowledge a user wants for **their own system**, at a **global**
 level, analogous to a global `~/.claude/CLAUDE.md`. Personal, cross-project, machine-spanning.
 **mage angle:** a standalone hub already covers cross-project federation
-([ADR-0012](../decisions/0012-wings-optional-convention-standalone-hubs.md)); the new shape is a
+([ADR-0012](../decisions/0056-hubs-addressed-by-remote-located-by-derivation.md)); the new shape is a
 conventional **`~/`-rooted hub auto-discovered as a user default** — the personal tier above
 repo/hub (e.g. `mage init --user-hub`, resolved when no repo/hub is found). Open question: real
 machinery, or just a documented convention + discovery rule? Bounded by
-[ADR-0005](../decisions/0005-one-canonical-memory-others-are-feeders.md) — still one canonical store
+[ADR-0005](../decisions/0051-the-ladder-runs-before-anything-is-remembered.md) — still one canonical store
 per scope; the global hub is another vault, not a rival.
 
 ### Theme D — cost-aware docs & querying
 
 #### FT-13 — be token-mindful when updating docs (reduce, don't just append) · (orig #4)
 **Status:** raw
-**Touches:** [ADR-0004 — capture insight, not copies](../decisions/0004-capture-insight-not-copies.md)
+**Touches:** [ADR-0004 — capture insight, not copies](../decisions/0051-the-ladder-runs-before-anything-is-remembered.md)
 **Sequence:** unsequenced (grooming-quality)
 Be **mindful when updating docs** — every user pays the token cost. A redirect/update
 should **delete or reduce** the old text, not just append "here's what changed". The
@@ -334,7 +334,7 @@ its own right, and a lint/nudge in the dream sweep.
 
 #### FT-14 — make markdown files queryable (less context to fetch) · (orig #12)
 **Status:** raw
-**Touches:** [ADR-0010 — not a coordination layer](../decisions/0010-durable-memory-not-coordination-layer.md)
+**Touches:** [ADR-0010 — not a coordination layer](../decisions/0050-mage-turns-a-repeated-failure-into-enforcement.md)
 **Sequence:** relates to deferred **MCP recall accelerator** + "no-vector-in-core"
 Can we make the markdown files **queryable** — something to lessen the context an
 agent has to fetch?
@@ -346,21 +346,21 @@ with FT-09's `--json` export.
 
 #### FT-18 — observability of mage's context-window footprint  ·  (soak; was a duplicate FT-15)
 **Status:** raw
-**Touches:** [ADR-0021 — offline, no telemetry; local signal](../decisions/0021-offline-no-telemetry-local-signal.md), [ADR-0033 — recall: @import the bounded root index](../decisions/0033-recall-import-bounded-index.md)
+**Touches:** [ADR-0021 — offline, no telemetry; local signal](../decisions/0054-files-in-the-repo-no-runtime-no-server.md), [ADR-0033 (now ADR-0058) — recall: @import the bounded root index](../decisions/0058-recall-one-bounded-index.md)
 **Sequence:** unsequenced (measurement track)
 Today mage does not track or trace its impact on the agent or the context window. We need to measure
 how much mage pushes into context — are we bloating it, or optimizing future references?
-**mage angle:** must stay **local** to respect [ADR-0021](../decisions/0021-offline-no-telemetry-local-signal.md)
+**mage angle:** must stay **local** to respect [ADR-0021](../decisions/0054-files-in-the-repo-no-runtime-no-server.md)
 (no phone-home) — a `mage skills --metrics`-style local report of recall/import byte-cost and
 context-match, never external telemetry. Pairs directly with FT-14 (query, fetch less) and the
-[ADR-0033](../decisions/0033-recall-import-bounded-index.md) bounded-index recall budget. (Renumbered
+[ADR-0033](../decisions/0058-recall-one-bounded-index.md) bounded-index recall budget. (Renumbered
 from a second `FT-15` — ids are append-only; FT-15 stays the AI-agent-rules entry in Theme E.)
 
 ### Theme E — agent integration & use cases
 
 #### FT-15 — AI agent rules (distinct from skills) · (orig #10)
 **Status:** raw
-**Touches:** [ADR-0006 — two-layer recall](../decisions/0006-two-layer-recall-per-wing-skills.md), [ADR-0013 — procedure skills](../decisions/0013-procedure-skills-self-grooming-loop.md)
+**Touches:** [ADR-0006 — two-layer recall](../decisions/0058-recall-one-bounded-index.md), [ADR-0013 — procedure skills](../decisions/0057-a-guard-lands-by-pull-request.md)
 **Sequence:** unsequenced
 Look at **AI agent rules** — something *different* from skills (e.g. always-on
 constraints / project rules vs invokable procedures).
@@ -371,7 +371,7 @@ generalized.
 
 #### FT-16 — KB-driven code review / debugging · (orig #14)
 **Status:** raw
-**Touches:** [ADR-0013 — procedure skills + self-grooming loop](../decisions/0013-procedure-skills-self-grooming-loop.md)
+**Touches:** [ADR-0013 — procedure skills + self-grooming loop](../decisions/0057-a-guard-lands-by-pull-request.md)
 **Sequence:** unsequenced (use-case track)
 A use case: **code review / debugging driven by the KB** — the agent reviews or
 debugs against the captured gotchas/playbooks/decisions.
@@ -379,41 +379,41 @@ debugs against the captured gotchas/playbooks/decisions.
 The gotcha/decision notes are exactly what a reviewer should load first; could ship
 as an example skill that wires the KB into a review/debug flow.
 
-### Theme F — ADR-0041 deferrals (2026-07-27 batch)
+### Theme F — ADR-0041 (now ADR-0058) deferrals (2026-07-27 batch)
 
-Deferred by [ADR-0041](../decisions/0041-genre-decides-the-recall-rung.md) during the genre/recall-rung grill — each needs its own bake, not a slot in a schema wave.
+Deferred by [ADR-0041](../decisions/0058-recall-one-bounded-index.md) during the genre/recall-rung grill — each needs its own bake, not a slot in a schema wave.
 
 #### FT-22 — path-collision decision nudge
 **Status:** raw
-**Touches:** [ADR-0041](../decisions/0041-genre-decides-the-recall-rung.md), [ADR-0009](../decisions/0009-no-runtime-automation-rides-host-hooks.md), [ADR-0038](../decisions/0038-promote-note-rung-deleted-graduate-on-usage.md)
+**Touches:** [ADR-0041](../decisions/0058-recall-one-bounded-index.md), [ADR-0009 (now ADR-0054)](../decisions/0054-files-in-the-repo-no-runtime-no-server.md), [ADR-0038 (now ADR-0057)](../decisions/0057-a-guard-lands-by-pull-request.md)
 **Sequence:** unsequenced (post-0.1.0)
 A PostToolUse hook matching edited file paths against a generated map (path globs → governing ADR, from provenance + links) emitting one line: "heads up — ADR-0020 governs dashboard.html". Event-keyed, annotate-only.
 **mage angle:** the contextual complement to the wing-skill Governing-decisions section. False-positive tuning is the whole risk — see the Gate-2 stall gotchas; deserves a replay-gate before shipping.
 
 #### FT-23 — falsify-on-commit for doc-genre notes
 **Status:** raw
-**Touches:** [ADR-0041](../decisions/0041-genre-decides-the-recall-rung.md), [ADR-0037](../decisions/0037-readiness-doctor-remit-and-autofix-line.md)
+**Touches:** [ADR-0041](../decisions/0058-recall-one-bounded-index.md), [ADR-0037 (now ADR-0055)](../decisions/0055-connect-doctor-migrate.md)
 **Sequence:** unsequenced
 Event-driven staleness: watch `provenance.commit` + touched paths, stamp `stale-suspect` when a commit falsifies a current-truth note. Wave B shipped the cheap check (commits-behind count in doctor); this is the real event machinery.
 **mage angle:** rot rate is a property of genre, not age — this makes the `doc` lifecycle verb real. Needs its own false-positive bake.
 
 #### FT-24 — per-work-style type maps ride template wings
 **Status:** raw
-**Touches:** [ADR-0041](../decisions/0041-genre-decides-the-recall-rung.md) §3, FT-04
+**Touches:** [ADR-0041](../decisions/0058-recall-one-bounded-index.md) §3, FT-04
 **Sequence:** unsequenced (scaling track)
 The `metadata.json` `genres` override (new types → existing genres, never new genres) is the seam FT-04's template wings plug into: a template ships seed notes AND the type registrations they need (e.g. `runbook: memory` for an SRE wing).
 **mage angle:** makes "mage as a framework shaped by the user's work" concrete without forking the lingua franca.
 
 #### FT-25 — capture-side recurrence guard (deleted-note resurrection)
 **Status:** raw
-**Touches:** [ADR-0029](../decisions/0029-digest-to-agent-capture.md), [ADR-0038](../decisions/0038-promote-note-rung-deleted-graduate-on-usage.md)
+**Touches:** [ADR-0029 (now ADR-0052)](../decisions/0052-streams-and-the-observe-schema.md), [ADR-0038](../decisions/0057-a-guard-lands-by-pull-request.md)
 **Sequence:** unsequenced (grooming-quality)
 Soak evidence (sreforge, 2026-07-27): `all-seats-route-to-agy` was re-captured two days after commit f58db26 deleted near-identical content with a documented reason. Capture has no memory of what was deliberately removed, so rejected knowledge resurrects.
 **mage angle:** a groom/learn check against the git history of deleted notes (or a lightweight tombstone list) before authoring — "this was removed on <date> because <reason>; still capture?" Pairs with the reject-ledger (ADR-0031 Phase 2).
 
 #### FT-26 — house every external hub centrally: address by remote, locate by derivation
-**Status:** promoted → [ADR-0043 — a hub is addressed by its remote, located by derivation](../decisions/0043-hub-addressed-by-remote-located-by-derivation.md) (2026-07-29; entry stays as the breadcrumb)
-**Touches:** [ADR-0043](../decisions/0043-hub-addressed-by-remote-located-by-derivation.md) (decided here), [ADR-0042](../decisions/0042-reach-tier-harness-grants.md) (its revisit trigger, verbatim), [ADR-0011](../decisions/0011-recursive-scan-hub-projects.md), [ADR-0012](../decisions/0012-wings-optional-convention-standalone-hubs.md), FT-20
+**Status:** promoted → [ADR-0043 (now ADR-0056) — a hub is addressed by its remote, located by derivation](../decisions/0056-hubs-addressed-by-remote-located-by-derivation.md) (2026-07-29; entry stays as the breadcrumb)
+**Touches:** [ADR-0043](../decisions/0056-hubs-addressed-by-remote-located-by-derivation.md) (decided here), [ADR-0042 (now ADR-0056)](../decisions/0056-hubs-addressed-by-remote-located-by-derivation.md) (its revisit trigger, verbatim), [ADR-0011](../decisions/0056-hubs-addressed-by-remote-located-by-derivation.md), [ADR-0012](../decisions/0056-hubs-addressed-by-remote-located-by-derivation.md), FT-20
 **Sequence:** unsequenced (blocks git-tracked project-scope grants)
 Every `metadata.json` already records `hub_repo`, and **nothing reads it**. If the local hub path were *derived* from that remote — a deterministic location such as `~/.mage/hubs/<slug>`, cloned on demand — rather than recorded as an absolute `hub_path`, then one path would be identical on every machine and from every worktree. That single change unlocks git-tracked project-scope grants, portable clones, and hub-absent machines in one move, and retires the absolute-`hub_path` smell. It also gives external hubs a single conventional home instead of scattering them wherever each was first cloned.
 **mage angle:** the open question a grill must settle is **derived-path determinism vs. reusing the local clone you already edit** — preferring an existing clone destroys the determinism that makes the whole thing work. A symlink at the derived path is the candidate synthesis, unverified on both Claude Code symlink-following and WSL. Distinct from [FT-20](#ft-20--a-global-user-level-hub-personal-cross-system-memory----soak-raw-author-note-3), which is a *global user-level hub* as a personal memory tier; this one is about **where all hubs live**, not about adding a new one. Directly relevant to the worktree-propagation research ([#103](https://github.com/Sumit1993/mage-memory/issues/103)).
@@ -433,8 +433,8 @@ breadcrumb.)_
 
 - inbox_for [mage roadmap](roadmap.md)
 - staged_into [release sequence (0.0.x → 0.1.0)](plan-release-sequence.md)
-- bounded_by [ADR-0010 — durable memory, not a coordination layer](../decisions/0010-durable-memory-not-coordination-layer.md)
-- promotes_via [ADR-0019 — mage promote: self-grooming](../decisions/0019-mage-promote-self-grooming.md)
-- recall_model [ADR-0006 — two-layer recall, per-wing skills](../decisions/0006-two-layer-recall-per-wing-skills.md)
-- dashboard_bound [ADR-0020 — no-server tiered dashboards](../decisions/0020-no-server-tiered-dashboards.md)
-- caveat_for [ADR-0022 — SDD skills removed](../decisions/0022-remove-sdd-skills.md) (FT-04 (c): template wings are notes, not the removed workflow skills)
+- bounded_by [ADR-0010 — durable memory, not a coordination layer](../decisions/0050-mage-turns-a-repeated-failure-into-enforcement.md)
+- promotes_via [ADR-0019 — mage promote: self-grooming](../decisions/0057-a-guard-lands-by-pull-request.md)
+- recall_model [ADR-0006 — two-layer recall, per-wing skills](../decisions/0058-recall-one-bounded-index.md)
+- dashboard_bound [ADR-0020 — no-server tiered dashboards](../decisions/0054-files-in-the-repo-no-runtime-no-server.md)
+- caveat_for [ADR-0022 — SDD skills removed](../decisions/0050-mage-turns-a-repeated-failure-into-enforcement.md) (FT-04 (c): template wings are notes, not the removed workflow skills)

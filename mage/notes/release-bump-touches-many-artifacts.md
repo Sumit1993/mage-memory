@@ -80,4 +80,4 @@ by release-please**: the next version is computed from commits, so there is no m
 forget — the `mage doctor --release` preflight is no longer needed for that failure mode.
 
 Relates: [release sequence](../work/plan-release-sequence.md) · the release-please decision is recorded
-in [the 0.0.12 spec](../work/plan-0.0.12-organic-grooming-loop.md) (becomes ADR-0024).
+in [the 0.0.12 spec](../work/plan-0.0.12-organic-grooming-loop.md) (becomes ADR-0024 (now ADR-0057)).

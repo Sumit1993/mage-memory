@@ -14,7 +14,7 @@ is preserved.
   (`skills/{constitution,specify,clarify,plan,tasks,analyze,implement}/`),
   inspired by spec-kit's command bodies but rewritten for mage's knowledge-base
   model. **These skills were removed in 0.0.10**
-  ([ADR-0022](mage/decisions/0022-remove-sdd-skills.md)) — they were isolated
+  ([ADR-0050](mage/decisions/0050-mage-turns-a-repeated-failure-into-enforcement.md)) — they were isolated
   from the memory loop and mage's identity is memory-first. This credit is
   **retained for releases 0.0.1–0.0.9**, which shipped the adapted work and for
   which the MIT attribution is required.

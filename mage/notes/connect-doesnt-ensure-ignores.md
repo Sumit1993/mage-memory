@@ -25,7 +25,7 @@ cover the capture sinks: **prismalens-docs-hub** (a *public* repo) had an
 `git add -A` away from committing redacted-but-still-sensitive `.learnings/` /
 `.metrics/` into a public repo — a direct contradiction of mage's own
 "*redact before write*" and "*metrics never enter git*" principles
-([ADR-0014](../decisions/0014-two-gate-redaction.md)).
+([ADR-0014 (now ADR-0053)](../decisions/0053-redaction-two-gates-one-engine.md)).
 
 **Root cause — a missing-feature gap, not a crash bug.** `connect`'s job is
 wiring hooks; it **never touches `.gitignore`** (it only prints the word
@@ -65,7 +65,7 @@ it — especially when the writes are sensitive and the repo may be public.
 
 ## Relations
 
-- guards [ADR-0014 — two-gate redaction](../decisions/0014-two-gate-redaction.md)
+- guards [ADR-0014 — two-gate redaction](../decisions/0053-redaction-two-gates-one-engine.md)
 - found_during [release sequence — 0.0.9](../work/plan-release-sequence.md)
-- adapter [ADR-0017 — mage connect: the host hook adapter](../decisions/0017-mage-connect-host-hook-adapter.md)
+- adapter [ADR-0017 (now ADR-0055) — mage connect: the host hook adapter](../decisions/0055-connect-doctor-migrate.md)
 - see_also [Gotcha — scope Gate-2 to the knowledge base](gate2-blocks-own-redaction-fixtures.md)

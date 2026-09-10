@@ -33,7 +33,7 @@ bulk-import skill, orphan-check tuning, onboarding pointers) are tracked in the
 - **Finish** with `mage index` + `verify` + `dream`; expect dangling links only where the source
   was already broken.
 
-## Insight — when a verbatim copy does NOT violate ADR-0004
+## Insight — when a verbatim copy does NOT violate ADR-0004 (now ADR-0051)
 
 Capture-by-pointer forbids duplicating a *linkable* source. When the prose docs ARE the canonical
 originals (a backup with nothing external to link to), verbatim migration into mage is correct —
@@ -43,4 +43,4 @@ it gives an orphaned original a durable home, it doesn't duplicate one.
 
 - sharpens [mage roadmap](../work/roadmap.md)
 - evidence_for [agentmemory mining map](agentmemory-mining-map.md)
-- clarifies [ADR-0004 — capture insight, not copies](../decisions/0004-capture-insight-not-copies.md)
+- clarifies [ADR-0004 — capture insight, not copies](../decisions/0051-the-ladder-runs-before-anything-is-remembered.md)

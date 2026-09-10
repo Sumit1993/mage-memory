@@ -20,13 +20,13 @@ Procedural entry point for the **mage** wing. mage notes hold the facts; this sk
 - `gotcha` Gotcha — a throwaway measurement script is code, and its bug becomes an ADR's evidence — `notes/ad-hoc-measurement-scripts-are-code.md`
 - `gotcha` Gotcha — agy reports byte-exact compliance it did not deliver; verify the artifact, not the report — `notes/agy-commit-message-compliance-is-unreliable.md`
 - `gotcha` Gotcha — `mage connect` turns on capture but does not ensure the sink is gitignored — `notes/connect-doesnt-ensure-ignores.md`
+- `gotcha` Gotcha — ctx_execute_file refuses paths outside the project root, and the scratchpad is always outside it — `notes/context-mode-blocks-files-outside-project-root.md`
 - `gotcha` Gotcha — a delegate sent after a command that does not exist will find the one you forbade — `notes/delegation-prompts-must-name-real-commands.md`
 - `gotcha` Gotcha — scope Gate-2 to the knowledge base, not the whole repo — `notes/gate2-blocks-own-redaction-fixtures.md`
 - `gotcha` Gotcha — a Gate-2 false positive can stall an autonomous groom; never disable the hook to unblock — `notes/gate2-fp-blocks-autonomy.md`
-- `gotcha` Gotcha — a mature KB emits no capture terminals, so the keep-rate gate cannot calibrate on it — `notes/mature-kb-emits-no-capture-terminals.md`
-- `gotcha` Gotcha — `npx mage` in this repo runs the PUBLISHED release, not your working tree — `notes/npx-mage-runs-the-published-release.md`
-- `gotcha` Gotcha — a lock on a hook path is the wrong mechanism; mage already folds append-only JSONL — `notes/prefer-the-repos-lock-free-convention.md`
-- `gotcha` Gotcha — promote's recurrence fold has near-zero precision on a mature KB — `notes/promote-folds-mechanical-tokens.md`
+- `gotcha` Gotcha — Gemini re-indents entire files with tabs; diff-stat inflation is the tell — `notes/gemini-reindents-whole-files-with-tabs.md`
+- `gotcha` Gotcha — the harness memory layer rewrites mage frontmatter on every Write/Edit under mage/ — `notes/harness-memory-layer-rewrites-mage-frontmatter.md`
+- `gotcha` Gotcha — distill's corrections lens counts harness notifications as user corrections — `notes/harness-notifications-pollute-the-corrections-lens.md`
 
 ## Capture
 
@@ -34,16 +34,12 @@ When you learn something durable in this wing, capture it with `mage:learn` (ins
 
 ## Governing decisions
 
-- [0013 — Procedure skills and the self-grooming loop](mage/decisions/0013-procedure-skills-self-grooming-loop.md)
-- [0014 — Two-gate redaction (strip secrets before write, not before display)](mage/decisions/0014-two-gate-redaction.md)
-- [0017 — `mage connect`: the host hook adapter (capture is opt-in)](mage/decisions/0017-mage-connect-host-hook-adapter.md)
-- [0018 — `mage distill`: the observed-scratch reader (capture, on first sight)](mage/decisions/0018-mage-distill-observed-scratch-reader.md)
-- [0029 — Digest-to-agent capture: deterministic narrowing, agent judgment (supersedes prose-keyed)](mage/decisions/0029-digest-to-agent-capture.md)
-- [0030 — Opt-in agent autonomy ladder for the grooming loop (Operator / Approver / Overseer)](mage/decisions/0030-agent-autonomy-ladder.md)
-- [0031 — Programmatic provenance stamping + the autonomy reject-ledger (Phase 1: stamp at creation)](mage/decisions/0031-programmatic-provenance-stamp.md)
-- [0032 — Capture-redirect: co-opt the host's native-memory write into mage's git-durable pipeline (relocation where the host allows it, coexist nudge as the floor)](mage/decisions/0032-capture-redirect-native-memory.md)
-- [0033 — Recall: `@import` the bounded root index into the host's auto-loaded context (the capture companion to ADR-0032)](mage/decisions/0033-recall-import-bounded-index.md)
-- [0034 — Adopt: a dispatcher for onboarding pre-existing knowledge](mage/decisions/0034-adopt-preexisting-knowledge.md)
-- [0035 — Notes are memories: one unified store; embrace the harness format at rest, normalize at the durable boundary](mage/decisions/0035-decouple-harness-memory-from-notes.md)
-- [0038 — promote's note-proposal rung is deleted; graduate repoints to note-read usage; recurrence becomes a digest annotation](mage/decisions/0038-promote-note-rung-deleted-graduate-on-usage.md)
-- …and 6 more in decisions/
+- [0050 — mage turns a repeated failure into enforcement; memory is the queue](mage/decisions/0050-mage-turns-a-repeated-failure-into-enforcement.md)
+- [0051 — The ladder runs before anything is remembered](mage/decisions/0051-the-ladder-runs-before-anything-is-remembered.md)
+- [0052 — Streams and the observe schema](mage/decisions/0052-streams-and-the-observe-schema.md)
+- [0053 — Redaction: two gates, one engine](mage/decisions/0053-redaction-two-gates-one-engine.md)
+- [0054 — Files in the repo, no runtime, no server, nothing leaves the machine](mage/decisions/0054-files-in-the-repo-no-runtime-no-server.md)
+- [0055 — Connect, doctor, migrate](mage/decisions/0055-connect-doctor-migrate.md)
+- [0056 — A hub is addressed by its remote and located by derivation](mage/decisions/0056-hubs-addressed-by-remote-located-by-derivation.md)
+- [0057 — A guard lands by pull request; the human merges](mage/decisions/0057-a-guard-lands-by-pull-request.md)
+- [0058 — Recall is one bounded index, loaded every session](mage/decisions/0058-recall-one-bounded-index.md)

@@ -39,11 +39,11 @@ memory worth keeping — hard-earned knowledge, not facts you can re-derive in s
   files.
 - **No server.** Nothing to host, no daemon, no background process. mage rides
   the host agent's hooks; the dashboard is a generated artifact, not a service
-  ([ADR-0020](mage/decisions/0020-no-server-tiered-dashboards.md)).
+  ([ADR-0054](mage/decisions/0054-files-in-the-repo-no-runtime-no-server.md)).
 - **No telemetry — nothing leaves your machine.** mage never phones home. The
   only network egress is `doctor`'s opt-in connectivity check; metrics stay
   local and never enter git
-  ([ADR-0021](mage/decisions/0021-offline-no-telemetry-local-signal.md)).
+  ([ADR-0054](mage/decisions/0054-files-in-the-repo-no-runtime-no-server.md)).
 - **Self-grooming, human-in-the-loop.** mage *proposes* (graduate / merge /
   reword …); **you** confirm and commit. Nothing is ever auto-committed.
 
@@ -204,7 +204,7 @@ Hit a bug? Run **`mage doctor --report`** and attach the redacted bundle. It's a
 coverage), metrics **summary numbers only**, and a recent-error count — run
 through the redaction boundary, so it **never** carries note content, keywords,
 paths, or secrets
-([ADR-0021](mage/decisions/0021-offline-no-telemetry-local-signal.md)). Open
+([ADR-0054](mage/decisions/0054-files-in-the-repo-no-runtime-no-server.md)). Open
 issues at [github.com/Sumit1993/mage-memory/issues](https://github.com/Sumit1993/mage-memory/issues).
 
 ## Status

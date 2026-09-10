@@ -169,11 +169,8 @@ stay a note.
 - **/mage:optimize** (`skills/optimize/SKILL.md`) — the post-graduation half:
   reword a mis-firing trigger, or **demote** a skill that stops earning its keep
   (skill → note, the reverse of graduation).
-- **ADR-0013** (`mage/decisions/0013-procedure-skills-self-grooming-loop.md`) §1 —
+- **ADR-0057** (`mage/decisions/0057-a-guard-lands-by-pull-request.md`) —
   a skill is a graduated note; the note is the substrate, the skill its pushed
-  form; dream is the single applier.
-- **ADR-0019** (`mage/decisions/0019-mage-promote-self-grooming.md`) §5 — only
-  procedural notes graduate.
-- **ADR-0038** (`mage/decisions/0038-promote-note-rung-deleted-graduate-on-usage.md`) —
-  note-read usage across distinct chapters (not recurrence, not context-match)
-  gates graduation.
+  form; dream is the single applier. Only procedural notes graduate, and
+  note-read usage across distinct chapters, not recurrence and not
+  context-match, is what gates it.

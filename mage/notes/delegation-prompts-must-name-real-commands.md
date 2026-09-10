@@ -6,7 +6,7 @@ last_reviewed: "2026-07-19"
 status: active
 sources:
   - notes/mage-no-biome-2space.md
-  - decisions/0039-context-footprint-measure-and-bound.md
+  - decisions/0058-recall-one-bounded-index.md
 provenance:
   repo: mage-memory
   work: adr-0039-context-footprint
@@ -23,7 +23,7 @@ keywords:
 Naming a verification command in a delegation prompt **without checking it exists** is how a
 capable delegate ends up doing the exact thing the knowledge base warns against.
 
-**Hit 2026-07-19 (ADR-0039):** a prompt told an agy/Gemini run to verify with
+**Hit 2026-07-19 (ADR-0039 (now ADR-0058)):** a prompt told an agy/Gemini run to verify with
 `pnpm run lint`. This repo has **no `lint` script** — only `typecheck` and `test`. The delegate
 went looking for a linter, found biome, and ran it. Biome's default config indents with
 **tabs**, so a ~130-line change came back as a 472-line whole-file reformat — the precise

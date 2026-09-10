@@ -10,8 +10,8 @@ provenance:
   repo: mage-memory
   work: prismalens-soak-groom-2026-07-19
 sources:
-  - decisions/0019-mage-promote-self-grooming.md
-  - decisions/0029-digest-to-agent-capture.md
+  - decisions/0057-a-guard-lands-by-pull-request.md
+  - decisions/0052-streams-and-the-observe-schema.md
   - https://github.com/Sumit1993/mage-memory/issues/71
   - cc-session:d8d18f6f-21d4-4679-8b16-531132e1b88d
 keywords:
@@ -48,7 +48,7 @@ That list has drifted behind the harness. Surviving the filter today:
 - `toolsearch`, `workflow`, `skill`, `monitor`, `sendmessage` — postdate the list
 - `mcp__*` tool names — never covered
 - `llm` (from `llm.ts`) — only *generic* filenames are denylisted, not filenames as a class
-- `adr` and `0019` (from `ADR-0019`) — no numeric filter, and `adr` is high-frequency
+- `adr` and `0019` (from `ADR-0019 (now ADR-0057)`) — no numeric filter, and `adr` is high-frequency
   in a docs-heavy repo, so it pulls unrelated work into one bucket
 
 `workflow` is a double hit: it is also a lens name, so it collides with the fold itself.
@@ -81,11 +81,11 @@ instead of converging on their own.
 
 ## How to apply
 
-**Superseded in part, 2026-07-19 — read [ADR-0038](../decisions/0038-promote-note-rung-deleted-graduate-on-usage.md) before acting on this.**
+**Superseded in part, 2026-07-19 — read [ADR-0038 (now ADR-0057)](../decisions/0057-a-guard-lands-by-pull-request.md) before acting on this.**
 This note originally recommended replacing the denylist with a semantic-content score.
 That was wrong in the same way `DENOISE` is wrong: both are attempts to build a
 deterministic selector of a purely semantic property, which
-[ADR-0029](../decisions/0029-digest-to-agent-capture.md) killed on the evidence of two
+[ADR-0029 (now ADR-0052)](../decisions/0052-streams-and-the-observe-schema.md) killed on the evidence of two
 pre-registered gates (Faultline 0/62, prose-keyed 0/55). ADR-0038 deletes the fold
 instead of improving it.
 

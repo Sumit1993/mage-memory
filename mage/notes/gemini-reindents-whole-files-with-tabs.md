@@ -23,7 +23,7 @@ modified: 2026-07-27T09:47:12.778Z
 
 # Gotcha — Gemini re-indents entire files with tabs; diff-stat inflation is the tell
 
-Both ADR-0041 Wave-B agy jobs (Gemini 3.6 Flash) converted every touched file's 2-space
+Both ADR-0041 (now ADR-0058) Wave-B agy jobs (Gemini 3.6 Flash) converted every touched file's 2-space
 indentation to tabs, turning ~200-line functional changes into 700-1800-line diffs
 (`skills-cmd.ts` +553 churned; `paths.ts` 478 lines churned for a 5-line real delta).
 

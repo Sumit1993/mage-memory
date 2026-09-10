@@ -9,9 +9,9 @@ provenance:
   repo: mage-memory
   work: adr-0044-local-hub-migration
 sources:
-  - decisions/0044-setup-is-a-conversation-over-one-address.md
-  - decisions/0043-hub-addressed-by-remote-located-by-derivation.md
-  - decisions/0037-readiness-doctor-remit-and-autofix-line.md
+  - decisions/0056-hubs-addressed-by-remote-located-by-derivation.md
+  - decisions/0056-hubs-addressed-by-remote-located-by-derivation.md
+  - decisions/0055-connect-doctor-migrate.md
 keywords:
   - local-hub
   - migration
@@ -21,12 +21,12 @@ keywords:
   - mixed-version
   - name-derivation
 ---
-# Plan — the `local://` hub migration (ADR-0044, issue #123)
+# Plan — the `local://` hub migration (ADR-0044 (now ADR-0056), issue #123)
 
 The one-time migration ADR-0044 names in its Consequences: existing local-only
 hubs carry a filesystem path in `hub_repo` (or only a `hub_path`), which throws
 on canonicalization once the `local://` scheme lands. This plan is the
-implementation design; it blocks the removal of `hub_path` (ADR-0043 §6).
+implementation design; it blocks the removal of `hub_path` (ADR-0043 (now ADR-0056) §6).
 
 ## Vehicle — extend `mage migrate`, no new command
 
@@ -134,7 +134,7 @@ rather than implying more: migrate's scope is the current repo and its walk-up,
 so a later run may meet a name an earlier run already claimed, and will chain
 past it. A set of hubs never visible together therefore has no
 invocation-order-independent assignment — which no design can provide without a
-global registry mage deliberately does not keep (ADR-0010). `--name <n>` is the
+global registry mage deliberately does not keep (ADR-0010 (now ADR-0050)). `--name <n>` is the
 deterministic override when a specific hub must hold a specific name.
 
 **The claim is `mkdir` — no lockfile.** The claim primitive is

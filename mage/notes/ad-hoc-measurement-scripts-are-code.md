@@ -5,8 +5,8 @@ created: "2026-07-19"
 last_reviewed: "2026-07-19"
 status: active
 sources:
-  - decisions/0039-context-footprint-measure-and-bound.md
-  - decisions/0033-recall-import-bounded-index.md
+  - decisions/0058-recall-one-bounded-index.md
+  - decisions/0058-recall-one-bounded-index.md
 provenance:
   repo: mage-memory
   work: adr-0039-context-footprint
@@ -25,7 +25,7 @@ Numbers produced by ad-hoc analysis get quoted in decisions, commit messages and
 where they acquire an authority the five-minute script never earned. **A parser bug in a
 measurement becomes a wrong fact in the permanent record.**
 
-**Hit 2026-07-19 (ADR-0039).** A script measuring redundant keywords in the generated index
+**Hit 2026-07-19 (ADR-0039 (now ADR-0058)).** A script measuring redundant keywords in the generated index
 split entry lines on `)`, which broke on any title containing parentheses — e.g.
 *"Faultline: a friction/derivation capture trigger (prefilter, not miner)"*. Title fragments
 were counted as keywords. The resulting figure — **"5,919 B of redundant keywords, 23% of the
@@ -52,7 +52,7 @@ inverse "54% unmeasurable" when the real figure was **~21%**.
   implementation ran against real data; the projection ran against your parser.
 - Distinguish **projected** from **measured** in the ADR text, and when a projection proves
   wrong, record the correction rather than quietly editing the number — see ADR-0039 §10, which
-  applies the same rule to [ADR-0033](../decisions/0033-recall-import-bounded-index.md)'s
+  applies the same rule to [ADR-0033 (now ADR-0058)](../decisions/0058-recall-one-bounded-index.md)'s
   "~4KB" claim.
 - Print the *derivation*, not just the total, so a wrong intermediate is visible.
 

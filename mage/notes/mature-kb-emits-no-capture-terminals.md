@@ -10,8 +10,8 @@ provenance:
   repo: mage-memory
   work: prismalens-soak-groom-2026-07-19
 sources:
-  - decisions/0030-agent-autonomy-ladder.md
-  - decisions/0031-programmatic-provenance-stamp.md
+  - decisions/0057-a-guard-lands-by-pull-request.md
+  - decisions/0057-a-guard-lands-by-pull-request.md
   - work/phase2-reject-ledger-0.1.0-gate.md
   - cc-session:d8d18f6f-21d4-4679-8b16-531132e1b88d
 keywords:
@@ -31,7 +31,7 @@ modified: 2026-07-19T06:53:57.173Z
 
 # Gotcha — a mature KB emits no capture terminals, so the keep-rate gate cannot calibrate on it
 
-ADR-0031 Phase 2 (merged 2026-07-19, PR #64) measures autonomy quality as a
+ADR-0031 (now ADR-0057) Phase 2 (merged 2026-07-19, PR #64) measures autonomy quality as a
 keep-rate over autonomously-authored notes, counting **only `source === "capture"`
 terminals** — `adopt` and legacy notes are excluded by construction, which is
 correct and deliberate.

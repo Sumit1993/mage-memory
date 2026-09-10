@@ -10,10 +10,10 @@ provenance:
   repo: mage-memory
   work: adr-0039-soak
 sources:
-  - decisions/0039-context-footprint-measure-and-bound.md
-  - decisions/0011-recursive-scan-hub-projects.md
-  - decisions/0012-wings-optional-convention-standalone-hubs.md
-  - decisions/0004-capture-insight-not-copies.md
+  - decisions/0058-recall-one-bounded-index.md
+  - decisions/0056-hubs-addressed-by-remote-located-by-derivation.md
+  - decisions/0056-hubs-addressed-by-remote-located-by-derivation.md
+  - decisions/0051-the-ladder-runs-before-anything-is-remembered.md
   - notes/soak-targets.md
   - src/metrics/footprint.ts
   - src/commands/index-cmd.ts
@@ -35,7 +35,7 @@ modified: 2026-07-19T18:06:46.460Z
 
 # Footprint soak (0.0.14) — what held, and two shape assumptions that did not
 
-**Handoff.** `mage footprint` (ADR-0039) shipped in 0.0.14 having only ever run against
+**Handoff.** `mage footprint` (ADR-0039 (now ADR-0058)) shipped in 0.0.14 having only ever run against
 `mage-memory` itself. The first external soak — the two targets in
 [soak-targets](../notes/soak-targets.md) — validated the headline design and found **two gaps, both
 caused by assumptions that hold for a single-wing, file-citing KB and not for the others.**
@@ -115,7 +115,7 @@ is **the file the agent actually loads**, and those differ by KB shape.
 hub. There is nothing there to measure.
 
 But it means the metric designed as the honest savings-adjacent number
-([ADR-0039 §2](../decisions/0039-context-footprint-measure-and-bound.md)) **only works on KBs
+([ADR-0039 §2](../decisions/0058-recall-one-bounded-index.md)) **only works on KBs
 whose notes cite repo files** — which turned out to be the authoring KB and not the others. The
 sample it was validated on was the sample that suits it.
 
@@ -133,23 +133,23 @@ out-of-scope. Small, self-contained fix in `src/metrics/footprint.ts`.
 ## Not gaps
 
 - **Yield / trend read "insufficient data"** on all three — correct, and the intended behaviour
-  ([ADR-0039 §Consequences](../decisions/0039-context-footprint-measure-and-bound.md)): they
+  ([ADR-0039 §Consequences](../decisions/0058-recall-one-bounded-index.md)): they
   need ~30 sessions and must never render zeros. External KBs have no sampler history yet
   because 0.0.14 only just shipped.
 
 ## Suggested order
 
 1. **Grill Gap 1** — it is the one that lets a real KB grow past a real cliff unwarned, and hubs
-   are a first-class shape ([ADR-0011](../decisions/0011-recursive-scan-hub-projects.md),
-   [ADR-0012](../decisions/0012-wings-optional-convention-standalone-hubs.md)).
+   are a first-class shape ([ADR-0011 (now ADR-0056)](../decisions/0056-hubs-addressed-by-remote-located-by-derivation.md),
+   [ADR-0012 (now ADR-0056)](../decisions/0056-hubs-addressed-by-remote-located-by-derivation.md)).
 2. **Decide Gap 2** — cheap, and the current output actively misleads on two of three KBs.
 3. **Fix the absolute-path bug** — trivial, can ride either.
 4. **Re-soak after each** — this pass took minutes and found what months of self-hosting did not.
 
 ## Relations
 
-- follows [ADR-0039 — measure the context footprint](../decisions/0039-context-footprint-measure-and-bound.md)
+- follows [ADR-0039 — measure the context footprint](../decisions/0058-recall-one-bounded-index.md)
 - soak layout and targets in [soak-targets](../notes/soak-targets.md)
-- hub shape per [ADR-0011](../decisions/0011-recursive-scan-hub-projects.md) /
-  [ADR-0012](../decisions/0012-wings-optional-convention-standalone-hubs.md)
-- pointer leverage rests on [ADR-0004 — capture insight, not copies](../decisions/0004-capture-insight-not-copies.md)
+- hub shape per [ADR-0011](../decisions/0056-hubs-addressed-by-remote-located-by-derivation.md) /
+  [ADR-0012](../decisions/0056-hubs-addressed-by-remote-located-by-derivation.md)
+- pointer leverage rests on [ADR-0004 (now ADR-0051) — capture insight, not copies](../decisions/0051-the-ladder-runs-before-anything-is-remembered.md)

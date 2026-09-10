@@ -21,10 +21,10 @@ sources:
   - src/commands/observe.ts
   - skills/learn/SKILL.md
   - skills/groom/SKILL.md
-  - mage/decisions/0009-no-runtime-automation-rides-host-hooks.md
-  - mage/decisions/0013-procedure-skills-self-grooming-loop.md
-  - mage/decisions/0018-mage-distill-observed-scratch-reader.md
-  - mage/decisions/0019-mage-promote-self-grooming.md
+  - mage/decisions/0054-files-in-the-repo-no-runtime-no-server.md
+  - mage/decisions/0057-a-guard-lands-by-pull-request.md
+  - mage/decisions/0052-streams-and-the-observe-schema.md
+  - mage/decisions/0057-a-guard-lands-by-pull-request.md
   - ~/ai-context/mage-redact-false-positives-issue.md
   - cc-session:3c5c8534-8611-4d9d-9087-9975da48dd44
 keywords:
@@ -44,12 +44,12 @@ keywords:
 
 > **Stale-suspect (2026-07-01) — read as origin design, not current behavior.** This plan
 > captures 0.0.12 *as designed on 2026-06-15*: a lesson path where **mage stages/drafts**
-> lessons on its own judgment. The **digest→agent pivot** ([ADR-0029](../decisions/0029-digest-to-agent-capture.md))
+> lessons on its own judgment. The **digest→agent pivot** ([ADR-0029 (now ADR-0052)](../decisions/0052-streams-and-the-observe-schema.md))
 > later **superseded that mechanic** — two replay gates killed deterministic candidate-selection,
 > so mage's model-free core now only emits a **digest** and the **host agent** judges + writes
-> (mage writes no lesson drafts itself). [ADR-0030](../decisions/0030-agent-autonomy-ladder.md)
+> (mage writes no lesson drafts itself). [ADR-0030 (now ADR-0057)](../decisions/0057-a-guard-lands-by-pull-request.md)
 > then added the Operator/Approver/Overseer **autonomy dial**, and
-> [ADR-0032](../decisions/0032-capture-redirect-native-memory.md)/[0033](../decisions/0033-recall-import-bounded-index.md)
+> [ADR-0032 (now ADR-0051)](../decisions/0051-the-ladder-runs-before-anything-is-remembered.md)/[0033](../decisions/0058-recall-one-bounded-index.md)
 > reworked capture (redirect the host's native-memory write into git) and recall (launch-load the
 > bounded index). The live map is the
 > [autonomy track](plan-release-sequence.md#the-autonomy-track--what-010-now-delivers-adr-00290036)
@@ -57,13 +57,13 @@ keywords:
 > `mage:groom`/`mage:learn` mechanics + `.mage/` layout below still hold.
 
 **Status: GRILLED 2026-06-15 — decisions locked; BUILT 2026-06-16.** Recorded as
-**[ADR-0024](../decisions/0024-organic-grooming-loop.md)** (this note remains the full grill
+**[ADR-0024 (now ADR-0057)](../decisions/0057-a-guard-lands-by-pull-request.md)** (this note remains the full grill
 rationale; the ADR is the crisp decision of record) — *finishing*
-[ADR-0009](../decisions/0009-no-runtime-automation-rides-host-hooks.md) §24 step 2 (the
+[ADR-0009 (now ADR-0054)](../decisions/0054-files-in-the-repo-no-runtime-no-server.md) §24 step 2 (the
 planned-but-unbuilt nudge) and amending
-[ADR-0013](../decisions/0013-procedure-skills-self-grooming-loop.md) /
-[ADR-0019](../decisions/0019-mage-promote-self-grooming.md). Follow-up:
-**[ADR-0025](../decisions/0025-one-transient-state-home.md)** folds the transient dirs into `.mage/`.
+[ADR-0013 (now ADR-0057)](../decisions/0057-a-guard-lands-by-pull-request.md) /
+[ADR-0019 (now ADR-0057)](../decisions/0057-a-guard-lands-by-pull-request.md). Follow-up:
+**[ADR-0025 (now ADR-0054)](../decisions/0054-files-in-the-repo-no-runtime-no-server.md)** folds the transient dirs into `.mage/`.
 
 > **The grill flipped the thesis.** This note was drafted as "closing the *procedure* path"
 > (recurring workflow → skill). The 2026-06-15 grill established the opposite: the organic
@@ -89,7 +89,7 @@ planned-but-unbuilt nudge) and amending
    uses **no hook**: index loaded at session start, recall via `<system-reminder>`, creation
    **inline via the Write tool during the response**, driven by an always-on instruction. So
    inline is the primary path; the boundary is only the safety-net. (OQ 9 = NO embedded judge:
-   breaks ADR-0009 "no reasoner in the engine" + ADR-0021 no-egress, and is redundant — the
+   breaks ADR-0009 "no reasoner in the engine" + ADR-0021 (now ADR-0054) no-egress, and is redundant — the
    skills already ARE the judge.)
 5. **(b2) frictionless staged write + batch-confirm at the boundary.** The agent writes a
    short draft with NO per-note confirm; the human-confirm happens at the batch commit. Bends
@@ -100,7 +100,7 @@ planned-but-unbuilt nudge) and amending
    (committed, indexed-live). Keeps unconfirmed drafts OUT of the live index until promoted.
 
 **Mechanism**
-7. **Engine = first-sight** (`mage distill`, ADR-0018) + inline capture — never the recurrence
+7. **Engine = first-sight** (`mage distill`, ADR-0018 (now ADR-0052)) + inline capture — never the recurrence
    tally.
 8. **The boundary nudge RUNS distill (ii)** over the new `.learnings/` segment to catch
    lessons the agent forgot to capture inline, drafts them to `.staging/`, and surfaces the
@@ -285,7 +285,7 @@ wouldn't help — what would surface is activity not worth a procedural note.
 
 mage conflates two paths through the ladder:
 
-1. **Lesson path** — `correction`/`failure` → first-sight insight ([mage distill](../decisions/0018-mage-distill-observed-scratch-reader.md))
+1. **Lesson path** — `correction`/`failure` → first-sight insight ([mage distill](../decisions/0052-streams-and-the-observe-schema.md))
    → note (gotcha/principle). Lessons are usually one-shot; their home is **distill
    (first-sight)**, NOT recurrence. A lesson rarely needs to graduate to a *skill* — it is
    already auto-loaded as a note.
@@ -385,7 +385,7 @@ model. An embedded judge is a LATER option IF fully-autonomous out-of-band groom
 ## Provenance — finishing a planned loop, not inventing one (raised 2026-06-14)
 
 The whole organic loop this note proposes was **written down at the start and simply left
-unbuilt** — A/B are completing [ADR-0009](../decisions/0009-no-runtime-automation-rides-host-hooks.md),
+unbuilt** — A/B are completing [ADR-0009](../decisions/0054-files-in-the-repo-no-runtime-no-server.md),
 not extending it:
 
 - **The nudge trigger (B) = ADR-0009 §24, step 2** — *"A `PreCompact` / `SessionEnd` hook
@@ -393,10 +393,10 @@ not extending it:
   (`mage observe`, deterministic capture); the step-2 nudge was never wired.
 - **The loosening-to-autonomy (the confidence ladder / auto-tuner) was planned twice** —
   ADR-0009 §25 (*"Promote … starts human-confirm; graduates to **auto-promote** when a pattern
-  recurs ≥2× at confidence ≥ threshold"*) and [ADR-0021](../decisions/0021-offline-no-telemetry-local-signal.md)
+  recurs ≥2× at confidence ≥ threshold"*) and [ADR-0021](../decisions/0054-files-in-the-repo-no-runtime-no-server.md)
   §2 (*"local data drives **per-user adaptation (the deferred auto-tuner / autonomy rungs)** …
   more automated promotions over time runs through the user's **own local accept-rate**, not a
-  remote server"*). Both UNBUILT — promotion still cold-starts at human-confirm (ADR-0016 Rung
+  remote server"*). Both UNBUILT — promotion still cold-starts at human-confirm (ADR-0016 (now ADR-0057) Rung
   A), with no local-accept-rate loosening yet.
 - **What these ADRs already SETTLE for OQ 9:** judgment "rides" the host agent and "never
   smuggle a reasoner into the CLI" (ADR-0009 §17,§19); signal stays local, no phone-home
@@ -430,7 +430,7 @@ playbook from that.
 Add a hook path that injects a SHORT nudge into the agent's context when (and only when) a
 candidate is ripe — never auto-grooms, never commits.
 
-> **Not new design — UNBUILT design.** This is [ADR-0009](../decisions/0009-no-runtime-automation-rides-host-hooks.md)
+> **Not new design — UNBUILT design.** This is [ADR-0009](../decisions/0054-files-in-the-repo-no-runtime-no-server.md)
 > §24 step 2 verbatim: *"A `PreCompact` / `SessionEnd` hook **nudges** the agent ('distill
 > `.learnings/` … before context is lost')."* The nudge was planned at the start; the wired
 > hooks only ever ran `mage observe` (capture, step 1), never the nudge (step 2). B finishes it.
@@ -503,19 +503,19 @@ a quality gate, or it trades "nothing graduates" for "junk graduates":
 
 ## Relations
 
-- amends [ADR-0013](../decisions/0013-procedure-skills-self-grooming-loop.md) — the
+- amends [ADR-0013](../decisions/0057-a-guard-lands-by-pull-request.md) — the
   scratch→note→skill loop; this completes its *procedure* path and adds the organic trigger
   ADR-0013 §4 hand-waved ("promote-on-recurrence surfaces them").
-- amends [ADR-0019](../decisions/0019-mage-promote-self-grooming.md) — the promote manifest +
+- amends [ADR-0019](../decisions/0057-a-guard-lands-by-pull-request.md) — the promote manifest +
   the procedural-only graduation gate (the `covered=20 / graduate=0` finding lives here).
-- depends_on [ADR-0015](../decisions/0015-mage-observe-capture-schema.md) — the lens
+- depends_on [ADR-0015 (now ADR-0052)](../decisions/0052-streams-and-the-observe-schema.md) — the lens
   definitions (workflow vs correction/failure) the diagnosis turns on.
-- relates_to [ADR-0018](../decisions/0018-mage-distill-observed-scratch-reader.md) — the
+- relates_to [ADR-0018](../decisions/0052-streams-and-the-observe-schema.md) — the
   lesson path's proper home (first-sight, not recurrence).
-- constrains [ADR-0009](../decisions/0009-no-runtime-automation-rides-host-hooks.md) — "no
+- constrains [ADR-0009](../decisions/0054-files-in-the-repo-no-runtime-no-server.md) — "no
   model in the engine; judgment rides host hooks/skills" — the principle the embedded-judge
   fork (OQ 9) would have to amend.
-- constrains [ADR-0021](../decisions/0021-offline-no-telemetry-local-signal.md) — offline /
+- constrains [ADR-0021](../decisions/0054-files-in-the-repo-no-runtime-no-server.md) — offline /
   no-telemetry / local-signal — the other principle an embedded cheap judge would touch.
 - follows [plan-0.0.11-signal-and-capture](plan-0.0.11-signal-and-capture.md) — whose honest
   soak finding (precision not reach) surfaced this.

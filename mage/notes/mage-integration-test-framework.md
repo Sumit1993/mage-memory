@@ -14,7 +14,7 @@ provenance:
 mage has an opt-in integration/real-test suite (test/integration/) for the built CLI + external tools (claude -p); live tests are cost-gated
 
 
-mage-memory now has a tiered test layout (built 2026-06-27, ADR-0032 Phase 11):
+mage-memory now has a tiered test layout (built 2026-06-27, ADR-0032 (now ADR-0051) Phase 11):
 
 - **Default** — `npm test` (`vitest run`, via `vitest.config.ts`) = fast unit/fixture
   tests under `src/` + `test/`. `test/integration/**` is EXCLUDED, so the default run
@@ -43,5 +43,5 @@ optionally because of cost. **How to apply:** write live tests gated with
 `requireLive(ctx)` from `test/integration/lib/harness.ts` (`runMage`, `initKb`,
 `wireCommandeer`, `runClaude`). The README has a MANIFEST of ad-hoc `~/ai-context/`
 harnesses still to fold in (memory-deny spike, mage-soak digest, faultline-prove,
-dogfood smoke). See [ADR-0032](../decisions/0032-capture-redirect-native-memory.md) (Gate 0)
+dogfood smoke). See [ADR-0032](../decisions/0051-the-ladder-runs-before-anything-is-remembered.md) (Gate 0)
 and [dogfood-before-release](dogfood-before-release.md).
