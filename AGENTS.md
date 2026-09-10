@@ -38,4 +38,4 @@ run them.
 ## Order of work
 
 The pinned tracking issue on GitHub is the order of work. Read it before picking anything up.
-ADR-0048 is the charter; `docs/plans/0048-road-to-0.1.0/` holds the plan page and evidence.
+ADR-0048 is the charter; the plan, its mechanics and its evidence are comments on that issue (#204).

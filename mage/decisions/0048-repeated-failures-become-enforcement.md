@@ -13,8 +13,6 @@ sources:
   - decisions/0001-memory-first-product-supersedes-specshub.md
   - decisions/0029-digest-to-agent-capture.md
   - decisions/0046-derived-hub-git-and-merge-ratification.md
-  - docs/plans/0048-road-to-0.1.0/mage-notes-ladder-routing-2026-09-03.md
-  - docs/plans/0048-road-to-0.1.0/mage-adr-digest-2026-09-03.md
 keywords:
   - charter
   - enforcement-ladder
@@ -30,7 +28,7 @@ keywords:
 
 > **Status: proposed (2026-09-03).** Changes the charter set by ADR-0001. The plan, evidence
 > and issue list live in the tracking issue (#204, rewritten under this ADR). Mechanics (ids,
-> schemas, states, the kit write path) are section 12 of the plan page in `docs/plans/0048-road-to-0.1.0/`.
+> schemas, states, the kit write path) are the "section 12" comment on #204.
 
 ## Context
 
