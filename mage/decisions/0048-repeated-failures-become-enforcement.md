@@ -84,15 +84,19 @@ the observe log because the observer listens after the call.
    rewrite, a failed check). `left the queue`: a note promoted or deleted. The gate is
    `prevented` above zero for three distinct guards (landed fixes at rungs 1 to 3), at
    least one on a unit other than mage-memory, and `left the queue` above zero. The ledger
-   is derived from observe events and lives under `.mage/` (ADR-0025); a kit fix counts in
-   whichever unit it fires. Nothing new is committed; the release notes quote the counts.
+   is derived from observe events and lives under `.mage/` (ADR-0025). A unit is one
+   knowledge base with its own ledger, in-repo or hub; an event counts in the unit whose
+   observe log received it, so a kit fix counts in the unit of the session it fired in.
+   Nothing new is committed; the release notes quote the counts.
    Replaces the a1 gate of ADR-0024 and ADR-0040.
 7. **The ladder runs before a memory is written.** Native memory stays on and pointed at the
    store; the moment the agent tries to save a lesson is the trigger. The ADR-0032 PreToolUse
    memory hook is repointed, not removed: it blocks the write, returns the ladder, and admits
    only a note that states why no higher rung fits, its trigger moment and its pointer. The
-   same hook fires on direct writes under `notes/`. mage has no runtime; the hook makes the
-   agent judge, it does not judge. The roster loads as before (ADR-0033).
+   same hook fires on direct writes under `notes/`. If the hook itself fails, a write under
+   `notes/` is denied and every other write passes: an admission gate that fails open admits
+   everything unjudged. mage has no runtime; the hook makes the agent judge, it does not
+   judge. The roster loads as before (ADR-0033).
 8. **Migration is `mage migrate`, no new verb.** For a 0.0.x knowledge base it clears
    retired transient state, rewrites the AGENTS.md block (#198 first), repoints the memory hook
    to the ladder, installs the PreToolUse observe arm, and leaves
