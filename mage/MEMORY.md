@@ -43,3 +43,5 @@
 - `gotcha` [Gotcha — key bodies with `-`/`_` partially leak past the high-entropy detector](notes/redaction-anthropic-key-detector.md) — mage
 
 > 37 memory notes total (37 shown). Read INDEX.md before non-trivial work.
+- [Point-in-time research stays private](notes/point-in-time-research-stays-private.md) — feedback, research, strategy, kit notes/, valid_until, never public docs
+- [Notes must read in one screen](notes/notes-must-read-in-one-screen.md) — feedback, operator skips long notes and the dashboard, unslop applies to mage text, #253
