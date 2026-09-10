@@ -191,7 +191,7 @@ adopting an authored skill is *remembering*, not copying a source (ADR-0013 §5)
 
 ## See also
 
-- **ADR-0013** (`mage/decisions/0013-procedure-skills-self-grooming-loop.md`) —
+- **ADR-0057** (`mage/decisions/0057-a-guard-lands-by-pull-request.md`) —
   procedure skills, adopt-in-place, and the scratch → note → skill ladder.
-- **ADR-0014** (`mage/decisions/0014-two-gate-redaction.md`) — two-gate
+- **ADR-0053** (`mage/decisions/0053-redaction-two-gates-one-engine.md`) — two-gate
   redaction; `mage redact` is Gate 2 before any note/skill is written.

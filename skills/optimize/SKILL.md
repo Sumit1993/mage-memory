@@ -224,8 +224,7 @@ edits this pass — the learning rate held.
   proposals for proven notes (ADR-0038); `/mage:graduate` confirms them and
   `mage dream --apply` — the single serialized writer — mints the generated
   skills this skill then tunes.
-- **ADR-0016** (`mage/decisions/0016-context-match-confidence-ladder-applier.md`)
+- **ADR-0057** (`mage/decisions/0057-a-guard-lands-by-pull-request.md`)
   — context-match as the load-bearing predicate, the confidence ladder, the
-  single-writer applier, and the four hard ceilings.
-- **ADR-0013** (`mage/decisions/0013-procedure-skills-self-grooming-loop.md`) —
-  the scratch → note → skill ladder and the textual-learning-rate held-out gate.
+  single-writer applier, the four hard ceilings, and the scratch → note → skill
+  ladder with its textual-learning-rate held-out gate.
