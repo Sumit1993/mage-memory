@@ -25,10 +25,10 @@ describe("integration: release smoke (deterministic)", () => {
   it("--help hides the plumbing verbs and shows the human verbs", async () => {
     const { stdout } = await runMage(["--help"], { cwd: REPO_ROOT });
     const verbLine = (v: string) => new RegExp(`^\\s+${v}\\b`, "m").test(stdout);
-    for (const hidden of ["observe", "index", "distill", "promote"]) {
+    for (const hidden of ["observe", "distill", "promote"]) {
       expect(verbLine(hidden), `plumbing verb '${hidden}' should be hidden from --help`).toBe(false);
     }
-    for (const human of ["init", "connect", "doctor", "skills"]) {
+    for (const human of ["init", "connect", "doctor", "index", "skills"]) {
       expect(verbLine(human), `human verb '${human}' should be visible in --help`).toBe(true);
     }
   });

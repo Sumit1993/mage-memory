@@ -32,12 +32,12 @@ describe("disconnect", () => {
     };
     await writeFile(localPath(dir), `${JSON.stringify(pre, null, 2)}\n`);
 
-    // connect wires 10 mage groups in
+    // connect wires 11 mage groups in
     await connect({ cwd: dir, yes: true });
 
     const r = await disconnect({ cwd: dir, yes: true });
     expect(r.scope).toBe("local");
-    expect(r.removed).toBe(10);
+    expect(r.removed).toBe(11);
     expect(r.backedUp).toBe(true);
 
     const settings = JSON.parse(await readFile(localPath(dir), "utf8")) as {
@@ -64,7 +64,7 @@ describe("disconnect", () => {
 
     const r = await disconnect({ cwd: dir, yes: true, gitHook: false });
     expect(r.autoMemoryUnset).toBe(true);
-    expect(r.removed).toBe(13); // all 13 mage groups (incl. the 3 commandeer)
+    expect(r.removed).toBe(14); // all 14 mage groups (incl. the 3 commandeer)
     const settings = JSON.parse(await readFile(localPath(dir), "utf8")) as {
       autoMemoryDirectory?: string;
       hooks?: unknown;

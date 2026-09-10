@@ -94,6 +94,7 @@ export const MAGE_HOOKS: ReadonlyArray<{
   // Second Stop group: capture the agent's final reply (ADR-0019 amendment to
   // ADR-0015). Distinct id from mage:metrics:Stop, so both coexist on Stop.
   { event: "Stop", id: "mage:observe:Stop", command: "mage observe" },
+  { event: "Stop", id: "mage:nudge:Stop", command: "mage nudge" },
   // Capture autonomous SUBagent work (0.0.11 Candidate 4): a Task subagent's tool
   // calls never reach the main-session PostToolUse hook, so its final reply — read
   // from the subagent transcript, exactly like Stop → assistant_msg — is the one

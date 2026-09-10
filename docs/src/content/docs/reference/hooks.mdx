@@ -66,26 +66,26 @@ block healthy. `connect` now reaps them, and `doctor` counts them.
 
 ### Worked example
 
-A settings file carrying the full legacy shape — 30 id-less orphans, the 10 correctly
+A settings file carrying the full legacy shape: 33 id-less orphans, the 11 correctly
 tagged groups, and one `mage learn` hook of the user's own:
 
 ```text
 $ jq '[.hooks[][]] | length' .claude/settings.local.json
-41    # 30 id-less orphans + 10 tagged mage:* + 1 of mine
+45    # 33 id-less orphans + 11 tagged mage:* + 1 of mine
 
 $ mage doctor
-✗ connection          : local: hook block out of date (mage:* drift: missing=[none] stale=[none] duplicate-registrations=30); re-run `mage connect`
+✗ connection          : local: hook block out of date (mage:* drift: missing=[none] stale=[none] duplicate-registrations=33); re-run `mage connect`
 
 $ mage connect --yes
-✓ Wired 10 events into /home/you/project/.claude/settings.local.json (personal settings file).
-  Reaped 30 legacy/duplicate mage hook registration(s).
+✓ Wired 11 events into /home/you/project/.claude/settings.local.json (personal settings file).
+  Reaped 33 legacy/duplicate mage hook registration(s).
   Run `mage disconnect` to remove.
 
 $ mage doctor
 ✓ connection          : local: mage hooks current
 
 $ jq '[.hooks[][]] | length' .claude/settings.local.json
-11    # 10 tagged mage:*, plus the `mage learn` hook — untouched
+12    # 11 tagged mage:*, plus the `mage learn` hook: untouched
 ```
 
 Four registrations per event collapse to one; the user's own hook survives every step.
@@ -108,63 +108,28 @@ Two design rules matter for trust:
 - **Capture rides the host, with no runtime daemon.** There is no separate process
   to start, supervise, or leak. The hooks are the entire runtime surface.
 
-## The boundary nudge
+### Guard events
 
-The one capture-adjacent hook that does more than append is
-**`mage:nudge:SessionStart`** — the *boundary nudge*. A compaction is when your
-host summarizes a long conversation and starts a fresh chapter; the detail of the
-chapter that just closed is exactly what is most at risk of being forgotten.
-
-The nudge runs on `SessionStart` and **writes no note or draft itself** (its
-only writes are its own throttle-watermark state) — it hands the
-host agent a read-only digest as additional context, and the agent decides what
-to stage. It has two halves — the **fresh-chapter digest** and the
-**autonomy-scaled backlog mandate** — each firing on `compact`, `startup`, or
-`resume` under its own conditions; only `/clear` is a fast no-op. The full
-source-by-source firing matrix is in
-[The boundary nudge](../loop/nudge.md#when-it-fires).
-
-One worked case, because "two halves, three sources, each under its own
-conditions" is easy to read as one switch. Here the host resumes a session,
-new scratch has accumulated, and the last closed chapter has not been surfaced
-yet — so **both** halves fire, into **different channels**:
+Hooks that block or rewrite tool calls, such as claude-kit guards, can pipe a guard event directly to `mage observe` on stdin:
 
 ```text
-in   { "hook_event_name": "SessionStart", "source": "resume", "cwd": "~/sources/mage-memory" }
-
-     scratch fingerprint changed since last run  → re-scan, do not serve cache
-     last closed chapter ts > lastChapterTs      → digest half FIRES
-     backlog 4, last backlog line > 4h ago       → backlog line FIRES
-     source = resume (not compact)               → mandate forced to operator, whatever the configured level
-
-out  systemMessage                    (USER sees this, in the terminal)
-     │ mage: 0 staged · 4 chapters unmined · up to 0 eligible to graduate → /mage:groom
-
-     hookSpecificOutput.additionalContext   (MODEL sees this, user never does)
-     │ <chapter digest: the closed chapter's salient signals, unranked>
-     │ <autonomy mandate: operator — draft, show the human, write only after a yes>
+$ echo '{"guard_id":"kit/guard/no-haiku","tool":"Agent","detail":"model=haiku"}' | mage observe
 ```
 
-Two things this makes concrete. The **channels are not interchangeable**: the
-deterministic teaser goes to the user, the full digest and mandate go only to the
-model — mage narrows, the agent judges. And the halves are **independently
-gated**: the same `resume` with no new scratch is a cache hit that surfaces no
-digest — only the backlog line, if the throttle window has elapsed — while a
-`resume` whose chapter was already seen still prints the backlog line alone.
+The event is admitted by the presence of a `guard_id` key or by specifying `--event guard_fired`. It validates the `<scope>/guard/<slug>` format, scrubs any detail string, and appends a single `guard_fired` event to the scratch.
 
-It lives on `SessionStart`, not `PreCompact` or `SessionEnd`, for two concrete
-reasons baked into the code:
+## The boundary nudge
 
-- `PreCompact` fires *before* the chapter closes, so the chapter is not yet
-  complete to distill.
-- `SessionEnd` cannot inject context — its output has nowhere to go because the
-  session is already ending.
+The capture-adjacent hooks running `mage nudge` provide session boundary visibility:
 
-`SessionStart` with `source === "compact"` is the first moment that can both see
-the closed chapter and hand text back to you.
+- **`mage:nudge:Stop`**: When Claude stops or completes a turn, `mage nudge` inspects the session events in scratch and emits a concise receipt:
+  `mage: <N> denied · <N> corrected · <N> new signatures · <N> guard fires`
+  If all four counts are zero or if no knowledge base exists in the workspace, it remains silent and exits 0.
 
-See [The boundary nudge](../loop/nudge.md) for the full digest-and-mandate
-contract and how the agent's resulting drafts flow into
-[Stage and groom](../loop/stage-groom.md), and the
-[Commands reference](../reference/commands.mdx) for the CLI surface behind these
-hooks.
+- **`mage:nudge:SessionStart`**: At session startup or resumption, `mage nudge` stays quiet by default. It prints only when action is needed:
+  - If graduation proposals are waiting, it outputs `mage · 1 proposal is waiting` (or plural).
+  - If a connected hub repository or grant check fails, it outputs a single status warning.
+  Otherwise, it outputs nothing.
+
+See [The boundary nudge](../loop/nudge.md) for details on session receipts and boundary handling, and the [Commands reference](../reference/commands.mdx) for the CLI surface behind these hooks.
+

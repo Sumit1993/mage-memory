@@ -29,7 +29,7 @@ function countMage(s: ClaudeSettings): number {
 const tmp = (): Promise<string> => tmpDir("mage-settings-");
 
 describe("MAGE_HOOKS table", () => {
-  it("wires exactly thirteen rows (10 base + 3 commandeer)", () => {
+  it("wires exactly fourteen rows (11 base + 3 commandeer)", () => {
     expect(MAGE_HOOKS).toEqual([
       { event: "SessionStart", id: "mage:observe:SessionStart", command: "mage observe" },
       { event: "SessionStart", id: "mage:nudge:SessionStart", command: "mage nudge" },
@@ -44,6 +44,7 @@ describe("MAGE_HOOKS table", () => {
       { event: "SessionEnd", id: "mage:observe:SessionEnd", command: "mage observe" },
       { event: "Stop", id: "mage:metrics:Stop", command: "mage skills --metrics --quiet" },
       { event: "Stop", id: "mage:observe:Stop", command: "mage observe" },
+      { event: "Stop", id: "mage:nudge:Stop", command: "mage nudge" },
       { event: "SubagentStop", id: "mage:observe:SubagentStop", command: "mage observe" },
       {
         event: "PreToolUse",
@@ -201,9 +202,9 @@ describe("upsertMageHooks", () => {
 });
 
 describe("commandeer-tier gating (ADR-0032)", () => {
-  it("omits the commandeer rows by default (10 groups, no PreToolUse)", () => {
+  it("omits the commandeer rows by default (11 groups, no PreToolUse)", () => {
     const merged = upsertMageHooks(null).settings;
-    expect(countMage(merged)).toBe(10);
+    expect(countMage(merged)).toBe(11);
     expect(merged.hooks?.PreToolUse).toBeUndefined();
     // PostToolUse carries only the observe group, not the memory one.
     const post = merged.hooks?.PostToolUse ?? [];
@@ -211,9 +212,9 @@ describe("commandeer-tier gating (ADR-0032)", () => {
     expect(post.find((g) => g.id === "mage:observe:PostToolUse")).toBeTruthy();
   });
 
-  it("adds the commandeer rows with matchers when commandeer:true (13 groups)", () => {
+  it("adds the commandeer rows with matchers when commandeer:true (14 groups)", () => {
     const merged = upsertMageHooks(null, { commandeer: true }).settings;
-    expect(countMage(merged)).toBe(13);
+    expect(countMage(merged)).toBe(14);
     const pre = merged.hooks?.PreToolUse ?? [];
     expect(pre).toHaveLength(1);
     expect(pre[0]?.id).toBe("mage:memory:PreToolUse");
@@ -230,7 +231,7 @@ describe("commandeer-tier gating (ADR-0032)", () => {
     expect(on.hooks?.PreToolUse).toHaveLength(1);
     const off = upsertMageHooks(on, { commandeer: false }).settings;
     expect(off.hooks?.PreToolUse).toBeUndefined(); // event pruned
-    expect(countMage(off)).toBe(10);
+    expect(countMage(off)).toBe(11);
     expect(off.hooks?.PostToolUse?.find((g) => g.id === "mage:memory:PostToolUse")).toBeUndefined();
   });
 });
@@ -596,15 +597,15 @@ describe("upsertMageHooks — the reaped counter (#150)", () => {
     expect(upsertMageHooks(once).reaped).toBe(0);
   });
 
-  it("40 registrations (30 id-less + 10 tagged) collapse to 10, reaping 30", () => {
+  it("44 registrations (33 id-less + 11 tagged) collapse to 11, reaping 33", () => {
     const before = darkState();
-    expect(Object.values(before.hooks ?? {}).flat()).toHaveLength(40);
+    expect(Object.values(before.hooks ?? {}).flat()).toHaveLength(44);
 
     const { settings: after, reaped } = upsertMageHooks(before);
-    expect(reaped).toBe(30);
+    expect(reaped).toBe(33);
 
     const groups = Object.values(after.hooks ?? {}).flat();
-    expect(groups).toHaveLength(10);
+    expect(groups).toHaveLength(11);
     expect(groups.filter((g) => typeof g.id !== "string")).toEqual([]);
   });
 
