@@ -689,10 +689,6 @@
           "description": "target the personal ~/.claude/settings.json instead of the repo-local file"
         },
         {
-          "flags": "--all-projects",
-          "description": "from a hub: wire every registered project's code repo (repo-local each)"
-        },
-        {
           "flags": "--no-git-hook",
           "description": "skip installing the redaction pre-commit hook"
         },

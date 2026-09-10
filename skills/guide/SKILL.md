@@ -54,6 +54,18 @@ never receive the terminal notice. Run `mage connect` to clone the hub there.
 Do **not** run `mage init`, since that mints a second, divergent knowledge
 base instead of reaching the real one.
 
+**No access grant.** The hub is present on disk, but Claude Code's
+`permissions.additionalDirectories` carries no grant for it in either
+settings scope: in external mode you cannot read a single note; in hybrid
+mode in-repo notes under `mage/` remain readable and only the external hub
+is unreachable. At session start this fires on both channels together. The
+human sees a `mage · the harness has no access grant...` notice in the
+terminal. You get an `additionalContext` message naming the ungranted path;
+that is the message you act on, and you never receive the terminal notice.
+Ask the user to run `mage connect` in this repo; that is the only fix. Do
+**not** run `mage init`, since that mints a second, divergent knowledge
+base instead of reaching the real one.
+
 Hybrid is its own mode value (`"hybrid"`): docs root is the in-repo `mage/`;
 each `hub_ref` is a cross-cutting registration with a hub. (A schema-v1 file
 recorded as mode=in-repo with non-empty `hub_refs[]` is read as hybrid.)
@@ -177,4 +189,4 @@ Code-repo side (`<repo>/mage/metadata.json`):
 }
 ```
 
-Hub side (`<hub>/metadata.json`, at the root): `{ schema, name, created_at, projects: [{ name, storage, code_repo_path, code_repo_url }] }`.
+Hub side (`<hub>/metadata.json`, at the root): `{ schema, name, created_at, projects: [{ name, storage, code_repo_url }] }`.

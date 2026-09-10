@@ -325,7 +325,6 @@ describe("mage index — hub projects + registry (ADR-0011/0012)", () => {
       {
         name: "engine",
         storage: "hub-owned",
-        code_repo_path: "/code/engine",
         code_repo_url: "git@github.com:me/engine.git",
       },
     ]);
@@ -352,7 +351,6 @@ describe("mage index — hub projects + registry (ADR-0011/0012)", () => {
       {
         name: "engine",
         storage: "hub-owned",
-        code_repo_path: "/code/engine",
         code_repo_url: "git@github.com:me/engine.git",
       },
     ]);
@@ -386,7 +384,6 @@ describe("mage index — hub projects + registry (ADR-0011/0012)", () => {
       {
         name: "web",
         storage: "in-repo",
-        code_repo_path: "/code/web",
         code_repo_url: "git@github.com:me/web.git",
       },
     ]);
@@ -394,8 +391,10 @@ describe("mage index — hub projects + registry (ADR-0011/0012)", () => {
     expect(r.noteCount).toBe(0);
     const idx = await readIndex(root);
     expect(idx).toContain("Linked repositories");
-    expect(idx).toContain("/code/web"); // pointer to where its notes live
-    expect(idx).toContain("INDEX"); // → open its INDEX
+    expect(idx).toContain("git@github.com:me/web.git");
+    expect(idx).toContain("INDEX");
+    expect(idx).not.toContain("undefined");
+    expect(idx).not.toContain("/code/web");
   });
 
   it("is idempotent on a hub (re-run byte-identical; no self-ingestion)", async () => {
@@ -434,13 +433,11 @@ describe("mage index — fan out over owned project docs roots (#106)", () => {
       {
         name: "alpha",
         storage: "hub-owned",
-        code_repo_path: "/code/alpha",
         code_repo_url: "git@github.com:me/alpha.git",
       },
       {
         name: "beta",
         storage: "hub-owned",
-        code_repo_path: "/code/beta",
         code_repo_url: "git@github.com:me/beta.git",
       },
     ]);
@@ -501,7 +498,6 @@ describe("mage index — fan out over owned project docs roots (#106)", () => {
       {
         name: "alpha",
         storage: "hub-owned",
-        code_repo_path: "/code/alpha",
         code_repo_url: "git@github.com:me/alpha.git",
       },
     ]);
@@ -549,7 +545,6 @@ describe("mage index — fan out over owned project docs roots (#106)", () => {
       {
         name: "alpha",
         storage: "hub-owned",
-        code_repo_path: "/code/alpha",
         code_repo_url: "git@github.com:me/alpha.git",
       },
     ]);
@@ -594,13 +589,11 @@ describe("mage index — fan out over owned project docs roots (#106)", () => {
       {
         name: "alpha",
         storage: "hub-owned",
-        code_repo_path: "/code/alpha",
         code_repo_url: "git@github.com:me/alpha.git",
       },
       {
         name: "beta",
         storage: "hub-owned",
-        code_repo_path: "/code/beta",
         code_repo_url: "git@github.com:me/beta.git",
       },
     ]);

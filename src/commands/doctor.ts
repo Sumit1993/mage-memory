@@ -1,6 +1,5 @@
-import { readFile } from "node:fs/promises";
-import { homedir, platform } from "node:os";
-import { join } from "node:path";
+import { platform } from "node:os";
+import { mageInstalledIn, mageSkillsInstalled } from "../adapters/claude-code/plugins.js";
 import { buildReport, renderReport } from "../doctor/report.js";
 import { evaluateGenreTells, renderGenreTells } from "../doctor/genre-tells.js";
 import { pushKbChecks } from "../doctor/kb-checks.js";
@@ -10,6 +9,8 @@ import { hasGh, hasGit } from "../git.js";
 import { logger } from "../logger.js";
 import { absolutePath, codeRepoDocsRoot, exists, findCodeRepoRoot, looksLikeHub, readHubMetadata, resolveDocsRoot } from "../paths.js";
 import { which } from "../shell.js";
+
+export { mageInstalledIn };
 
 export interface DoctorOptions {
   hub?: string;
@@ -21,6 +22,8 @@ export interface DoctorOptions {
   cwd?: string;
   /** Gather checks WITHOUT rendering or the network probe — for the setup readiness footer. */
   quiet?: boolean;
+  /** Probe network reachability (GitHub). Injected opt-in (default false). */
+  network?: boolean;
 }
 
 export interface DoctorCheck {
@@ -183,12 +186,9 @@ async function pushEnvChecks(checks: DoctorCheck[], opts: DoctorOptions): Promis
     }
   }
 
-  // 6. Network probe (optional — checks if GitHub is reachable). Skipped in quiet mode
-  // (the readiness footer wants a fast, local summary) AND under vitest: the fetch can
-  // burn its full 5s AbortSignal on a slow/blocked CI runner and trip a test's own 5s
-  // deadline (the Node-22 hub-liveness timeout). It is network-only, optional, and has no
-  // bearing on the KB, so no test needs it.
-  if (opts.quiet || process.env.VITEST) return;
+  // 6. Network probe (optional — checks if GitHub is reachable). Injected opt-in:
+  // skipped in quiet mode or unless explicitly requested via `opts.network`.
+  if (opts.quiet || !opts.network) return;
   try {
     const r = await fetch("https://github.com", { method: "HEAD", signal: AbortSignal.timeout(5000) });
     checks.push({
@@ -247,28 +247,6 @@ async function checkSkillsInstall(): Promise<DoctorCheck> {
       "mage plugin NOT installed — mage:learn / mage:groom are unreachable → " +
       "`/plugin marketplace add Sumit1993/mage-memory` then `/plugin install mage@mage`",
   };
-}
-
-/** Host plugin registry path (honors CLAUDE_CONFIG_DIR, else ~/.claude). */
-function pluginRegistryPath(): string {
-  const base = process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude");
-  return join(base, "plugins", "installed_plugins.json");
-}
-
-/** The installed `mage@<marketplace>` id from the host registry, or null. Fail-open. */
-async function mageSkillsInstalled(): Promise<string | null> {
-  try {
-    return mageInstalledIn(JSON.parse(await readFile(pluginRegistryPath(), "utf8")));
-  } catch {
-    return null; // no registry / unreadable / bad JSON → treat as not installed
-  }
-}
-
-/** PURE: the first `mage`/`mage@…` plugin id in a parsed installed_plugins.json, else null. */
-export function mageInstalledIn(registry: unknown): string | null {
-  const plugins = (registry as { plugins?: Record<string, unknown> } | null)?.plugins;
-  if (!plugins || typeof plugins !== "object") return null;
-  return Object.keys(plugins).find((k) => k === "mage" || k.startsWith("mage@")) ?? null;
 }
 
 /**

@@ -1,7 +1,7 @@
 import { Command, Option } from "commander";
 import { adopt } from "./commands/adopt.js";
 import { autonomy } from "./commands/autonomy.js";
-import { connect, connectAllProjects } from "./commands/connect.js";
+import { connect } from "./commands/connect.js";
 import { dashboard } from "./commands/dashboard-cmd.js";
 import { OPEN_WITH_TARGETS } from "./dashboard/html.js";
 import { disconnect } from "./commands/disconnect.js";
@@ -541,6 +541,7 @@ export function buildProgram(): Command {
         hub: opts.hub,
         fix: opts.fix,
         report: opts.report,
+        network: true,
       });
       if (!result.passed) process.exit(1);
     });
@@ -581,23 +582,15 @@ export function buildProgram(): Command {
       "--user",
       "target the personal ~/.claude/settings.json instead of the repo-local file",
     )
-    .option(
-      "--all-projects",
-      "from a hub: wire every registered project's code repo (repo-local each)",
-    )
     .option("--no-git-hook", "skip installing the redaction pre-commit hook")
     .option(
       "-y, --yes",
       "non-interactive: auto-confirm prompts, including cloning the hub (a real `git clone`) on a hub-absent machine when a usable hub_repo is recorded",
     )
     .action(async (opts) => {
-      if (opts.allProjects) {
-        await connectAllProjects({ yes: opts.yes, gitHook: opts.gitHook });
-      } else {
-        await connect({ user: opts.user, yes: opts.yes, gitHook: opts.gitHook });
-        // Setup self-verifies: surface recall+skills drift (e.g. plugin not installed) now.
-        await readinessFooter(process.cwd());
-      }
+      await connect({ user: opts.user, yes: opts.yes, gitHook: opts.gitHook });
+      // Setup self-verifies: surface recall+skills drift (e.g. plugin not installed) now.
+      await readinessFooter(process.cwd());
     });
 
   // ─── disconnect ───────────────────────────────────────────────────────────

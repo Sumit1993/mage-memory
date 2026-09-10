@@ -266,7 +266,34 @@ additionalContext: This repo is in external mode, so its knowledge base lives in
 
 ## Reaching a hub from the code repo
 
-Finding the knowledge base and being *allowed to read it* are two different things. In `external` and `hybrid` modes the docs root sits outside the repo your agent was launched in, and agent harnesses confine file access to the project root. So `mage connect` also grants access to the hub — for Claude Code, by adding it to `permissions.additionalDirectories` in the repo's local settings.
+Finding the knowledge base and being *allowed to read it* are two different things. In `external` mode (and for referenced hubs in `hybrid` mode), a docs target sits outside the repo your agent was launched in, and agent harnesses confine file access to the project root. So `mage connect` also grants access to the hub — for Claude Code, by adding it to `permissions.additionalDirectories` in the repo's local settings.
+
+A hub that is present on disk but not granted is surfaced at session start on both channels, exempt from the backlog throttle:
+
+```console
+systemMessage    : mage · the harness has no access grant for the knowledge base at ~/.mage/hubs/github.com/acme/docs — run `mage connect`
+additionalContext: This repo's knowledge base lives outside the project root at
+                    ~/.mage/hubs/github.com/acme/docs, and Claude Code's
+                    permissions.additionalDirectories carries no grant for it
+                    in either settings scope, so you cannot read a single note.
+                    Ask the user to run `mage connect` in this repo; that is the
+                    only fix. Do NOT run `mage init` here: it would mint a
+                    SECOND knowledge base.
+```
+
+In `hybrid` mode, in-repo notes under `mage/` remain readable and only the external hub is unreachable:
+
+```console
+systemMessage    : mage · the harness has no access grant for the external hub at ~/.mage/hubs/github.com/acme/docs — run `mage connect`
+additionalContext: This repo references an external hub at
+                    ~/.mage/hubs/github.com/acme/docs, and Claude Code's
+                    permissions.additionalDirectories carries no grant for it
+                    in either settings scope. In-repo notes under mage/ are
+                    readable, and only the external hub is unreachable.
+                    Ask the user to run `mage connect` in this repo; that is the
+                    only fix. Do NOT run `mage init` here: it would mint a
+                    SECOND knowledge base.
+```
 
 Three consequences worth knowing:
 

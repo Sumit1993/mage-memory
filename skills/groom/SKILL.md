@@ -109,17 +109,13 @@ itself neither. Don't groom; tell the user to `cd` into a project or `mage init`
 
 **At a hub root, fan out (Decision 1).** A hub is one KB *and* a registry of
 project KBs, so groom the hub's OWN `.mage/learnings/` (at the hub root) **and every
-registered project**. Read the hub's `metadata.json` registry and derive each
-project's docs root from its `storage`:
-
-- `repo-owned` (hybrid) → `<code_repo_path>/mage/`
-- `hub-owned`           → `<hub>/projects/<name>/` (flat)
+registered hub-owned project** (`<hub>/projects/<name>/`). Repo-owned projects keep
+their notes in their own repo checkouts and are groomed there.
 
 Then run **both phases below once per root**, passing `--dir <root>` to each engine
 command. Each root keeps its **own** watermark + tally, so `--seen` stays
 unambiguous and projects never conflate — this is why the fan-out is a per-root
-loop, not one mixed manifest. Skip any project whose `code_repo_path` is absent on
-this machine. If the user scopes the run to the hub only (e.g. "groom root-only"),
+loop, not one mixed manifest. If the user scopes the run to the hub only (e.g. "groom root-only"),
 groom just the hub root and skip the fan-out.
 
 ---

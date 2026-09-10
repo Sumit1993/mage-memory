@@ -190,11 +190,10 @@ export interface HubProject {
    * (the hub has the actual files). Used when the code repo was linked via the
    * external-only flow (no in-repo notes at link time).
    *
-   * "repo-owned" — the project's notes live at `<code_repo_path>/mage/` (the code
+   * "repo-owned" — the project's notes live in the code repo's `mage/` (the code
    * repo owns the files; the hub just registers awareness). Used in hybrid mode.
    */
   storage: "hub-owned" | "repo-owned";
-  code_repo_path: string;
   code_repo_url: string;
 }
 
