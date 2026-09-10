@@ -188,13 +188,13 @@ archive of what you read, it doesn't belong.
 
 ## 6. Note-type vocabulary, genres, and recall rungs
 
-`type` is an open vocabulary, but every note type maps onto a **genre** that decides its recall rung ([ADR-0041](mage/decisions/0041-genre-decides-the-recall-rung.md)). Only **memory** genre notes populate the always-loaded recall index (`INDEX.md`/`MEMORY.md`) (ADR-0041). Non-memory types (`plan`, `spec`, `tasks`, `decision`) remain legal types for storage and linking, but are non-memory genres (`work`, `doc`, `decision` per ADR-0041) that are excluded from always-loaded recall — authored deliberately, never the default destination for captured knowledge.
+`type` is an open vocabulary, but every note type maps onto a **genre** that decides its recall rung. Only **memory** genre notes populate the always-loaded recall index (`INDEX.md`/`MEMORY.md`). Non-memory types (`plan`, `spec`, `tasks`, `decision`) remain legal types for storage and linking, but are non-memory genres (`work`, `doc`, `decision`) that are excluded from always-loaded recall — authored deliberately, never the default destination for captured knowledge. Plans and task lists live in the issue tracker ([ADR-0048](mage/decisions/0048-repeated-failures-become-enforcement.md) decision 9); `mage/work/` is retired and its existing files are read-only until they move to issues.
 
 | `type:` | Genre | Recall Rung | Purpose & Lifecycle |
 |---|---|---|---|
 | `gotcha` `procedure` `pointer` `principle` `feedback` `reference` `note` | **memory** | 2 (1 when graduated) | Recall-bearing memories (edit-in-place). Default destination for captured knowledge. |
 | `decision` | **decision** | 3 (on demand) | Settled architectural choice (supersede/amend, never edit in place; `mage/decisions/`). |
-| `plan` `tasks` | **work** | 3 (on demand) | Task lists & work plans (complete and archive; lives in `mage/work/`). |
+| `plan` `tasks` | **work** | 3 (on demand) | Legacy only. New plans and task lists are issues (ADR-0048 decision 9); existing `mage/work/` files stay read-only until migrated. |
 | `spec` `doc` | **doc** | 3 (on demand) | System specification / current truth (expire on falsification). |
 | anything else | **unclassified** | 3 (on demand) | Doctor annotates; never rejected. |
 
@@ -211,9 +211,9 @@ Before creating a memory note, check whether a better home wins (in order):
 | If it is... | Better home | Action / Destination |
 |---|---|---|
 | File- or function-scoped detail | **Code comment** | Place directly in source code. |
-| Task with a done-state / forward plan | **Ticket / `work/`** | Track in `mage/work/<slug>/` or issue tracker (`type: plan`/`tasks`). |
+| Task with a done-state / forward plan | **Issue** | Open an issue in the tracker (ADR-0048 decision 9). Never a new `mage/work/` file. |
 | Current-truth system spec | **Doc beside code** | Keep in repo docs beside code (`type: spec`). |
-| Investigation evidence / raw trace | **Artifact + pointer** | Save raw data in `work/<slug>/artifacts/`, keep thin pointer note. |
+| Investigation evidence / raw trace | **Issue comment + pointer** | Attach the evidence to the issue it decides (ADR-0048 decision 10); keep a thin pointer note only if it must be recalled. |
 | Agent instruction ("do X as Y") | **Skill / Prompt** | Place in `skills/` instruction. |
 | Settled architectural choice & rationale | **Decision record** | Author ADR in `mage/decisions/` (`type: decision`). |
 | Non-completing, recallable insight/gotcha | **Memory note** ✅ | Author a memory-genre note (`mage/notes/`). |
