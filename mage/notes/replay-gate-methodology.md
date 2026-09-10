@@ -9,9 +9,9 @@ provenance:
   repo: mage-memory
   work: capture-validation-gate
 sources:
-  - mage/decisions/0027-faultline-friction-capture-trigger.md
-  - mage/decisions/0028-prose-keyed-capture.md
-  - mage/decisions/0029-digest-to-agent-capture.md
+  - mage/decisions/0052-streams-and-the-observe-schema.md
+  - mage/decisions/0052-streams-and-the-observe-schema.md
+  - mage/decisions/0052-streams-and-the-observe-schema.md
 ---
 
 # Replay-gate methodology — does a capture mechanism produce USEFUL knowledge?
@@ -62,6 +62,6 @@ digest on a couple of real sessions; grep it for each known gem; verify the judg
 
 - Standing corpus + harness: `~/ai-context/mage-prove-20260619/` (author-local; adapter maps raw
   CC transcripts → `ObserveEvent[]`).
-- [ADR-0027](../decisions/0027-faultline-friction-capture-trigger.md) ·
-  [ADR-0028](../decisions/0028-prose-keyed-capture.md) ·
-  [ADR-0029](../decisions/0029-digest-to-agent-capture.md) — the three gated designs and outcomes.
+- [ADR-0027 (now ADR-0052)](../decisions/0052-streams-and-the-observe-schema.md) ·
+  [ADR-0028 (now ADR-0052)](../decisions/0052-streams-and-the-observe-schema.md) ·
+  [ADR-0029 (now ADR-0052)](../decisions/0052-streams-and-the-observe-schema.md) — the three gated designs and outcomes.

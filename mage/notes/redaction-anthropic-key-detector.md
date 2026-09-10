@@ -38,4 +38,4 @@ high-entropy detectors (detector order = scan priority; earlier wins the overlap
 in `src/redact.test.ts` (the never-leak loop is the regression guard); include a
 fixture whose body has `-`/`_` so a future prefix-leak regression is caught.
 
-See [redaction in the glossary](context.md) and ADR-0014 (two-gate redaction).
+See [redaction in the glossary](context.md) and ADR-0014 (now ADR-0053) (two-gate redaction).

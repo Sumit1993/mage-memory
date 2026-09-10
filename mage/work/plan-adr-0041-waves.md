@@ -10,10 +10,10 @@ provenance:
   repo: mage-memory
   work: adr-0041-genre-recall-rungs
 sources:
-  - decisions/0041-genre-decides-the-recall-rung.md
-  - decisions/0042-reach-tier-harness-grants.md
-  - decisions/0035-decouple-harness-memory-from-notes.md
-  - decisions/0039-context-footprint-measure-and-bound.md
+  - decisions/0058-recall-one-bounded-index.md
+  - decisions/0056-hubs-addressed-by-remote-located-by-derivation.md
+  - decisions/0051-the-ladder-runs-before-anything-is-remembered.md
+  - decisions/0058-recall-one-bounded-index.md
   - notes/soak-targets.md
   - notes/npx-mage-runs-the-published-release.md
   - cc-session:ee0349da-df7e-4672-b8be-dc8cb25cb2c5
@@ -32,7 +32,7 @@ keywords:
 modified: 2026-07-28T10:00:59.884Z
 ---
 
-# ADR-0041 wave plan — A, B, C, and the ratification gate
+# ADR-0041 (now ADR-0058) wave plan — A, B, C, and the ratification gate
 
 > **Why this note exists.** The three-wave plan lived only in a session log until
 > 2026-07-28, which made Wave C effectively invisible — the ADR names waves but
@@ -77,8 +77,8 @@ Wave 3: C — connect/external layers (needs B's fallback rooms to exist)
 |---|---|
 | Plugin packaging allowlist (kills the 556MB plugin cache) | **not built** — filed as [#96](https://github.com/Sumit1993/mage-memory/issues/96) |
 | `noteSizeCap`: wire or delete | **done** — wired in #94; `src/doctor/genre-tells.ts` is its first importer |
-| ADR-B draft | **done** — became [ADR-0041](../decisions/0041-genre-decides-the-recall-rung.md) |
-| ADR-C draft | **done 2026-07-31** — became [ADR-0044](../decisions/0044-setup-is-a-conversation-over-one-address.md) (PR #118) |
+| ADR-B draft | **done** — became [ADR-0041](../decisions/0058-recall-one-bounded-index.md) |
+| ADR-C draft | **done 2026-07-31** — became [ADR-0044 (now ADR-0056)](../decisions/0056-hubs-addressed-by-remote-located-by-derivation.md) (PR #118) |
 
 ## Wave A — curation + the better-home ladder
 
@@ -114,7 +114,7 @@ Soak curation PRs, applied row-for-row against approved manifests:
 ## Wave C — connect / external layers
 
 **Grilled 2026-07-31; ADR drafted.** Became
-[ADR-0044](../decisions/0044-setup-is-a-conversation-over-one-address.md) (open as PR #118),
+[ADR-0044](../decisions/0056-hubs-addressed-by-remote-located-by-derivation.md) (open as PR #118),
 closing [#104](https://github.com/Sumit1993/mage-memory/issues/104).
 
 Scope as designed: the grilled **config format + question flow** for
@@ -123,8 +123,8 @@ taste-critical because users touch it directly, which is why the grill was queue
 for a fresh session rather than the tail of the 2026-07-27 wave day.
 
 **C shrank before it was drafted.** Two ADRs landed in the interval and each took
-a bite: [ADR-0042](../decisions/0042-reach-tier-harness-grants.md) took the grant
-question, [ADR-0043](../decisions/0043-hub-addressed-by-remote-located-by-derivation.md)
+a bite: [ADR-0042 (now ADR-0056)](../decisions/0056-hubs-addressed-by-remote-located-by-derivation.md) took the grant
+question, [ADR-0043 (now ADR-0056)](../decisions/0056-hubs-addressed-by-remote-located-by-derivation.md)
 took addressing and location. What was left in the middle is the part neither
 touched — **the conversation a human has with the tool**. So ADR-C is a
 human-surface design doc sitting on top of two settled mechanisms, not a third
@@ -146,13 +146,13 @@ What it decided, in one line each:
 > 0043 calls `hub_path` "slated for removal", and on that day every local-only hub
 > would become unaddressable. ADR-0044 §2–3 is what makes 0043 completable.
 
-> [ADR-0042](../decisions/0042-reach-tier-harness-grants.md) (the reach tier) was
+> [ADR-0042](../decisions/0056-hubs-addressed-by-remote-located-by-derivation.md) (the reach tier) was
 > **adjacent, not a substitute** — a separate grill on the same day, about harness
 > grants rather than the config surface.
 
 ## The ratification gate
 
-From [ADR-0041](../decisions/0041-genre-decides-the-recall-rung.md) — the ADR stays
+From [ADR-0041](../decisions/0058-recall-one-bounded-index.md) — the ADR stays
 `status: proposed` until this is satisfied. The Wave-B release *opens* the window;
 the evidence below closes it. This gate governs **ADR-0041 only**.
 
@@ -203,7 +203,7 @@ small top-level `INDEX.md` is *not* evidence the filter landed.
 | central hub by derivation (`~/.mage/hubs/<slug>`) | FT-26 |
 | plugin cache bloat | [#96](https://github.com/Sumit1993/mage-memory/issues/96) |
 | worktree propagation research | [#103](https://github.com/Sumit1993/mage-memory/issues/103) |
-| `HarnessAdapter` seam | [ADR-0036](../decisions/0036-defer-harness-adapter-seam.md) revisit trigger |
+| `HarnessAdapter` seam | [ADR-0036 (now ADR-0054)](../decisions/0054-files-in-the-repo-no-runtime-no-server.md) revisit trigger |
 
 ## Post-migration measurement — 2026-07-31
 
@@ -231,7 +231,7 @@ in two independent ways. Both are recorded as their own gotchas
   `code_repo_path` values (missing the `sources/` segment), so the monitor reported
   `code repo not present on disk` and skipped all three prismalens units. Fixed;
   the soak went from 2 live units to 4.
-- **Keep-rate was computable but unwired.** ADR-0031 Phase 2 shipped
+- **Keep-rate was computable but unwired.** ADR-0031 (now ADR-0057) Phase 2 shipped
   (`src/grooming/reconcile.ts`; `.mage/metrics/keep-rate.json` in all five KBs) but
   the monitor never opened the file, so every digest printed *"Keep-rate not
   computed"*. The `baseline: true` flag on a `seen` entry turns out to **be** the
@@ -270,12 +270,12 @@ evidence base. **The window effectively restarts 2026-07-31.**
    and 3. Merging the `code_repo_path` fix
    ([`prismalens-kb#17`](https://github.com/prismalens/prismalens-kb/pull/17)) is a
    precondition — until it lands, prismalens goes dark again on the next machine.
-5. Flip [ADR-0041](../decisions/0041-genre-decides-the-recall-rung.md) to
+5. Flip [ADR-0041](../decisions/0058-recall-one-bounded-index.md) to
    `accepted` if **its** gate holds (the yield/KILL criteria above).
-   [ADR-0042](../decisions/0042-reach-tier-harness-grants.md) is **not** covered by
+   [ADR-0042](../decisions/0056-hubs-addressed-by-remote-located-by-derivation.md) is **not** covered by
    that gate — it is a separate decision with its own revisit trigger, and is
    evaluated on its own terms.
-6. Ratify and implement [ADR-0044](../decisions/0044-setup-is-a-conversation-over-one-address.md)
+6. Ratify and implement [ADR-0044](../decisions/0056-hubs-addressed-by-remote-located-by-derivation.md)
    (drafted in PR #118, closing [#104](https://github.com/Sumit1993/mage-memory/issues/104)).
    [#121](https://github.com/Sumit1993/mage-memory/pull/121) has landed, so implementation is
    unblocked; `hub_path` cannot be removed until the migration specified in
@@ -283,9 +283,9 @@ evidence base. **The window effectively restarts 2026-07-31.**
 
 ## Relations
 
-- Governed by [ADR-0041](../decisions/0041-genre-decides-the-recall-rung.md),
-  amending [ADR-0035](../decisions/0035-decouple-harness-memory-from-notes.md)
-- Companion to [ADR-0039](../decisions/0039-context-footprint-measure-and-bound.md)
+- Governed by [ADR-0041](../decisions/0058-recall-one-bounded-index.md),
+  amending [ADR-0035 (now ADR-0051)](../decisions/0051-the-ladder-runs-before-anything-is-remembered.md)
+- Companion to [ADR-0039 (now ADR-0058)](../decisions/0058-recall-one-bounded-index.md)
   and [plan-footprint-soak-findings](plan-footprint-soak-findings.md)
 - Soak targets: [[soak-targets]]
 - Release ordering: [plan-release-sequence](plan-release-sequence.md)

@@ -10,8 +10,8 @@ provenance:
   repo: mage-memory
   work: adr-0045-0046-implementation
 sources:
-  - decisions/0045-cross-environment-presence.md
-  - decisions/0046-derived-hub-git-and-merge-ratification.md
+  - decisions/0056-hubs-addressed-by-remote-located-by-derivation.md
+  - decisions/0057-a-guard-lands-by-pull-request.md
   - src/paths.ts
   - src/grooming/config.ts
   - src/provenance.ts
@@ -25,7 +25,7 @@ keywords:
   - fixture-hub
 ---
 
-# Plan — implementing ADR-0045 and ADR-0046
+# Plan — implementing ADR-0045 (now ADR-0056) and ADR-0046 (now ADR-0057)
 
 The two decision records state *what* was decided. This plan carries the *how*: signatures,
 shapes, file paths and sequencing. Nothing here is a decision; changing any of it does not require
@@ -33,9 +33,9 @@ reopening an ADR.
 
 ## Sequencing
 
-1. **Ratify [ADR-0042](../decisions/0042-reach-tier-harness-grants.md),
-   [ADR-0043](../decisions/0043-hub-addressed-by-remote-located-by-derivation.md) and
-   [ADR-0044](../decisions/0044-setup-is-a-conversation-over-one-address.md) first.** 0045 amends
+1. **Ratify [ADR-0042 (now ADR-0056)](../decisions/0056-hubs-addressed-by-remote-located-by-derivation.md),
+   [ADR-0043 (now ADR-0056)](../decisions/0056-hubs-addressed-by-remote-located-by-derivation.md) and
+   [ADR-0044 (now ADR-0056)](../decisions/0056-hubs-addressed-by-remote-located-by-derivation.md) first.** 0045 amends
    0043 and 0044 and leans on 0042. Amending unratified decisions is what produced the six-deep
    stack. **Done** — the pull request carrying 0045 and 0046 flips all three to `accepted`. 0044's
    `local://` address scheme still has no implementation; that is lane work, not a ratification
@@ -183,7 +183,7 @@ Settable through the existing settings command.
 
 **Provenance.** Two additional fields at the creation stamp in `src/provenance.ts`: the channel the
 note arrived through, and a reference to the review that produced it. Creation-only, consistent with
-[ADR-0031](../decisions/0031-programmatic-provenance-stamp.md) §3. No authorship level is set, which
+[ADR-0031 (now ADR-0057)](../decisions/0057-a-guard-lands-by-pull-request.md) §3. No authorship level is set, which
 is what keeps the reject-ledger cohort in `src/grooming/reconcile.ts` unchanged.
 
 **Bounds.** One pull request per run, and at most **five** notes in it (ADR-0046 §7). Five is

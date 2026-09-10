@@ -34,17 +34,17 @@ keywords:
 
 # mage — roadmap
 
-> Scope line set 2026-05-29 (grill-with-docs session). Decisions: [ADR-0001](../decisions/0001-memory-first-product-supersedes-specshub.md)–0036 — the run to 0.1.0 is now the **autonomy track** ([0029](../decisions/0029-digest-to-agent-capture.md)–[0036](../decisions/0036-defer-harness-adapter-seam.md)), sequenced in the [release note](plan-release-sequence.md#the-autonomy-track--what-010-now-delivers-adr-00290036). What to mine from agentmemory: [mining map](../notes/agentmemory-mining-map.md). Language: [context & glossary](../notes/context.md). Founding design research was distilled into these notes; the raw research is author-local and not version-controlled here.
+> Scope line set 2026-05-29 (grill-with-docs session). Decisions: [ADR-0001 (now ADR-0050)](../decisions/0050-mage-turns-a-repeated-failure-into-enforcement.md)–0036 — the run to 0.1.0 is now the **autonomy track** ([0029](../decisions/0052-streams-and-the-observe-schema.md)–[0036](../decisions/0054-files-in-the-repo-no-runtime-no-server.md)), sequenced in the [release note](plan-release-sequence.md#the-autonomy-track--what-010-now-delivers-adr-00290036). What to mine from agentmemory: [mining map](../notes/agentmemory-mining-map.md). Language: [context & glossary](../notes/context.md). Founding design research was distilled into these notes; the raw research is author-local and not version-controlled here.
 
 ## v0.1 — the durable, portable, navigable knowledge base (the founding value)
-- **Fork specshub → mage**: rename `.specshub/`→`mage/`, schema, CLI/package/awareness skill; **carry** modes (in-repo/external/hybrid), metadata, hub registry, commit hygiene, SDD skills (specs = a work type) [ADR-0002].
-- **Vault**: `mage/{notes/, work/<slug>/(artifacts/ ignored), decisions/, archive/, INDEX.md, .obsidian/}`; track work+notes, git-ignore `artifacts/` + `.learnings/` [ADR-0003].
+- **Fork specshub → mage**: rename `.specshub/`→`mage/`, schema, CLI/package/awareness skill; **carry** modes (in-repo/external/hybrid), metadata, hub registry, commit hygiene, SDD skills (specs = a work type) [ADR-0002 (now ADR-0050)].
+- **Vault**: `mage/{notes/, work/<slug>/(artifacts/ ignored), decisions/, archive/, INDEX.md, .obsidian/}`; track work+notes, git-ignore `artifacts/` + `.learnings/` [ADR-0003 (now ADR-0054)].
 - **Note** = just-markdown + suggested `type` + `#wing/room` tag [Q5]; **Obsidian-native** portable `[text](path.md)` links + frontmatter + tags.
-- **Capture-by-pointer**: insight/procedure/pointers, `sources:`, not copies [ADR-0004].
-- **`mage index`** → hierarchical INDEX (root + per-wing) [ADR-0006].
+- **Capture-by-pointer**: insight/procedure/pointers, `sources:`, not copies [ADR-0004 (now ADR-0051)].
+- **`mage index`** → hierarchical INDEX (root + per-wing) [ADR-0006 (now ADR-0058)].
 - **Skills**: awareness + `learn` (explicit, human-confirm) + **one-per-wing** [ADR-0006].
 - **Cheap anti-staleness only**: notes carry `last_reviewed`/`provenance.commit`; awareness treats notes as point-in-time ("verify stale notes vs current code"); on-write overlap/contradiction check in `/learn`.
-- **Coexistence**: mage canonical; native auto-memory left as-is (no harvest bridge yet) [ADR-0005].
+- **Coexistence**: mage canonical; native auto-memory left as-is (no harvest bridge yet) [ADR-0005 (now ADR-0051)].
 
 ## 0.0.x → 0.1.0 — the self-grooming loop, made autonomous (the path to the milestone)
 
@@ -54,8 +54,8 @@ secret **redaction**, ECC-style skill **grouping**, **ingest** of existing skill
 **automation**, and an **icon/visualization** — into a single horizon. **0.1.0 ships the
 full capture → graduate → optimize loop**, all human-committed; nothing is crowned 1.0.
 The dependency-ordered build is the [release sequence](plan-release-sequence.md); the
-model is [ADR-0013](../decisions/0013-procedure-skills-self-grooming-loop.md) (procedure
-skills + the loop) + [ADR-0014](../decisions/0014-two-gate-redaction.md) (two-gate redaction).
+model is [ADR-0013 (now ADR-0057)](../decisions/0057-a-guard-lands-by-pull-request.md) (procedure
+skills + the loop) + [ADR-0014 (now ADR-0053)](../decisions/0053-redaction-two-gates-one-engine.md) (two-gate redaction).
 
 **Reframed 2026-07-01 — 0.1.0 is the autonomy milestone.** Since 0.0.11 the loop has been
 made genuinely *autonomous*, and **all post-0.0.11 work serves that one vision**: a durable
@@ -63,7 +63,7 @@ memory that **captures, recalls, and grooms hard-earned knowledge with as little
 friction as the maintainer opts into**, the git commit the one irreducible human act. The
 0.0.5→0.0.8 chain proved capture/promote *mechanically* but the live soak showed the agent
 **skipped** the `mage stage` CLI and **ignored** "read `INDEX.md` first" — so the autonomy
-track (ADR-0029–0036) turns capture into a *redirect* (co-opt the host's native-memory write
+track (ADR-0029 (now ADR-0052)–0036) turns capture into a *redirect* (co-opt the host's native-memory write
 into git), recall into a launch-*load* (the bounded index auto-loaded, survives `/compact`),
 and adds the opt-in **Operator → Approver → Overseer** dial that lets the agent drain the
 grooming ladder while mage's engine stays model-free. Full sequencing + per-ADR status: the
@@ -71,8 +71,8 @@ grooming ladder while mage's engine stays model-free. Full sequencing + per-ADR 
 
 - **Shipped in 0.0.2** (was "v0.2+ deferred"): recursive scan, multi-home wings,
   hub-project indexing, `link` external awareness, hub generalization —
-  [ADR-0011](../decisions/0011-recursive-scan-hub-projects.md) /
-  [ADR-0012](../decisions/0012-wings-optional-convention-standalone-hubs.md).
+  [ADR-0011 (now ADR-0056)](../decisions/0056-hubs-addressed-by-remote-located-by-derivation.md) /
+  [ADR-0012 (now ADR-0056)](../decisions/0056-hubs-addressed-by-remote-located-by-derivation.md).
 - **Carried into the 0.1.0 path** (no longer "deferred"): full `/dream` healing sweep,
   opt-in auto-capture (observe → connect → distill → promote → **graduate**),
   `mage:learn --from` (prose/transcripts **+ existing skills**), Obsidian
@@ -84,15 +84,15 @@ grooming ladder while mage's engine stays model-free. Full sequencing + per-ADR 
   human-confirmed), two-gate redaction, and Claude Code **plugin** distribution
   (the `mage:` namespace keeps skill names clean — `mage:learn`, `mage:distill`, …).
 - **The autonomy line (ADR-0029–0036) — the cut's final substance** (added 2026-07-01):
-  the [digest→agent pivot](../decisions/0029-digest-to-agent-capture.md) (deterministic core
+  the [digest→agent pivot](../decisions/0052-streams-and-the-observe-schema.md) (deterministic core
   narrows, the host model judges — mage stays model-free), the opt-in
-  [autonomy dial](../decisions/0030-agent-autonomy-ladder.md),
-  [capture-redirect](../decisions/0032-capture-redirect-native-memory.md) +
-  [launch-load recall](../decisions/0033-recall-import-bounded-index.md),
-  [adopt](../decisions/0034-adopt-preexisting-knowledge.md) for pre-existing knowledge, and
-  [notes-are-memories](../decisions/0035-decouple-harness-memory-from-notes.md) (one unified
+  [autonomy dial](../decisions/0057-a-guard-lands-by-pull-request.md),
+  [capture-redirect](../decisions/0051-the-ladder-runs-before-anything-is-remembered.md) +
+  [launch-load recall](../decisions/0058-recall-one-bounded-index.md),
+  [adopt](../decisions/0055-connect-doctor-migrate.md) for pre-existing knowledge, and
+  [notes-are-memories](../decisions/0051-the-ladder-runs-before-anything-is-remembered.md) (one unified
   store). Built on `main`, riding the unshipped 0.0.12; the four autonomy ADRs were
-  **ratified 2026-07-01**, so remaining = the a1 autonomy bake (+ the ADR-0035/0031 tail).
+  **ratified 2026-07-01**, so remaining = the a1 autonomy bake (+ the ADR-0035 (now ADR-0051)/0031 tail).
   Full detail: the
   [autonomy track](plan-release-sequence.md#the-autonomy-track--what-010-now-delivers-adr-00290036).
 
@@ -103,7 +103,7 @@ grooming ladder while mage's engine stays model-free. Full sequencing + per-ADR 
   [ADR-0013].
 - **Multi-repo hub graph aggregation + cross-repo `/dream`** — ADR-0012 §2 rejects
   content/graph aggregation; only registry-pointer memory aggregation survives, and it
-  needs its own grill [ADR-0010/0012].
+  needs its own grill [ADR-0010 (now ADR-0050)/0012].
 
 ## Out of scope (the sharp "no")
 - **Multi-agent coordination** — leases / signals / actions / routines / task queues. mage is durable memory, not an orchestration layer [ADR-0010].
@@ -113,20 +113,20 @@ grooming ladder while mage's engine stays model-free. Full sequencing + per-ADR 
 - Verify `mage-memory` at publish (npm similarity filter) — exact name + GitHub confirmed free 2026-05-29.
 
 ## Relations
-- realizes [ADR-0003 — track work, ignore artifacts](../decisions/0003-track-work-ignore-artifacts.md)
-- realizes [ADR-0006 — two-layer recall](../decisions/0006-two-layer-recall-per-wing-skills.md)
-- v0.2_informed_by [ADR-0007 — mine agentmemory's design](../decisions/0007-mine-agentmemory-design-not-depend.md)
-- v0.2_informed_by [ADR-0009 — no runtime; automation rides host hooks](../decisions/0009-no-runtime-automation-rides-host-hooks.md)
-- bounded_by [ADR-0010 — durable memory, not a coordination layer](../decisions/0010-durable-memory-not-coordination-layer.md)
+- realizes [ADR-0003 — track work, ignore artifacts](../decisions/0054-files-in-the-repo-no-runtime-no-server.md)
+- realizes [ADR-0006 — two-layer recall](../decisions/0058-recall-one-bounded-index.md)
+- v0.2_informed_by [ADR-0007 (now ADR-0050) — mine agentmemory's design](../decisions/0050-mage-turns-a-repeated-failure-into-enforcement.md)
+- v0.2_informed_by [ADR-0009 (now ADR-0054) — no runtime; automation rides host hooks](../decisions/0054-files-in-the-repo-no-runtime-no-server.md)
+- bounded_by [ADR-0010 — durable memory, not a coordination layer](../decisions/0050-mage-turns-a-repeated-failure-into-enforcement.md)
 - mining_map [agentmemory mining map](../notes/agentmemory-mining-map.md)
 - detailed_by [mage v0.1 implementation plan](plan-v0.1.md)
 - sequenced_by [release sequence (post-v0.1 → 1.0)](plan-release-sequence.md)
 - field_tested_by [migration field notes](../notes/migration-field-notes.md)
-- decided_by [ADR-0011 — recursive scan; hub projects are wings](../decisions/0011-recursive-scan-hub-projects.md)
-- decided_by [ADR-0013 — procedure skills + the self-grooming loop](../decisions/0013-procedure-skills-self-grooming-loop.md)
-- gated_by [ADR-0014 — two-gate redaction](../decisions/0014-two-gate-redaction.md)
-- autonomy_by [ADR-0029 — digest-to-agent capture](../decisions/0029-digest-to-agent-capture.md)
-- autonomy_by [ADR-0030 — opt-in agent autonomy ladder](../decisions/0030-agent-autonomy-ladder.md)
-- autonomy_by [ADR-0032 — capture-redirect native memory](../decisions/0032-capture-redirect-native-memory.md)
-- autonomy_by [ADR-0033 — recall: import the bounded index](../decisions/0033-recall-import-bounded-index.md)
-- autonomy_by [ADR-0035 — notes are memories: one unified store](../decisions/0035-decouple-harness-memory-from-notes.md)
+- decided_by [ADR-0011 — recursive scan; hub projects are wings](../decisions/0056-hubs-addressed-by-remote-located-by-derivation.md)
+- decided_by [ADR-0013 — procedure skills + the self-grooming loop](../decisions/0057-a-guard-lands-by-pull-request.md)
+- gated_by [ADR-0014 — two-gate redaction](../decisions/0053-redaction-two-gates-one-engine.md)
+- autonomy_by [ADR-0029 — digest-to-agent capture](../decisions/0052-streams-and-the-observe-schema.md)
+- autonomy_by [ADR-0030 (now ADR-0057) — opt-in agent autonomy ladder](../decisions/0057-a-guard-lands-by-pull-request.md)
+- autonomy_by [ADR-0032 (now ADR-0051) — capture-redirect native memory](../decisions/0051-the-ladder-runs-before-anything-is-remembered.md)
+- autonomy_by [ADR-0033 (now ADR-0058) — recall: import the bounded index](../decisions/0058-recall-one-bounded-index.md)
+- autonomy_by [ADR-0035 — notes are memories: one unified store](../decisions/0051-the-ladder-runs-before-anything-is-remembered.md)

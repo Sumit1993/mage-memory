@@ -17,7 +17,7 @@ keywords: [gate2, pre-commit, hook, redaction, scope, docs-root, fixtures, conne
 
 # Gotcha — scope Gate-2 to the knowledge base, not the whole repo
 
-The 0.0.7 dogfood installed the redaction **pre-commit hook** (ADR-0018 §7) and
+The 0.0.7 dogfood installed the redaction **pre-commit hook** (ADR-0018 (now ADR-0052) §7) and
 then could not commit the build: it flagged ~16 "live secrets" — **all of them
 redaction *test fixtures*** in `src/**/*.test.ts`. A redaction tool's tests
 *must* contain secret-shaped strings (`sk-ant-…`, `ghp_…`, high-entropy blobs) to
@@ -25,12 +25,12 @@ prove the detectors fire; a deterministic scanner cannot tell a fixture from a
 live key.
 
 **Root cause (a scope bug, now fixed).** `scanStaged` scanned the **whole** staged
-set. But Gate-2's mandate ([ADR-0014](../decisions/0014-two-gate-redaction.md) §2)
+set. But Gate-2's mandate ([ADR-0014 (now ADR-0053)](../decisions/0053-redaction-two-gates-one-engine.md) §2)
 is the **tracked, *shared* knowledge base** — the notes/skills mage authors under
 the docs root (`mage/` in-repo, or the hub root). That is the *only* surface mage
 writes to and the only seam where a distilled secret becomes public. App source
 (`src/`, incl. its fixtures) is **out of scope by design** — mage is not a general
-repo secret-scanner ([ADR-0010](../decisions/0010-durable-memory-not-coordination-layer.md);
+repo secret-scanner ([ADR-0010 (now ADR-0050)](../decisions/0050-mage-turns-a-repeated-failure-into-enforcement.md);
 that's gitleaks' job).
 
 **Fix / principle.** `scanStaged` now resolves the docs root and scans only staged
@@ -56,4 +56,4 @@ hook into the **real cwd**: the git-hook target is `process.cwd()`-based and
 not `cwd` leaked a hook into the real repo. When testing `connect`/`disconnect`,
 isolate **both** the settings path *and* `cwd` (or pass `gitHook: false`).
 
-See [ADR-0018 §7](../decisions/0018-mage-distill-observed-scratch-reader.md).
+See [ADR-0018 §7](../decisions/0052-streams-and-the-observe-schema.md).

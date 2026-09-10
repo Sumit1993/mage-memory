@@ -11,7 +11,7 @@ provenance:
   work: adr-0038-pr1-note-rung-deletion
 sources:
   - https://github.com/Sumit1993/mage-memory/pull/72
-  - decisions/0038-promote-note-rung-deleted-graduate-on-usage.md
+  - decisions/0057-a-guard-lands-by-pull-request.md
   - cc-session:d8d18f6f-21d4-4679-8b16-531132e1b88d
 keywords:
   - test
@@ -29,7 +29,7 @@ modified: 2026-07-19T08:44:11.205Z
 
 # Gotcha — weakening a test's assertions to make it pass can delete its purpose
 
-Deleting `promote`'s note-proposal rung (ADR-0038) broke a command-level test that
+Deleting `promote`'s note-proposal rung (ADR-0038 (now ADR-0057)) broke a command-level test that
 asserted the rejected-buffer suppressing a re-offered note proposal. The rung was
 gone, so the proposal never appeared. The test was "fixed" by repointing it to the
 new reality:

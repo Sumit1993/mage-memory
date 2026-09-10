@@ -5,7 +5,7 @@ created: "2026-07-19"
 last_reviewed: "2026-07-19"
 status: active
 sources:
-  - decisions/0039-context-footprint-measure-and-bound.md
+  - decisions/0058-recall-one-bounded-index.md
   - src/metrics/rollup.ts
   - src/grooming/tally.ts
   - src/metrics/footprint-trend.ts
@@ -28,7 +28,7 @@ keywords:
 Reaching for a lockfile to protect a read-modify-write took **four review rounds** and never
 fully converged. The codebase already had the right answer in two files.
 
-**The saga (2026-07-19, ADR-0039).** The footprint trend was written as a JSON document mutated
+**The saga (2026-07-19, ADR-0039 (now ADR-0058)).** The footprint trend was written as a JSON document mutated
 in place on every SessionStart. Each fix exposed the next layer:
 
 1. **Read-modify-write race** — concurrent sessions dropped each other's samples.

@@ -38,7 +38,7 @@ surfaced in recall — a note IS a memory, see [mage is durable memory](mage-is-
   `~/sources/sreforge-workspace/sreforge-memory/projects/sreforge`.
 
 A soak UNIT is one capture target, never a whole hub: an in-repo KB is its own unit; a hub fans
-out one unit per registered project, driven from the project's CODE repo (ADR-0010/0012).
+out one unit per registered project, driven from the project's CODE repo (ADR-0010 (now ADR-0050)/0012).
 
 ## The monitor (lives OUTSIDE the repo on purpose)
 

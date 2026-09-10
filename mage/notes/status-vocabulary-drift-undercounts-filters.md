@@ -23,7 +23,7 @@ modified: 2026-07-27T09:10:58.135Z
 
 # Gotcha — filter on a frontmatter enum only after a census; vocabulary drifts silently
 
-ADR-0041's governing-decision filters were written to `status === "accepted"` per the ADR's
+ADR-0041 's (now ADR-0058) governing-decision filters were written to `status === "accepted"` per the ADR's
 words — but 28 of 40 ADRs in this very repo use the older `status: active`. Both Wave-B
 surfaces silently undercounted 3× (governance line said 10, wing harvest dropped 28) and every
 test passed, because fixtures used the same vocabulary as the code.

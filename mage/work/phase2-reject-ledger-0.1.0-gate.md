@@ -11,7 +11,7 @@ provenance:
 sources:
   - src/provenance.ts
   - src/note.ts
-  - mage/decisions/0031-programmatic-provenance-stamp.md
+  - mage/decisions/0057-a-guard-lands-by-pull-request.md
   - cc-session:d9b17997-d946-40f3-9aea-84b5b7d99b6c
 keywords:
   - 0.1.0
@@ -28,7 +28,7 @@ keywords:
   - crown-threshold
 ---
 
-# 0.1.0's last build gate: ADR-0031 Phase 2 — the reject-ledger reconciler (built; bake pending)
+# 0.1.0's last build gate: ADR-0031 (now ADR-0057) Phase 2 — the reject-ledger reconciler (built; bake pending)
 
 **ADR-0031 Phase 2 was the last *build* gate before the 0.1.0 cut — and it is now built** (the
 reject-ledger reconciler + `provenance.source` + keep-rate surfaces). Everything else on the
@@ -42,7 +42,7 @@ what makes the **a1 autonomy bake gate measurable at all.**
 
 0.1.0's bake gate (from the release sequence) is: *the soak produces durable notes the
 maintainer **keeps** — a healthy keep-vs-`git revert` ledger.* That keep-rate is
-[ADR-0030](../decisions/0030-agent-autonomy-ladder.md)'s crown signal — the only evidence that
+[ADR-0030 (now ADR-0057)](../decisions/0057-a-guard-lands-by-pull-request.md)'s crown signal — the only evidence that
 higher autonomy is worth it. **Phase 2 is the code that computes it** — until it existed the gate
 was not "failing" but *unfalsifiable*, which is exactly what the soak monitor reported (its dated
 chapters read *"Keep-rate not computed"*). With the reconciler landed the keep-rate is computable;
@@ -71,6 +71,6 @@ None of it blocks on design:
 ## Relations
 
 - gates [release sequence — the autonomy track](plan-release-sequence.md)
-- realizes_phase_2_of [ADR-0031 — programmatic provenance + the reject-ledger](../decisions/0031-programmatic-provenance-stamp.md)
-- measures [ADR-0030 — the autonomy ladder's crown signal](../decisions/0030-agent-autonomy-ladder.md)
+- realizes_phase_2_of [ADR-0031 — programmatic provenance + the reject-ledger](../decisions/0057-a-guard-lands-by-pull-request.md)
+- measures [ADR-0030 — the autonomy ladder's crown signal](../decisions/0057-a-guard-lands-by-pull-request.md)
 - observed_by [soak targets — the read-only monitor](../notes/soak-targets.md)

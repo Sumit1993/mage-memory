@@ -13,7 +13,7 @@ sources:
   - notes/dogfood-before-release.md
   - notes/mage-integration-test-framework.md
   - notes/soak-targets.md
-  - decisions/0041-genre-decides-the-recall-rung.md
+  - decisions/0058-recall-one-bounded-index.md
   - work/plan-adr-0041-waves.md
   - cc-session:d8d18f6f-21d4-4679-8b16-531132e1b88d
   - cc-session:cc52271f-c247-4662-ac8c-94699ee8bb4d

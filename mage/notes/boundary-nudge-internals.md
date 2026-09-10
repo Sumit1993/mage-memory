@@ -9,8 +9,8 @@ sources:
   - src/adapters/claude-code/nudge-state.ts
   - src/adapters/claude-code/settings.ts
   - src/distill/digest.ts
-  - mage/decisions/0030-agent-autonomy-ladder.md
-  - mage/decisions/0029-digest-to-agent-capture.md
+  - mage/decisions/0057-a-guard-lands-by-pull-request.md
+  - mage/decisions/0052-streams-and-the-observe-schema.md
   - cc-session:38816fdd-1c3d-4bad-b3d0-e1decb93b50c
 keywords:
   - nudge
@@ -30,7 +30,7 @@ keywords:
 
 `mage nudge` is one command wired to the Claude Code **SessionStart** hook
 (`settings.ts` → `MAGE_HOOKS`, id `mage:nudge:SessionStart`). It is the safety-net for the
-[organic grooming loop](../decisions/0024-organic-grooming-loop.md): the human's inline capture is
+[organic grooming loop](../decisions/0057-a-guard-lands-by-pull-request.md): the human's inline capture is
 primary; the nudge only catches what the agent forgot. Never throws (fail-open, exit 0).
 
 ## The moving parts (by file)
@@ -53,7 +53,7 @@ primary; the nudge only catches what the agent forgot. Never throws (fail-open, 
 - **`hookSpecificOutput.additionalContext`** — MODEL-only, injected into the agent's context, never
   shown to the user. Carries the full digest + the autonomy mandate. The agent names the keeper.
 
-## Key behaviours (ADR-0030 amendment, 2026-07-10)
+## Key behaviours (ADR-0030 (now ADR-0057) amendment, 2026-07-10)
 
 - The digest surfaces at **every firing source**, not just `compact` — non-compacting users (short
   sessions, `/clear`, early quit) close a chapter via `session_end` and see it on their next entry.

@@ -17,14 +17,14 @@ keywords: [plan, milestones, fork, vault, note-model, index, skills, v0.1, build
 
 _v0.1 shipped at commit `1ec8225` — all eight milestones (A–H) are done. This plan is kept as the historical build record; the naming authority is [plan-v0.1-locks](../notes/plan-v0.1-locks.md)._
 
-> Scope: [roadmap](roadmap.md) (v0.1). Decisions: [ADR-0001](../decisions/0001-memory-first-product-supersedes-specshub.md)–[0006](../decisions/0006-two-layer-recall-per-wing-skills.md). Language: [context & glossary](../notes/context.md). Forks specshub (`https://github.com/Sumit1993/specshub`) per [ADR-0002](../decisions/0002-fork-and-reorient-specshub.md).
+> Scope: [roadmap](roadmap.md) (v0.1). Decisions: [ADR-0001 (now ADR-0050)](../decisions/0050-mage-turns-a-repeated-failure-into-enforcement.md)–[0006](../decisions/0058-recall-one-bounded-index.md). Language: [context & glossary](../notes/context.md). Forks specshub (`https://github.com/Sumit1993/specshub`) per [ADR-0002 (now ADR-0050)](../decisions/0050-mage-turns-a-repeated-failure-into-enforcement.md).
 > Source facts confirmed against specshub: `src/{paths,init,gitignore,git,shell,logger,index}.ts`, `src/commands/{verify,doctor,list,status,link,unlink}.ts`, `plugin/`.
 
 ## 0. Principles & what carries unchanged
 - **Carry as-is** (works, already memory-shaped): `shell.ts`, `logger.ts`, `git.ts` (getRemoteOriginUrl/gitInit/hasGh/hasGit — no auto-commit), the commander CLI scaffolding, the modes (in-repo/external/hybrid), the hub registry shape (`HubMetadata`/`HubProject`), commit-hygiene philosophy (suggest, never run).
 - **Reorient**: `paths.ts` constants/schema, `init.ts` scaffolding, the awareness skill, `verify`/`doctor`/`link` structural assumptions, the SDD skills' write target.
 - **Add**: note model + frontmatter, `mage index` (hierarchical INDEX generator), `learn` skill, per-wing skill generation, `.obsidian/` scaffold, AGENTS.md+CLAUDE.md shim, capture-by-pointer conventions, cheap staleness fields.
-- **Drop**: `cross-refs/` as a dir (ADR-0006 §12a — relationships are notes/edges); spec-era "SDD is the center" framing.
+- **Drop**: `cross-refs/` as a dir (ADR-0006 (now ADR-0058) §12a — relationships are notes/edges); spec-era "SDD is the center" framing.
 - **New dep**: `gray-matter` (frontmatter read/write). Everything else stays (commander/ora/picocolors/tar/@inquirer/prompts).
 
 ---
@@ -54,9 +54,9 @@ B1. **In-repo vault layout** (`initInRepo` in `init.ts`): scaffold under `.mage/
   ```
   (`.learnings/` created lazily by `/learn`; `work/<slug>/artifacts/` lazily.) Write a seed `INDEX.md` ("GENERATED — run `mage index`"). Keep metadata write (new schema).
 B2. **External hub layout** (`scaffoldHubStructure`): hub root gets `{ metadata.json (registry), INDEX.md, IDENTITY.md, notes/, archive/, projects/, .obsidian/ }`. **Remove `cross-refs/` scaffolding.** (Decide MAP.md fate — see Open Q.) Per-project dir = `projects/<name>/.mage/{notes/,work/,decisions/,archive/,INDEX.md}`.
-B3. **`.gitignore`** (via `ensureGitignored`): add patterns `.mage/**/artifacts/` and `.mage/.learnings/` (in-repo); for hub, `**/artifacts/` + `.learnings/` [ADR-0003]. Confirm `ensureGitignored` handles glob lines (it appends literal lines — fine).
+B3. **`.gitignore`** (via `ensureGitignored`): add patterns `.mage/**/artifacts/` and `.mage/.learnings/` (in-repo); for hub, `**/artifacts/` + `.learnings/` [ADR-0003 (now ADR-0054)]. Confirm `ensureGitignored` handles glob lines (it appends literal lines — fine).
 B4. **`.obsidian/` config writer** (new `src/obsidian.ts`): emit minimal `app.json`, `graph.json` (group colors keyed on `tag:#wing/*`), `appearance.json`. Hand-written JSON, no dep. Makes the vault open with a sensible graph.
-B5. **AGENTS.md + CLAUDE.md shim** (new `src/agents-md.ts`, called by init) [reverses specshub's old "no preamble" stance]: write a minimal `AGENTS.md` at repo/hub root — "this repo has a mage KB at `.mage/`; read `INDEX.md` first; consult before non-trivial work; capture findings with `/mage:learn`; commit hygiene" — plus `CLAUDE.md` containing `@AGENTS.md`. Generated/regenerable (a view). *(Consider mage ADR-0007 to record the reversal.)*
+B5. **AGENTS.md + CLAUDE.md shim** (new `src/agents-md.ts`, called by init) [reverses specshub's old "no preamble" stance]: write a minimal `AGENTS.md` at repo/hub root — "this repo has a mage KB at `.mage/`; read `INDEX.md` first; consult before non-trivial work; capture findings with `/mage:learn`; commit hygiene" — plus `CLAUDE.md` containing `@AGENTS.md`. Generated/regenerable (a view). *(Consider mage ADR-0007 (now ADR-0050) to record the reversal.)*
 **Accept:** `mage init --in-repo` produces a folder that opens cleanly in Obsidian; `git status` shows artifacts/.learnings ignored; AGENTS.md+CLAUDE.md present.
 
 ---
@@ -70,7 +70,7 @@ C1. **Frontmatter schema** (`src/note.ts`, using gray-matter) — all optional, 
   tags: [billing/payments]   # #wing/room scoping
   created: / updated:        # dates (tooling-managed)
   provenance: { repo, commit, work }   # for staleness/re-verify
-  sources: [url|ticket|file:line]      # POINTERS, not copies [ADR-0004]
+  sources: [url|ticket|file:line]      # POINTERS, not copies [ADR-0004 (now ADR-0051)]
   status: active             # active|stale-suspect|superseded|archived
   last_reviewed:             # cheap staleness signal
   keywords: [..]             # optional; index falls back to H1+headers+tags
@@ -151,4 +151,4 @@ Full `/dream` sweep (only cheap read-time staleness + on-write overlap ship) · 
 ## Relations
 - implements [mage roadmap](roadmap.md)
 - governed_by [mage v0.1 locks (naming authority)](../notes/plan-v0.1-locks.md)
-- forks_per [ADR-0002 — fork and reorient specshub](../decisions/0002-fork-and-reorient-specshub.md)
+- forks_per [ADR-0002 — fork and reorient specshub](../decisions/0050-mage-turns-a-repeated-failure-into-enforcement.md)

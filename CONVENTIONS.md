@@ -147,15 +147,15 @@ skip-set: `.obsidian/`, `.git/`, `node_modules/`, `artifacts/`, `.mage/` (covers
 custom dir, or in a hub's `projects/<name>/`, indexes just the same. `archive/`
 is intentionally skipped (use `status: archived` to retire a note in place); the
 rest of the directory layout is a human convenience, not a rule the tooling
-enforces. Hub layout + projects-as-wings: see ADR-0011
-(`mage/decisions/0011-recursive-scan-hub-projects.md`).
+enforces. Hub layout + projects-as-wings: see ADR-0011 (now ADR-0056)
+(`mage/decisions/0056-hubs-addressed-by-remote-located-by-derivation.md`).
 
 **Wings are optional, and a note can have several.** Tagging is never required —
 an untagged note is valid and indexes under *Cross-cutting* (reach for a wing only
 when a base spans more than one scope). The **first** tag is the primary wing
 (drives color + ownership); a note is indexed under **every** wing it is tagged
-with (multi-home, matching Obsidian's own tag semantics). See ADR-0012
-(`mage/decisions/0012-wings-optional-convention-standalone-hubs.md`).
+with (multi-home, matching Obsidian's own tag semantics). See ADR-0012 (now ADR-0056)
+(`mage/decisions/0056-hubs-addressed-by-remote-located-by-derivation.md`).
 
 ---
 
@@ -188,13 +188,13 @@ archive of what you read, it doesn't belong.
 
 ## 6. Note-type vocabulary, genres, and recall rungs
 
-`type` is an open vocabulary, but every note type maps onto a **genre** that decides its recall rung. Only **memory** genre notes populate the always-loaded recall index (`INDEX.md`/`MEMORY.md`). Non-memory types (`plan`, `spec`, `tasks`, `decision`) remain legal types for storage and linking, but are non-memory genres (`work`, `doc`, `decision`) that are excluded from always-loaded recall — authored deliberately, never the default destination for captured knowledge. Plans and task lists live in the issue tracker ([ADR-0048](mage/decisions/0048-repeated-failures-become-enforcement.md) decision 9); `mage/work/` is retired and its existing files are read-only until they move to issues.
+`type` is an open vocabulary, but every note type maps onto a **genre** that decides its recall rung. Only **memory** genre notes populate the always-loaded recall index (`INDEX.md`/`MEMORY.md`). Non-memory types (`plan`, `spec`, `tasks`, `decision`) remain legal types for storage and linking, but are non-memory genres (`work`, `doc`, `decision`) that are excluded from always-loaded recall — authored deliberately, never the default destination for captured knowledge. Plans and task lists live in the issue tracker ([ADR-0048 (now ADR-0050)](mage/decisions/0050-mage-turns-a-repeated-failure-into-enforcement.md) decision 9); `mage/work/` is retired and its existing files are read-only until they move to issues.
 
 | `type:` | Genre | Recall Rung | Purpose & Lifecycle |
 |---|---|---|---|
 | `gotcha` `procedure` `pointer` `principle` `feedback` `reference` `note` | **memory** | 2 (1 when graduated) | Recall-bearing memories (edit-in-place). Default destination for captured knowledge. |
 | `decision` | **decision** | 3 (on demand) | Settled architectural choice (supersede/amend, never edit in place; `mage/decisions/`). |
-| `plan` `tasks` | **work** | 3 (on demand) | Legacy only. New plans and task lists are issues (ADR-0048 decision 9); existing `mage/work/` files stay read-only until migrated. |
+| `plan` `tasks` | **work** | 3 (on demand) | Legacy only. New plans and task lists are issues (ADR-0050); existing `mage/work/` files stay read-only until migrated. |
 | `spec` `doc` | **doc** | 3 (on demand) | System specification / current truth (expire on falsification). |
 | anything else | **unclassified** | 3 (on demand) | Doctor annotates; never rejected. |
 
@@ -211,9 +211,9 @@ Before creating a memory note, check whether a better home wins (in order):
 | If it is... | Better home | Action / Destination |
 |---|---|---|
 | File- or function-scoped detail | **Code comment** | Place directly in source code. |
-| Task with a done-state / forward plan | **Issue** | Open an issue in the tracker (ADR-0048 decision 9). Never a new `mage/work/` file. |
+| Task with a done-state / forward plan | **Issue** | Open an issue in the tracker (ADR-0050). Never a new `mage/work/` file. |
 | Current-truth system spec | **Doc beside code** | Keep in repo docs beside code (`type: spec`). |
-| Investigation evidence / raw trace | **Issue comment + pointer** | Attach the evidence to the issue it decides (ADR-0048 decision 10); keep a thin pointer note only if it must be recalled. |
+| Investigation evidence / raw trace | **Issue comment + pointer** | Attach the evidence to the issue it decides (ADR-0050); keep a thin pointer note only if it must be recalled. |
 | Agent instruction ("do X as Y") | **Skill / Prompt** | Place in `skills/` instruction. |
 | Settled architectural choice & rationale | **Decision record** | Author ADR in `mage/decisions/` (`type: decision`). |
 | Non-completing, recallable insight/gotcha | **Memory note** ✅ | Author a memory-genre note (`mage/notes/`). |
@@ -281,7 +281,7 @@ itself, colors itself, and routes agents to the right context for free.
 mage's **hand-authored static skills ship as a Claude Code plugin** (marketplace
 `mage`, manifest in `.claude-plugin/`). The plugin namespace does the grouping, so
 each skill's `name:` stays **bare** and the harness presents it as `mage:<name>` —
-clean names, no `mage-` baked into each one (see [ADR-0013](mage/decisions/0013-procedure-skills-self-grooming-loop.md)):
+clean names, no `mage-` baked into each one (see [ADR-0013 (now ADR-0057)](mage/decisions/0057-a-guard-lands-by-pull-request.md)):
 
 | Installed as | Skill | Source |
 |---|---|---|
@@ -306,7 +306,7 @@ skills from other tools — the namespace protects you inside Claude Code, not o
 ## 10. Command tiers (what humans type vs what machinery invokes)
 
 mage's CLI is one binary but **three tiers**, sorted by the deterministic/judgment line
-([ADR-0009](mage/decisions/0009-no-runtime-automation-rides-host-hooks.md)): a hook may
+([ADR-0009 (now ADR-0054)](mage/decisions/0054-files-in-the-repo-no-runtime-no-server.md)): a hook may
 *fire* a deterministic command or *nudge* a judgment skill, but **never reasons itself**.
 
 | Tier | Commands | Invoked by | Notes |
@@ -317,14 +317,14 @@ mage's CLI is one binary but **three tiers**, sorted by the deterministic/judgme
 
 **Guardrails (all tiers):**
 - **Never auto-commit.** Hook-fired `index`/`skills`/`verify` *write* files (auto-write
-  is allowed, [ADR-0013](mage/decisions/0013-procedure-skills-self-grooming-loop.md) §4);
+  is allowed, [ADR-0013](mage/decisions/0057-a-guard-lands-by-pull-request.md) §4);
   the human always commits the diff. The `Stop` metrics fold writes only the gitignored
-  `mage/.mage/metrics/` cache (ADR-0016 §2) — never the catalog, never a commit.
-- **Double-observe is tolerated, not policed** *(amended, [ADR-0017](mage/decisions/0017-mage-connect-host-hook-adapter.md) §5)*:
+  `mage/.mage/metrics/` cache (ADR-0016 (now ADR-0057) §2) — never the catalog, never a commit.
+- **Double-observe is tolerated, not policed** *(amended, [ADR-0017 (now ADR-0055)](mage/decisions/0055-connect-doctor-migrate.md) §5)*:
   mage and a host's own observer (e.g. ECC homunculus) may coexist — separate files,
   separate consumers, zero added cost. mage reads only its **own** artifacts and ignores
   foreign memory stores entirely (no harvest — **feeders cut**,
-  [ADR-0018](mage/decisions/0018-mage-distill-observed-scratch-reader.md)). `mage connect`
+  [ADR-0018 (now ADR-0052)](mage/decisions/0052-streams-and-the-observe-schema.md)). `mage connect`
   fully ignores it.
 - **Batch, don't spam:** accumulate changed note-paths during a turn; run `mage index`
   **once at `Stop`**, not after every edit.
@@ -336,14 +336,14 @@ safe default, else **fail with a message naming the flag** — never hang, never
 guess a consequential choice. So `mage connect --yes` runs in one go (agents); bare
 `mage connect` prompts (humans). Applies to `init`/`link`/`unlink`/`connect`/`disconnect`.
 
-**`mage connect` / `mage disconnect`** ([ADR-0017](mage/decisions/0017-mage-connect-host-hook-adapter.md), 0.0.6):
+**`mage connect` / `mage disconnect`** ([ADR-0017](mage/decisions/0055-connect-doctor-migrate.md), 0.0.6):
 because mage ships as an npm `bin`, the wired hook lines are clean one-liners (`mage observe`)
 — no plugin-root resolution. connect writes the hook block to **`.claude/settings.local.json`**
 (per-repo, gitignored; `--user` for `~/.claude/settings.json`), `id:"mage:*"`-prefixed;
 re-running is idempotent (replace-by-id), malformed JSON is refused (never clobbered), and
 a `.bak` is written first. `mage disconnect` removes only the `mage:*` entries.
 
-**Redaction pre-commit hook** ([ADR-0018](mage/decisions/0018-mage-distill-observed-scratch-reader.md) §7, 0.0.7):
+**Redaction pre-commit hook** ([ADR-0018 §7, now ADR-0053](mage/decisions/0053-redaction-two-gates-one-engine.md), 0.0.7):
 `mage connect` *also* installs (opt-in, **independently toggleable**) a blocking git
 `pre-commit` hook → `mage redact --check --staged` — redaction Gate 2 at the tracked write
 (block a live secret, warn PII, `--no-verify` escapes). Same discipline as the settings

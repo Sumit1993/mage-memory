@@ -66,7 +66,7 @@ Consolidations below where they differ.
    unadvertised plumbing flags) → stay visible.
 
 3. **Engine vs skill — there is no `mage groom` command.** mage has **no model**
-   (ADR-0009); the CLI is a deterministic **engine** (counts, reports, moves
+   (ADR-0009 (now ADR-0054)); the CLI is a deterministic **engine** (counts, reports, moves
    watermarks — never judges). Grooming is **judgment**, borrowed from the host
    agent via a **skill**. So the engines stay `distill`/`promote` (hidden
    plumbing); the human-facing grooming is the **`mage:groom` skill**. A `mage
@@ -136,7 +136,7 @@ Consolidations below where they differ.
     analyze/constitution`, ~1085 lines) + clean the **5 advertising sites**
     (`marketplace.json` ×2, `plugin.json`, `README` 90–91 & 399). The
     never-shipped `ATTRIBUTION.md` gap self-resolves (only the deleted skills
-    reference it). Record completion as a short ADR (the prune ADR-0001/0002
+    reference it). Record completion as a short ADR (the prune ADR-0001 (now ADR-0050)/0002
     deferred). Kept skills: **learn · groom · graduate · optimize · guide**.
 
 11. **Small friction closers (all 0.0.10).** **(B+C)** Hub-aware `doctor`/`status`
@@ -263,4 +263,4 @@ mattering.
 - found_during [release sequence — 0.0.9](plan-release-sequence.md)
 - see_also [Gotcha — connect does not ensure sink ignores](../notes/connect-doesnt-ensure-ignores.md)
 - refines [roadmap](roadmap.md)
-- governed_by [ADR-0017 — mage connect: the host hook adapter](../decisions/0017-mage-connect-host-hook-adapter.md)
+- governed_by [ADR-0017 (now ADR-0055) — mage connect: the host hook adapter](../decisions/0055-connect-doctor-migrate.md)

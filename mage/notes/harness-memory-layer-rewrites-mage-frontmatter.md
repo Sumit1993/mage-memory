@@ -7,7 +7,7 @@ status: active
 sources:
   - cc-session:f0a4c7d6-14a5-4f07-a1f4-052892c791bc
   - cc-session:d9b17997-d946-40f3-9aea-84b5b7d99b6c
-  - decisions/0035-decouple-harness-memory-from-notes.md
+  - decisions/0051-the-ladder-runs-before-anything-is-remembered.md
 keywords:
   - auto-memory
   - frontmatter
@@ -37,7 +37,7 @@ of CC, not mage").
 
 **The tell:** `name: ""` on line 2, or `node_type: memory` inside the frontmatter block.
 Detection sweep: `grep -rl "node_type: memory" mage/` — then filter out legitimate body
-mentions (ADR-0034/0035 and notes documenting the schema) by checking the match is inside
+mentions (ADR-0034 (now ADR-0055)/0035 and notes documenting the schema) by checking the match is inside
 the frontmatter.
 
 **Procedure:**
@@ -49,7 +49,7 @@ the frontmatter.
    need their frontmatter reconstructed by hand.
 3. Re-run `mage index` afterwards; the generated indexes are written by the CLI and stay clean.
 
-Product-shaped root cause: [ADR-0035](../decisions/0035-decouple-harness-memory-from-notes.md)
+Product-shaped root cause: [ADR-0035 (now ADR-0051)](../decisions/0051-the-ladder-runs-before-anything-is-remembered.md)
 territory — the KB doubling as the harness memory store is what puts every note in the blast
 radius. Related capture-routing principle:
 [route-memories-to-the-matching-store](route-memories-to-the-matching-store.md).
