@@ -4,12 +4,12 @@ tags: [mage/decisions]
 status: accepted
 created: "2026-09-10"
 last_reviewed: "2026-09-10"
-keywords: [ladder, rung, note, trigger, pointer, skipped, memory-hook, native-memory, admission, capture]
+keywords: [ladder, rung, note, trigger, pointer, skipped, memory-hook, native-memory, ladder-gate, capture]
 ---
 
 # 0051 — The ladder runs before anything is remembered
 ## Decision
-The highest rung that can carry a lesson wins: impossible (architecture, config, a deny rule); check (lint,
+The highest rung that can carry a fix wins: impossible (architecture, config, a deny rule); check (lint,
 test, CI job, pre-commit); hook (blocks or rewrites at the moment of the action); rule (one line in AGENTS.md
 or a skill, carrying an id); note (a rung-5 guard). A lower rung only when every higher rung is shown not to
 apply, and the proposal records each skipped rung with its reason. The moment an agent tries to save a memory
@@ -25,8 +25,8 @@ deletions: the store was enforcement debt. Native memory minted lessons nobody r
 moment of saving, whether a hook or a check should exist instead.
 ## Forbids
 A note without trigger, pointer and skipped rungs. A copy of a source as a note. A hook that judges (it makes
-the agent judge). An admission gate that fails open on `notes/`. A frontmatter type or genre deciding a recall
-rung (0041, superseded). An automated note-to-skill graduation. A recurrence count as the admission test.
+the agent judge). A ladder gate that fails open on `notes/`. A frontmatter type or genre deciding a recall
+rung (0041, superseded). Promoting a note to a skill by usage count. A recurrence count as the ladder's test.
 ## Example
 Agent: Write `mage/notes/npx-runs-published.md`. Hook: deny, "which rung? impossible, check, hook, rule, note.
 A note needs `trigger:`, `pointer:` and `skipped:`". Agent rewrites with `trigger: "deciding which mage binary

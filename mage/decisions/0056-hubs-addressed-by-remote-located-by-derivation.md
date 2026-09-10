@@ -4,15 +4,15 @@ tags: [mage/decisions]
 status: accepted
 created: "2026-09-10"
 last_reviewed: "2026-09-10"
-keywords: [hub, external-mode, hub_repo, derivation, MAGE_HOME, machine-binding, reach-grant, wing, scan, link]
+keywords: [hub, external-mode, hub_repo, derivation, MAGE_HOME, machine-binding, reach-grant, project-subdir, scan, link]
 ---
 
 # 0056 — A hub is addressed by its remote and located by derivation
 ## Decision
 A hub is one Obsidian vault and one knowledge base: its own `notes/` and `decisions/` plus flat per-project
 subdirectories (`projects/<name>/notes/`). The scanner recurses by deny-list (`archive/`, `artifacts/`,
-`.mage/`, `node_modules/`) and never depends on the registry. A wing is an optional convention, never inferred.
-An external hub is addressed by its git remote (`hub_repo`, committed) and located by derivation under
+`.mage/`, `node_modules/`) and never depends on the registry. A project subdirectory is an optional convention,
+never inferred. An external hub is addressed by its git remote (`hub_repo`, committed) and located by derivation under
 `$MAGE_HOME/hubs/<host>/<owner>/<repo>`; a machine path is never written to a committed file, and machine
 bindings live in `settings.local.json`. On an origin mismatch at the derived path the derived path wins, loudly,
 and mage never falls back to `hub_path`. An unreachable hub is reported, never silently replaced by the code

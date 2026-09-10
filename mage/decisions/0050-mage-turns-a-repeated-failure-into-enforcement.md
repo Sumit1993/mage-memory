@@ -18,7 +18,7 @@ or note. A fire is one counted event attributed to a guard id. A proposal is a g
 one knowledge base with its own ledger. Plans and evidence live in the issue tracker; decisions and notes live
 in the knowledge base; a decision fits on one screen.
 ## Why
-39 notes in three months; 3 of 126 sessions here read one; three deterministic lesson selectors were built and
+39 notes in three months; 3 of 126 sessions here read one; three deterministic note selectors were built and
 killed (0 of 62, 0 of 55, 115 buckets to 0 proposals). What survived: code narrows, the agent judges, the human merges.
 ## Forbids
 A threshold or recurrence count that gates what the agent sees. A reasoner in the CLI, or a hook that reasons.

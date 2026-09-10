@@ -20,7 +20,7 @@ provenance, and refuses a missing skipped reason, an illegal type-rung pair, a h
 without trigger and pointer, a delete without a target. A guard is one committed file per id, `guards/<id>.md`
 beside `notes/`; the six carriers are outputs of landing and the compiled table under `.mage/` is a cache.
 Autonomy (operator, approver, overseer) sets how much the agent drains alone; the merge is the human gate at
-every level. A skill is one output rung, measured by firing, never a graduated note.
+every level. A skill is one output rung, measured by firing, never a note promoted by usage count.
 ## Why
 mage never commits; the pull request is the reviewable unit and git blame is the history. A derivation that
 silently stops matching looks like a healthy inventory: `flatten`'s detector went dark for weeks (#200).

@@ -17,9 +17,9 @@ consent field and nothing else. `doctor` audits capture, recall and readiness (k
 configured, ledger present, ladder hook installed), fails on a footprint breach, and `--fix` repairs only what
 is idempotent, mage-owned, local and reversible. `migrate` is the only migration verb: for a 0.0.x knowledge
 base it clears retired state, rewrites the AGENTS.md block without clobbering hand edits, repoints the memory
-hook, installs the PreToolUse arm, warns on `work/`, and imports existing notes through the ladder check. A
-retired verb prints its replacement and exits 0, never with a breaking marker. A person sees eight verbs:
-`init`, `connect`, `disconnect`, `doctor`, `index`, `groom`, `ledger`, and `observe` hidden.
+hook, installs the PreToolUse arm, warns on `work/`, and imports existing notes through the ladder check; after
+0.0.19 it folds into `connect`. A retired verb prints its replacement and exits 0, never with a breaking marker.
+A person sees eight verbs: `init`, `connect`, `disconnect`, `doctor`, `index`, `groom`, `ledger`, and `observe` hidden.
 ## Why
 24 verbs were registered and 11 were never run outside this repo. One conversation over one address is
 remembered; a menu is not. A hook a plugin installs silently is a hook nobody consented to.
