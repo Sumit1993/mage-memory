@@ -3,8 +3,9 @@ name: CI
 on:
   push:
     branches: [main]
+  # No `branches` filter: a stacked PR based on another PR's branch must still
+  # gate. Five PRs in the #206 stack showed no failures because nothing ran (#262).
   pull_request:
-    branches: [main]
   # Merge-queue support (#403): the queue builds a speculative merge of the
   # queued PR(s) onto main and requires `CI gate` to pass on THAT commit, which
   # is what lets the ruleset drop "branch must be up to date" without letting
