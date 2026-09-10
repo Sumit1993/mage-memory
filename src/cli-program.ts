@@ -311,12 +311,17 @@ export function buildProgram(): Command {
       "--reject <slugs|all>",
       "discard these staged drafts and record their keys",
     )
+    .option(
+      "--propose",
+      "open a pull request with the promoted notes instead of leaving them uncommitted",
+    )
     .action(
       async (opts: {
         dir?: string;
         json?: boolean;
         accept?: string;
         reject?: string;
+        propose?: boolean;
       }) => {
         await groomCmd(opts);
       },

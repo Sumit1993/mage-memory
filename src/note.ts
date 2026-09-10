@@ -22,6 +22,10 @@ export interface Provenance {
    * The reject-ledger reports the keep-rate over `source === "capture"` only.
    */
   source?: "capture" | "adopt";
+  /** Channel mark (ADR-0046 §4): "pipeline" for notes proposed via PR. */
+  channel?: "pipeline";
+  /** PR reference or URL that proposed this note (ADR-0046 §4). */
+  review?: string;
 }
 
 /**

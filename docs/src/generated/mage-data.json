@@ -420,6 +420,10 @@
         {
           "flags": "--reject <slugs|all>",
           "description": "discard these staged drafts and record their keys"
+        },
+        {
+          "flags": "--propose",
+          "description": "open a pull request with the promoted notes instead of leaving them uncommitted"
         }
       ]
     },

@@ -111,6 +111,7 @@ export interface RedactConfig {
 export interface GroomingConfig {
   sensitivity?: "low" | "normal" | "high";
   autonomy?: "operator" | "approver" | "overseer";
+  proposals?: boolean;
   nudgeThrottleHours?: number;
   crownThreshold?: number;
 }

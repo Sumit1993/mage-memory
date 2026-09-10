@@ -1,8 +1,22 @@
 import { rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { tmpDir } from "../test/fixtures/kb.js";
-import { gitInit, isGitRepo, noteExistsInHead, noteGitState } from "./git.js";
+import { initRepoWithIdentity, tmpDir } from "../test/fixtures/kb.js";
+import {
+  filterDirtyPathsOutsideKb,
+  getDefaultBranch,
+  getDirtyPaths,
+  getRepoRoot,
+  gitAdd,
+  getCurrentBranch,
+  resolveBranchRef,
+  gitCheckoutNewBranch,
+  gitCommit,
+  gitInit,
+  isGitRepo,
+  noteExistsInHead,
+  noteGitState,
+} from "./git.js";
 import { run } from "./shell.js";
 
 const tmp = (): Promise<string> => tmpDir("mage-git-");
@@ -77,5 +91,197 @@ describe("noteGitState", () => {
     await run("git", ["-C", repo, "add", "--", "x.md"]);
     await gitCommit(repo, "add x");
     expect(await noteExistsInHead(repo, "x.md")).toBe(true);
+  });
+});
+
+describe("proposal git helpers", () => {
+  it("getRepoRoot returns repo root when inside repo, null otherwise", async () => {
+    const repo = await tmp();
+    expect(await getRepoRoot(repo)).toBeNull();
+    await gitInit(repo);
+    const resolved = await getRepoRoot(repo);
+    expect(resolved).toBeTruthy();
+  });
+
+  it("getDefaultBranch detects main or branch configured", async () => {
+    const repo = await tmp();
+    await gitInit(repo);
+    const def = await getDefaultBranch(repo);
+    expect(def).toBeDefined();
+    expect(typeof def).toBe("string");
+  });
+
+  it("getDirtyPaths lists untracked and modified files", async () => {
+    const repo = await tmp();
+    await gitInit(repo);
+    await writeFile(join(repo, "file1.txt"), "hello\n");
+    await writeFile(join(repo, "file2.txt"), "world\n");
+    const dirty = await getDirtyPaths(repo);
+    expect(dirty).toContain("file1.txt");
+    expect(dirty).toContain("file2.txt");
+  });
+
+  it("getDirtyPaths throws instead of reporting a clean tree when git status fails", async () => {
+    // Not a git repo: `git status` exits non-zero. The old behaviour returned [], which a
+    // caller reads as "nothing dirty" — exactly the vacuous pass this must not produce.
+    const notARepo = await tmp();
+    await expect(getDirtyPaths(notARepo)).rejects.toThrow(/Command failed/);
+  });
+
+  it("filterDirtyPathsOutsideKb filters paths properly", () => {
+    const repo = "/repos/project";
+    const docsRoot = "/repos/project/mage";
+    const dirty = ["src/index.ts", "mage/notes/a.md", "package.json", "mage/INDEX.md"];
+    const outside = filterDirtyPathsOutsideKb(repo, docsRoot, dirty);
+    expect(outside).toEqual(["src/index.ts", "package.json"]);
+  });
+
+  it("filterDirtyPathsOutsideKb handles hub where docsRoot is repo", () => {
+    const repo = "/hubs/my-hub";
+    const docsRoot = "/hubs/my-hub";
+    const dirty = ["notes/a.md", "projects/p/notes/b.md"];
+    const outside = filterDirtyPathsOutsideKb(repo, docsRoot, dirty);
+    expect(outside).toEqual([]);
+  });
+
+  it("gitCheckoutNewBranch, gitAdd, gitCommit work in repo", async () => {
+    const repo = await tmp();
+    await gitInit(repo);
+    await writeFile(join(repo, "init.txt"), "init\n");
+    await run("git", ["-C", repo, "-c", "user.email=t@e.com", "-c", "user.name=t", "add", "init.txt"]);
+    await run("git", ["-C", repo, "-c", "user.email=t@e.com", "-c", "user.name=t", "commit", "-m", "initial"]);
+
+    await gitCheckoutNewBranch(repo, "mage/proposal/test-branch");
+    await writeFile(join(repo, "note.md"), "test\n");
+    await gitAdd(repo, ["note.md"]);
+    await run("git", ["-C", repo, "-c", "user.email=t@e.com", "-c", "user.name=t", "commit", "-m", "add note"]);
+
+    const head = await run("git", ["-C", repo, "rev-parse", "--abbrev-ref", "HEAD"]);
+    expect(head.stdout.trim()).toBe("mage/proposal/test-branch");
+  });
+
+  it("gitCommit with paths excludes other staged files (no whole-index sweep)", async () => {
+    const repo = await tmp();
+    // Line 177 below calls production gitCommit (no -c flags), which needs a real
+    // repo identity on a CI runner with no global user.email/user.name.
+    await initRepoWithIdentity(repo);
+    await writeFile(join(repo, "init.txt"), "init\n");
+    await run("git", ["-C", repo, "-c", "user.email=t@e.com", "-c", "user.name=t", "add", "init.txt"]);
+    await run("git", ["-C", repo, "-c", "user.email=t@e.com", "-c", "user.name=t", "commit", "-m", "initial"]);
+
+    // Simulates a pre-staged unrelated file elsewhere in the repo, as `git add` would
+    // leave it before a proposal run's own gitAdd/gitCommit pair.
+    await writeFile(join(repo, "unrelated.txt"), "unrelated\n");
+    await gitAdd(repo, ["unrelated.txt"]);
+
+    await writeFile(join(repo, "note.md"), "test\n");
+    await gitAdd(repo, ["note.md"]);
+    await gitCommit(repo, "add note", ["note.md"]);
+
+    const committed = await run("git", ["-C", repo, "show", "--name-only", "--pretty=format:", "HEAD"]);
+    expect(committed.stdout).toContain("note.md");
+    expect(committed.stdout).not.toContain("unrelated.txt");
+    // unrelated.txt stays staged, untouched by the scoped commit.
+    const status = await run("git", ["-C", repo, "status", "--porcelain"]);
+    expect(status.stdout).toContain("unrelated.txt");
+  });
+});
+
+describe("getDirtyPaths — rename sources (ADR-0046 §7 gate)", () => {
+  async function repoWithCommit(): Promise<string> {
+    const repo = await tmp();
+    await gitInit(repo);
+    await run("git", ["-C", repo, "config", "user.email", "t@e.com"]);
+    await run("git", ["-C", repo, "config", "user.name", "t"]);
+    return repo;
+  }
+
+  it("reports a rename's SOURCE, so an outside→inside-KB move cannot slip the gate", async () => {
+    const repo = await repoWithCommit();
+    await run("mkdir", ["-p", join(repo, "src"), join(repo, "mage", "notes")]);
+    await writeFile(join(repo, "src", "foo.ts"), "hi\n");
+    await gitAdd(repo, [repo]);
+    await gitCommit(repo, "init");
+    await run("git", ["-C", repo, "mv", "src/foo.ts", "mage/notes/foo.md"]);
+
+    const dirty = await getDirtyPaths(repo);
+    expect(dirty).toContain("mage/notes/foo.md");
+    expect(dirty).toContain("src/foo.ts");
+    // and therefore the gate sees a path outside the KB
+    expect(filterDirtyPathsOutsideKb(repo, join(repo, "mage"), dirty)).toEqual(["src/foo.ts"]);
+  });
+});
+
+describe("gitCheckoutNewBranch start point", () => {
+  it("cuts from the given branch, not from HEAD", async () => {
+    const repo = await tmp();
+    await gitInit(repo);
+    await run("git", ["-C", repo, "config", "user.email", "t@e.com"]);
+    await run("git", ["-C", repo, "config", "user.name", "t"]);
+    await writeFile(join(repo, "a.txt"), "a\n");
+    await gitAdd(repo, [repo]);
+    await gitCommit(repo, "base");
+    const base = await getCurrentBranch(repo);
+
+    await gitCheckoutNewBranch(repo, "feature");
+    await writeFile(join(repo, "b.txt"), "b\n");
+    await gitAdd(repo, [repo]);
+    await gitCommit(repo, "unrelated feature work");
+
+    // from the feature branch, cut a proposal branch off the base branch
+    await gitCheckoutNewBranch(repo, "mage/proposal/x", base ?? "main");
+    const log = await run("git", ["-C", repo, "log", "--oneline"]);
+    expect(log.stdout).not.toContain("unrelated feature work");
+    expect(log.stdout).toContain("base");
+  });
+});
+
+describe("resolveBranchRef — the CI shape (origin/main, no local main)", () => {
+  it("falls back to origin/<branch> when no local branch exists", async () => {
+    const upstream = await tmp();
+    await gitInit(upstream);
+    await run("git", ["-C", upstream, "config", "user.email", "t@e.com"]);
+    await run("git", ["-C", upstream, "config", "user.name", "t"]);
+    await writeFile(join(upstream, "a.txt"), "a\n");
+    await gitAdd(upstream, [upstream]);
+    await gitCommit(upstream, "base");
+    const upstreamBranch = (await getCurrentBranch(upstream)) ?? "main";
+
+    // What actions/checkout leaves you with: the remote-tracking ref only.
+    const clone = await tmp();
+    await run("git", ["clone", "--depth", "1", "--branch", upstreamBranch, upstream, clone]);
+    await run("git", ["-C", clone, "checkout", "-B", "feature"]);
+    await run("git", ["-C", clone, "branch", "-D", upstreamBranch]);
+
+    expect(
+      (await run("git", ["-C", clone, "rev-parse", "--verify", "--quiet", upstreamBranch])).code,
+    ).not.toBe(0);
+    expect(await resolveBranchRef(clone, upstreamBranch)).toBe(`origin/${upstreamBranch}`);
+
+    // and the branch can actually be cut from what it returns
+    const start = (await resolveBranchRef(clone, upstreamBranch)) as string;
+    await gitCheckoutNewBranch(clone, "mage/proposal/ci", start);
+    expect(await getCurrentBranch(clone)).toBe("mage/proposal/ci");
+  });
+
+  it("returns null when neither the branch nor origin's copy exists", async () => {
+    const repo = await tmp();
+    await gitInit(repo);
+    expect(await resolveBranchRef(repo, "nope")).toBeNull();
+  });
+});
+
+describe("getDefaultBranch precedence", () => {
+  it("prefers a branch that EXISTS over the global init.defaultBranch preference", async () => {
+    const repo = await tmp();
+    await run("git", ["-C", repo, "init", "-q", "-b", "master", "."]);
+    await run("git", ["-C", repo, "config", "user.email", "t@e.com"]);
+    await run("git", ["-C", repo, "config", "user.name", "t"]);
+    // the common developer setup: global preference says main, this repo is master
+    await run("git", ["-C", repo, "config", "init.defaultBranch", "main"]);
+    await writeFile(join(repo, "a.txt"), "a\n");
+    await gitAdd(repo, [repo]);
+    await gitCommit(repo, "base");
+    expect(await getDefaultBranch(repo)).toBe("master");
   });
 });

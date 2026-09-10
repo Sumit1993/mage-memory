@@ -44,6 +44,28 @@ describe("stampProvenance", () => {
     const out = stampProvenance(fm, { repo: "auto", source: "capture", autonomy: "overseer" });
     expect(out.provenance).toEqual({ source: "adopt", repo: "auto", autonomy: "overseer" });
   });
+
+  it("fills channel and review when absent (pipeline proposal mark — ADR-0046)", () => {
+    const out = stampProvenance(
+      { type: "note" },
+      { repo: "mage-memory", channel: "pipeline", review: "https://github.com/org/repo/pull/1" },
+    );
+    expect(out.provenance).toEqual({
+      repo: "mage-memory",
+      channel: "pipeline",
+      review: "https://github.com/org/repo/pull/1",
+    });
+  });
+
+  it("never clobbers existing channel or review fields", () => {
+    const fm: NoteFrontmatter = {
+      provenance: { channel: "pipeline", review: "https://github.com/org/repo/pull/1" },
+    };
+    const out = stampProvenance(fm, {
+      review: "https://github.com/org/repo/pull/2",
+    });
+    expect(out.provenance?.review).toBe("https://github.com/org/repo/pull/1");
+  });
 });
 
 // ─── resolveCreationStamp — autonomy gating, repo basename, commit fail-open ───
@@ -61,6 +83,14 @@ describe("resolveCreationStamp", () => {
     expect(await resolveCreationStamp(operator.resolved)).not.toHaveProperty("autonomy");
     const none = await withKb({ kind: "repo" });
     expect(await resolveCreationStamp(none.resolved)).not.toHaveProperty("autonomy");
+  });
+
+  it("omits autonomy when channel is pipeline even at overseer (ADR-0046)", async () => {
+    const { resolved } = await withKb({ kind: "repo", grooming: { autonomy: "overseer" } });
+    const stamp = await resolveCreationStamp(resolved, { channel: "pipeline" });
+    expect(stamp.channel).toBe("pipeline");
+    expect(stamp).not.toHaveProperty("autonomy");
+    expect(stamp.source).toBe("capture");
   });
 
   it("sets repo to the repo basename and omits commit when not a git repo", async () => {

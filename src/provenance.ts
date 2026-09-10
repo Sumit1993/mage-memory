@@ -19,7 +19,7 @@ import { readAutonomy } from "./grooming/config.js";
 import type { NoteFrontmatter, Provenance } from "./note.js";
 import type { ResolvedDocsRoot } from "./paths.js";
 
-/** The provenance fields mage stamps at note creation (ADR-0031). */
+/** The provenance fields mage stamps at note creation (ADR-0031, ADR-0046). */
 export interface ProvenanceStamp {
   /** Authorship — set ONLY at approver/overseer; absent ⇒ operator / human-written. */
   autonomy?: "approver" | "overseer";
@@ -29,36 +29,46 @@ export interface ProvenanceStamp {
   commit?: string;
   /** Cohort mark (ADR-0031 Phase 2): "capture" (the promote chokepoint) or "adopt". */
   source?: "capture" | "adopt";
+  /** Channel mark (ADR-0046 §4): "pipeline" for notes proposed via PR. */
+  channel?: "pipeline";
+  /** PR reference or URL that proposed this note (ADR-0046 §4). */
+  review?: string;
 }
 
 /**
  * Resolve the creation stamp for a docs root: `autonomy` iff the resolved level is
- * approver/overseer (read via `resolved.repo`, the hub-aware path — ADR-0030),
+ * approver/overseer and not a pipeline channel (read via `resolved.repo`, the hub-aware path — ADR-0030),
  * `repo` = the repo basename, `commit` = short HEAD (omitted when not a git repo),
  * `source` = "capture" (the promote chokepoint IS the fresh-capture cohort — ADR-0031 P2).
  */
-export async function resolveCreationStamp(resolved: ResolvedDocsRoot): Promise<ProvenanceStamp> {
-  const autonomy = await readAutonomy(resolved);
+export async function resolveCreationStamp(
+  resolved: ResolvedDocsRoot,
+  opts?: { channel?: "pipeline" },
+): Promise<ProvenanceStamp> {
+  const autonomy = opts?.channel === "pipeline" ? undefined : await readAutonomy(resolved);
   const commit = await getHeadCommit(resolved.repo);
   return {
     ...(autonomy === "approver" || autonomy === "overseer" ? { autonomy } : {}),
     repo: basename(resolved.repo),
     ...(commit ? { commit } : {}),
     source: "capture",
+    ...(opts?.channel !== undefined ? { channel: opts.channel } : {}),
   };
 }
 
 /**
  * Merge a creation stamp into a note's frontmatter (PURE). `autonomy` is always
  * applied when present in the stamp (mage owns the authorship mark); `repo`/`commit`/
- * `source` fill ONLY when absent, so a hand-authored (or an adopt-marked) provenance
- * value is never clobbered. Returns `fm` untouched when the merge would add nothing.
+ * `source`/`channel`/`review` fill ONLY when absent, so a hand-authored (or an adopt-marked)
+ * provenance value is never clobbered. Returns `fm` untouched when the merge would add nothing.
  */
 export function stampProvenance(fm: NoteFrontmatter, stamp: ProvenanceStamp): NoteFrontmatter {
   const provenance: Provenance = { ...fm.provenance };
   if (stamp.repo !== undefined && provenance.repo === undefined) provenance.repo = stamp.repo;
   if (stamp.commit !== undefined && provenance.commit === undefined) provenance.commit = stamp.commit;
   if (stamp.source !== undefined && provenance.source === undefined) provenance.source = stamp.source;
+  if (stamp.channel !== undefined && provenance.channel === undefined) provenance.channel = stamp.channel;
+  if (stamp.review !== undefined && provenance.review === undefined) provenance.review = stamp.review;
   if (stamp.autonomy !== undefined) provenance.autonomy = stamp.autonomy;
   return Object.keys(provenance).length > 0 ? { ...fm, provenance } : fm;
 }
