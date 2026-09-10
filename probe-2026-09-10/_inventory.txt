@@ -1,0 +1,48 @@
+Enforcement attach-point inventory, mage-memory worktree .claude/worktrees/fable-notes-probe at a945759. Verified 2026-09-10.
+
+1. PRE-COMMIT (src/git-hooks.ts)
+:26 REDACT_HOOK_MARKER. :42-50 REDACT_HOOK_BODY: plain /bin/sh, runs `mage flatten --staged --quiet` then blocks if `mage redact --check --staged` fails. :44 fail-open when `mage` not on PATH. :90-126 installRedactHook(), installed only by `mage connect`. :144-154 detectRedactHook() used by doctor.
+
+2. CI (.github/workflows/, 8 files)
+ci.yml: job test (node 22/24): `pnpm typecheck` (:50), `pnpm build`, `pnpm test` (:56), pack tarball. job smoke: install tarball, `mage --version`/`--help`. job gate: the single required check. `pnpm test:integration` runs in NO workflow. No lint/biome step; no lint script in package.json.
+pr-title.yml: Conventional Commits title check via prismalens/gh-workflows/actions/pr-title@main.
+release-please.yml: release-please-action with PAT; publish job via npm OIDC when release_created.
+docs.yml: `pnpm docs:gen`, Astro build, deploy to Pages on release.
+observation-digest.yml: cron 20 8 * * *, posts to an issue; temporary.
+claude-code-review.yml, claude.yml, dependabot-auto-merge.yml: caller stubs, no local logic.
+
+3. LINT/TYPECHECK/TEST CONFIG
+No biome.json, no lint script. tsconfig.json:41 include ["src/**/*","test/**/*"] so tests ARE typechecked. vitest.config.ts:9-10 includes src/**/*.test.ts and test/**/*.test.ts, excludes test/integration/**. vitest.integration.config.ts:15 only test/integration/**; never in CI.
+
+4. CLAUDE CODE HOOKS (src/adapters/claude-code/settings.ts)
+:80 SessionStart mage:observe. :87 SessionStart mage:nudge. :88 UserPromptSubmit observe. :89 PostToolUse (all tools) observe. :90 PostToolUseFailure. :91 PreCompact. :92 SessionEnd. :93 Stop mage:metrics (`mage skills --metrics --quiet`). :96 Stop observe. :101 SubagentStop. :109-115 PreToolUse matcher "Write|Edit" id mage:memory:PreToolUse command `mage memory-hook`, commandeer:true. :116-121 PostToolUse "Write|Edit" mage:memory:PostToolUse. :127-132 Stop mage:flatten `mage flatten --quiet`.
+No permissions.deny anywhere. .claude/settings.json has only a SessionStart hook (scripts/cloud-setup.sh). No .claude/settings.local.json, no .worktreeinclude.
+memory-hook.ts: :98 acts only on Write/Edit. :69-79 only a flat .md at the docs root is in scope. :112 generated artifact (INDEX.md/MEMORY.md) -> deny. :120-142 flat note Write/Edit -> redact in flight -> rewrite. :104 fail-open when docs root does not resolve. :161 same in PostToolUse. :230-245 whole action in try/catch, exits 0 on any error (fail-open boundary).
+nudge.ts: SessionStart nudge; two channels systemMessage / additionalContext; never blocks; exit 0 (:526).
+
+5. `mage doctor` (24 checks; src/commands/doctor.ts, src/doctor/kb-checks.ts, src/doctor/link-checks.ts)
+doctor.ts: :140 node version; :147 platform; :150 git; :153 npx; :160 gh; :171/:237 skills plugin; :174 hub at cwd; :192-211 github reachable (opt-in network probe, the only network call); :91-104 merge candidate.
+kb-checks.ts: :101 genre tells; :124 mage KB; :178 hub projects; :233 KB structure; :235 INDEX.md; :287 index freshness; :336 AGENTS.md awareness (flags retired command names); :382 gitignore sinks (--fix self-heals); :509-561 connection (hook drift); :605 external hub; :655-684 KB access grant; :719-740 redact hook; :766 metadata schema; :841 state layout; :900-932 recall budget.
+link-checks.ts:24 link integrity.
+
+6. `mage index` (src/commands/index-cmd.ts)
+No hard rejection of frontmatter. :68-71 counts status accepted||active for the governance line. :654-659 lifecycleSuffix flags superseded/stale-suspect/archived/deprecated inline. :456-475 roster bounded by lines and bytes (constants.ts:7-8 AUTO_MEMORY_MAX_BYTES=25600, AUTO_MEMORY_MAX_LINES=200); oversized entries omitted silently (:472). :545-561 logger.warn on degraded roster.
+
+7. REDACTION (src/redact.ts DETECTORS from :96, 18 kinds)
+:98 private-key, :107 url-credentials, :113 aws-access-key, :118 aws-secret-key, :125 github-token, :130 gitlab-token, :141 anthropic-key, :149 openai-key, :154 slack-token, :160 stripe-key, :165 google-api-key, :170 npm-token, :175 jwt, :180 bearer, :190 generic-key-value, :199 env-secret, :207 high-entropy, :213 email. Fixtures inline in src/redact.test.ts:21-27 (POSITIVES). No fixture dir under mage/ or test/.
+
+8. RELEASE
+release-please-config.json:10-11 extra-files: .claude-plugin/plugin.json $.version, .claude-plugin/marketplace.json $.plugins[0].version.
+src/release-consistency.test.ts: :26 semver clean; :30 plugin.json matches; :33-38 marketplace matches; :41-45 CHANGELOG has dated heading for current version.
+src/docs/generated-data.test.ts: :15-19 committed docs/src/generated/mage-data.json matches fresh build; :22-29 K/M symbols and mage:nudge:SessionStart present; :32-57 CLI command inventory matches expected hidden/visible sets.
+
+9. .gitignore: :10 mage/**/artifacts/, :15 mage/.learnings/, :16 mage/.metrics/, :17 mage/.staging/, :18 mage/.mage/, :23 mage/dashboard.html.
+
+10. PLUGIN SKILLS: skills/ graduate, groom, guide, learn, optimize. .claude-plugin/plugin.json, marketplace.json.
+
+11. AGENTS.md (41 lines) rule sentences: read INDEX.md first (:11-16); follow links, skim decisions (:17-18); treat notes as point-in-time, verify stale (:19-21); capture durable learnings with /mage:learn or a note + mage index (:23-25); memory genre only; decisions authored deliberately (:27-28); mage/work retired, plans live in issues (:28-29); done-state artifacts go to an issue or decision (:29-30); Docs surfaces section required in every spec (:32); mage never commits (:34-35); pinned tracking issue is the order of work (:40); ADR-0050 is the charter, mechanics in #204 (:41).
+CLAUDE.md: 5 lines, imports AGENTS.md.
+
+12. scripts/: cloud-setup.sh (cloud SessionStart bootstrap), gen-docs.mjs (regenerates docs data), sync-repo-governance.sh (applies .github/governance.json: settings, labels, branch ruleset via gh api), vendor-graph.mjs (vendors force-graph for dashboard.html).
+
+Other facts: src/cli-program.ts registers distill (:223), promote (:242), stage (:261), groom (:297), dashboard (:550), footprint (:164), skills (:136), ingest (:211). src/observe/types.ts:10 event union has no tool_attempt. src/provenance.ts:57 provenance stamp. src/commands/autonomy.ts:35 autonomy metadata field. src/paths.ts:17, :39 visible mage/ and .mage/ state; src/scan.ts:38 never scans .mage/. src/hub-url.ts:257, :292; src/paths.ts:869 resolveHubGrant, :836 reach grant, :686 hub_path fallback (contradicts 0056, #191). src/agents-md.ts:13 delimited block. src/commands/connect.ts:85. src/commands/init.ts:166 scaffolds work/.gitkeep (contradicts 0050). src/grooming/config.ts has no `landing` key. No `gh pr create`/push code in src/.
