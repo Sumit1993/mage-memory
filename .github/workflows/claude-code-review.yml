@@ -49,4 +49,9 @@ jobs:
       # the callee's `review` job self-restricts to read.
       pull-requests: write
       issues: read
+      # Read ceilings for the callee's `review` job: check-runs to read CI state on the
+      # head, actions to read a failed job's log. A callee cannot raise what the caller
+      # did not grant, so both live here. Story: prismalens/gh-workflows#145, #165.
+      checks: read
+      actions: read
       id-token: write
