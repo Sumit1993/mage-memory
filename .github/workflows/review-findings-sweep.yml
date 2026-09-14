@@ -1,0 +1,31 @@
+# This is a managed caller stub.
+# Logic lives in prismalens/gh-workflows/.github/workflows/review-findings-sweep.yml.
+# Do not add logic here.
+
+name: Review Findings Sweep
+
+on:
+  schedule:
+    # 05:41 UTC daily. Off the hour on purpose: GitHub delays cron at peak hours.
+    - cron: '41 5 * * *'
+  workflow_dispatch:
+    inputs:
+      full_history:
+        description: 'Sweep every pull request, ignoring the update window'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  sweep:
+    uses: prismalens/gh-workflows/.github/workflows/review-findings-sweep.yml@main
+    with:
+      full_history: ${{ inputs.full_history || false }}
+    # explicit mapping: `inherit` does not cross ownership boundaries.
+    secrets:
+      REVIEW_TELEMETRY_URL: ${{ secrets.REVIEW_TELEMETRY_URL }}
+      REVIEW_TELEMETRY_TOKEN: ${{ secrets.REVIEW_TELEMETRY_TOKEN }}
