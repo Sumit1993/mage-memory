@@ -1,0 +1,23 @@
+# This is a managed caller stub.
+# Logic lives in prismalens/gh-workflows/.github/workflows/telemetry-health.yml.
+# Do not add logic here.
+
+name: Telemetry Health
+
+on:
+  schedule:
+    # Mondays 06:17 UTC, after the weekly findings sweep.
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+  id-token: write
+
+jobs:
+  health:
+    uses: prismalens/gh-workflows/.github/workflows/telemetry-health.yml@main
+    secrets:
+      REVIEW_TELEMETRY_URL: ${{ secrets.REVIEW_TELEMETRY_URL }}
+      REVIEW_TELEMETRY_TOKEN: ${{ secrets.REVIEW_TELEMETRY_TOKEN }}
