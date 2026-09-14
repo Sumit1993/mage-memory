@@ -1,0 +1,37 @@
+# This is a managed caller stub.
+# Logic lives in prismalens/gh-workflows/.github/workflows/review-findings-sweep.yml.
+# Do not add logic here.
+
+name: Review Findings Sweep
+
+on:
+  # A closed PR is swept at once; the weekly run catches late thread changes and missed closes.
+  pull_request:
+    types: [closed]
+  schedule:
+    # Mondays 05:41 UTC. Off the hour on purpose: GitHub delays cron at peak hours.
+    - cron: '41 5 * * 1'
+  workflow_dispatch:
+    inputs:
+      full_history:
+        description: 'Sweep every pull request, ignoring the update window'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  pull-requests: read
+  # The sweep proves its repository to the telemetry Worker with an OIDC token (gh-workflows#176).
+  id-token: write
+
+jobs:
+  sweep:
+    uses: prismalens/gh-workflows/.github/workflows/review-findings-sweep.yml@main
+    with:
+      full_history: ${{ inputs.full_history || false }}
+      window_days: 8
+    # explicit mapping: `inherit` does not cross ownership boundaries.
+    secrets:
+      REVIEW_TELEMETRY_URL: ${{ secrets.REVIEW_TELEMETRY_URL }}
+      REVIEW_TELEMETRY_TOKEN: ${{ secrets.REVIEW_TELEMETRY_TOKEN }}
