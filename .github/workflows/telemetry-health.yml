@@ -10,6 +10,11 @@ on:
     - cron: '17 6 * * 1'
   workflow_dispatch:
 
+# One report at a time: overlapping runs would post the same window twice (gh-workflows#177).
+concurrency:
+  group: telemetry-health
+  cancel-in-progress: false
+
 permissions:
   actions: read
   contents: read
