@@ -110,6 +110,12 @@
       "purpose": "Capture the prompt's intent."
     },
     {
+      "event": "PreToolUse",
+      "id": "mage:observe:PreToolUse",
+      "command": "mage observe",
+      "purpose": "Capture a tool_attempt — a call was requested. Paired with the tool_use it produces by tool_use_id; an attempt with no matching use means the call was blocked (#209)."
+    },
+    {
       "event": "PostToolUse",
       "id": "mage:observe:PostToolUse",
       "command": "mage observe",

@@ -4,6 +4,7 @@
 // supplies already-scrubbed primitives (scrubbing is the scrub.ts boundary).
 
 import { createHash } from "node:crypto";
+import { scrubField } from "./scrub.js";
 import {
   type AssistantMsgEvent,
   type CompactEvent,
@@ -14,6 +15,7 @@ import {
   type SessionStartEvent,
   type SkillLoadEvent,
   type SkillMatch,
+  type ToolAttemptEvent,
   type ToolUseEvent,
   type UserPromptEvent,
 } from "./types.js";
@@ -62,9 +64,24 @@ export function buildSkillLoad(
 
 export function buildToolUse(
   base: EventBase,
-  p: { tool: string; paths: string[]; detail: string | null; ok: boolean; error_summary: string | null },
+  p: {
+    tool: string;
+    /** Omit where the host sent none; the row always carries the key, null when absent (#209). */
+    tool_use_id?: string | null;
+    paths: string[];
+    detail: string | null;
+    ok: boolean;
+    error_summary: string | null;
+  },
 ): ToolUseEvent {
-  return { v: OBSERVE_SCHEMA_VERSION, ts: base.ts, session: base.session, type: "tool_use", ...p };
+  return {
+    v: OBSERVE_SCHEMA_VERSION,
+    ts: base.ts,
+    session: base.session,
+    type: "tool_use",
+    ...p,
+    tool_use_id: p.tool_use_id ?? null,
+  };
 }
 
 export function buildCompact(base: EventBase, trigger: "manual" | "auto"): CompactEvent {
@@ -75,6 +92,14 @@ export function buildSessionEnd(base: EventBase, reason?: string): SessionEndEve
   const e: SessionEndEvent = { v: OBSERVE_SCHEMA_VERSION, ts: base.ts, session: base.session, type: "session_end" };
   // Omit `reason` entirely when absent (consumers tolerate absence, §2).
   return reason === undefined ? e : { ...e, reason };
+}
+
+/** PreToolUse → tool_attempt (#209): a call was requested, paired to its tool_use by tool_use_id. */
+export function buildToolAttempt(
+  base: EventBase,
+  p: { tool: string; tool_use_id: string; paths: string[]; detail: string | null },
+): ToolAttemptEvent {
+  return { v: OBSERVE_SCHEMA_VERSION, ts: base.ts, session: base.session, type: "tool_attempt", ...p };
 }
 
 export function buildGuardFired(
@@ -104,7 +129,7 @@ const SEARCH_ROOT_TOOLS = new Set(["Glob", "Grep"]);
 /**
  * Extract `paths[]` from STRUCTURED inputs only (§5). Bash is never parsed for
  * paths (unreliable). Each value must be a string; non-strings are ignored
- * (noUncheckedIndexedAccess safety). Entries are bounded to PATH_MAX.
+ * (noUncheckedIndexedAccess safety). Entries are scrubbed and bounded to PATH_MAX.
  */
 export function extractPaths(toolName: string, input: Record<string, unknown>): string[] {
   if (FILE_PATH_TOOLS.has(toolName)) return boundedPath(input.file_path);
@@ -112,9 +137,12 @@ export function extractPaths(toolName: string, input: Record<string, unknown>): 
   return []; // Bash + all other tools.
 }
 
+/** A path is scrubbed like any free-text field (Gate-1): a secret or email in a file name
+ *  must not reach the log. */
 function boundedPath(value: unknown): string[] {
   if (typeof value !== "string" || value.length === 0) return [];
-  return [value.slice(0, PATH_MAX)];
+  const scrubbed = scrubField(value, PATH_MAX);
+  return scrubbed ? [scrubbed] : [];
 }
 
 // ─── deterministic per-tool detail (§5) ──────────────────────────────────────

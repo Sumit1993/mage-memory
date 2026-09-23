@@ -759,3 +759,182 @@ describe("observeCmd — guard_fired event (#230)", () => {
   });
 });
 
+describe("observeCmd — tool_attempt event on PreToolUse (#209)", () => {
+  // The real captured payload from #232's measurement (PreToolUse's full key set).
+  const REAL_PAYLOAD = {
+    hook_event_name: "PreToolUse",
+    session_id: "s1",
+    cwd: ".",
+    tool_name: "Bash",
+    tool_use_id: "toolu_01B4RKqNsR8Skqv7BpgzBGdX",
+    permission_mode: "bypassPermissions",
+    tool_input: { command: "uname -a", description: "Print system information" },
+  };
+
+  it("a real PreToolUse payload yields exactly one tool_attempt row with tool, tool_use_id, paths, detail, envelope", async () => {
+    const repo = await mkRepo();
+    await run(JSON.stringify({ ...REAL_PAYLOAD, cwd: repo }), { cwd: repo });
+    const events = await readEvents(repo, "s1");
+    expect(events).toHaveLength(1);
+    const [e] = events;
+    expect(e?.type).toBe("tool_attempt");
+    if (e?.type === "tool_attempt") {
+      expect(e.v).toBe(1);
+      expect(typeof e.ts).toBe("string");
+      expect(e.session).toBe("s1");
+      expect(e.tool).toBe("Bash");
+      expect(e.tool_use_id).toBe("toolu_01B4RKqNsR8Skqv7BpgzBGdX");
+      expect(e.paths).toEqual([]);
+      expect(e.detail).toBe("uname -a");
+    }
+  });
+
+  it("a real PostToolUse payload yields a tool_use row carrying the SAME tool_use_id", async () => {
+    const repo = await mkRepo();
+    await run(
+      JSON.stringify({
+        hook_event_name: "PostToolUse",
+        session_id: "s1",
+        cwd: repo,
+        tool_name: "Bash",
+        tool_use_id: "toolu_01B4RKqNsR8Skqv7BpgzBGdX",
+        tool_input: { command: "uname -a" },
+        tool_response: "ok",
+      }),
+      { cwd: repo },
+    );
+    const [e] = await readEvents(repo, "s1");
+    expect(e?.type).toBe("tool_use");
+    if (e?.type === "tool_use") {
+      expect(e.tool_use_id).toBe("toolu_01B4RKqNsR8Skqv7BpgzBGdX");
+    }
+  });
+
+  it("the pairing test: a prevented call leaves an attempt with no matching use", async () => {
+    const repo = await mkRepo();
+
+    // toolu_ran: requested, then it ran.
+    await run(
+      JSON.stringify({
+        hook_event_name: "PreToolUse",
+        session_id: "s-pair",
+        cwd: repo,
+        tool_name: "Bash",
+        tool_use_id: "toolu_ran",
+        tool_input: { command: "uname -a" },
+      }),
+      { cwd: repo },
+    );
+    await run(
+      JSON.stringify({
+        hook_event_name: "PostToolUse",
+        session_id: "s-pair",
+        cwd: repo,
+        tool_name: "Bash",
+        tool_use_id: "toolu_ran",
+        tool_input: { command: "uname -a" },
+        tool_response: "ok",
+      }),
+      { cwd: repo },
+    );
+
+    // toolu_denied: requested, never ran (a settings deny or a hook block — #232).
+    await run(
+      JSON.stringify({
+        hook_event_name: "PreToolUse",
+        session_id: "s-pair",
+        cwd: repo,
+        tool_name: "WebFetch",
+        tool_use_id: "toolu_denied",
+        tool_input: { url: "https://example.com" },
+      }),
+      { cwd: repo },
+    );
+
+    const events = await readEvents(repo, "s-pair");
+    expect(events).toHaveLength(3);
+
+    // Read it exactly as a consumer would: the set of ids that ran, vs. the ids attempted.
+    const usedIds = new Set(
+      events
+        .filter((e): e is Extract<ObserveEvent, { type: "tool_use" }> => e.type === "tool_use")
+        .map((e) => e.tool_use_id)
+        .filter((id): id is string => id !== null),
+    );
+    const attemptIds = events
+      .filter((e): e is Extract<ObserveEvent, { type: "tool_attempt" }> => e.type === "tool_attempt")
+      .map((e) => e.tool_use_id);
+
+    const prevented = attemptIds.filter((id) => !usedIds.has(id));
+    expect(prevented).toEqual(["toolu_denied"]);
+    expect(attemptIds).toContain("toolu_ran");
+  });
+
+  it("a missing tool_name writes nothing; a missing tool_use_id writes nothing; neither throws", async () => {
+    const repo = await mkRepo();
+
+    await run(
+      JSON.stringify({
+        hook_event_name: "PreToolUse",
+        session_id: "rej1",
+        cwd: repo,
+        tool_use_id: "toolu_x",
+        tool_input: {},
+      }),
+      { cwd: repo },
+    );
+    await expect(readEvents(repo, "rej1")).rejects.toThrow();
+
+    await run(
+      JSON.stringify({
+        hook_event_name: "PreToolUse",
+        session_id: "rej2",
+        cwd: repo,
+        tool_name: "Bash",
+        tool_input: {},
+      }),
+      { cwd: repo },
+    );
+    await expect(readEvents(repo, "rej2")).rejects.toThrow();
+  });
+
+  it("detail is scrubbed (same secret shape scrub.test.ts proves the scrubber catches) and capped to DETAIL_MAX", async () => {
+    const repo = await mkRepo();
+    await run(
+      JSON.stringify({
+        hook_event_name: "PreToolUse",
+        session_id: "s1",
+        cwd: repo,
+        tool_name: "Bash",
+        tool_use_id: "toolu_secret",
+        tool_input: { command: `echo ${SECRET}` },
+      }),
+      { cwd: repo },
+    );
+    const [e] = await readEvents(repo, "s1");
+    expect(e?.type).toBe("tool_attempt");
+    if (e?.type === "tool_attempt") {
+      expect(e.detail).not.toBeNull();
+      expect(e.detail as string).not.toContain(SECRET);
+    }
+
+    const repo2 = await mkRepo();
+    const longCommand = "x".repeat(DETAIL_MAX + 50);
+    await run(
+      JSON.stringify({
+        hook_event_name: "PreToolUse",
+        session_id: "s1",
+        cwd: repo2,
+        tool_name: "Bash",
+        tool_use_id: "toolu_long",
+        tool_input: { command: longCommand },
+      }),
+      { cwd: repo2 },
+    );
+    const [e2] = await readEvents(repo2, "s1");
+    if (e2?.type === "tool_attempt") {
+      expect((e2.detail as string).length).toBeLessThanOrEqual(DETAIL_MAX);
+    }
+  });
+});
+
