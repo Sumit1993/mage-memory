@@ -4,6 +4,7 @@ import { tmpDir, withKb } from "../../../test/fixtures/kb.js";
 import {
   type MemoryDecision,
   buildMemoryHookCommand,
+  ADMISSION_DENY_REASON,
   emitPostToolUseContext,
   emitPreToolUse,
   memoryPostToolUse,
@@ -33,6 +34,70 @@ const CC_NOTE = [
   "---",
   "**Symptom:** pods pending.",
   "",
+].join("\n");
+
+const VALID_ADMISSION_NOTE = [
+  "---",
+  "rung: note",
+  "skipped:",
+  "  impossible: cannot be ruled out by types",
+  "  check: behavioral, not static",
+  "  hook: cannot observe across sessions",
+  "  rule: agent needs a lesson",
+  "trigger: when soak monitor misses an incident",
+  "pointer: '[issue #229](https://github.com/Sumit1993/mage-memory/issues/229)'",
+  "---",
+  "# Soak monitor blind spots",
+  "",
+  "Body text.",
+].join("\n");
+
+const NOTE_MISSING_RUNG = [
+  "---",
+  "skipped:",
+  "  impossible: cannot be ruled out by types",
+  "  check: behavioral, not static",
+  "  hook: cannot observe across sessions",
+  "  rule: agent needs a lesson",
+  "trigger: when soak monitor misses an incident",
+  "pointer: '[issue #229](https://github.com/Sumit1993/mage-memory/issues/229)'",
+  "---",
+  "# Note",
+].join("\n");
+
+const NOTE_MISSING_SKIPPED = [
+  "---",
+  "rung: note",
+  "trigger: when soak monitor misses an incident",
+  "pointer: '[issue #229](https://github.com/Sumit1993/mage-memory/issues/229)'",
+  "---",
+  "# Note",
+].join("\n");
+
+const NOTE_MISSING_TRIGGER = [
+  "---",
+  "rung: note",
+  "skipped:",
+  "  impossible: cannot be ruled out by types",
+  "  check: behavioral, not static",
+  "  hook: cannot observe across sessions",
+  "  rule: agent needs a lesson",
+  "pointer: '[issue #229](https://github.com/Sumit1993/mage-memory/issues/229)'",
+  "---",
+  "# Note",
+].join("\n");
+
+const NOTE_MISSING_POINTER = [
+  "---",
+  "rung: note",
+  "skipped:",
+  "  impossible: cannot be ruled out by types",
+  "  check: behavioral, not static",
+  "  hook: cannot observe across sessions",
+  "  rule: agent needs a lesson",
+  "trigger: when soak monitor misses an incident",
+  "---",
+  "# Note",
 ].join("\n");
 
 describe("memoryPreToolUse", () => {
@@ -98,11 +163,11 @@ describe("memoryPreToolUse", () => {
     expect(d.slug).toBe("broken");
   });
 
-  it("PASSES a subdirectory write, a non-.md write, and a path outside the root", async () => {
+  it("PASSES a non-notes subdirectory write, a non-.md write, and a path outside the root", async () => {
     const kb = await withKb();
     const other = await tmpDir("outside-");
     const cases = [
-      join(kb.root, "notes", "x.md"), // subdir
+      join(kb.root, "work", "x.md"), // non-notes subdir
       join(kb.root, "scratch.txt"), // non-.md
       join(other, "elsewhere.md"), // outside the docs root
     ];
@@ -110,6 +175,108 @@ describe("memoryPreToolUse", () => {
       const d = await memoryPreToolUse(preWrite(kb.dir, fp, "whatever"));
       expect(d.kind).toBe("pass");
     }
+  });
+
+  it("does not deny a note carrying all four admission fields under the notes folder", async () => {
+    const kb = await withKb();
+    const d = await memoryPreToolUse(
+      preWrite(kb.dir, join(kb.root, "notes", "valid.md"), VALID_ADMISSION_NOTE),
+    );
+    expect(d.kind).toBe("pass");
+  });
+
+  it("denies a note under the notes folder missing rung", async () => {
+    const kb = await withKb();
+    const d = await memoryPreToolUse(
+      preWrite(kb.dir, join(kb.root, "notes", "no-rung.md"), NOTE_MISSING_RUNG),
+    );
+    expect(d.kind).toBe("deny");
+    if (d.kind === "deny") {
+      expect(d.reason).toContain("mage:mage/guard/note-admission");
+    }
+  });
+
+  it("denies a note under the notes folder missing skipped", async () => {
+    const kb = await withKb();
+    const d = await memoryPreToolUse(
+      preWrite(kb.dir, join(kb.root, "notes", "no-skipped.md"), NOTE_MISSING_SKIPPED),
+    );
+    expect(d.kind).toBe("deny");
+    if (d.kind === "deny") {
+      expect(d.reason).toContain("mage:mage/guard/note-admission");
+    }
+  });
+
+  it("denies a note under the notes folder missing trigger", async () => {
+    const kb = await withKb();
+    const d = await memoryPreToolUse(
+      preWrite(kb.dir, join(kb.root, "notes", "no-trigger.md"), NOTE_MISSING_TRIGGER),
+    );
+    expect(d.kind).toBe("deny");
+    if (d.kind === "deny") {
+      expect(d.reason).toContain("mage:mage/guard/note-admission");
+    }
+  });
+
+  it("denies a note under the notes folder missing pointer", async () => {
+    const kb = await withKb();
+    const d = await memoryPreToolUse(
+      preWrite(kb.dir, join(kb.root, "notes", "no-pointer.md"), NOTE_MISSING_POINTER),
+    );
+    expect(d.kind).toBe("deny");
+    if (d.kind === "deny") {
+      expect(d.reason).toContain("mage:mage/guard/note-admission");
+    }
+  });
+
+  it("deny reason is under ten lines and contains the guard id line", async () => {
+    const kb = await withKb();
+    const d = await memoryPreToolUse(
+      preWrite(kb.dir, join(kb.root, "notes", "invalid.md"), NOTE_MISSING_RUNG),
+    );
+    expect(d.kind).toBe("deny");
+    if (d.kind === "deny") {
+      const lines = d.reason.split(/\r?\n/);
+      expect(lines.length).toBeLessThan(10);
+      expect(lines).toContain("mage:mage/guard/note-admission");
+    }
+  });
+
+  it("denies every invalid attempt, not only the first one in a session", async () => {
+    const kb = await withKb();
+    const payload = {
+      ...preWrite(kb.dir, join(kb.root, "notes", "repeated.md"), NOTE_MISSING_RUNG),
+      session_id: "test-session-1",
+    };
+    expect((await memoryPreToolUse(payload)).kind).toBe("deny");
+    // A second pass would hand the unchanged write back to the host (ADR-0051).
+    expect((await memoryPreToolUse(payload)).kind).toBe("deny");
+  });
+
+  it("denies a notes/ write whose frontmatter is malformed YAML", async () => {
+    const kb = await withKb();
+    const broken = "---\nrung: note\nskipped: [oops\n---\n# Broken\n";
+    const d = await memoryPreToolUse(preWrite(kb.dir, join(kb.root, "notes", "broken.md"), broken));
+    expect(d).toEqual({ kind: "deny", reason: ADMISSION_DENY_REASON });
+  });
+
+  it("scrubs a secret out of an admitted note before it reaches disk", async () => {
+    const kb = await withKb();
+    const leaky = `${VALID_ADMISSION_NOTE}\ntoken AKIA1234567890ABCD56 leaked here\n`;
+    const d = await memoryPreToolUse(preWrite(kb.dir, join(kb.root, "notes", "leaky.md"), leaky));
+    if (d.kind !== "rewrite") throw new Error(`expected rewrite, got ${d.kind}`);
+    expect(d.updatedInput.content as string).not.toContain("AKIA1234567890ABCD56");
+    expect(d.slug).toBe("notes/leaky");
+  });
+
+  it("never emits an explicit allow when admitting a valid note", async () => {
+    const spy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const kb = await withKb();
+    const d = await memoryPreToolUse(
+      preWrite(kb.dir, join(kb.root, "notes", "valid.md"), VALID_ADMISSION_NOTE),
+    );
+    emitPreToolUse(d);
+    expect(spy).not.toHaveBeenCalled();
   });
 
   it("scrubs only new_string on an Edit (a fragment — no frontmatter map)", async () => {

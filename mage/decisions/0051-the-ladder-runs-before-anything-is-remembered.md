@@ -32,6 +32,6 @@ Agent: Write `mage/notes/npx-runs-published.md`. Hook: deny, "which rung? imposs
 A note needs `trigger:`, `pointer:` and `skipped:`". Agent rewrites with `trigger: "deciding which mage binary
 a verify command runs"`, `pointer: "package.json bin"`, four skipped rungs with reasons. Hook: pass.
 ## Relations
-Absorbs 0004, 0005, 0032, 0035, 0041 and decisions 2, 4, 7 of 0048. Today the hook is the 0032 scrub-and-redirect
-at `src/adapters/claude-code/memory-hook.ts:93`, fail-open at `:243`; #229 (PR #258) repoints it, #231 (PR #255)
+Absorbs 0004, 0005, 0032, 0035, 0041 and decisions 2, 4, 7 of 0048. The hook is `admitNoteWrite` in
+`src/adapters/claude-code/memory-hook.ts`, denying on any failure under `notes/` (#229, PR #258); #231 (PR #255)
 adds the schema check, #253 the one-screen check. Landing a note: 0057.
