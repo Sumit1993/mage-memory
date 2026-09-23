@@ -168,6 +168,19 @@ mage index
 mage skills
 ```
 
+### Admission and readability checks
+
+Every `mage index` run checks each note under `notes/` for the admission fields
+(`id`, `rung`, `skipped`, `trigger`, `pointer`) and the readability rules (one
+screen, no unlinked references, plain words), and prints one line per problem. It
+indexes anyway and exits 0. That is report mode, the default, because the existing
+notes have not been backfilled yet.
+
+`mage index --strict-admission` turns the report into a refusal. On any problem it
+prints the same report, writes nothing (no `INDEX.md`, no `MEMORY.md`, no project
+pair), and exits 1. At a hub root the check covers every project's notes too. See
+[Notes](../model/notes.md) for a failing note and the exact report.
+
 ### At a hub root, `index` fans out
 
 Run against a single knowledge base, `mage index` writes that one pair. Run at a
