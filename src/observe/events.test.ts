@@ -129,6 +129,15 @@ describe("extractPaths — structured inputs only (§4/§5)", () => {
     expect(extractPaths("Grep", { path: { x: 1 } })).toEqual([]);
   });
 
+  it("scrubs a secret or an email out of a path before it is logged", () => {
+    expect(extractPaths("Read", { file_path: "/tmp/AKIA1234567890ABCD56.txt" })).toEqual([
+      "/tmp/[REDACTED:aws-access-key].txt",
+    ]);
+    expect(extractPaths("Grep", { path: "/srv/u/someone@example.com/notes" })).toEqual([
+      "/srv/u/[REDACTED:email]/notes",
+    ]);
+  });
+
   it("bounds an over-long path to PATH_MAX", () => {
     const long = `/${"a".repeat(1000)}`;
     const [p] = extractPaths("Read", { file_path: long });

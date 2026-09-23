@@ -4,6 +4,7 @@
 // supplies already-scrubbed primitives (scrubbing is the scrub.ts boundary).
 
 import { createHash } from "node:crypto";
+import { scrubField } from "./scrub.js";
 import {
   type AssistantMsgEvent,
   type CompactEvent,
@@ -128,7 +129,7 @@ const SEARCH_ROOT_TOOLS = new Set(["Glob", "Grep"]);
 /**
  * Extract `paths[]` from STRUCTURED inputs only (§5). Bash is never parsed for
  * paths (unreliable). Each value must be a string; non-strings are ignored
- * (noUncheckedIndexedAccess safety). Entries are bounded to PATH_MAX.
+ * (noUncheckedIndexedAccess safety). Entries are scrubbed and bounded to PATH_MAX.
  */
 export function extractPaths(toolName: string, input: Record<string, unknown>): string[] {
   if (FILE_PATH_TOOLS.has(toolName)) return boundedPath(input.file_path);
@@ -136,9 +137,12 @@ export function extractPaths(toolName: string, input: Record<string, unknown>): 
   return []; // Bash + all other tools.
 }
 
+/** A path is scrubbed like any free-text field (Gate-1): a secret or email in a file name
+ *  must not reach the log. */
 function boundedPath(value: unknown): string[] {
   if (typeof value !== "string" || value.length === 0) return [];
-  return [value.slice(0, PATH_MAX)];
+  const scrubbed = scrubField(value, PATH_MAX);
+  return scrubbed ? [scrubbed] : [];
 }
 
 // ─── deterministic per-tool detail (§5) ──────────────────────────────────────
