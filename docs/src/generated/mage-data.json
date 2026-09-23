@@ -612,7 +612,7 @@
     },
     {
       "name": "migrate",
-      "summary": "Upgrade this KB's metadata to the current schema (idempotent; never commits)",
+      "summary": "Upgrade a 0.0.x KB: metadata schema, retired state cleared, hook groups refreshed, AGENTS.md block refreshed without clobbering (idempotent; never commits)",
       "aliases": [],
       "hidden": false,
       "options": [

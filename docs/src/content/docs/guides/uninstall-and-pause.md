@@ -79,6 +79,55 @@ The `mage` command is a global npm package:
 npm rm -g mage-memory
 ```
 
+## Upgrading from 0.0.x
+
+A knowledge base connected before 0.0.19 carries state whose writers retired, hook
+groups from an older release, and an `AGENTS.md` block from before hash stamps. Run
+`mage migrate` once in the code repo (or at the hub root). It is safe to re-run.
+
+Here it is on a 0.0.17 knowledge base, then a second time:
+
+```console
+$ mage migrate
+✓ Removed promote-tally at /repo/mage (its writer retired in #208)
+✓ Removed nudge-throttle at /repo/mage (its writer retired in #208)
+  Already current: /repo/mage/metadata.json
+staging: 1 draft(s) pending at /repo/mage — run `mage groom`
+⚠ work/ is retired (ADR-0050): 1 file(s) left in place at /repo/mage; links in notes and decisions are not rewritten
+  hooks: written (/repo/.claude/settings.local.json); observe arm: added
+⚠ /repo/AGENTS.md: the mage block between <!-- BEGIN mage --> and <!-- END mage --> predates hash stamps and was left as is. …
+    mage migrate never overwrites it. To take the current block, move any text of your own below <!-- END mage -->, delete the block, and run mage migrate again.
+
+Review the diff and commit yourself (mage never commits):
+    git add AGENTS.md CLAUDE.md metadata.json mage/metadata.json 2>/dev/null; git commit -m "chore: migrate mage state"
+$ mage migrate
+✓ Already current (mage.v2, .mage/ layout); nothing to migrate.
+staging: 1 draft(s) pending at /repo/mage — run `mage groom`
+⚠ work/ is retired (ADR-0050): 1 file(s) left in place at /repo/mage; links in notes and decisions are not rewritten
+  hooks: unchanged (/repo/.claude/settings.local.json); observe arm: present
+⚠ /repo/AGENTS.md: the mage block between <!-- BEGIN mage --> and <!-- END mage --> predates hash stamps and was left as is. …
+    mage migrate never overwrites it. To take the current block, move any text of your own below <!-- END mage -->, delete the block, and run mage migrate again.
+```
+
+What each line means:
+
+- **Removed …**: a file under `.mage/metrics/` whose only writer retired. Staged
+  drafts are never deleted; `mage groom` is how you clear them.
+- **hooks**: the hook groups in this repo's `.claude/settings.local.json` are
+  rewritten to the current set, at the tier they already had. The PreToolUse observe
+  arm is added, the memory hook now runs the ladder check, and `autoMemoryDirectory`
+  is left alone. A repo that was never connected is left unconnected: run
+  `mage connect` for that. Your personal `~/.claude/settings.json` is never touched.
+- **AGENTS.md**: the block is refreshed only when it is exactly what mage wrote. A
+  block with hand edits, or from before hash stamps, is left as is with a warning.
+  To take the current block, move your own text below `<!-- END mage -->`, delete
+  the block, and run `mage migrate` again.
+- At a hub root, each registered project gets a line telling you to run
+  `mage migrate` in its code repo, because the hook groups live there.
+
+These strings are the ones `test/integration/migrate.integration.test.ts` asserts.
+If you change what `mage migrate` prints, update this transcript with it.
+
 ## What stays behind
 
 - **Your notes.** Everything under `mage/` — notes, `INDEX.md`, `decisions/` — is

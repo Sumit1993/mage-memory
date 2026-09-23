@@ -10,6 +10,11 @@ import {
   metricsPath,
   stagingPath,
 } from "../paths.js";
+import {
+  type ClaudeSettings,
+  hasCommandeerHooks,
+  upsertMageHooks,
+} from "../adapters/claude-code/settings.js";
 import { mageMigrate } from "./migrate.js";
 
 afterEach(() => {
@@ -97,7 +102,7 @@ describe("mage migrate", () => {
 
 /**
  * Seed the pre-fold transient dirs at `docsRoot` with sentinel content:
- * `.learnings/x.jsonl`, `.metrics/promote.json`, `.staging/d.md`. Returns the
+ * `.learnings/x.jsonl`, `.metrics/keep-rate.json`, `.staging/d.md`. Returns the
  * exact bytes written so a test can assert the move is byte-identical.
  */
 async function seedOldLayout(
@@ -110,7 +115,7 @@ async function seedOldLayout(
   await mkdir(join(docsRoot, ".metrics"), { recursive: true });
   await mkdir(join(docsRoot, ".staging"), { recursive: true });
   await writeFile(join(docsRoot, ".learnings", "x.jsonl"), learning);
-  await writeFile(join(docsRoot, ".metrics", "promote.json"), promote);
+  await writeFile(join(docsRoot, ".metrics", "keep-rate.json"), promote);
   await writeFile(join(docsRoot, ".staging", "d.md"), draft);
   return { learning, promote, draft };
 }
@@ -129,7 +134,7 @@ describe("mage migrate — state fold (ADR-0025)", () => {
 
     // All three dirs now live under mage/.mage/<leaf>/ with byte-identical content.
     expect(await readFile(join(learningsPath(docs), "x.jsonl"), "utf8")).toBe(seed.learning);
-    expect(await readFile(join(metricsPath(docs), "promote.json"), "utf8")).toBe(seed.promote);
+    expect(await readFile(join(metricsPath(docs), "keep-rate.json"), "utf8")).toBe(seed.promote);
     expect(await readFile(join(stagingPath(docs), "d.md"), "utf8")).toBe(seed.draft);
 
     // The old dot-dirs are gone (it was a MOVE, not a copy).
@@ -168,7 +173,7 @@ describe("mage migrate — state fold (ADR-0025)", () => {
     expect(second.layoutMoves).toHaveLength(0);
     // Content is exactly where the first run left it, unchanged.
     expect(await readFile(join(learningsPath(docs), "x.jsonl"), "utf8")).toBe(seed.learning);
-    expect(await readFile(join(metricsPath(docs), "promote.json"), "utf8")).toBe(seed.promote);
+    expect(await readFile(join(metricsPath(docs), "keep-rate.json"), "utf8")).toBe(seed.promote);
     expect(await readFile(join(stagingPath(docs), "d.md"), "utf8")).toBe(seed.draft);
   });
 
@@ -191,7 +196,7 @@ describe("mage migrate — state fold (ADR-0025)", () => {
     // Each project's dirs moved under its own .mage/, byte-identical.
     expect(await readFile(join(learningsPath(alpha), "x.jsonl"), "utf8")).toBe(seedA.learning);
     expect(await readFile(join(stagingPath(alpha), "d.md"), "utf8")).toBe(seedA.draft);
-    expect(await readFile(join(metricsPath(beta), "promote.json"), "utf8")).toBe(seedB.promote);
+    expect(await readFile(join(metricsPath(beta), "keep-rate.json"), "utf8")).toBe(seedB.promote);
     expect(await present(join(alpha, ".learnings"))).toBe(false);
     expect(await present(join(beta, ".staging"))).toBe(false);
 
@@ -245,7 +250,7 @@ describe("mage migrate — state fold (ADR-0025)", () => {
     expect(await readFile(join(learningsPath(docs), "prior.jsonl"), "utf8")).toBe(prior);
 
     // The non-colliding siblings still migrate cleanly (fail-safe is per-leaf).
-    expect(await readFile(join(metricsPath(docs), "promote.json"), "utf8")).toBe(seed.promote);
+    expect(await readFile(join(metricsPath(docs), "keep-rate.json"), "utf8")).toBe(seed.promote);
     expect(await readFile(join(stagingPath(docs), "d.md"), "utf8")).toBe(seed.draft);
     expect(await present(join(docs, ".metrics"))).toBe(false);
     expect(await present(join(docs, ".staging"))).toBe(false);
@@ -265,11 +270,11 @@ describe("mage migrate — state fold (ADR-0025)", () => {
     expect(learningSrc).toBe(false);
     expect(await readFile(join(learningsPath(docs), "x.jsonl"), "utf8")).toBe(seed.learning);
 
-    const promoteDest = await present(join(metricsPath(docs), "promote.json"));
-    const promoteSrc = await present(join(docs, ".metrics", "promote.json"));
+    const promoteDest = await present(join(metricsPath(docs), "keep-rate.json"));
+    const promoteSrc = await present(join(docs, ".metrics", "keep-rate.json"));
     expect(promoteDest).toBe(true);
     expect(promoteSrc).toBe(false);
-    expect(await readFile(join(metricsPath(docs), "promote.json"), "utf8")).toBe(seed.promote);
+    expect(await readFile(join(metricsPath(docs), "keep-rate.json"), "utf8")).toBe(seed.promote);
 
     const draftDest = await present(join(stagingPath(docs), "d.md"));
     const draftSrc = await present(join(docs, ".staging", "d.md"));
@@ -339,5 +344,126 @@ describe("mage migrate — state fold (ADR-0025)", () => {
     const raw = JSON.parse(await readFile(metadataPath(code), "utf8"));
     expect(raw.redact).toEqual({ ignore: ["a/**", "b/**"], allow: ["LIT_A", "LIT_B"] });
     expect(await present(join(docs, ".redactignore"))).toBe(false);
+  });
+});
+
+describe("mage migrate — 0.0.x clearing (#207)", () => {
+  /** A 0.0.17-shaped settings.local.json: commandeer tier, auto-memory relocated, no observe PreToolUse. */
+  function legacySettings(): ClaudeSettings {
+    const { settings } = upsertMageHooks(null, { commandeer: true });
+    const pre = (settings.hooks?.PreToolUse ?? []).filter((g) => g.id !== "mage:observe:PreToolUse");
+    settings.hooks = { ...settings.hooks, PreToolUse: pre };
+    return { ...settings, autoMemoryDirectory: "/x", mageStashedAutoMemoryDirectory: "/y" };
+  }
+
+  async function writeLocal(dir: string, s: ClaudeSettings): Promise<string> {
+    const p = join(dir, ".claude", "settings.local.json");
+    await mkdir(join(dir, ".claude"), { recursive: true });
+    await writeFile(p, `${JSON.stringify(s, null, 2)}\n`);
+    return p;
+  }
+
+  it("removes the retired state files and keeps staged drafts and live metrics", async () => {
+    const { dir, root } = await withKb();
+    const m = metricsPath(root);
+    await mkdir(m, { recursive: true });
+    for (const f of ["promote.json", "distill.json", "nudge-throttle.json", "staged-rejects.json"]) {
+      await writeFile(join(m, f), "{}");
+    }
+    await mkdir(stagingPath(root), { recursive: true });
+    await writeFile(join(stagingPath(root), "d.md"), "# draft\n");
+
+    const r = await mageMigrate({ dir });
+    expect(r.cleared.filter((c) => c.outcome === "removed").map((c) => c.kind).sort()).toEqual([
+      "distill-watermark",
+      "nudge-throttle",
+      "promote-tally",
+    ]);
+    for (const f of ["promote.json", "distill.json", "nudge-throttle.json"]) {
+      expect(await present(join(m, f))).toBe(false);
+    }
+    expect(await present(join(m, "staged-rejects.json"))).toBe(true);
+    expect(await present(join(stagingPath(root), "d.md"))).toBe(true);
+    expect(r.staged).toEqual([{ root, drafts: 1 }]);
+
+    const again = await mageMigrate({ dir });
+    expect(again.cleared.every((c) => c.outcome === "absent")).toBe(true);
+  });
+
+  it("adds the observe arm to a 0.0.17 settings file and keeps its tier and auto-memory keys", async () => {
+    const { dir } = await withKb();
+    const path = await writeLocal(dir, legacySettings());
+
+    const r = await mageMigrate({ dir });
+    expect(r.hooks).toEqual({ path, outcome: "written", observeArm: "added" });
+    const after = JSON.parse(await readFile(path, "utf8")) as ClaudeSettings;
+    const ids = (after.hooks?.PreToolUse ?? []).map((g) => g.id);
+    expect(ids).toContain("mage:observe:PreToolUse");
+    expect(ids).toContain("mage:memory:PreToolUse");
+    expect(hasCommandeerHooks(after)).toBe(true);
+    expect(after.autoMemoryDirectory).toBe("/x");
+    expect(after.mageStashedAutoMemoryDirectory).toBe("/y");
+
+    const bytes = await readFile(path, "utf8");
+    const again = await mageMigrate({ dir });
+    expect(again.hooks).toEqual({ path, outcome: "unchanged", observeArm: "present" });
+    expect(await readFile(path, "utf8")).toBe(bytes);
+  });
+
+  it("never turns the commandeer tier on for a base-tier settings file", async () => {
+    const { dir } = await withKb();
+    const path = await writeLocal(dir, upsertMageHooks(null).settings);
+    await mageMigrate({ dir });
+    expect(hasCommandeerHooks(JSON.parse(await readFile(path, "utf8")))).toBe(false);
+  });
+
+  it("leaves an unconnected KB unconnected", async () => {
+    const { dir } = await withKb();
+    const r = await mageMigrate({ dir });
+    expect(r.hooks?.outcome).toBe("not-connected");
+    expect(await present(join(dir, ".claude", "settings.local.json"))).toBe(false);
+  });
+
+  it("at a hub, clears every project root and names each project to migrate there", async () => {
+    const { dir } = await withKb({
+      kind: "hub",
+      projects: [{ name: "alpha", storage: "hub-owned", code_repo_url: "" }],
+    });
+    const m = metricsPath(join(dir, "projects", "alpha"));
+    await mkdir(m, { recursive: true });
+    await writeFile(join(m, "promote.json"), "{}");
+
+    const r = await mageMigrate({ dir });
+    expect(await present(join(m, "promote.json"))).toBe(false);
+    expect(r.projectsToVisit).toEqual(["alpha"]);
+  });
+
+  it("counts files under a retired work/ dir and leaves them", async () => {
+    const { dir, root } = await withKb();
+    await mkdir(join(root, "work", "plans"), { recursive: true });
+    await writeFile(join(root, "work", "plans", "p.md"), "# plan\n");
+    const r = await mageMigrate({ dir });
+    expect(r.work).toEqual([{ root, files: 1 }]);
+    expect(await present(join(root, "work", "plans", "p.md"))).toBe(true);
+  });
+
+  it("refreshes the AGENTS.md block only through the no-clobber path", async () => {
+    const { dir } = await withKb();
+    // No AGENTS.md yet: created and stamped.
+    expect((await mageMigrate({ dir })).agentsMd?.agents).toBe("created");
+    expect((await mageMigrate({ dir })).agentsMd?.agents).toBe("unchanged");
+
+    // A hand edit inside a stamped block is kept, byte for byte.
+    const file = join(dir, "AGENTS.md");
+    const edited = (await readFile(file, "utf8")).replace("never a copy of the source.", "never a copy. HAND");
+    await writeFile(file, edited);
+    expect((await mageMigrate({ dir })).agentsMd?.agents).toBe("kept-hand-edits");
+    expect(await readFile(file, "utf8")).toBe(edited);
+
+    // An unstamped legacy block that differs is kept and gets no stamp.
+    const legacy = edited.replace(/^<!-- mage-block-hash: [0-9a-f]{12} -->\n/m, "");
+    await writeFile(file, legacy);
+    expect((await mageMigrate({ dir })).agentsMd?.agents).toBe("kept-unstamped");
+    expect(await readFile(file, "utf8")).toBe(legacy);
   });
 });

@@ -7,6 +7,7 @@ import {
   DECISIONS_DIR,
   INDEX_FILE,
   NOTES_DIR,
+  WORK_DIR,
   absolutePath,
   assertSafeName,
   exists,
@@ -151,14 +152,9 @@ copies of sources) — navigable as an Obsidian graph.
    current code before relying on it.
 
 **After you learn something durable** — an interface detail, a gotcha, how two
-services couple, a faster path to a source — capture it with \`mage:learn\` into
+services couple, a faster path to a source — capture it with \`/mage:learn\` into
 the hub. Capture the reusable *insight + procedure + pointers*, never a copy.
-
-**Capture lessons inline, at first sight.** When you learn something durable
-mid-task, stage a SHORT draft right then — \`mage stage --title "..." --tags
-wing/room\` (body on stdin; it is scrubbed and parked in \`.staging/\`). No per-note
-confirm; you batch-review the drafts later with \`mage:groom\`. Don't wait for a
-session boundary — capture at first sight.
+Plans, specs and task lists live in the issue tracker, not in the hub (ADR-0050).
 
 **Commit hygiene:** mage never commits for you. It suggests \`git\` commands; you
 run them.`;
@@ -169,6 +165,7 @@ function mageBlock(opts: AgentsMdOptions): string {
   const indexPath = rel(opts.docsRel, INDEX_FILE);
   const notesPath = rel(opts.docsRel, `${NOTES_DIR}/`);
   const decisionsPath = rel(opts.docsRel, `${DECISIONS_DIR}/`);
+  const workPath = rel(opts.docsRel, `${WORK_DIR}/`);
   const kbDesc = kbDescription(opts);
   return `## mage knowledge base
 
@@ -178,7 +175,8 @@ procedure, and pointers (not copies of sources) — navigable as an Obsidian gra
 **Before non-trivial work in this repo:**
 
 1. Read \`${indexPath}\` first — the always-current index of what's known
-   (one line per note: type · title · keywords · → link). Open only the notes
+   (one line per memory-genre note: type · title · keywords · → link; the
+   auto-loaded \`MEMORY.md\` roster is its bounded subset). Open only the notes
    the task actually touches; don't read everything.
 2. Follow the links in those notes (standard markdown \`[text](path.md)\` links)
    and skim \`${decisionsPath}\` for governing decisions.
@@ -187,15 +185,13 @@ procedure, and pointers (not copies of sources) — navigable as an Obsidian gra
    current code before relying on it.
 
 **After you learn something durable** — an interface detail, a gotcha, how two
-services couple, a faster path to a source — capture it with \`mage:learn\`, or
+services couple, a faster path to a source — capture it with \`/mage:learn\`, or
 add a note under \`${notesPath}\` and run \`mage index\`. Capture the reusable
-*insight + procedure + pointers*, never a copy of the source.
-
-**Capture lessons inline, at first sight.** When you learn something durable
-mid-task, stage a SHORT draft right then — \`mage stage --title "..." --tags
-wing/room\` (body on stdin; it is scrubbed and parked in \`.staging/\`). No per-note
-confirm; you batch-review the drafts later with \`mage:groom\`. Don't wait for a
-session boundary — capture at first sight.
+*insight + procedure + pointers*, never a copy of the source. This rule targets
+the **memory** genre only (\`${notesPath}\`). \`${decisionsPath}\` (ADRs) is authored
+deliberately, not a destination for captured knowledge. \`${workPath}\` is retired
+(ADR-0050); plans, specs and task lists live in the issue tracker. An
+artifact with a done-state belongs in an issue or a decision, not in notes.
 
 **Commit hygiene:** mage never commits for you. It suggests \`git\` commands; you
 run them.`;

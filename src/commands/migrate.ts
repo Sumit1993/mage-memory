@@ -12,12 +12,40 @@
 //      leftover `.redactignore` file into `metadata.redact`. Visits every docs root the
 //      KB owns — a code repo's `mage/`, a hub root, and each hub `projects/<name>/`.
 //
+//   3. 0.0.x CLEARING (#207). Removes state whose only writer retired (#208): the
+//      promote tally, the distill watermark, the nudge throttle. Counts, never deletes,
+//      staged drafts (groom Phase 0 still reads them) and retired `work/` files.
+//      Re-upserts the hook groups in the KB's own `settings.local.json` at the tier it
+//      already has, which repoints the memory hook and adds the PreToolUse observe arm.
+//      Refreshes the AGENTS.md block through the no-clobber path (#198).
+//
+// Every step probes the artifact it touches instead of reading a version stamp: the
+// three stores (`.mage/`, `settings.local.json`, `AGENTS.md`) have different owners,
+// and one stamp would say "migrated" on a clone whose settings were never touched.
+//
 // Re-running is a quiet no-op. It never commits. FAIL-SAFE: a layout move that hits a
 // pre-existing target or any fs error leaves the OLD artifact untouched — a draft or a
 // ledger is never lost to a half-migration.
 
-import { mkdir, rename, rm } from "node:fs/promises";
+import { mkdir, readdir, rename, rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import {
+  type AgentsMdOptions,
+  type AgentsMdWriteResult,
+  keptWarning,
+  writeAgentsMd,
+} from "../agents-md.js";
+import {
+  MAGE_ID_PREFIX,
+  hasCommandeerHooks,
+  isMageGroup,
+  readClaudeSettings,
+  resolveSettingsTarget,
+  upsertMageHooks,
+  writeClaudeSettings,
+} from "../adapters/claude-code/settings.js";
+import { distillWatermarkPath } from "../distill/watermark.js";
+import { PROMOTE_FILE } from "../grooming/tally.js";
 import { logger } from "../logger.js";
 import {
   LEARNINGS_DIR,
@@ -26,15 +54,20 @@ import {
   METADATA_SCHEMA,
   METRICS_DIR,
   type RedactConfig,
+  type MageMetadata,
   STAGING_DIR,
+  WORK_DIR,
   absolutePath,
   exists,
   hubMetadataPath,
   looksLikeHub,
   metadataPath,
+  metricsPath,
+  outOfRepoKbTargets,
   ownedDocsRoots,
   readHubMetadata,
   readMetadata,
+  stagingPath,
   stateDir,
   writeHubMetadata,
   writeMetadata,
@@ -66,12 +99,42 @@ export interface LayoutMoveEntry {
   outcome: "moved" | "skipped";
 }
 
+/** One retired state file the clearing step looked for (#207). */
+export interface ClearedEntry {
+  root: string;
+  kind: "promote-tally" | "distill-watermark" | "nudge-throttle";
+  /** "removed"; "absent" — nothing there; "skipped" — an fs error left it in place. */
+  outcome: "removed" | "absent" | "skipped";
+}
+
+/** The hook re-upsert in the KB's own `settings.local.json` (#207). */
+export interface HooksEntry {
+  path: string;
+  outcome: "written" | "unchanged" | "not-connected" | "malformed";
+  /** Whether `mage:observe:PreToolUse` was already there, was added, or does not apply. */
+  observeArm: "present" | "added" | "n/a";
+}
+
 export interface MigrateResult {
   migrated: MigrateEntry[];
   alreadyCurrent: string[];
   /** State-fold layout relocations (ADR-0025); empty when nothing needed moving. */
   layoutMoves: LayoutMoveEntry[];
+  /** Retired state files, one entry per kind per docs root. */
+  cleared: ClearedEntry[];
+  /** Pending groom drafts per docs root; counted, never deleted. */
+  staged: { root: string; drafts: number }[];
+  /** Files under a retired `work/` dir per docs root; counted, never moved. */
+  work: { root: string; files: number }[];
+  /** Null when no KB root carries a settings file to re-upsert. */
+  hooks: HooksEntry | null;
+  /** Null when the AGENTS.md block could not be targeted (hub path unknown). */
+  agentsMd: AgentsMdWriteResult | null;
+  /** A hub's registered projects, each of which needs its own `mage migrate`. */
+  projectsToVisit: string[];
 }
+
+const OBSERVE_PRETOOLUSE_ID = `${MAGE_ID_PREFIX}observe:PreToolUse`;
 
 /**
  * The pre-fold dot-dir for each `.mage/` leaf — what the layout migration relocates.
@@ -102,6 +165,10 @@ export async function mageMigrate(opts: MigrateOptions = {}): Promise<MigrateRes
   const migrated: MigrateEntry[] = [];
   const alreadyCurrent: string[] = [];
   const layoutMoves: LayoutMoveEntry[] = [];
+  const clearRoots: string[] = [];
+  let settingsRoot: string | null = null;
+  let agentsTarget: { root: string; opts: AgentsMdOptions | null } | null = null;
+  const projectsToVisit: string[] = [];
 
   // 1. Nearest code-repo metadata (walk up), if any.
   const codeRepo = await findCodeRepo(start);
@@ -109,6 +176,9 @@ export async function mageMigrate(opts: MigrateOptions = {}): Promise<MigrateRes
     const path = metadataPath(codeRepo);
     const meta = await readMetadata(codeRepo); // normalizes v1 → v2 in memory
     if (meta) {
+      clearRoots.push(join(codeRepo, META_DIR));
+      settingsRoot = codeRepo;
+      agentsTarget = { root: codeRepo, opts: repoAgentsOptions(meta, codeRepo) };
       // State fold first: relocate dirs + PARSE any leftover `.redactignore` into the
       // in-memory metadata, so the single schema-stamping write below also persists the
       // merged `redact` field (one write, never a stale schema). The source file is
@@ -145,6 +215,12 @@ export async function mageMigrate(opts: MigrateOptions = {}): Promise<MigrateRes
       // file is parsed-but-not-deleted and removed only AFTER the hub write resolves —
       // this bounds loss to zero across all N projects even if the hub write fails.
       const roots = await ownedDocsRoots({ root: start, kind: "hub", repo: start });
+      clearRoots.push(...roots);
+      settingsRoot ??= start;
+      agentsTarget ??= { root: start, opts: { kind: "hub", docsRel: "." } };
+      // Commandeer lives in each linked code repo's settings.local.json, which this
+      // run cannot reach (#212): name each project so the operator runs it there.
+      projectsToVisit.push(...hub.projects.map((p) => p.name).filter(Boolean));
       const folds: ParsedRedactIgnore[] = [];
       let folded: RedactConfig | undefined;
       for (const root of roots) {
@@ -178,7 +254,118 @@ export async function mageMigrate(opts: MigrateOptions = {}): Promise<MigrateRes
   if (migrated.length === 0 && alreadyCurrent.length === 0 && layoutMoves.length === 0) {
     throw new Error(`No mage knowledge base found at or above ${start}. Nothing to migrate.`);
   }
-  return { migrated, alreadyCurrent, layoutMoves };
+
+  // 3. 0.0.x clearing (#207). Never throws past this point.
+  const cleared: ClearedEntry[] = [];
+  const staged: MigrateResult["staged"] = [];
+  const work: MigrateResult["work"] = [];
+  for (const root of clearRoots) {
+    await clearRetiredState(root, cleared);
+    staged.push({ root, drafts: await countFiles(stagingPath(root), (n) => n.endsWith(".md")) });
+    work.push({ root, files: await countFiles(join(root, WORK_DIR), () => true, true) });
+  }
+  const hooks = settingsRoot ? await reupsertHooks(settingsRoot) : null;
+  let agentsMd: AgentsMdWriteResult | null = null;
+  if (agentsTarget?.opts) {
+    agentsMd = await writeAgentsMd(agentsTarget.root, agentsTarget.opts).catch(() => null);
+  }
+
+  return {
+    migrated,
+    alreadyCurrent,
+    layoutMoves,
+    cleared,
+    staged,
+    work,
+    hooks,
+    agentsMd,
+    projectsToVisit,
+  };
+}
+
+/**
+ * The AGENTS.md template a code repo's metadata selects, or null when a hybrid or
+ * external repo's hub path cannot be resolved (the block is then left untouched).
+ */
+function repoAgentsOptions(meta: MageMetadata, codeRepo: string): AgentsMdOptions | null {
+  if (meta.mode === "in-repo") return { kind: "repo", mode: "in-repo", docsRel: META_DIR };
+  const target = outOfRepoKbTargets(meta, codeRepo)[0]?.root;
+  const hubPath =
+    target ?? (meta.mode === "external" ? meta.hub_path : meta.hub_refs[0]?.hub_path) ?? null;
+  const project = meta.mode === "external" ? meta.project : meta.hub_refs[0]?.project;
+  if (!hubPath || !project) return null;
+  return { kind: "repo", mode: meta.mode, docsRel: META_DIR, hubPath, project };
+}
+
+/** The retired state files at one docs root and their only (now retired) writers. */
+function retiredStateFiles(root: string): { kind: ClearedEntry["kind"]; path: string }[] {
+  return [
+    // `mage promote` (#208). MEMORY.md's roster falls back to recency without it.
+    { kind: "promote-tally", path: join(metricsPath(root), PROMOTE_FILE) },
+    // `mage distill` (#208).
+    { kind: "distill-watermark", path: distillWatermarkPath(root) },
+    // The SessionStart backlog throttle, gone from the nudge since #210.
+    { kind: "nudge-throttle", path: join(metricsPath(root), "nudge-throttle.json") },
+  ];
+}
+
+async function clearRetiredState(root: string, out: ClearedEntry[]): Promise<void> {
+  for (const { kind, path } of retiredStateFiles(root)) {
+    if (!(await exists(path))) {
+      out.push({ root, kind, outcome: "absent" });
+      continue;
+    }
+    try {
+      await rm(path);
+      out.push({ root, kind, outcome: "removed" });
+    } catch {
+      out.push({ root, kind, outcome: "skipped" });
+    }
+  }
+}
+
+/** Files under `dir` whose name passes `keep`; 0 for a missing dir. Never throws. */
+async function countFiles(
+  dir: string,
+  keep: (name: string) => boolean,
+  recursive = false,
+): Promise<number> {
+  const entries = await readdir(dir, { withFileTypes: true, recursive }).catch(() => []);
+  return entries.filter((e) => e.isFile() && keep(e.name)).length;
+}
+
+/**
+ * Re-upsert mage's hook groups in `root`'s `settings.local.json` at the tier it already
+ * has: commandeer present stays present, absent stays absent, and `autoMemoryDirectory`
+ * is never touched. A KB that was never connected is left alone, since connect is the
+ * one opt-in setup act (ADR-0055). Only ever the local file, never `~/.claude`.
+ */
+async function reupsertHooks(root: string): Promise<HooksEntry> {
+  const { path } = resolveSettingsTarget({ cwd: root });
+  const read = await readClaudeSettings(path).catch(() => null);
+  if (!read || read.malformed) {
+    return { path, outcome: read?.malformed ? "malformed" : "not-connected", observeArm: "n/a" };
+  }
+  const groups = Object.values(read.settings?.hooks ?? {}).flat();
+  if (!read.settings || !groups.some((g) => isMageGroup(g))) {
+    return { path, outcome: "not-connected", observeArm: "n/a" };
+  }
+  const hadArm = (read.settings.hooks?.PreToolUse ?? []).some(
+    (g) => g.id === OBSERVE_PRETOOLUSE_ID,
+  );
+  const { settings } = upsertMageHooks(read.settings, {
+    commandeer: hasCommandeerHooks(read.settings),
+  });
+  const observeArm = hadArm ? "present" : "added";
+  if (JSON.stringify(settings) === JSON.stringify(read.settings)) {
+    return { path, outcome: "unchanged", observeArm };
+  }
+  try {
+    await writeClaudeSettings(path, settings);
+    return { path, outcome: "written", observeArm };
+  } catch {
+    return { path, outcome: "malformed", observeArm: "n/a" };
+  }
 }
 
 /** Walk up from `start` to the nearest dir holding `mage/metadata.json`. */
@@ -303,8 +490,17 @@ function dedupe(base?: string[], add?: string[]): string[] | undefined {
 export function reportMigrate(result: MigrateResult): void {
   const moved = result.layoutMoves.filter((m) => m.outcome === "moved");
   const skipped = result.layoutMoves.filter((m) => m.outcome === "skipped");
+  const removed = result.cleared.filter((c) => c.outcome === "removed");
+  const agents = result.agentsMd?.agents;
+  const changed =
+    result.migrated.length > 0 ||
+    moved.length > 0 ||
+    removed.length > 0 ||
+    result.hooks?.outcome === "written" ||
+    agents === "created" ||
+    agents === "written";
 
-  if (result.migrated.length === 0 && moved.length === 0) {
+  if (!changed) {
     logger.success(`Already current (${METADATA_SCHEMA}, ${STATE_DIR_NOTE}); nothing to migrate.`);
   } else {
     for (const m of result.migrated) {
@@ -312,6 +508,9 @@ export function reportMigrate(result: MigrateResult): void {
     }
     for (const m of moved) {
       logger.success(`Moved ${m.kind} under .mage/ at ${m.root}`);
+    }
+    for (const c of removed) {
+      logger.success(`Removed ${c.kind} at ${c.root} (its writer retired in #208)`);
     }
     for (const p of result.alreadyCurrent) {
       logger.detail(`Already current: ${p}`);
@@ -323,12 +522,50 @@ export function reportMigrate(result: MigrateResult): void {
       `Skipped ${s.kind} at ${s.root} (target exists or fs error — old artifact left in place)`,
     );
   }
+  for (const c of result.cleared.filter((e) => e.outcome === "skipped")) {
+    logger.detail(`Skipped ${c.kind} at ${c.root} (fs error — left in place)`);
+  }
+  for (const { root, drafts } of result.staged.filter((e) => e.drafts > 0)) {
+    logger.info(`staging: ${drafts} draft(s) pending at ${root} — run \`mage groom\``);
+  }
+  for (const { root, files } of result.work.filter((e) => e.files > 0)) {
+    logger.warn(
+      `work/ is retired (ADR-0050): ${files} file(s) left in place at ${root}; links in notes and decisions are not rewritten`,
+    );
+  }
 
-  if (result.migrated.length > 0 || moved.length > 0) {
+  const h = result.hooks;
+  if (h?.outcome === "not-connected") {
+    logger.detail("hooks: not connected here — run `mage connect`");
+  } else if (h?.outcome === "malformed") {
+    logger.warn(`hooks: ${h.path} is not valid JSON — left as is`);
+  } else if (h) {
+    logger.detail(`hooks: ${h.outcome} (${h.path}); observe arm: ${h.observeArm}`);
+  }
+
+  if (result.agentsMd) {
+    const kept = keptWarning(result.agentsMd);
+    if (kept) {
+      logger.warn(kept);
+      logger.detail(
+        "  mage migrate never overwrites it. To take the current block, move any text of your own below <!-- END mage -->, delete the block, and run mage migrate again.",
+      );
+    } else {
+      logger.detail(`AGENTS.md: ${result.agentsMd.agents}`);
+    }
+  } else {
+    logger.warn("AGENTS.md left as is: hub path unknown — run `mage link`");
+  }
+
+  for (const name of result.projectsToVisit) {
+    logger.detail(`run \`mage migrate\` in the code repo for ${name}`);
+  }
+
+  if (changed) {
     logger.blank();
     logger.info("Review the diff and commit yourself (mage never commits):");
     logger.detail(
-      '  git add metadata.json mage/metadata.json 2>/dev/null; git commit -m "chore: migrate mage state to .mage/ + metadata.redact"',
+      '  git add AGENTS.md CLAUDE.md metadata.json mage/metadata.json 2>/dev/null; git commit -m "chore: migrate mage state"',
     );
   }
 }
