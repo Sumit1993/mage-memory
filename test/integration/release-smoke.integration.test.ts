@@ -8,6 +8,7 @@ import { mkdir, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { REPO_ROOT, assertBuilt, initKb, runMage, runMageStdin } from "./lib/harness.js";
+import { RETIRED_VERB_MESSAGES } from "../../src/commands/retired.js";
 
 /** No JS stack trace / thrown-error noise leaked into CLI output. */
 function clean(s: string): boolean {
@@ -38,11 +39,13 @@ describe("integration: release smoke (deterministic)", () => {
     expect(skills).toEqual(["graduate", "groom", "guide", "learn", "optimize"]);
   });
 
-  it("distill --json emits valid JSON on a fresh KB", async () => {
+  it("distill --json prints the retired message and exits 0", async () => {
     const { dir } = await initKb();
     const { stdout, code } = await runMage(["distill", "--json"], { cwd: dir });
     expect(code).toBe(0);
-    expect(() => JSON.parse(stdout)).not.toThrow();
+    expect(stdout.trim()).toBe(
+      RETIRED_VERB_MESSAGES.distill,
+    );
   });
 
   it("the Gate-0 hook command fails OPEN on malformed stdin (never crashes the host)", async () => {

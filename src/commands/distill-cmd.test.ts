@@ -13,6 +13,8 @@ import type { ObserveEvent } from "../observe/types.js";
 import type { DistillManifest } from "../distill/types.js";
 import { readWatermark, writeWatermark, DISTILL_VERSION } from "../distill/watermark.js";
 import { distillCmd } from "./distill-cmd.js";
+import { buildProgram } from "../cli-program.js";
+import { RETIRED_VERB_MESSAGES } from "./retired.js";
 
 // ─── tmp fixture plumbing ─────────────────────────────────────────────────────
 
@@ -175,5 +177,23 @@ describe("distillCmd — --seen disposition (the only write path)", () => {
   it("rejects a trailing-colon (empty offset)", async () => {
     const { repo } = await tmpRepo();
     await expect(distillCmd({ dir: repo, seen: `${SESSION}:` })).rejects.toThrow(/expected "<session>:<offset>"/);
+  });
+});
+
+describe("mage distill signpost", () => {
+  it("prints that distill has retired and exits 0", async () => {
+    const program = buildProgram();
+    program.exitOverride();
+    const lines: string[] = [];
+    const origLog = console.log;
+    console.log = (...msgs: unknown[]) => {
+      lines.push(msgs.map((m) => String(m)).join(" "));
+    };
+    try {
+      await program.parseAsync(["distill"], { from: "user" });
+      expect(lines.join("\n")).toBe(RETIRED_VERB_MESSAGES.distill);
+    } finally {
+      console.log = origLog;
+    }
   });
 });

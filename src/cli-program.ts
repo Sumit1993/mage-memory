@@ -2,13 +2,10 @@ import { Command, Option } from "commander";
 import { adopt } from "./commands/adopt.js";
 import { autonomy } from "./commands/autonomy.js";
 import { connect } from "./commands/connect.js";
-import { dashboard } from "./commands/dashboard-cmd.js";
 import { OPEN_WITH_TARGETS } from "./dashboard/html.js";
 import { disconnect } from "./commands/disconnect.js";
-import { distillCmd } from "./commands/distill-cmd.js";
 import { doctor, readinessFooter } from "./commands/doctor.js";
 import { flattenCmd } from "./commands/flatten.js";
-import { footprint } from "./commands/footprint.js";
 import { dream } from "./commands/dream-cmd.js";
 import { groomCmd } from "./commands/groom-cmd.js";
 import { index } from "./commands/index-cmd.js";
@@ -20,10 +17,9 @@ import { mageMigrate, reportMigrate } from "./commands/migrate.js";
 import { buildMemoryHookCommand } from "./adapters/claude-code/memory-hook.js";
 import { buildNudgeCommand } from "./adapters/claude-code/nudge.js";
 import { buildObserveCommand } from "./commands/observe.js";
-import { promoteCmd } from "./commands/promote-cmd.js";
 import { redactCmd } from "./commands/redact.js";
+import { printRetiredVerb } from "./commands/retired.js";
 import { skills } from "./commands/skills-cmd.js";
-import { stageCmd } from "./commands/stage-cmd.js";
 import { status } from "./commands/status.js";
 import { unlink } from "./commands/unlink.js";
 import { verify } from "./commands/verify.js";
@@ -145,7 +141,7 @@ export function buildProgram(): Command {
   program
     .command("skills")
     .description(
-      "(Re)generate one auto-loaded skill per wing into .claude/skills/ and .agents/skills/",
+      "Retired signpost; `--metrics` still folds the context-match rollup until `mage ledger` (#237)",
     )
     .option(
       "-d, --dir <path>",
@@ -161,22 +157,21 @@ export function buildProgram(): Command {
       "metrics mode: fold + write the rollup silently (the Stop-hook path)",
     )
     .action(async (opts) => {
-      await skills({
-        dir: opts.dir,
-        metrics: opts.metrics,
-        json: opts.json,
-        quiet: opts.quiet,
-      });
+      if (opts.metrics) {
+        await skills({ dir: opts.dir, metrics: true, json: opts.json, quiet: opts.quiet });
+        return;
+      }
+      printRetiredVerb("skills", !!opts.quiet);
     });
 
   // ─── footprint ─────────────────────────────────────────────────────────────
   program
     .command("footprint")
-    .description("report mage's context-window cost: launch surfaces, yield, pointer leverage")
+    .description("Retired signpost: use `mage doctor` instead")
     .option("--json", "emit the measurement as JSON instead of the table")
     .option("--quiet", "render nothing but still return the result")
     .action(async (opts) => {
-      await footprint({ json: opts.json, quiet: opts.quiet });
+      printRetiredVerb("footprint", !!opts.quiet);
     });
 
 
@@ -231,9 +226,7 @@ export function buildProgram(): Command {
   // ─── distill ─────────────────────────────────────────────────────────────────
   program
     .command("distill", { hidden: true })
-    .description(
-      "Read observed .mage/learnings into note candidates (plumbing behind mage:groom Phase 1)",
-    )
+    .description("Retired signpost: use `mage groom` instead")
     .option(
       "-d, --dir <path>",
       "where to look for the knowledge base (default: cwd; walks up for in-repo)",
@@ -243,16 +236,14 @@ export function buildProgram(): Command {
       "--seen <session:offset>",
       "advance the distill watermark after a batch is dispositioned",
     )
-    .action(async (opts: { dir?: string; json?: boolean; seen?: string }) => {
-      await distillCmd({ dir: opts.dir, json: opts.json, seen: opts.seen });
+    .action(async () => {
+      printRetiredVerb("distill", false);
     });
 
   // ─── promote ─────────────────────────────────────────────────────────────────
   program
     .command("promote", { hidden: true })
-    .description(
-      "Fold note-read usage into graduate proposals (plumbing behind mage:graduate)",
-    )
+    .description("Retired signpost: use `mage groom` instead")
     .option(
       "-d, --dir <path>",
       "where to look for the knowledge base (default: cwd; walks up for in-repo)",
@@ -262,16 +253,24 @@ export function buildProgram(): Command {
       "--seen <session:offset>",
       "advance the promote offset after a batch is dispositioned",
     )
-    .action(async (opts: { dir?: string; json?: boolean; seen?: string }) => {
-      await promoteCmd({ dir: opts.dir, json: opts.json, seen: opts.seen });
+    .action(async () => {
+      printRetiredVerb("promote", false);
+    });
+
+  // ─── graduate ────────────────────────────────────────────────────────────────
+  program
+    .command("graduate", { hidden: true })
+    .description("Retired signpost: use `mage groom` instead")
+    .argument("[args...]")
+    .allowUnknownOption()
+    .action(async () => {
+      printRetiredVerb("graduate", false);
     });
 
   // ─── stage ─────────────────────────────────────────────────────────────────────
   program
     .command("stage", { hidden: true })
-    .description(
-      "Stage a short lesson draft into .mage/staging/ (frictionless inline capture — the organic grooming loop)",
-    )
+    .description("Retired signpost: use `mage observe` instead")
     .option(
       "-d, --dir <path>",
       "where to look for the knowledge base (default: cwd; walks up for in-repo)",
@@ -288,19 +287,9 @@ export function buildProgram(): Command {
     )
     .option("--body <text>", "lesson body (else read from stdin)")
     .option("--json", "emit the result as JSON")
-    .action(
-      async (opts: {
-        dir?: string;
-        title?: string;
-        type?: string;
-        tags?: string;
-        wing?: string;
-        body?: string;
-        json?: boolean;
-      }) => {
-        await stageCmd(opts);
-      },
-    );
+    .action(async () => {
+      printRetiredVerb("stage", false);
+    });
 
   // ─── groom ───────────────────────────────────────────────────────────────────────
   program
@@ -565,9 +554,7 @@ export function buildProgram(): Command {
   // ─── dashboard ──────────────────────────────────────────────────────────────
   program
     .command("dashboard")
-    .description(
-      "Generate this KB's dashboard (Dashboard.md + Knowledge.base; --html adds the interactive cockpit)",
-    )
+    .description("Retired signpost: use `mage index` instead")
     .option("--html", "also generate the self-contained dashboard.html cockpit")
     .option("--hub <path>", "hub root")
     .option("--open", "print the command to open the html")
@@ -579,13 +566,8 @@ export function buildProgram(): Command {
         .choices([...OPEN_WITH_TARGETS])
         .default("file"),
     )
-    .action(async (opts) => {
-      await dashboard({
-        hub: opts.hub,
-        html: opts.html,
-        open: opts.open,
-        openWith: opts.openWith,
-      });
+    .action(async () => {
+      printRetiredVerb("dashboard", false);
     });
 
   // ─── connect ──────────────────────────────────────────────────────────────

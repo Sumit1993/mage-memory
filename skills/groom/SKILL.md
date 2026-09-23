@@ -1,11 +1,10 @@
 ---
 name: groom
 description: |
-  Groom mage's own observed scratch (`.mage/learnings/*.jsonl`) into durable notes —
-  the judgment tier of the self-grooming loop. Runs the two deterministic engines
-  in sequence: `mage distill` (FIRST SIGHT — a striking insight earns a note the
-  first time it is seen) then `mage promote` (GRADUATION — fold note-read usage
-  into proposals for proven notes to become auto-loadable skills).
+  Dispose of the staged draft batch (`mage groom`): keep, edit or drop each
+  draft the capture inbox lifted into `.mage/staging/`. The two mining readers
+  it used to run after that, `mage distill` and `mage promote`, retired in #208
+  and have no replacement until the proposal digest (#219).
   Fires at session boundaries, after a PreCompact, or when the user says
   "groom", "distill", "promote", "mine the learnings", or "what did we learn".
   Judges candidates through the shared capture pipeline, routes proven notes to
@@ -21,21 +20,16 @@ durable notes.** It is the back half of the loop `/mage:learn` serves, fired onc
 a stretch of work has closed: `learn` captures *this one finding now*; `groom`
 mines *the accumulated record*.
 
-groom is the **judgment tier** over two deterministic engine readers — **no
-model lives in mage** (ADR-0009). The engines count and cluster; you decide what
-is note-worthy. They run in sequence, catching durable knowledge through two
-complementary gates:
-
-- **Phase 1 — first sight (`mage distill`)** — a single vivid finding earns a
-  note the *first* time it is seen.
-- **Phase 2 — graduation routing (`mage promote`)** — a note already proven by
-  recurrence is routed to `/mage:graduate`. It does **not** propose new notes
-  (ADR-0038); Phase 1 and `/mage:learn` are the only paths into the note base.
+groom is a **judgment tier** — **no model lives in mage** (ADR-0050). Today it has
+one working phase, Phase 0 below. Phases 1 and 2 retired in #208 (see the
+section after Step 0).
 
 **Phase 0 — pending inline drafts (`mage groom`, 0.0.12).** Before the two mining
-phases, dispose of lessons captured INLINE during work. `mage stage` parks short,
-redacted drafts in `.mage/staging/` with no per-note confirm (and the boundary nudge
-distills forgotten ones there too); your job is the batch human-confirm:
+phases, dispose of lessons captured INLINE during work. Drafts reach
+`.mage/staging/` when `mage groom` lifts the Claude Code capture inbox (flat notes
+at the docs root) into it. `mage stage` retired in #208, and its replacement, a
+`finding` event on `mage observe`, is not built yet (ADR-0052). Your job is the
+batch human-confirm:
 
 - `mage groom --json` surfaces the pending, deduped batch (capped at the staging
   budget; the rest defer). For each draft, keep / edit / drop it.
@@ -43,10 +37,8 @@ distills forgotten ones there too); your job is the batch human-confirm:
   re-indexes; `mage groom --reject <slugs|all>` discards them and records the
   rejection so the same lesson is never re-drafted.
 
-These drafts are the freshest, highest-signal material (the agent chose to stage
-them) — clear them first, THEN run the mining phases below for what inline capture
-missed. (`mage groom` the COMMAND manages `.mage/staging/`; the two phases below are the
-deeper `.mage/learnings/` mining that the `/mage:groom` SKILL also runs.)
+These drafts are the freshest, highest-signal material. Clear them; that is the
+whole run until #219 lands.
 
 Notes are the reusable **insight + procedure + pointers**, never a copy of the
 source (see `CONVENTIONS.md`). groom mines **only mage's own** `.mage/learnings/` —
@@ -81,18 +73,16 @@ The floor never moves, at either level:
 `autonomy: approver|overseer` (the reject-ledger's authorship mark, ADR-0030) plus
 `repo` + `commit`. It appears in the diff you review and commit; you write none of it.
 
-**Approver** — groom the backlog and write the **clearly-durable** notes straight
-into the working tree (run Phase 1 / Phase 2 below, but write the keepers without
-the per-note prompt); leave anything **borderline** staged in `.mage/staging/` for
+**Approver** — dispose the staged batch and write the **clearly-durable** drafts
+straight into the working tree without the per-note prompt; leave anything **borderline** staged in `.mage/staging/` for
 a later human pass; run `mage index`. Do **not** graduate.
 
-**Overseer** — everything Approver does, **plus** dispose the borderline tier (write or `--reject` it rather than leaving it staged), fold lessons that share a question with an existing note into that note (one-question test, verdict stated in the batch), and **graduate** eligible notes — route every `action: "graduate"` proposal through **`/mage:graduate`** as always (recurrence-gated ≥ M, commit-gated). Never graduate inline here; the routing is unchanged, only the per-note pause is waived.
+**Overseer** — everything Approver does, **plus** dispose the borderline tier (write or `--reject` it rather than leaving it staged), fold lessons that share a question with an existing note into that note (one-question test, verdict stated in the batch). Graduation has no input while `mage promote` is retired (#208), so there is nothing to route to `/mage:graduate`.
 
-Watermarks still advance only after the batch is dispositioned (Step 4 / Step 8) —
-in autonomous mode "dispositioned" means written/merged/rejected into the working
-tree, not a per-note yes.
+In autonomous mode "dispositioned" means written, merged or rejected into the
+working tree, not a per-note yes.
 
-## Step 0 — Resolve the roots to groom (once, for both phases)
+## Step 0 — Resolve the roots to groom
 
 Find the nearest `mage/metadata.json` (walk up). The docs root to groom is:
 
@@ -112,114 +102,20 @@ project KBs, so groom the hub's OWN `.mage/learnings/` (at the hub root) **and e
 registered hub-owned project** (`<hub>/projects/<name>/`). Repo-owned projects keep
 their notes in their own repo checkouts and are groomed there.
 
-Then run **both phases below once per root**, passing `--dir <root>` to each engine
-command. Each root keeps its **own** watermark + tally, so `--seen` stays
-unambiguous and projects never conflate — this is why the fan-out is a per-root
-loop, not one mixed manifest. If the user scopes the run to the hub only (e.g. "groom root-only"),
+Then run **Phase 0 once per root**, passing `--dir <root>`. Each root keeps its
+own staging batch, so projects never conflate. If the user scopes the run to the hub only (e.g. "groom root-only"),
 groom just the hub root and skip the fan-out.
 
 ---
 
-## Phase 1 — first sight (`mage distill`)
+## Phases 1 and 2 — retired (#208)
 
-1. **Run the deterministic reader.**
-   ```bash
-   mage distill --json
-   ```
-   It reads mage's own `.mage/learnings/*.jsonl` from the **last watermark forward**,
-   chops un-distilled events at `compact`/session boundaries (the natural
-   "chapters"), keeps only salient events, and emits a `DistillManifest`:
-   ```jsonc
-   {
-     "clusters": [ /* candidate clusters, each with salient signals */ ],
-     "cursors":  { "<session>": <offset>, … },  // advance these in step 3
-     "capped":   false                          // true ⇒ output was capped
-   }
-   ```
-   Only **closed** segments are offered (up to the last `compact`/`session_end`);
-   the in-flight session is never half-distilled. If `clusters` is empty, there is
-   nothing new on first sight — move to Phase 2. A failed read fails open to empty.
-
-2. **Judge each cluster through the four lenses — *led by user corrections*.**
-   For every cluster, weigh these in order (the reader flags the signals; you
-   reason over them):
-
-   | Lens | What it looks like in the cluster | mage note-type |
-   |---|---|---|
-   | **① User corrections & nudges** *(first-class — look here first)* | a `user_prompt` right after an agent action: "no, do it this way", "actually I meant…", a steer or a standing rule | `principle` / `gotcha` |
-   | **② Error → fix** | a `tool_use` with `ok:false` followed by the fix that worked | `gotcha` |
-   | **③ Repeated workflow** | the same tool sequence run several times | `procedure` |
-   | **④ Tool / approach preference** | a consistent tool or approach choice | `procedure` / `principle` |
-
-   **Direct human feedback is the highest-signal durable knowledge** — a user
-   correction is a standing intent the agent should never relearn, so it outranks
-   a one-off stack trace. You may **split** a cluster holding two unrelated
-   insights or **merge** clusters that are really one; the reader's chunking is
-   mechanical scaffolding, not a verdict. Drop routine clusters with no lesson.
-   Capture **on first sight** — there is no later recurrence pass to catch a miss
-   (ADR-0038 deleted it), so a lesson skipped here is a lesson lost.
-
-3. **For each kept insight, run the SHARED CAPTURE PIPELINE** (the same back half
-   `/mage:learn` defines — see that skill's **Steps**; do not re-derive it):
-   classify (`type` + wing + room → `#<wing>/<room>`), one-question test vs INDEX.md (MERGE / SUPERSEDE / NEW — emit the verdict block per draft; dedup within the batch: two drafts answering one question are one note), **redaction Gate 2**
-   (`mage redact <draft-file>` — a LIVE secret, non-zero exit, STOPS that one
-   note; strip with `mage redact --strip` or remove by hand), show the human, and
-   write under `mage/notes/` only after a yes.
-
-4. **Advance the Phase-1 watermark — only after the human dispositions the batch.**
-   ```bash
-   mage distill --seen <session>:<offset>   # one per session, from manifest.cursors
-   ```
-   This moves mage's per-session bookmark **past everything the human just
-   reviewed** — kept notes *and* skipped clusters (advancing past a skip is
-   distill's negative memory). The reader is a pure read; **`--seen` is the only
-   thing that moves the bookmark.** An interrupted run that never reaches this step
-   does no harm: a re-run safely re-offers, and the one-question test dedupes. If
-   `manifest.capped` is `true`, tell the user the output was capped and that
-   re-running continues from the new watermark to drain the rest.
-
----
-
-## Phase 2 — route proven notes to graduation (`mage promote`)
-
-Phase 1 captures first sight. **Phase 2 is no longer a catch-net.**
-
-[ADR-0057](../../mage/decisions/0057-a-guard-lands-by-pull-request.md)
-deleted the note-proposal rung: recurrence no longer proposes NEW notes. Proposing
-a note from a keyword fold is the deterministic-selection pattern two pre-registered
-replay gates killed (Faultline 0/62, prose-keyed 0/55), and the field evidence agreed
-— a groom across four roots produced ~115 buckets and 0 durable proposals. **If a
-lesson is worth keeping, capture it in Phase 1 or inline with `/mage:learn`.** Do not
-go looking for missed lessons in recurrence counts; there is nothing there.
-
-5. **Run the deterministic reader.**
-   ```bash
-   mage promote --json
-   ```
-   It folds every CLOSED `.mage/learnings/` segment from the last watermark forward,
-   persists the tally, and emits a `PromoteManifest`:
-   ```jsonc
-   {
-     "proposals": [
-       { "action": "graduate", "target": "notes/<file>.md", "payload": {…}, "evidence": "…" }
-     ],
-     "cursors": { "<session>": <offset>, … },
-     "covered": <n>                            // recurring signatures covered by notes (info)
-   }
-   ```
-   **Every proposal is `action: "graduate"`.** An empty `proposals` list is the
-   normal, healthy result — and it does **not** mean "nothing recurred". A covered
-   signature yields no proposal when it is below M, when its covering note is not
-   procedural (only procedure/gotcha graduate; legacy: playbook), or when the human already rejected it.
-   Report it neutrally and stop; it is never a signal to go hunting.
-
-6. **Route graduations to `/mage:graduate`.** Point at that skill — never graduate
-   here, and never re-implement its confirmation flow.
-
-7. **Do not disposition anything else.** There are no `note` candidates to judge,
-   no `merge` fallback to construct from a fold, and no `--seen` batch to advance
-   (`--seen` existed to mark a note-candidate batch reviewed). Recurrence is
-   plumbing that feeds graduation, not a queue for the human to grind down.
+Phase 1 ran `mage distill --json`, a first-sight reader over `.mage/learnings/`.
+Phase 2 ran `mage promote --json`, a graduation reader over note-read counts.
+Both verbs now print a signpost and exit 0, so neither phase has input. Skip them.
+Do not substitute `mage groom --json`: it returns the staged batch, not a
+first-sight or graduation manifest. Their work returns as the proposal digest in
+`mage groom` (#219).
 
 ---
 
@@ -233,22 +129,17 @@ mage never commits for you — it suggests, you run.
 
 ## Quality bar
 
-- Phase 1 leads with **user corrections** and standing intent, not error-fix volume.
-- Phase 2 drafts nothing. An empty `proposals` list is the healthy result — never
-  treat it as a prompt to mine recurrence for missed lessons (ADR-0038).
-- Every **Phase 1** draft passes the same capture pipeline as `/mage:learn` — classify,
-  one-question test, **Gate 2**, human confirm. (Phase 2 drafts nothing, so it never enters
-  that pipeline; it routes to `/mage:graduate`.) Captures *insight + procedure +
+- Every kept draft passes the same capture pipeline as `/mage:learn` — classify,
+  one-question test, **Gate 2**, human confirm. Captures *insight + procedure +
   pointers*; points to canonical sources, never mirrors them.
-- Routes `graduate` proposals to `/mage:graduate`; never graduates here.
-- Watermarks advance **only** on explicit disposition; re-runs are safe.
+- A draft is accepted or rejected only on explicit disposition; re-runs are safe.
 
 ## See also
 
 - **/mage:learn** (`skills/learn/SKILL.md`) — the shared capture pipeline
-  (classify → one-question test → Gate 2 → confirm → write) both phases funnel into.
-- **/mage:graduate** (`skills/graduate/SKILL.md`) — where Phase 2 hands
-  `action: "graduate"` proposals (note → Procedure skill).
+  (classify → one-question test → Gate 2 → confirm → write) Phase 0 funnels into.
+- **/mage:graduate** (`skills/graduate/SKILL.md`) — where Phase 2 handed
+  `action: "graduate"` proposals, before #208 retired it.
 - **ADR-0052** (`mage/decisions/0052-streams-and-the-observe-schema.md`) —
   distill as deterministic reader + judgment skill; first-sight capture; CLOSED-only
   watermark; mage reads only its own artifacts; and the `.mage/learnings/*.jsonl`
