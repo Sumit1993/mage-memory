@@ -116,6 +116,14 @@ describe("mergeCcSource", () => {
     const existing = [{ issue: "a#1" }, { issue: "a#1" }];
     expect(mergeCcSource(existing, undefined)).toEqual([{ issue: "a#1" }]);
   });
+  it("dedupes object entries whose keys arrive in a different order", () => {
+    const existing = [{ issue: "a#1", note: { x: 1, y: 2 } }, { note: { y: 2, x: 1 }, issue: "a#1" }];
+    expect(mergeCcSource(existing, undefined)).toEqual([{ issue: "a#1", note: { x: 1, y: 2 } }]);
+  });
+  it("keeps a string that reads like an object's JSON apart from the object", () => {
+    const existing = ['{"issue":"a#1"}', { issue: "a#1" }];
+    expect(mergeCcSource(existing, undefined)).toEqual(existing);
+  });
   it("drops null and undefined entries", () => {
     expect(mergeCcSource(["url:x", null, undefined, "url:y"], undefined)).toEqual([
       "url:x",

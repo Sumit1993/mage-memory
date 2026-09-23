@@ -154,15 +154,27 @@ export function captureKey(sessionId: string, slug: string): string {
   return `${sessionId}::${slug}`;
 }
 
+/** JSON with object keys sorted at every depth, so `{a, b}` and `{b, a}` dedupe as one. */
+function canonicalJson(v: unknown): string {
+  if (Array.isArray(v)) return `[${v.map(canonicalJson).join(",")}]`;
+  if (typeof v === "object" && v !== null) {
+    const o = v as Record<string, unknown>;
+    return `{${Object.keys(o)
+      .sort()
+      .map((k) => `${JSON.stringify(k)}:${canonicalJson(o[k])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(v) ?? "null";
+}
+
 /**
  * Merge an existing `sources` array with a `cc-session:<id>` pointer, de-duped,
- * order-stable. A `sources` entry mage does not recognise (an object form, e.g.
- * `{ issue: "org/repo#1" }`) is carried through unchanged, in its original position —
- * this runs unattended in a Stop hook and in pre-commit, so dropping what it does not
- * understand is worse than passing it through untouched (#199). Only `null`/`undefined`
- * are dropped, since they carry nothing. Non-string entries dedupe on a stable
- * serialisation rather than object identity, so two structurally identical entries fold
- * to one.
+ * order-stable. A non-empty string and a non-array object (e.g. `{ issue: "org/repo#1" }`)
+ * are kept, in their original position: this runs unattended in a Stop hook and in
+ * pre-commit, so dropping an object form mage does not recognise is worse than passing it
+ * through (#199). Anything else (null, an empty string, a number, a boolean, an array)
+ * carries no pointer and is dropped. Objects dedupe on key-sorted JSON, so two
+ * structurally identical entries fold to one whatever their key order.
  */
 export function mergeCcSource(
   existing: unknown,
@@ -175,13 +187,13 @@ export function mergeCcSource(
     // else — null, undefined, an empty string, a bare number — carries no pointer, and
     // the pre-#199 code dropped it too.
     if (typeof s === "string") {
-      if (s.length === 0 || seen.has(s)) return;
-      seen.add(s);
+      if (s.length === 0 || seen.has(`s:${s}`)) return;
+      seen.add(`s:${s}`);
       out.push(s);
       return;
     }
     if (typeof s !== "object" || s === null || Array.isArray(s)) return;
-    const key = JSON.stringify(s);
+    const key = `o:${canonicalJson(s)}`;
     if (seen.has(key)) return;
     seen.add(key);
     out.push(s as Record<string, unknown>);
