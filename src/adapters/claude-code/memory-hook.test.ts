@@ -4,6 +4,7 @@ import { tmpDir, withKb } from "../../../test/fixtures/kb.js";
 import {
   type MemoryDecision,
   buildMemoryHookCommand,
+  ADMISSION_DENY_REASON,
   emitPostToolUseContext,
   emitPreToolUse,
   memoryPostToolUse,
@@ -241,26 +242,31 @@ describe("memoryPreToolUse", () => {
     }
   });
 
-  it("denies the same target once within a session, then passes", async () => {
+  it("denies every invalid attempt, not only the first one in a session", async () => {
     const kb = await withKb();
-    const target = join(kb.root, "notes", "repeated.md");
     const payload = {
-      ...preWrite(kb.dir, target, NOTE_MISSING_RUNG),
+      ...preWrite(kb.dir, join(kb.root, "notes", "repeated.md"), NOTE_MISSING_RUNG),
       session_id: "test-session-1",
     };
+    expect((await memoryPreToolUse(payload)).kind).toBe("deny");
+    // A second pass would hand the unchanged write back to the host (ADR-0051).
+    expect((await memoryPreToolUse(payload)).kind).toBe("deny");
+  });
 
-    const first = await memoryPreToolUse(payload);
-    expect(first.kind).toBe("deny");
+  it("denies a notes/ write whose frontmatter is malformed YAML", async () => {
+    const kb = await withKb();
+    const broken = "---\nrung: note\nskipped: [oops\n---\n# Broken\n";
+    const d = await memoryPreToolUse(preWrite(kb.dir, join(kb.root, "notes", "broken.md"), broken));
+    expect(d).toEqual({ kind: "deny", reason: ADMISSION_DENY_REASON });
+  });
 
-    const second = await memoryPreToolUse(payload);
-    expect(second.kind).toBe("pass");
-
-    // In a different session, it denies again
-    const differentSession = await memoryPreToolUse({
-      ...preWrite(kb.dir, target, NOTE_MISSING_RUNG),
-      session_id: "test-session-2",
-    });
-    expect(differentSession.kind).toBe("deny");
+  it("scrubs a secret out of an admitted note before it reaches disk", async () => {
+    const kb = await withKb();
+    const leaky = `${VALID_ADMISSION_NOTE}\ntoken AKIA1234567890ABCD56 leaked here\n`;
+    const d = await memoryPreToolUse(preWrite(kb.dir, join(kb.root, "notes", "leaky.md"), leaky));
+    if (d.kind !== "rewrite") throw new Error(`expected rewrite, got ${d.kind}`);
+    expect(d.updatedInput.content as string).not.toContain("AKIA1234567890ABCD56");
+    expect(d.slug).toBe("notes/leaky");
   });
 
   it("never emits an explicit allow when admitting a valid note", async () => {

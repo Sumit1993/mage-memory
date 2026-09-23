@@ -19,18 +19,18 @@
 // one irreplaceable job is the secret scrub: it MUST happen before bytes hit disk,
 // and nothing downstream can do it after the fact.
 //
-// FAIL-OPEN, never DENY-on-error: any stdin/parse/fs/redact failure emits nothing
-// and exits 0 — a capture hook that crashed or blocked would break the agent's
+// FAIL-OPEN, never DENY-on-error, except under notes/: there a failure denies
+// (ADR-0051). Elsewhere any stdin/parse/fs/redact failure emits nothing and exits 0 — a capture hook that crashed or blocked would break the agent's
 // writes. We emit JSON ONLY to deny a generated index or to rewrite a topic note;
 // an unrelated write emits nothing, preserving the host's normal permission flow
 // (an explicit `allow` there would bypass the user's own permission prompts).
 // Mirrors the observe.ts / nudge.ts fail-open contract.
 
-import { appendFile, mkdir, readFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { Command } from "commander";
 import { parseNote } from "../../note.js";
-import { isUnder, NOTES_DIR, resolveDocsRoot, stateDir } from "../../paths.js";
+import { isUnder, NOTES_DIR, resolveDocsRoot } from "../../paths.js";
 import { redact } from "../../redact.js";
 import { isGeneratedArtifact } from "../../scan.js";
 import { checkAdmission } from "../../scanner/admission.js";
@@ -55,54 +55,6 @@ const ADMISSION_CHECKED_FIELDS = new Set<string>([
   "trigger",
   "pointer",
 ]);
-
-const DENIALS_FILE = "denials.jsonl";
-
-function denialsPath(docsRoot: string): string {
-  return join(stateDir(docsRoot), DENIALS_FILE);
-}
-
-async function hasBeenDenied(
-  docsRoot: string,
-  target: string,
-  sessionId: string,
-): Promise<boolean> {
-  try {
-    const raw = await readFile(denialsPath(docsRoot), "utf8");
-    for (const line of raw.split(/\r?\n/)) {
-      if (!line.trim()) continue;
-      try {
-        const entry = JSON.parse(line) as { target?: unknown; session?: unknown };
-        if (entry.target === target && entry.session === sessionId) {
-          return true;
-        }
-      } catch {
-        // fail-open on malformed line
-      }
-    }
-  } catch {
-    return false;
-  }
-  return false;
-}
-
-async function recordDenial(
-  docsRoot: string,
-  target: string,
-  sessionId: string,
-): Promise<void> {
-  try {
-    const dir = stateDir(docsRoot);
-    await mkdir(dir, { recursive: true });
-    await appendFile(
-      denialsPath(docsRoot),
-      `${JSON.stringify({ target, session: sessionId, at: new Date().toISOString() })}\n`,
-      "utf8",
-    );
-  } catch {
-    // fail-open: recording failure must never break the hook
-  }
-}
 
 /**
  * Determine if a target path is under the notes folder (`<docsRoot>/notes/...`).
@@ -196,43 +148,16 @@ export async function memoryPreToolUse(
   const resolved = await resolveDocsRoot(cwd).catch(() => null);
   if (!resolved) return PASS;
 
-  // A write or edit targeting a file under the notes folder must carry the
-  // admission fields (rung, skipped, trigger, pointer). Otherwise it denies once
-  // per session with the fixed admission reply.
+  // A write or edit under the notes folder must carry the admission fields (rung,
+  // skipped, trigger, pointer), every attempt. Any failure here denies: a ladder gate
+  // that fails open on notes/ is what ADR-0051 forbids.
   const notesTarget = notesRel(resolved.root, filePath, cwd);
   if (notesTarget !== null) {
-    const sessionId = str(payload.session_id) ?? str(payload.sessionId) ?? "unknown";
-
-    if (await hasBeenDenied(resolved.root, notesTarget.relTarget, sessionId)) {
-      return PASS;
-    }
-
-    let content = "";
-    if (toolName === "Write") {
-      content = str(input.content) ?? "";
-    } else {
-      try {
-        const existing = await readFile(notesTarget.absTarget, "utf8");
-        const oldStr = str(input.old_string);
-        const newStr = str(input.new_string) ?? "";
-        content = oldStr !== undefined ? existing.replace(oldStr, newStr) : existing;
-      } catch {
-        content = str(input.new_string) ?? str(input.content) ?? "";
-      }
-    }
-
-    const { frontmatter } = parseNote(content);
-    const problems = checkAdmission(frontmatter, content);
-    const relevantProblems = problems.filter((p) =>
-      ADMISSION_CHECKED_FIELDS.has(p.field),
-    );
-
-    if (relevantProblems.length > 0) {
-      await recordDenial(resolved.root, notesTarget.relTarget, sessionId);
+    try {
+      return await admitNoteWrite(toolName, input, notesTarget);
+    } catch {
       return { kind: "deny", reason: ADMISSION_DENY_REASON };
     }
-
-    return PASS;
   }
 
   const rel = flatInboxRel(resolved.root, filePath);
@@ -269,6 +194,52 @@ export async function memoryPreToolUse(
     updatedInput: { ...input, new_string: text },
     reason: rewriteReason(findings.length),
     slug: rel.replace(/\.md$/, ""),
+    masked: findings.length,
+  };
+}
+
+/**
+ * The notes/ branch of {@link memoryPreToolUse}. Throws on malformed frontmatter; the
+ * caller turns any throw into a deny. An admitted write is scrubbed like a flat note,
+ * and passes untouched when there is nothing to scrub, so the host's permission
+ * prompt still runs.
+ */
+async function admitNoteWrite(
+  toolName: "Write" | "Edit",
+  input: Record<string, unknown>,
+  { absTarget, relTarget }: { absTarget: string; relTarget: string },
+): Promise<MemoryDecision> {
+  let content: string;
+  if (toolName === "Write") {
+    content = str(input.content) ?? "";
+  } else {
+    const newStr = str(input.new_string) ?? "";
+    const oldStr = str(input.old_string);
+    const existing = await readFile(absTarget, "utf8").catch(() => null);
+    content =
+      existing === null
+        ? newStr
+        : oldStr !== undefined
+          ? existing.replace(oldStr, () => newStr)
+          : existing;
+  }
+
+  const { frontmatter } = parseNote(content);
+  const problems = checkAdmission(frontmatter, content).filter((p) =>
+    ADMISSION_CHECKED_FIELDS.has(p.field),
+  );
+  if (problems.length > 0) return { kind: "deny", reason: ADMISSION_DENY_REASON };
+
+  const field = toolName === "Write" ? "content" : "new_string";
+  const raw = str(input[field]);
+  if (raw === undefined) return PASS;
+  const { text, findings } = redact(raw);
+  if (findings.length === 0) return PASS;
+  return {
+    kind: "rewrite",
+    updatedInput: { ...input, [field]: text },
+    reason: rewriteReason(findings.length),
+    slug: relTarget.replace(/\.md$/, ""),
     masked: findings.length,
   };
 }
