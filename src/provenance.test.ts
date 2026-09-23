@@ -45,7 +45,7 @@ describe("stampProvenance", () => {
     expect(out.provenance).toEqual({ source: "adopt", repo: "auto", autonomy: "overseer" });
   });
 
-  it("fills channel and review when absent (pipeline proposal mark — ADR-0046)", () => {
+  it("fills channel and review when absent (pipeline proposal mark — ADR-0057)", () => {
     const out = stampProvenance(
       { type: "note" },
       { repo: "mage-memory", channel: "pipeline", review: "https://github.com/org/repo/pull/1" },
@@ -85,7 +85,7 @@ describe("resolveCreationStamp", () => {
     expect(await resolveCreationStamp(none.resolved)).not.toHaveProperty("autonomy");
   });
 
-  it("omits autonomy when channel is pipeline even at overseer (ADR-0046)", async () => {
+  it("omits autonomy when channel is pipeline even at overseer (ADR-0057)", async () => {
     const { resolved } = await withKb({ kind: "repo", grooming: { autonomy: "overseer" } });
     const stamp = await resolveCreationStamp(resolved, { channel: "pipeline" });
     expect(stamp.channel).toBe("pipeline");

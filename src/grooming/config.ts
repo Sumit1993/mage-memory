@@ -33,7 +33,7 @@ export interface ResolvedGrooming {
   sensitivity: Sensitivity;
   /** The opt-in autonomy level (ADR-0030); absent/junk ⇒ "operator". */
   autonomy: Autonomy;
-  /** Proposals setting (ADR-0046); absent/junk/non-boolean ⇒ false. */
+  /** Proposals setting (ADR-0057); absent/junk/non-boolean ⇒ false. */
   proposals: boolean;
   /** The backlog-reminder window in hours (ADR-0030 §5); absent/non-number ⇒ undefined (caller defaults). */
   nudgeThrottleHours: number | undefined;

@@ -83,7 +83,7 @@ export async function getDefaultBranch(repoPath: string): Promise<string> {
  * Get repo-relative dirty (modified, added, deleted, untracked) paths.
  */
 export async function getDirtyPaths(repoPath: string): Promise<string[]> {
-  // Fail closed: a caller uses this to decide whether a write is safe (ADR-0046 §7),
+  // Fail closed: a caller uses this to decide whether a write is safe (ADR-0057),
   // so a git failure must not read as "clean tree" — throw rather than return [].
   const r = await run("git", ["-C", repoPath, "status", "--porcelain", "-z"], {
     throwOnError: true,
@@ -132,7 +132,7 @@ export async function gitCheckoutNewBranch(
   startPoint?: string,
 ): Promise<void> {
   // Without a start point this cuts from HEAD, so a feature branch's unrelated commits
-  // ride into a proposal PR opened against the default branch (ADR-0046 §1).
+  // ride into a proposal PR opened against the default branch (ADR-0057).
   const args = ["-C", repoPath, "checkout", "-b", branchName];
   if (startPoint) args.push(startPoint);
   await run("git", args, { throwOnError: true });
@@ -200,7 +200,7 @@ export async function gitUnstage(repoPath: string, paths: string[]): Promise<voi
  * Create a commit with message in `repoPath`. With `paths`, the commit is scoped to
  * those paths (git's own pathspec limit) instead of the whole index — pass the same
  * list given to `gitAdd` so pre-staged unrelated files elsewhere in the repo cannot
- * ride along (ADR-0046 §7).
+ * ride along (ADR-0057).
  */
 export async function gitCommit(repoPath: string, message: string, paths?: string[]): Promise<void> {
   const args = ["-C", repoPath, "commit", "-m", message];
@@ -218,7 +218,7 @@ export async function gitPush(repoPath: string, branchName: string): Promise<voi
 }
 
 /**
- * Open a pull request using `gh pr create` (ADR-0046). Returns the PR URL.
+ * Open a pull request using `gh pr create` (ADR-0057). Returns the PR URL.
  */
 export async function createPullRequest(
   repoPath: string,

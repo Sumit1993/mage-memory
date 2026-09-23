@@ -186,7 +186,7 @@ describe("judgeProposal — ordering / precedence", () => {
   });
 });
 
-describe("judgeProposal — environment and terminal state neutrality (ADR-0046 §6)", () => {
+describe("judgeProposal — environment and terminal state neutrality (ADR-0057)", () => {
   it("produces byte-identical verdicts across env vars and TTY states", () => {
     const envKeys = ["CI", "GITHUB_ACTIONS", "CLAUDE_CODE_REMOTE", "VITEST"] as const;
     const origEnv: Record<string, string | undefined> = {};

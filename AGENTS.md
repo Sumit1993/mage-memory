@@ -35,7 +35,7 @@ artifact with a done-state belongs in an issue or a decision, not in notes.
 run them. The one exception is `mage groom --accept … --propose`, which you have
 to turn on per knowledge base (`grooming.proposals`) and invoke by hand: it
 commits to a branch under `mage/proposal/` and opens a pull request, and can
-produce nothing else — never a commit on a default branch (ADR-0046).
+produce nothing else — never a commit on a default branch (ADR-0057).
 <!-- END mage -->
 
 ## Order of work

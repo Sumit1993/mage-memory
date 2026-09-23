@@ -19,7 +19,7 @@ import { readAutonomy } from "./grooming/config.js";
 import type { NoteFrontmatter, Provenance } from "./note.js";
 import type { ResolvedDocsRoot } from "./paths.js";
 
-/** The provenance fields mage stamps at note creation (ADR-0031, ADR-0046). */
+/** The provenance fields mage stamps at note creation (ADR-0031, ADR-0057). */
 export interface ProvenanceStamp {
   /** Authorship — set ONLY at approver/overseer; absent ⇒ operator / human-written. */
   autonomy?: "approver" | "overseer";
@@ -29,9 +29,9 @@ export interface ProvenanceStamp {
   commit?: string;
   /** Cohort mark (ADR-0031 Phase 2): "capture" (the promote chokepoint) or "adopt". */
   source?: "capture" | "adopt";
-  /** Channel mark (ADR-0046 §4): "pipeline" for notes proposed via PR. */
+  /** Channel mark (ADR-0057): "pipeline" for notes proposed via PR. */
   channel?: "pipeline";
-  /** PR reference or URL that proposed this note (ADR-0046 §4). */
+  /** PR reference or URL that proposed this note (ADR-0057). */
   review?: string;
 }
 

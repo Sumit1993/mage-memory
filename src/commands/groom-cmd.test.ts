@@ -197,7 +197,7 @@ describe("mage groom — guards", () => {
   });
 });
 
-describe("mage groom --accept … --propose (ADR-0046)", () => {
+describe("mage groom --accept … --propose (ADR-0057)", () => {
   it("refuses when grooming.proposals is not enabled", async () => {
     const { dir, repo } = await withKb({ kind: "repo" });
     // A real git repo: getRepoRoot must succeed here so the run reaches judgeProposal's

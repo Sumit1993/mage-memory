@@ -187,7 +187,7 @@ describe("proposal git helpers", () => {
   });
 });
 
-describe("getDirtyPaths — rename sources (ADR-0046 §7 gate)", () => {
+describe("getDirtyPaths — rename sources (ADR-0057 gate)", () => {
   async function repoWithCommit(): Promise<string> {
     const repo = await tmp();
     await gitInit(repo);

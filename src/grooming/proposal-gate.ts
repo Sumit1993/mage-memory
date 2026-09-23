@@ -1,8 +1,8 @@
-// Refusal predicate for proposed writes (ADR-0046 §6, §7; plan Lane E).
+// Refusal predicate for proposed writes (ADR-0057, §7; plan Lane E).
 
 /** The reserved branch namespace. Nothing outside it may be created. */
 export const PROPOSAL_BRANCH_PREFIX = "mage/proposal/";
-/** Max notes in one proposal PR (ADR-0046 §7). */
+/** Max notes in one proposal PR (ADR-0057). */
 export const PROPOSAL_NOTE_CAP = 5;
 
 export interface ProposalRequest {
@@ -29,7 +29,7 @@ export type ProposalVerdict =
   | { readonly ok: false; readonly message: string };
 
 /**
- * Pure refusal predicate gating proposal writes (ADR-0046 §6).
+ * Pure refusal predicate gating proposal writes (ADR-0057).
  * Performs no I/O and reads no environment variable or terminal state.
  */
 export function judgeProposal(req: ProposalRequest): ProposalVerdict {

@@ -326,7 +326,7 @@ export {
 } from "./grooming/proposals.js";
 // `noteProposalFor` is GONE with the note-proposal rung (ADR-0038).
 export { buildManifest, graduateProposalFor } from "./grooming/promote.js";
-// Proposal refusal gate (ADR-0046).
+// Proposal refusal gate (ADR-0057).
 export {
   PROPOSAL_BRANCH_PREFIX,
   PROPOSAL_NOTE_CAP,

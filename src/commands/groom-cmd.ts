@@ -246,7 +246,7 @@ async function rejectBatch(
   return result;
 }
 
-// ─── propose: branch + commit + push + pr + review stamp (ADR-0046) ────────
+// ─── propose: branch + commit + push + pr + review stamp (ADR-0057) ────────
 
 /**
  * Best-effort return to where the user was before a failed proposal run. The branch is
@@ -356,7 +356,7 @@ async function proposeBatch(
 
   const originBranch = await getCurrentBranch(kbRepo);
   // Cut from the default branch, never from HEAD: on a feature branch the proposal PR
-  // would otherwise carry that branch's unrelated commits (ADR-0046 §1).
+  // would otherwise carry that branch's unrelated commits (ADR-0057).
   const startPoint = await resolveBranchRef(kbRepo, defaultBranch);
   if (!startPoint) {
     throw new Error(
@@ -373,7 +373,7 @@ async function proposeBatch(
   let committed = false;
   let pushed = false;
   try {
-    // Stamp channel at creation (ADR-0046 §4). No autonomy mark.
+    // Stamp channel at creation (ADR-0057). No autonomy mark.
     const stamp = await resolveCreationStamp(resolved, { channel: "pipeline" });
     accepted = await promoteBatch(root, selected, stamp);
     promoted = accepted;
@@ -390,7 +390,7 @@ async function proposeBatch(
 
     // Gate-2 over what is ACTUALLY staged. The earlier scan ran before anything was
     // added, so it saw an empty index; `gitAdd` sweeps in every dirty file under the
-    // KB root, which the dirty-path check deliberately permits (ADR-0014, ADR-0046 §7).
+    // KB root, which the dirty-path check deliberately permits (ADR-0014, ADR-0057).
     const indexScan = await scanStaged(kbRepo);
     if (indexScan.blocked) {
       // Unstage before throwing: `git checkout` carries staged changes back to the
@@ -494,7 +494,7 @@ function formatProposalPrBody(drafts: StagedDraft[]): string {
   const lines = [
     "## Proposed Knowledge Notes",
     "",
-    "Proposed via `mage groom --accept … --propose` (ADR-0046).",
+    "Proposed via `mage groom --accept … --propose` (ADR-0057).",
     "",
     "### Notes",
     "",
