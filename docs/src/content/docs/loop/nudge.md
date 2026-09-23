@@ -7,7 +7,7 @@ sidebar:
 
 Inline capture records lessons as you work. The **boundary nudge** is the command `mage nudge`, which runs at host lifecycle boundaries to provide visibility without interrupting flow.
 
-The nudge **writes nothing**. It is a read-only command that inspects current session events and surfaces feedback when warranted.
+The nudge writes no note, draft or proposal. It reads the session events and surfaces feedback when warranted. Its one write: on a firing SessionStart (`compact`, `startup`, `resume`) it appends a footprint sample to the git-ignored `.mage/metrics/footprint.jsonl`, even when it prints nothing.
 
 ## When it fires
 
@@ -20,7 +20,7 @@ The boundary nudge is wired to two hooks in Claude Code:
 
 At the `Stop` boundary, `mage nudge` reads the session events recorded in the capture scratch. It aggregates four key signals:
 
-- `denied`: Actions blocked by guards (counted from `guard_fired` events).
+- `denied`: Tool calls that were requested and never ran: a `tool_attempt` with no `tool_use` sharing its id. A deny rule and a blocking hook both count; a guard that only rewrote the call does not.
 - `corrected`: Substantive user corrections following assistant messages or tool use.
 - `new signatures`: Distinct failure signatures observed in the current session.
 - `guard fires`: Total guard events recorded for this session.

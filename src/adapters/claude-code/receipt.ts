@@ -21,7 +21,8 @@ export interface SessionReceiptCounts {
 /**
  * Compute the four receipt counts from a single session's events.
  *
- * - denied: count guard_fired events (the schema does not have a settings-deny event type).
+ * - denied: tool_attempt rows whose tool_use_id no tool_use shares, i.e. calls that never
+ *   ran (ADR-0052). A guard_fired row alone can be a rewrite, so it is not a denial.
  * - corrected: substantive user prompts immediately preceded by tool_use or assistant_msg.
  * - newSignatures: distinct failure skeletons from non-protocol tool failures in this session.
  * - guardFires: total guard_fired events in this session.
@@ -29,6 +30,8 @@ export interface SessionReceiptCounts {
 export function computeReceipt(events: ObserveEvent[]): SessionReceiptCounts {
   let guardFires = 0;
   let corrections = 0;
+  const attempted = new Set<string>();
+  const ran = new Set<string>();
   const signatures = new Set<string>();
 
   let prevType: ObserveEvent["type"] | null = null;
@@ -36,6 +39,8 @@ export function computeReceipt(events: ObserveEvent[]): SessionReceiptCounts {
   for (const e of events) {
     if (e.type === "guard_fired") {
       guardFires += 1;
+    } else if (e.type === "tool_attempt") {
+      attempted.add(e.tool_use_id);
     } else if (e.type === "user_prompt") {
       if (
         (prevType === "tool_use" || prevType === "assistant_msg") &&
@@ -45,6 +50,7 @@ export function computeReceipt(events: ObserveEvent[]): SessionReceiptCounts {
       }
       prevType = "user_prompt";
     } else if (e.type === "tool_use") {
+      if (e.tool_use_id) ran.add(e.tool_use_id);
       if (e.ok === false) {
         const raw = e.error_summary ?? e.detail ?? `${e.tool} failed`;
         if (!isProtocolFailure(raw)) {
@@ -62,8 +68,11 @@ export function computeReceipt(events: ObserveEvent[]): SessionReceiptCounts {
     }
   }
 
+  let denied = 0;
+  for (const id of attempted) if (!ran.has(id)) denied += 1;
+
   return {
-    denied: guardFires,
+    denied,
     corrected: corrections,
     newSignatures: signatures.size,
     guardFires,
