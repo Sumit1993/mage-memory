@@ -305,6 +305,60 @@ describe("mage groom --accept … --propose (ADR-0046)", () => {
     }
   });
 
+  it("for a hub-root KB, commits only what the run wrote, not the rest of the hub", async () => {
+    // At a hub root the KB root IS the repo, so staging `[root]` would take every dirty or
+    // pre-staged file in the hub into the proposal PR.
+    const { dir, repo } = await withKb({ kind: "hub", grooming: { proposals: true } });
+    await initRepoWithIdentity(repo);
+    await run("git", ["-C", repo, "add", "."]);
+    await run("git", ["-C", repo, "commit", "-m", "init"]);
+
+    const [slug] = await stageDistinct(dir, 1);
+    await writeFile(join(repo, "pre-staged.md"), "someone else's staged edit\n");
+    await run("git", ["-C", repo, "add", "pre-staged.md"]);
+    await writeFile(join(repo, "dirty-unstaged.md"), "work in progress\n");
+
+    const pushSpy = vi.spyOn(gitModule, "gitPush").mockResolvedValue();
+    const prSpy = vi.spyOn(gitModule, "createPullRequest").mockResolvedValue("https://x/pull/1");
+    try {
+      await groomCmd({ dir, accept: slug, propose: true });
+      const proposeCommit = await run("git", ["-C", repo, "show", "--name-only", "--pretty=format:", "HEAD~1"]);
+      expect(proposeCommit.stdout).toContain(`notes/${slug}.md`);
+      expect(proposeCommit.stdout).not.toContain("pre-staged.md");
+      expect(proposeCommit.stdout).not.toContain("dirty-unstaged.md");
+    } finally {
+      pushSpy.mockRestore();
+      prSpy.mockRestore();
+    }
+  });
+
+  it("the draft pre-scan honours the metadata.redact allowlist, as the commit-time scan does", async () => {
+    const { dir, repo } = await withKb({ kind: "repo", grooming: { proposals: true } });
+    const metaFile = join(dir, "mage", "metadata.json");
+    const meta = JSON.parse(await readFile(metaFile, "utf8"));
+    meta.redact = { allow: ["AKIAIOSFODNN7EXAMPLE"] };
+    await writeFile(metaFile, `${JSON.stringify(meta, null, 2)}\n`);
+    await initRepoWithIdentity(repo);
+    await run("git", ["-C", repo, "add", "."]);
+    await run("git", ["-C", repo, "commit", "-m", "init"]);
+    const sDir = stagingPath(join(dir, "mage"));
+    await mkdir(sDir, { recursive: true });
+    await writeFile(
+      join(sDir, "allowed-example.md"),
+      "---\ntype: gotcha\ntags: [mage/secret]\n---\n# Allowed example key\n\nthe AWS docs example key: AKIAIOSFODNN7EXAMPLE\n",
+    );
+
+    const pushSpy = vi.spyOn(gitModule, "gitPush").mockResolvedValue();
+    const prSpy = vi.spyOn(gitModule, "createPullRequest").mockResolvedValue("https://x/pull/1");
+    try {
+      await groomCmd({ dir, accept: "all", propose: true });
+      expect(prSpy).toHaveBeenCalledOnce();
+    } finally {
+      pushSpy.mockRestore();
+      prSpy.mockRestore();
+    }
+  });
+
   it("refuses when dirty paths exist outside the knowledge base", async () => {
     const { dir, repo } = await withKb({ kind: "repo", grooming: { proposals: true } });
     await initRepoWithIdentity(repo);
@@ -357,6 +411,9 @@ describe("mage groom --accept … --propose (ADR-0046)", () => {
       await expect(groomCmd({ dir, accept: slug, propose: true })).rejects.toThrow(/redaction scan blocked/i);
       expect(pushSpy).not.toHaveBeenCalled();
       expect(prSpy).not.toHaveBeenCalled();
+      // Unstaged before the branch switch, so the user's next commit cannot sweep it in.
+      const cached = await run("git", ["-C", repo, "diff", "--cached", "--name-only"]);
+      expect(cached.stdout).not.toContain("unrelated.md");
     } finally {
       pushSpy.mockRestore();
       prSpy.mockRestore();

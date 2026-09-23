@@ -15,7 +15,8 @@ import { type ResolvedDocsRoot, requireDocsRoot, stagingPath } from "../paths.js
 import { resolveCreationStamp, stampProvenance } from "../provenance.js";
 import { scanNotes } from "../scan.js";
 import { hasLiveSecret, scanSecrets } from "../redact.js";
-import { scanStaged } from "../staged-scan.js";
+import { readRedactConfig, scanStaged } from "../staged-scan.js";
+import { redactIgnoreFromMetadata } from "../redactignore.js";
 import { BASE_THRESHOLDS } from "../grooming/thresholds.js";
 import { readGrooming } from "../grooming/config.js";
 import {
@@ -36,6 +37,7 @@ import {
   gitCheckoutNewBranch,
   gitDeleteBranch,
   gitCommit,
+  gitUnstage,
   gitPush,
   hasGh,
   hasGit,
@@ -309,8 +311,11 @@ async function proposeBatch(
   const stagedScan = await scanStaged(kbRepo);
   let redactionBlocked = stagedScan.blocked;
   if (!redactionBlocked) {
+    // The same `metadata.redact` allowlist Gate-2 applies at commit time, so a literal the
+    // KB has allowed does not block here and then pass there.
+    const allow = redactIgnoreFromMetadata(await readRedactConfig(resolved.repo, resolved.kind)).literals;
     for (const draft of selected) {
-      const findings = scanSecrets(`${JSON.stringify(draft.frontmatter)}\n${draft.body}`);
+      const findings = scanSecrets(`${JSON.stringify(draft.frontmatter)}\n${draft.body}`, allow);
       if (hasLiveSecret(findings)) {
         redactionBlocked = true;
         break;
@@ -372,18 +377,27 @@ async function proposeBatch(
     const stamp = await resolveCreationStamp(resolved, { channel: "pipeline" });
     accepted = await promoteBatch(root, selected, stamp);
     promoted = accepted;
-    await index({ dir: opts.dir, quiet: opts.json });
+    const indexed = await index({ dir: opts.dir, quiet: opts.json });
 
-    // Stage changes under docsRoot and commit
-    await gitAdd(kbRepo, [root]);
+    // Stage what this run wrote. For a KB under a repo that is the KB root. For a hub-root
+    // KB the root IS the repo, so `[root]` would sweep every dirty or pre-staged file in
+    // the hub into the proposal; there it is the promoted notes and the index outputs only.
+    const commitPaths =
+      root === kbRepo
+        ? [...accepted, ...indexed.written].map((rel) => join(root, rel))
+        : [root];
+    await gitAdd(kbRepo, commitPaths);
 
     // Gate-2 over what is ACTUALLY staged. The earlier scan ran before anything was
     // added, so it saw an empty index; `gitAdd` sweeps in every dirty file under the
     // KB root, which the dirty-path check deliberately permits (ADR-0014, ADR-0046 §7).
     const indexScan = await scanStaged(kbRepo);
     if (indexScan.blocked) {
+      // Unstage before throwing: `git checkout` carries staged changes back to the
+      // user's branch, where their next commit would sweep the secret in.
+      await gitUnstage(kbRepo, commitPaths).catch(() => {});
       throw new Error(
-        "mage groom --propose: the redaction scan blocked the staged content, so nothing was committed or pushed.",
+        "mage groom --propose: the redaction scan blocked the staged content, so nothing was committed or pushed. The content was unstaged and is still in your working tree.",
       );
     }
 
@@ -393,7 +407,7 @@ async function proposeBatch(
         : `feat(memory): propose ${selected.length} notes`;
     // Scope to root: for a hub-owned KB gitAdd only staged the project subtree, and an
     // unscoped commit would sweep in whatever else was already staged in the hub repo.
-    await gitCommit(kbRepo, commitMsg1, [root]);
+    await gitCommit(kbRepo, commitMsg1, commitPaths);
     committed = true;
     await gitPush(kbRepo, branchName);
     pushed = true;

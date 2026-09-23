@@ -190,6 +190,13 @@ export async function gitAdd(repoPath: string, paths: string[]): Promise<void> {
 }
 
 /**
+ * Unstage paths in `repoPath`, leaving the working tree as it is.
+ */
+export async function gitUnstage(repoPath: string, paths: string[]): Promise<void> {
+  await run("git", ["-C", repoPath, "reset", "-q", "--", ...paths], { throwOnError: true });
+}
+
+/**
  * Create a commit with message in `repoPath`. With `paths`, the commit is scoped to
  * those paths (git's own pathspec limit) instead of the whole index — pass the same
  * list given to `gitAdd` so pre-staged unrelated files elsewhere in the repo cannot
