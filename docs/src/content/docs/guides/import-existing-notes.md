@@ -29,14 +29,15 @@ before it can touch disk, and **you** commit.
 ## Preview what would be ingested
 
 `/mage:learn --from` is driven by a deterministic manifest you can inspect first.
-Source enumeration is folded into `mage groom`:
+The read-only `mage ingest` plumbing verb enumerates and classifies the sources
+under a folder without writing anything:
 
 ```bash
-# Review proposals through groom
-mage groom
+# What would be picked up, as a human-readable list
+mage ingest ./docs
 
-# Inspect pending proposals as JSON
-mage groom --json
+# The same manifest as JSON, for tooling
+mage ingest ./docs --json
 ```
 
 Nothing is created until you run `/mage:learn --from` and accept the drafts.

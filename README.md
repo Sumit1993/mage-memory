@@ -112,8 +112,9 @@ npx skills add Sumit1993/mage-memory --global
 
 You get `/mage:guide` (how to use the base), `/mage:learn` (capture a note), and
 the self-grooming skills `/mage:groom`, `/mage:graduate`, and `/mage:optimize`.
-Per-wing `mage-wing-*` skills are **generated** into `.claude/skills/` +
-`.agents/skills/` by `mage index`. Backfill existing docs with
+Per-wing `mage-wing-*` skills that the retired `mage skills` generated into
+`.claude/skills/` + `.agents/skills/` stay where they are; nothing regenerates
+them (#208). Backfill existing docs with
 `/mage:learn --from <dir>`.
 
 > The `mage:` namespace is a Claude Code feature. Other agents that read
@@ -126,7 +127,7 @@ Per-wing `mage-wing-*` skills are **generated** into `.claude/skills/` +
 #    capture hooks + the redaction pre-commit gate (pass --no-connect to skip).
 mage init --in-repo
 
-# 2. Regenerate recall surfaces (INDEX.md + MEMORY.md) and navigation skills
+# 2. Regenerate both recall surfaces: INDEX.md + the auto-loaded MEMORY.md roster
 mage index
 ```
 

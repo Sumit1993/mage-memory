@@ -4,7 +4,7 @@ description: |
   Push a proven procedural note up into its own auto-loadable Procedure skill.
   Fires when the user says "graduate", "make this a skill", or when
   `mage:groom` surfaces a proven note that saw continued usage (was read across enough distinct chapters).
-  Reads the deterministic graduation reader (`mage groom --json`) for
+  Reads the deterministic graduation reader (`mage promote --json`) for
   `action: "graduate"` proposals, shows the human the backing note plus the
   note-read usage evidence, and on confirm pipes the graduate Proposal JSON to
   `mage dream --apply` — the single writer that mints `mage-skill-<slug>`,
@@ -34,6 +34,11 @@ write through the single applier.
 
 ## Steps
 
+**Retired (#208).** `mage promote` now prints a signpost and exits 0, so step 2 returns
+no candidates and this skill has nothing to graduate. Do not substitute `mage groom --json`:
+it returns the staged batch, not a graduation manifest. Graduation comes back as one
+proposal type in `mage groom` (#219).
+
 1. **Resolve the knowledge base.** Find the nearest `mage/metadata.json` (walk
    up). docs root = `<repo>/mage/` (in-repo) or `<hub root>/projects/<project>/`
    (external — the hub root is derived from `hub_repo`, ADR-0043). The deprecated
@@ -42,7 +47,7 @@ write through the single applier.
 
 2. **Run the deterministic graduation reader.**
    ```bash
-   mage groom --json
+   mage promote --json
    ```
    It emits a `PromoteManifest`. Every proposal is now `action: "graduate"` —
    ADR-0038 deleted the `action: "note"` rung, so there is no other kind to filter out:
@@ -103,7 +108,7 @@ write through the single applier.
 
 ## Worked example — a proven gotcha graduates
 
-`/mage:groom` surfaced, and you ran `mage groom --json`, which returned:
+`/mage:groom` surfaced, and you ran `mage promote --json`, which returned:
 
 ```jsonc
 {

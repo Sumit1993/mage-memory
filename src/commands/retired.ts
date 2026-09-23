@@ -1,18 +1,16 @@
 export const RETIRED_VERB_MESSAGES = {
   distill:
-    "mage distill has retired. Use `mage groom` instead.\nCandidate distillation is folded into groom.",
+    "mage distill has retired. Nothing replaces it yet.\nIts work moves to `mage groom` with the proposal digest (#219).",
   promote:
-    "mage promote has retired. Use `mage groom` instead.\nPromotion proposals are folded into groom.",
+    "mage promote has retired. Nothing replaces it yet.\nIts work moves to `mage groom` with the proposal digest (#219).",
   graduate:
-    "mage graduate has retired. Use `mage groom` instead.\nProcedure skill proposals are reviewed and applied through groom.",
+    "mage graduate has retired. Nothing replaces it yet.\nA skill becomes one proposal type in `mage groom` (#219, #235).",
   skills:
-    "mage skills has retired. Use `mage index` instead.\nGenerating navigation skills is folded into index.",
+    "mage skills has retired. The wing skill is retired; `mage index` regenerates INDEX.md and MEMORY.md.\n`mage skills --metrics` keeps folding the context-match rollup until `mage ledger` (#237).",
   dashboard:
     "mage dashboard has retired. Use `mage index` instead.\nGraph and dashboard generation are folded into index.",
   footprint:
     "mage footprint has retired. Use `mage doctor` instead.\nContext footprint diagnostics are folded into doctor.",
-  ingest:
-    "mage ingest has retired. Use `mage groom` instead.\nSource enumeration is folded into groom.",
   stage:
     "mage stage has retired. Use `mage observe` instead.\nDirect capture will route through observe, but the finding event is not built yet.",
 } as const;

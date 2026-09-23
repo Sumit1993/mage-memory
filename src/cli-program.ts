@@ -9,6 +9,7 @@ import { flattenCmd } from "./commands/flatten.js";
 import { dream } from "./commands/dream-cmd.js";
 import { groomCmd } from "./commands/groom-cmd.js";
 import { index } from "./commands/index-cmd.js";
+import { ingestCmd } from "./commands/ingest.js";
 import { type InitMode, type InitVisibility, init } from "./commands/init.js";
 import { link, type Storage } from "./commands/link.js";
 import { list } from "./commands/list.js";
@@ -18,6 +19,7 @@ import { buildNudgeCommand } from "./adapters/claude-code/nudge.js";
 import { buildObserveCommand } from "./commands/observe.js";
 import { redactCmd } from "./commands/redact.js";
 import { printRetiredVerb } from "./commands/retired.js";
+import { skills } from "./commands/skills-cmd.js";
 import { status } from "./commands/status.js";
 import { unlink } from "./commands/unlink.js";
 import { verify } from "./commands/verify.js";
@@ -138,7 +140,9 @@ export function buildProgram(): Command {
   // ─── skills ──────────────────────────────────────────────────────────────────
   program
     .command("skills")
-    .description("Retired signpost: use `mage index` instead")
+    .description(
+      "Retired signpost; `--metrics` still folds the context-match rollup until `mage ledger` (#237)",
+    )
     .option(
       "-d, --dir <path>",
       "where to look for the knowledge base (default: cwd; walks up for in-repo)",
@@ -153,6 +157,10 @@ export function buildProgram(): Command {
       "metrics mode: fold + write the rollup silently (the Stop-hook path)",
     )
     .action(async (opts) => {
+      if (opts.metrics) {
+        await skills({ dir: opts.dir, metrics: true, json: opts.json, quiet: opts.quiet });
+        return;
+      }
       printRetiredVerb("skills", !!opts.quiet);
     });
 
@@ -206,11 +214,13 @@ export function buildProgram(): Command {
   // ─── ingest ──────────────────────────────────────────────────────────────────
   program
     .command("ingest", { hidden: true })
-    .description("Retired signpost: use `mage groom` instead")
+    .description(
+      "Enumerate + classify ingestable sources under <dir> (read-only) — what `mage:learn --from` distills.",
+    )
     .argument("<dir>", "directory to scan for ingestable sources")
     .option("--json", "emit the manifest as JSON to stdout (machine-readable)")
-    .action(async () => {
-      printRetiredVerb("ingest", false);
+    .action(async (dir: string, opts: { json?: boolean }) => {
+      await ingestCmd(dir, { json: opts.json });
     });
 
   // ─── distill ─────────────────────────────────────────────────────────────────

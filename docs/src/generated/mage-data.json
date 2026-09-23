@@ -249,7 +249,7 @@
     },
     {
       "name": "skills",
-      "summary": "Retired signpost: use `mage index` instead",
+      "summary": "Retired signpost; `--metrics` still folds the context-match rollup until `mage ledger` (#237)",
       "aliases": [],
       "hidden": false,
       "options": [
@@ -321,7 +321,7 @@
     },
     {
       "name": "ingest",
-      "summary": "Retired signpost: use `mage groom` instead",
+      "summary": "Enumerate + classify ingestable sources under <dir> (read-only) — what `mage:learn --from` distills.",
       "aliases": [],
       "hidden": true,
       "options": [

@@ -131,8 +131,7 @@ to avoid), and **pointers** to canonical sources — never a copy of the source
 
 10. **Suggest follow-ups (never auto-run):**
     ```bash
-    mage index          # refresh INDEX.md
-    mage index          # refresh per-wing skills (if a new wing appeared)
+    mage index          # refresh INDEX.md and MEMORY.md
     git -C <repo> add mage && git -C <repo> commit -m "note: <title> (#<wing>)"
     ```
 
@@ -143,7 +142,7 @@ docs and transcripts into notes, **and adopt the user's own skills in place** �
 adopting an authored skill is *remembering*, not copying a source (ADR-0013 §5).
 
 1. **Inventory `<dir>` deterministically.** FIRST run the read-only CLI
-   `mage groom <dir> --json`. It returns a classified manifest: an array of
+   `mage ingest <dir> --json`. It returns a classified manifest: an array of
    `{ relPath, kind, title, summary }` where `kind` is one of `skill` | `note` |
    `prose` | `transcript`. Don't split sources by hand — drive the rest of the
    flow per `kind`:

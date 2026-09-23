@@ -20,23 +20,19 @@ async function runCli(args: string[]): Promise<{ stdout: string; exitCode: numbe
   }
 }
 
-describe("retired verbs signposts (graduate, ingest)", () => {
+describe("retired verbs signposts (graduate)", () => {
   it("mage graduate prints that graduate has retired and exits 0", async () => {
     const res = await runCli(["graduate"]);
     expect(res.exitCode).toBe(0);
     expect(res.stdout).toBe(RETIRED_VERB_MESSAGES.graduate);
   });
-
-  it("mage ingest prints that ingest has retired and exits 0", async () => {
-    const res = await runCli(["ingest", "."]);
-    expect(res.exitCode).toBe(0);
-    expect(res.stdout).toBe(RETIRED_VERB_MESSAGES.ingest);
-  });
 });
 
 describe("retired verbs signposts respect --quiet (skills, footprint)", () => {
-  it("mage skills --metrics --quiet produces empty stdout and exits 0", async () => {
-    const res = await runCli(["skills", "--metrics", "--quiet"]);
+  // `skills --metrics` still runs the real fold (the Stop hook path, #237), so it is
+  // covered in skills-cmd.test.ts, not here: from the test cwd it would write .mage/.
+  it("mage skills --quiet produces empty stdout and exits 0", async () => {
+    const res = await runCli(["skills", "--quiet"]);
     expect(res.exitCode).toBe(0);
     expect(res.stdout).toBe("");
   });

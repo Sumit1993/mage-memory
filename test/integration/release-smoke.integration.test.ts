@@ -8,6 +8,7 @@ import { mkdir, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { REPO_ROOT, assertBuilt, initKb, runMage, runMageStdin } from "./lib/harness.js";
+import { RETIRED_VERB_MESSAGES } from "../../src/commands/retired.js";
 
 /** No JS stack trace / thrown-error noise leaked into CLI output. */
 function clean(s: string): boolean {
@@ -43,7 +44,7 @@ describe("integration: release smoke (deterministic)", () => {
     const { stdout, code } = await runMage(["distill", "--json"], { cwd: dir });
     expect(code).toBe(0);
     expect(stdout.trim()).toBe(
-      "mage distill has retired. Use `mage groom` instead.\nCandidate distillation is folded into groom.",
+      RETIRED_VERB_MESSAGES.distill,
     );
   });
 

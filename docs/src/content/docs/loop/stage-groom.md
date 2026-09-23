@@ -19,7 +19,7 @@ Drafts reach `.mage/staging/` from two feeders: direct capture (which will route
 
 When the agent notices a unit during work (a correction you made, a gotcha that bit you, a rule worth keeping), capture routes toward `mage observe` (the finding event is not built yet). There is no per-draft confirmation prompt; capture is meant to be cheap so the agent captures at first sight instead of deferring. The [boundary nudge](./nudge.md) surfaces units at the boundary for the agent to capture the same way; the nudge itself writes nothing.
 
-A draft is small on purpose: one distilled fact plus a short *why* and *how*. The target size is the **soft lesson cap of 1200 characters**. It is genuinely soft: `mage observe` warns if a draft runs past it but never blocks. Frictionless capture matters more than a hard limit on a draft that you are about to review anyway. (The 1200-character lesson cap is far under the 6000-character cap on a full authored note.)
+A draft is small on purpose: one distilled fact plus a short *why* and *how*. The target size is the **soft lesson cap of 1200 characters**. It is genuinely soft: `mage stage` warned if a draft ran past it but never blocked, and it retired in #208. Frictionless capture matters more than a hard limit on a draft that you are about to review anyway. (The 1200-character lesson cap is far under the 6000-character cap on a full authored note.)
 
 Every draft is scrubbed for secrets before it touches disk, even though `.mage/staging/` is git-ignored and pre-commit — defense in depth.
 

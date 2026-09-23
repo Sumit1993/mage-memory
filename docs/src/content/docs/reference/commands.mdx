@@ -41,7 +41,7 @@ The `mage` binary above is only part of the surface — there are agent skills t
 
 **B · CLI commands you type** — the terminal verbs for setup and housekeeping that doesn't belong inside the agent (`init`, `link`, `connect`, `index`, `doctor`, `dream`, and friends). The rest of this page is their reference.
 
-**C · Plumbing** — hidden CLI verbs you never type by hand (`observe`, `groom`, `nudge`, `memory-hook`, `redact`, `flatten`, and friends). A skill or a host hook runs them for you; the complete, generated set is in [the full inventory](#the-full-inventory) — that table, not this list, is the authoritative roster.
+**C · Plumbing** — hidden CLI verbs you never type by hand (`observe`, `groom`, `nudge`, `memory-hook`, `redact`, `ingest`, `flatten`, and friends). A skill or a host hook runs them for you; the complete, generated set is in [the full inventory](#the-full-inventory) — that table, not this list, is the authoritative roster.
 
 **The rhythm:** skills (A) when you curate · CLI (B) at setup and check-ups · plumbing (C) never by hand. **The one hybrid:** `groom` is both the `/mage:groom` skill (what you use) and a hidden `mage groom` CLI verb (what the skill calls) — every other name is cleanly one channel.
 
@@ -198,16 +198,19 @@ legitimately produce different orderings: regenerate, never hand-merge.
 
 `mage index` is a visible, typeable command — you can run it yourself any time.
 The hooks and the `/mage:learn` flow also run it for you
-automatically, so you rarely need to run it manually. `mage index` also carries a read-only metrics
-mode that reports context-match (whether the skills that auto-loaded matched the
-work that followed):
+automatically, so you rarely need to run it manually.
+
+`mage skills` has retired, but its read-only metrics mode still works until
+`mage ledger` takes it over (#237). It reports context-match (whether the skills
+that auto-loaded matched the work that followed), and the `mage:metrics:Stop` hook
+runs it quietly to keep the rollup current:
 
 ```bash
 # Read-only context-match report for your generated skills
-mage index --metrics
+mage skills --metrics
 
 # Same report as JSON, for tooling
-mage index --metrics --json
+mage skills --metrics --json
 ```
 
 See [Optimize](../loop/optimize.md) for how those match rates drive reword and
@@ -370,18 +373,21 @@ mage migrate
 
 ## Retired verbs
 
-Eight verbs stop doing their work and print signposts to their replacements:
+Seven verbs stop doing their work, print a signpost and exit 0. Where the
+replacement is not built yet, the signpost says so:
 
-| Retired verb | Prints | Note |
+| Retired verb | Where its work goes | Note |
 |---|---|---|
-| `distill` | `mage groom` | Candidate distillation is folded into groom. |
-| `promote` | `mage groom` | Promotion proposals are folded into groom. |
-| `graduate` | `mage groom` | Procedure skill proposals are reviewed and applied through groom. |
-| `skills` | `mage index` | Generating navigation skills is folded into index. |
+| `distill` | `mage groom` | Not built yet: the proposal digest (#219). |
+| `promote` | `mage groom` | Not built yet: the proposal digest (#219). |
+| `graduate` | `mage groom` | Not built yet: a skill becomes one proposal type (#219, #235). |
+| `skills` | `mage index` | The wing skill is retired; `mage index` regenerates `INDEX.md` and `MEMORY.md`. `skills --metrics` still runs until `mage ledger` (#237). |
 | `dashboard` | `mage index` | Graph and dashboard generation are folded into index. |
 | `footprint` | `mage doctor` | Context footprint diagnostics are folded into doctor. |
-| `ingest` | `mage groom` | Source enumeration is folded into groom. |
-| `stage` | `mage observe`, as a `finding` event | Direct capture will route through observe, but the finding event is not built yet. |
+| `stage` | `mage observe`, as a `finding` event | Not built yet (ADR-0052). |
+
+`ingest` stays working as hidden plumbing under `/mage:learn --from`: nothing
+else enumerates a folder yet.
 
 ## The full inventory
 
