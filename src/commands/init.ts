@@ -1,7 +1,7 @@
 import { confirm, select } from "@inquirer/prompts";
 import { mkdir, readdir, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
-import { writeAgentsMd } from "../agents-md.js";
+import { keptWarning, writeAgentsMd } from "../agents-md.js";
 import { getRemoteOriginUrl, gitInit, hasGh, isGitRepo } from "../git.js";
 import { ensureGitignored } from "../gitignore.js";
 import { logger } from "../logger.js";
@@ -51,6 +51,8 @@ export interface InitOptions {
   codeRepo?: string;
   /** Wire capture hooks after an in-repo init (Decision 5). Default true; `--no-connect` sets false. */
   connect?: boolean;
+  /** Force regeneration of AGENTS.md even if it has hand edits. */
+  forceAgentsMd?: boolean;
 }
 
 export interface InitResult {
@@ -95,7 +97,7 @@ export async function init(opts: InitOptions = {}): Promise<InitResult> {
           "Run `mage link <hub>` to add a hub reference, or remove mage/metadata.json first.",
       );
     }
-    await initInRepo(cwd, project);
+    await initInRepo(cwd, project, opts.forceAgentsMd);
     // Auto-connect (Decision 5): an in-repo KB is inert until capture is wired.
     // Default on; `--no-connect` skips. connect() runs its own confirm interactively
     // and auto-proceeds under --yes. Best-effort: the KB is already on disk, so a
@@ -172,7 +174,7 @@ async function scaffoldVaultDirs(docsRoot: string): Promise<void> {
 
 // ─── in-repo init ────────────────────────────────────────────────────────
 
-async function initInRepo(codeRepo: string, project: string): Promise<void> {
+async function initInRepo(codeRepo: string, project: string, forceAgentsMd?: boolean): Promise<void> {
   const docsRoot = codeRepoDocsRoot(codeRepo);
   await mkdir(docsRoot, { recursive: true });
   await scaffoldVaultDirs(docsRoot);
@@ -201,7 +203,15 @@ async function initInRepo(codeRepo: string, project: string): Promise<void> {
   if (added.length > 0) logger.detail(`Added .gitignore patterns: ${added.join(", ")}`);
 
   // Portable navigation contract for any agent (AGENTS.md + CLAUDE.md shim).
-  await writeAgentsMd(codeRepo, { kind: "repo", mode: "in-repo", docsRel: "mage" });
+  const agentsResult = await writeAgentsMd(
+    codeRepo,
+    { kind: "repo", mode: "in-repo", docsRel: "mage" },
+    { force: forceAgentsMd },
+  );
+  const kept = keptWarning(agentsResult);
+  if (kept) {
+    logger.warn(kept);
+  }
 
   logger.blank();
   logger.success(`Initialized in-repo mage knowledge base for project '${project}'.`);
@@ -259,7 +269,13 @@ async function initHubFlow(cwd: string, opts: InitOptions): Promise<InitResult> 
   }
 
   const visibility = await resolveVisibility(opts);
-  const hubRepoUrl = await initStandaloneHub({ hubDir, hubName, visibility, owner: opts.owner });
+  const hubRepoUrl = await initStandaloneHub({
+    hubDir,
+    hubName,
+    visibility,
+    owner: opts.owner,
+    forceAgentsMd: opts.forceAgentsMd,
+  });
   // Friction C: a hub is not a code repo, so it is NOT connected here. Members are
   // wired separately — `mage link <hub>` auto-connects capture in each code repo.
   logger.blank();
@@ -275,6 +291,7 @@ interface HubArgs {
   hubName: string;
   visibility: InitVisibility;
   owner: string | undefined;
+  forceAgentsMd?: boolean;
 }
 
 /**
@@ -338,7 +355,15 @@ async function initStandaloneHub(args: HubArgs): Promise<string> {
   ]);
   if (added.length > 0) logger.detail(`Added .gitignore patterns: ${added.join(", ")}`);
 
-  await writeAgentsMd(hubDir, { kind: "hub", docsRel: "." });
+  const hubAgentsResult = await writeAgentsMd(
+    hubDir,
+    { kind: "hub", docsRel: "." },
+    { force: args.forceAgentsMd },
+  );
+  const kept = keptWarning(hubAgentsResult);
+  if (kept) {
+    logger.warn(kept);
+  }
 
   logger.blank();
   logger.success(`Initialized standalone mage hub '${hubName}'.`);

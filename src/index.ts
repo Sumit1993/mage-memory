@@ -1,7 +1,17 @@
 // Programmatic API — re-exports each command so users can import and call from
 // their own scripts. CLI in src/cli.ts wraps these with commander.
 
-export { type AgentsMdOptions, writeAgentsMd } from "./agents-md.js";
+export {
+  type AgentsMdOptions,
+  type AgentsMdWriteResult,
+  KEPT_HAND_EDITS_MARKER,
+  KEPT_UNSTAMPED_MARKER,
+  blockHash,
+  keptHandEditsWarning,
+  keptUnstampedWarning,
+  keptWarning,
+  writeAgentsMd,
+} from "./agents-md.js";
 export { buildProgram } from "./cli-program.js";
 export {
   buildGeneratedDocsData,
