@@ -14,7 +14,8 @@ export type ObserveEventType =
   | "skill_load"
   | "tool_use"
   | "compact"
-  | "session_end";
+  | "session_end"
+  | "guard_fired";
 
 /** The event-type literals as a runtime set, for boundary validation. */
 const OBSERVE_EVENT_TYPES: ReadonlySet<string> = new Set<ObserveEventType>([
@@ -25,6 +26,7 @@ const OBSERVE_EVENT_TYPES: ReadonlySet<string> = new Set<ObserveEventType>([
   "tool_use",
   "compact",
   "session_end",
+  "guard_fired",
 ]);
 
 /**
@@ -35,6 +37,12 @@ const OBSERVE_EVENT_TYPES: ReadonlySet<string> = new Set<ObserveEventType>([
  */
 export function isObserveEventType(v: unknown): v is ObserveEventType {
   return typeof v === "string" && OBSERVE_EVENT_TYPES.has(v);
+}
+
+/** `<scope>/guard/<slug>` — lowercase, digits and single hyphens in each segment. */
+const GUARD_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*\/guard\/[a-z0-9]+(?:-[a-z0-9]+)*$/;
+export function isGuardId(v: unknown): v is string {
+  return typeof v === "string" && GUARD_ID.test(v);
 }
 
 /**
@@ -133,6 +141,17 @@ export interface SessionEndEvent extends ObserveEnvelope {
   reason?: string;
 }
 
+/** guard_fired — a kit guard (deny rule, hook, check) blocked or rewrote a tool call. */
+export interface GuardFiredEvent extends ObserveEnvelope {
+  type: "guard_fired";
+  /** `<scope>/guard/<slug>`, e.g. `kit/guard/no-haiku`. Validated at the boundary. */
+  guard_id: string;
+  /** The tool the guard fired on, verbatim (e.g. "Bash", "Agent"). */
+  tool: string;
+  /** Scrubbed, ≤ DETAIL_MAX; null when the hook sent none. */
+  detail: string | null;
+}
+
 export type ObserveEvent =
   | SessionStartEvent
   | UserPromptEvent
@@ -140,7 +159,8 @@ export type ObserveEvent =
   | SkillLoadEvent
   | ToolUseEvent
   | CompactEvent
-  | SessionEndEvent;
+  | SessionEndEvent
+  | GuardFiredEvent;
 
 // ─── bounds (named, exported) ────────────────────────────────────────────────
 
@@ -156,3 +176,8 @@ export const ERROR_SUMMARY_MAX = 200;
 export const ARGS_MAX = 200;
 /** Per-entry cap for a structured path (caps line size; paths are not scrubbed). */
 export const PATH_MAX = 400;
+/** guard_fired.guard_id cap. */
+export const GUARD_ID_MAX = 200;
+/** guard_fired.tool cap. */
+export const GUARD_TOOL_MAX = 100;
+
