@@ -39,6 +39,8 @@ export interface IndexOptions {
   quiet?: boolean;
   /** Reject on admission or readability problems instead of report mode (default false). */
   strictAdmission?: boolean;
+  /** Internal: the parent already checked this project root, so skip the checks. */
+  skipChecks?: boolean;
 }
 
 export interface IndexResult {
@@ -100,60 +102,29 @@ export async function index(opts: IndexOptions = {}): Promise<IndexResult> {
   const hubMeta = resolved.kind === "hub" ? await readHubMetadata(root) : null;
   const registry = buildRegistryView(hubMeta?.projects ?? []);
 
-  // Remove stale generated per-wing index files (idempotency across mode flips).
-  await cleanGeneratedWingIndexes(root, hierarchical ? allWings : []);
-
-  // Run admission and readability checks on every note file under notes/
-  const noteFiles = entries.filter((e) => /(^|\/)notes\//.test(e.relPath));
+  // Admission and readability run before anything is written. A hub root's scan already
+  // covers `projects/<name>/notes/`, so the fan-out below indexes each project with
+  // skipChecks: strict mode refuses on a project's notes here, and nothing counts twice.
   let admissionProblems = 0;
   let readabilityProblems = 0;
-  const failingFiles: Array<{
-    relPath: string;
-    problems: Array<{ label: string; message: string; line: number | null }>;
-  }> = [];
-
-  for (const entry of noteFiles) {
-    let rawFile: string;
-    try {
-      rawFile = await readFile(join(root, entry.relPath), "utf8");
-    } catch {
-      continue;
-    }
-    const { frontmatter } = parseNote(rawFile);
-    const adm = checkAdmission(frontmatter, rawFile);
-    const read = checkReadability(rawFile);
-
-    admissionProblems += adm.length;
-    readabilityProblems += read.length;
-
-    if (adm.length > 0 || read.length > 0) {
-      const fileProbs: Array<{
-        label: string;
-        message: string;
-        line: number | null;
-      }> = [];
-      for (const p of adm) {
-        fileProbs.push({ label: p.field, message: p.message, line: p.line });
-      }
-      for (const p of read) {
-        fileProbs.push({ label: p.rule, message: p.message, line: p.line });
-      }
-      failingFiles.push({ relPath: entry.relPath, problems: fileProbs });
-    }
-  }
-
-  // Report mode output (unless quiet)
-  if (!opts.quiet && failingFiles.length > 0) {
+  if (!opts.skipChecks) {
+    const failingFiles = await checkNotes(root, entries);
     for (const file of failingFiles) {
-      console.log(file.relPath);
-      for (const p of file.problems) {
-        console.log(`  ${p.label}: ${p.message} (line ${p.line ?? "null"})`);
-      }
+      admissionProblems += file.admission;
+      readabilityProblems += file.readability;
     }
-    const totalProblems = admissionProblems + readabilityProblems;
-    console.log(
-      `Total: ${totalProblems} problem(s) (${admissionProblems} admission, ${readabilityProblems} readability) across ${failingFiles.length} file(s).`,
-    );
+    if (!opts.quiet && failingFiles.length > 0) {
+      for (const file of failingFiles) {
+        console.log(file.relPath);
+        for (const p of file.problems) {
+          console.log(`  ${p.label}: ${p.message} (line ${p.line ?? "null"})`);
+        }
+      }
+      const totalProblems = admissionProblems + readabilityProblems;
+      console.log(
+        `Total: ${totalProblems} problem(s) (${admissionProblems} admission, ${readabilityProblems} readability) across ${failingFiles.length} file(s).`,
+      );
+    }
   }
 
   // Strict mode: write nothing and return failure result when problems exist
@@ -171,6 +142,9 @@ export async function index(opts: IndexOptions = {}): Promise<IndexResult> {
       passed: false,
     };
   }
+
+  // Remove stale generated per-wing index files (idempotency across mode flips).
+  await cleanGeneratedWingIndexes(root, hierarchical ? allWings : []);
 
   const written: string[] = [];
   if (hierarchical) {
@@ -250,13 +224,11 @@ export async function index(opts: IndexOptions = {}): Promise<IndexResult> {
     const subResult = await index({
       dir: projRoot,
       quiet: true,
-      strictAdmission: opts.strictAdmission,
+      skipChecks: true,
     });
     for (const file of subResult.written) {
       written.push(relative(root, join(projRoot, file)));
     }
-    admissionProblems += subResult.admissionProblems;
-    readabilityProblems += subResult.readabilityProblems;
   }
 
   if (!opts.quiet) {
@@ -280,6 +252,43 @@ export async function index(opts: IndexOptions = {}): Promise<IndexResult> {
   };
 }
 
+
+interface FailingFile {
+  relPath: string;
+  admission: number;
+  readability: number;
+  problems: Array<{ label: string; message: string; line: number | null }>;
+}
+
+/** Admission and readability problems for every note under `notes/` in one root. */
+async function checkNotes(
+  root: string,
+  entries: Awaited<ReturnType<typeof scanNotes>>,
+): Promise<FailingFile[]> {
+  const failing: FailingFile[] = [];
+  for (const entry of entries.filter((e) => /(^|\/)notes\//.test(e.relPath))) {
+    let rawFile: string;
+    try {
+      rawFile = await readFile(join(root, entry.relPath), "utf8");
+    } catch {
+      continue;
+    }
+    const { frontmatter } = parseNote(rawFile);
+    const adm = checkAdmission(frontmatter, rawFile);
+    const read = checkReadability(rawFile);
+    if (adm.length === 0 && read.length === 0) continue;
+    failing.push({
+      relPath: entry.relPath,
+      admission: adm.length,
+      readability: read.length,
+      problems: [
+        ...adm.map((p) => ({ label: p.field, message: p.message, line: p.line })),
+        ...read.map((p) => ({ label: p.rule, message: p.message, line: p.line })),
+      ],
+    });
+  }
+  return failing;
+}
 
 // ─── registry decoration (ADR-0011 §3, ADR-0012 §2) ──────────────────────────
 

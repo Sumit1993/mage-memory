@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkReadability } from "./readability.js";
+import { checkReadability, findLinkRanges } from "./readability.js";
 
 describe("checkReadability", () => {
   it("passes a clean, concise, self-contained note with plain words", () => {
@@ -175,4 +175,34 @@ describe("readability: link matching stays linear (CodeQL js/polynomial-redos)",
     const problems = checkReadability(`---\ntype: note\n---\n\n${body}\n`);
     expect(problems.filter((p) => /section/i.test(p.message))).toHaveLength(0);
   });
+
+  it("a line of 20000 `[](` repeats finishes fast", () => {
+    // The second input shape CodeQL names in alert 14.
+    const body = `${"[](".repeat(20_000)} section 12.3`;
+    const start = Date.now();
+    checkReadability(`---\ntype: note\n---\n\n${body}\n`);
+    expect(Date.now() - start).toBeLessThan(1000);
+  });
+
+  it("findLinkRanges finds exactly what the old link regex found", () => {
+    const oldRegex = /\[[^\][]*\]\([^()]*\)/g;
+    const lines = [
+      "See [a](b) and [c](d).",
+      "[[x](y)] nested open",
+      "[a](b(c)) paren in target",
+      "[a] (b) space between",
+      "[](empty)[x]()",
+      "[a](b [c](d)",
+      "no links here",
+      "[unclosed(",
+      "[a]](b)",
+    ];
+    for (const line of lines) {
+      const expected = [...line.matchAll(oldRegex)].map(
+        (m) => [m.index, m.index + m[0].length] as [number, number],
+      );
+      expect(findLinkRanges(line), line).toEqual(expected);
+    }
+  });
 });
+

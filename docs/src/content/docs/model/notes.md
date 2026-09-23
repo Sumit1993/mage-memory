@@ -137,6 +137,28 @@ trigger: ""
 Consult section 12.3 for details.
 ```
 
+Saved as `notes/failing.md`, it gives four admission problems and one readability problem:
+
+```console
+$ mage index
+notes/failing.md
+  id: id middle segment "rule" does not match rung "note" (line 2)
+  skipped: skipped is required (line null)
+  trigger: trigger must be a non-empty string (line 4)
+  pointer: pointer is required (line null)
+  self-contained: unlinked reference to "section 12.3" (line 8)
+Total: 5 problem(s) (4 admission, 1 readability) across 1 file(s).
+✓ Indexed 1 note(s) across 0 wing(s) → 2 file(s) (flat).
+$ echo $?
+0
+$ mage index --strict-admission
+...same report...
+$ echo $?
+1
+```
+
+A missing field reports `line null`. Under `--strict-admission` nothing is written.
+
 ## Notes are point-in-time
 
 A note records what was true *when it was written*. Code moves on; a note can quietly go wrong. mage treats every note as a snapshot, not a live truth, and gives you signals to catch drift:

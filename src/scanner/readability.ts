@@ -121,16 +121,7 @@ export function checkReadability(rawFile: string): ReadabilityProblem[] {
 
     // Rule 2: Self-contained references
     // Find all markdown link spans on this line: [text](target)
-    const linkRanges: [number, number][] = [];
-    // `[^\][]*` rather than `[^\]]*`: excluding `[` from the link-text class stops the
-    // scan restarting at every `[`, which is quadratic on a line of `[[[[[` (CodeQL
-    // js/polynomial-redos). `mage index` runs in CI on third-party PRs, so the input
-    // is not always ours. Cost: link text holding an unescaped `[` no longer matches.
-    const linkRegex = /\[[^\][]*\]\([^()]*\)/g;
-    let lm: RegExpExecArray | null;
-    while ((lm = linkRegex.exec(line)) !== null) {
-      linkRanges.push([lm.index, lm.index + lm[0].length]);
-    }
+    const linkRanges = findLinkRanges(line);
 
     // Find all inline code spans on this line
     const codeRanges: [number, number][] = [];
@@ -183,4 +174,42 @@ export function checkReadability(rawFile: string): ReadabilityProblem[] {
   }
 
   return problems;
+}
+
+/**
+ * Spans of `[text](target)` links on one line, matching what
+ * `/\[[^\][]*\]\([^()]*\)/g` finds, in one pass. The regex form restarts its scan at
+ * every `[`, so a line of `[](` repeated is quadratic (CodeQL js/polynomial-redos), and
+ * `mage index` runs in CI on third-party PRs. Link text may not hold `[` or `]`, and the
+ * target may not hold `(` or `)`.
+ */
+export function findLinkRanges(line: string): [number, number][] {
+  const n = line.length;
+  // nextBracket[i]: first index >= i holding `[` or `]`; nextParen[i]: same for `(` or `)`.
+  const nextBracket = new Int32Array(n + 1).fill(n);
+  const nextParen = new Int32Array(n + 1).fill(n);
+  for (let i = n - 1; i >= 0; i--) {
+    const c = line[i];
+    nextBracket[i] = c === "[" || c === "]" ? i : nextBracket[i + 1]!;
+    nextParen[i] = c === "(" || c === ")" ? i : nextParen[i + 1]!;
+  }
+  const ranges: [number, number][] = [];
+  let i = 0;
+  while (i < n) {
+    if (line[i] !== "[") {
+      i++;
+      continue;
+    }
+    const close = nextBracket[i + 1]!;
+    if (close < n && line[close] === "]" && line[close + 1] === "(") {
+      const end = nextParen[close + 2]!;
+      if (end < n && line[end] === ")") {
+        ranges.push([i, end + 1]);
+        i = end + 1;
+        continue;
+      }
+    }
+    i++;
+  }
+  return ranges;
 }
