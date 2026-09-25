@@ -104,6 +104,23 @@ describe("writeAgentsMd — KB shape blocks (kind repo/hub · mode in-repo/hybri
     }
   });
 
+  it("carries the commit hygiene passage with a worked proposal example in every shape", async () => {
+    for (const opts of [
+      { kind: "repo", mode: "in-repo", docsRel: "mage" },
+      { kind: "repo", mode: "hybrid", docsRel: "mage" },
+      { kind: "hub", mode: "in-repo", docsRel: "." },
+      { kind: "repo", mode: "external", docsRel: "mage", hubPath: "/abs/hub", project: "engine" },
+    ] as const) {
+      const repo = await tmpDir();
+      await writeAgentsMd(repo, opts);
+      const agents = await readAgents(repo);
+      expect(agents).toContain("Commit hygiene");
+      expect(agents).toContain(
+        "Example:\na KB opted in, the operator runs `mage groom --propose`, the command commits\nto a proposal branch and opens a PR.",
+      );
+    }
+  });
+
   it("keeps a hand-edited block and reports kept-hand-edits", async () => {
     const repo = await tmpDir();
     const opts = {
