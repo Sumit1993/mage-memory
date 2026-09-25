@@ -49,6 +49,7 @@ export interface IndexResult {
   wings: string[];
   hierarchical: boolean;
   written: string[];
+  deleted: string[];
   memoryTier: 0 | 1 | 2;
   admissionProblems: number;
   readabilityProblems: number;
@@ -136,6 +137,7 @@ export async function index(opts: IndexOptions = {}): Promise<IndexResult> {
       wings,
       hierarchical,
       written: [],
+      deleted: [],
       memoryTier: 0,
       admissionProblems,
       readabilityProblems,
@@ -144,7 +146,7 @@ export async function index(opts: IndexOptions = {}): Promise<IndexResult> {
   }
 
   // Remove stale generated per-wing index files (idempotency across mode flips).
-  await cleanGeneratedWingIndexes(root, hierarchical ? allWings : []);
+  const deleted = await cleanGeneratedWingIndexes(root, hierarchical ? allWings : []);
 
   const written: string[] = [];
   if (hierarchical) {
@@ -229,6 +231,9 @@ export async function index(opts: IndexOptions = {}): Promise<IndexResult> {
     for (const file of subResult.written) {
       written.push(relative(root, join(projRoot, file)));
     }
+    for (const file of subResult.deleted) {
+      deleted.push(relative(root, join(projRoot, file)));
+    }
   }
 
   if (!opts.quiet) {
@@ -245,6 +250,7 @@ export async function index(opts: IndexOptions = {}): Promise<IndexResult> {
     wings,
     hierarchical,
     written,
+    deleted,
     memoryTier,
     admissionProblems,
     readabilityProblems,
@@ -789,13 +795,14 @@ function encodePath(p: string): string {
 async function cleanGeneratedWingIndexes(
   root: string,
   keepWings: string[],
-): Promise<void> {
+): Promise<string[]> {
+  const deleted: string[] = [];
   const keep = new Set(keepWings.map((w) => `_index.${w}.md`));
   let entries: import("node:fs").Dirent[];
   try {
     entries = await readdir(root, { withFileTypes: true });
   } catch {
-    return;
+    return deleted;
   }
   for (const e of entries) {
     if (!e.isFile() || !/^_index\..+\.md$/.test(e.name) || keep.has(e.name))
@@ -803,9 +810,13 @@ async function cleanGeneratedWingIndexes(
     const p = join(root, e.name);
     try {
       const content = await readFile(p, "utf8");
-      if (content.includes(GEN_MARKER)) await rm(p);
+      if (content.includes(GEN_MARKER)) {
+        await rm(p);
+        deleted.push(e.name);
+      }
     } catch {
       /* leave files we can't read */
     }
   }
+  return deleted;
 }

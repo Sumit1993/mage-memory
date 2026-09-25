@@ -380,13 +380,14 @@ async function proposeBatch(
     promoted = accepted;
     const indexed = await index({ dir: opts.dir, quiet: opts.json });
 
-    // Stage what this run wrote. For a KB under a repo that is the KB root. For a hub-root
-    // KB the root IS the repo, so `[root]` would sweep every dirty or pre-staged file in
-    // the hub into the proposal; there it is the promoted notes and the index outputs only.
-    const commitPaths =
-      root === kbRepo
-        ? [...accepted, ...indexed.written].map((rel) => join(root, rel))
-        : [root];
+    // Stage what this run wrote: the promoted notes, index outputs, and any cleaned index files.
+    // Scoped strictly to concrete paths so unrelated dirty or pre-staged files in the repo
+    // (inside or outside the KB) are not swept into the proposal commit (ADR-0057).
+    const commitPaths = [
+      ...accepted,
+      ...indexed.written,
+      ...indexed.deleted,
+    ].map((rel) => join(root, rel));
     await gitAdd(kbRepo, commitPaths);
 
     // Gate-2 over what is ACTUALLY staged. The earlier scan ran before anything was

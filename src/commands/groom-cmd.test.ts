@@ -422,7 +422,7 @@ describe("mage groom --accept … --propose (ADR-0057)", () => {
     );
   });
 
-  it("re-scans the INDEX after staging, catching a dirty KB file the first scan could not see", async () => {
+  it("does not sweep an unrelated dirty file inside the KB into the proposal commit (root !== kbRepo)", async () => {
     const { dir, repo, root } = await withKb({
       kind: "repo",
       grooming: { proposals: true, autonomy: "overseer" },
@@ -430,23 +430,26 @@ describe("mage groom --accept … --propose (ADR-0057)", () => {
     await initRepoWithIdentity(repo);
     await run("git", ["-C", repo, "add", "."]);
     await run("git", ["-C", repo, "commit", "-m", "init"]);
+    expect(root).not.toBe(repo);
 
     const [slug] = await stageDistinct(dir, 1);
-    // An UNRELATED dirty file under the KB root. judgeProposal permits dirty paths
-    // inside the KB, and gitAdd sweeps it in — so only an index re-scan can catch it.
+    // An UNRELATED dirty file under the KB root. Since gitAdd stages only proposal-changed
+    // concrete paths, this file is not swept into the proposal commit.
     await mkdir(join(root, "notes"), { recursive: true });
     await writeFile(join(root, "notes", "unrelated.md"), "aws key: AKIAIOSFODNN7EXAMPLE\n");
 
+    const ghSpy = vi.spyOn(gitModule, "hasGh").mockResolvedValue(true);
     const pushSpy = vi.spyOn(gitModule, "gitPush").mockResolvedValue();
     const prSpy = vi.spyOn(gitModule, "createPullRequest").mockResolvedValue("https://x/pull/1");
     try {
-      await expect(groomCmd({ dir, accept: slug, propose: true })).rejects.toThrow(/redaction scan blocked/i);
-      expect(pushSpy).not.toHaveBeenCalled();
-      expect(prSpy).not.toHaveBeenCalled();
-      // Unstaged before the branch switch, so the user's next commit cannot sweep it in.
-      const cached = await run("git", ["-C", repo, "diff", "--cached", "--name-only"]);
-      expect(cached.stdout).not.toContain("unrelated.md");
+      await groomCmd({ dir, accept: slug, propose: true });
+      const proposeCommit = await run("git", ["-C", repo, "show", "--name-only", "--pretty=format:", "HEAD~1"]);
+      expect(proposeCommit.stdout).toContain(`notes/${slug}.md`);
+      expect(proposeCommit.stdout).not.toContain("unrelated.md");
+      const status = await run("git", ["-C", repo, "status", "--porcelain"]);
+      expect(status.stdout).toContain("unrelated.md");
     } finally {
+      ghSpy.mockRestore();
       pushSpy.mockRestore();
       prSpy.mockRestore();
     }
