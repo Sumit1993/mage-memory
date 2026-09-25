@@ -126,8 +126,10 @@ mage index          # refresh INDEX.md so the new notes are findable
 git -C <repo> add mage && git -C <repo> commit -m "groom: <n> notes"
 ```
 mage never commits for you — it suggests, you run. The exception is
-`--propose` (ADR-0057): opt-in per knowledge base, and it can only ever produce a
-branch and a pull request.
+`--propose` (ADR-0057): opt-in per knowledge base. `--propose` itself commits
+the promoted notes and pushes the proposal branch to open a pull request;
+Step 9's manual `git add`/`git commit` does not apply in proposal mode. It can
+only ever produce a branch and a pull request.
 
 ## Quality bar
 
