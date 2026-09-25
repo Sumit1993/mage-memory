@@ -1,11 +1,11 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import * as gitModule from "../git.js";
 import { run } from "../shell.js";
 import { exists, stagingPath } from "../paths.js";
 import { parseNote } from "../note.js";
-import { initRepoWithIdentity, withKb } from "../../test/fixtures/kb.js";
+import { initRepoWithIdentity, tmpDir, withKb } from "../../test/fixtures/kb.js";
 import { groomCmd } from "./groom-cmd.js";
 import { stageCmd } from "./stage-cmd.js";
 
@@ -241,6 +241,35 @@ describe("mage groom --accept … --propose (ADR-0057)", () => {
       rootSpy.mockRestore();
       pushSpy.mockRestore();
       prSpy.mockRestore();
+    }
+  });
+
+  it("normalises repoRoot and kbRepo when they differ only in form (symlink and trailing slash)", async () => {
+    const { dir, repo } = await withKb({ kind: "repo", grooming: { proposals: true } });
+    await initRepoWithIdentity(repo);
+    await run("git", ["-C", repo, "-c", "user.email=t@e.com", "-c", "user.name=t", "add", "."]);
+    await run("git", ["-C", repo, "-c", "user.email=t@e.com", "-c", "user.name=t", "commit", "-m", "init"]);
+
+    const externalDir = await tmpDir();
+    const link = join(externalDir, "repo-symlink");
+    await symlink(repo, link);
+
+    const [slug] = await stageDistinct(dir, 1);
+    const ghSpy = vi.spyOn(gitModule, "hasGh").mockResolvedValue(true);
+    const pushSpy = vi.spyOn(gitModule, "gitPush").mockResolvedValue();
+    const prSpy = vi.spyOn(gitModule, "createPullRequest").mockResolvedValue("https://x/pull/1");
+    // getRepoRoot returns a symlinked path with a trailing slash — differs only in form
+    const rootSpy = vi.spyOn(gitModule, "getRepoRoot").mockResolvedValue(`${link}/`);
+
+    try {
+      const res = await groomCmd({ dir, accept: slug, propose: true });
+      expect(res.accepted).toEqual([`notes/${slug}.md`]);
+      expect(res.proposalPr).toBe("https://x/pull/1");
+    } finally {
+      ghSpy.mockRestore();
+      pushSpy.mockRestore();
+      prSpy.mockRestore();
+      rootSpy.mockRestore();
     }
   });
 

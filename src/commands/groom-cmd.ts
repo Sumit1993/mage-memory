@@ -9,7 +9,7 @@
 // writes into committed `notes/`; the human still commits the diff (ADR-0013).
 
 import { readFile, realpath } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { logger } from "../logger.js";
 import { type ResolvedDocsRoot, requireDocsRoot, stagingPath } from "../paths.js";
 import { resolveCreationStamp, stampProvenance } from "../provenance.js";
@@ -279,10 +279,10 @@ async function proposeBatch(
   spec: string,
   opts: GroomOptions,
 ): Promise<GroomResult> {
-  // getRepoRoot returns a realpath'd toplevel, so an un-canonicalised kbRepo makes the
-  // gate's equality check misfire on a symlinked dir or a trailing slash.
-  const kbRepo = await realpath(resolved.repo).catch(() => resolved.repo);
-  const root = await realpath(resolved.root).catch(() => resolved.root);
+  // Normalise both sides through realpath and resolve so paths differing only in form
+  // (e.g. symlinks or trailing slashes) compare equal.
+  const kbRepo = await realpath(resolve(resolved.repo)).catch(() => resolve(resolved.repo));
+  const root = await realpath(resolve(resolved.root)).catch(() => resolve(resolved.root));
   const selected = select(spec, staged);
 
   const first = selected[0];
@@ -294,12 +294,13 @@ async function proposeBatch(
   const proposalsEnabled = (await readGrooming(resolved)).proposals;
   // Fail closed: falling back to kbRepo here would make judgeProposal's `repoRoot !==
   // kbRepo` check compare kbRepo to itself and never fire, vacuously passing condition 5.
-  const repoRoot = await getRepoRoot(kbRepo);
-  if (!repoRoot) {
+  const rawRepoRoot = await getRepoRoot(kbRepo);
+  if (!rawRepoRoot) {
     throw new Error(
       `mage groom --propose: could not determine the git repository root for \`${kbRepo}\`; is it a git repository?`,
     );
   }
+  const repoRoot = await realpath(resolve(rawRepoRoot)).catch(() => resolve(rawRepoRoot));
   const defaultBranch = await getDefaultBranch(kbRepo);
   const branchSuffix =
     selected.length === 1
