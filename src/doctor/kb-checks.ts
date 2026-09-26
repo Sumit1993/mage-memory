@@ -90,7 +90,7 @@ export async function pushKbChecks(
   await pushReachGrantCheck(checks, opts);
   // Gate-2 redaction pre-commit hook (detect+nudge; never installed by --fix) and
   // metadata schema drift (advisory; --fix migrates in place). Both fail-open.
-  await pushRedactHookCheck(checks, kb, conn.diff.connected);
+  await pushRedactHookCheck(checks, kb, opts, conn.diff.connected);
   await pushSchemaDriftCheck(checks, kb, opts);
   // Pre-fold state layout drift (ADR-0025): an OLD `.learnings`/`.metrics`/`.staging`
   // dir at a docs root; --fix relocates it under `.mage/`.
@@ -600,6 +600,14 @@ async function pushExternalHubCheck(checks: DoctorCheck[], opts: DoctorOptions):
   if (!codeRepo) return;
   const external = await externalDocsRoot(codeRepo);
   if (external.kind === "not-external") return;
+  if (external.kind === "resolved" && external.originMismatch) {
+    checks.push({
+      name: "external hub",
+      ok: false,
+      detail: `origin mismatch — using ${external.value.repo} anyway: ${external.originMismatch}. Fix that clone's origin, or re-run \`mage link <address>\``,
+    });
+    return;
+  }
   if (external.kind === "resolved") {
     checks.push({
       name: "external hub",
@@ -634,8 +642,8 @@ async function pushExternalHubCheck(checks: DoctorCheck[], opts: DoctorOptions):
  *                                     neither must fail a CI runner or nag for a fix that will
  *                                     never be made.
  *   - hub present, grant missing    → FAIL, with `mage connect` as the fix
- *   - hub present, origin mismatch  → FAIL, hard error naming both remotes — never reused,
- *                                     never clobbered (ADR-0043 §2)
+ *   - hub present, origin mismatch  → FAIL naming both remotes — never granted, never
+ *                                     clobbered (ADR-0056)
  *
  * Detect-and-instruct only. ADR-0037 §2 holds doctor to read-only over host config, so
  * even though this repair passes §3's auto-fix test (idempotent ∧ mage-owned ∧ local ∧
@@ -654,7 +662,7 @@ async function pushReachGrantCheck(checks: DoctorCheck[], opts: DoctorOptions): 
       checks.push({
         name: "KB access grant",
         ok: false,
-        detail: `hub mismatch — never reused, never clobbered: ${status.details.join("; ")}`,
+        detail: `hub mismatch — not granted: ${status.details.join("; ")}`,
       });
       return;
     case "missing":
@@ -694,11 +702,9 @@ async function pushReachGrantCheck(checks: DoctorCheck[], opts: DoctorOptions): 
  * a commit that stages a live secret. `mage connect` installs it; `doctor` only
  * DETECTS — it never installs (Decision 7: --fix repairs drift, it does not wire
  * from scratch). Scope:
- *   - kind "hub" is skipped — this covers BOTH true hubs (not a code repo mage
- *     connects, Decision 5) AND external-mode projects (resolveDocsRoot reports them
- *     as kind "hub"; their notes commit to the hub, not the code repo, so the code
- *     repo has no note-commit to gate). External-mode Gate-2 placement is a
- *     deliberate deferral, not an oversight.
+ *   - a true hub is skipped: it is not a code repo mage connects (Decision 5).
+ *   - an external-mode project checks its CODE repo, where `mage connect` installs the
+ *     hook (#195); resolveDocsRoot reports it as kind "hub", so the kind alone can't tell.
  *   - non-git KBs are skipped: there is no pre-commit hook to speak of.
  * Severity is advisory throughout: Gate 1 (inline `mage redact`) still applies, and
  * a human's own pre-commit hook (foreign) is theirs to keep — we only suggest
@@ -707,11 +713,14 @@ async function pushReachGrantCheck(checks: DoctorCheck[], opts: DoctorOptions): 
 async function pushRedactHookCheck(
   checks: DoctorCheck[],
   kb: Kb,
+  opts: DoctorOptions,
   connected: boolean,
 ): Promise<void> {
-  if (kb.kind !== "repo") return; // hubs + external-mode KBs (see doc above)
+  const repo =
+    kb.kind === "repo" ? kb.repo : await findCodeRepoRoot(opts.cwd ?? process.cwd()).catch(() => null);
+  if (!repo) return; // a true hub (see doc above)
 
-  const status = await detectRedactHook(kb.repo);
+  const status = await detectRedactHook(repo);
   if (status === "not-a-repo") return; // no pre-commit hook concept here
 
   if (status === "present") {

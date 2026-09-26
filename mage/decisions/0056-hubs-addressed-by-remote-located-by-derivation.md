@@ -27,10 +27,10 @@ fallback to the wrong store writes knowledge where nobody will read it.
 the repo knowledge base. A reach grant keyed on auto-memory being on. An index that needs the registry.
 ## Example
 `metadata.json` holds `hub_repo: github.com/o/r-kb`; the hub is at `~/.mage/hubs/github.com/o/r-kb`. If that
-directory's origin is `github.com/x/other`, doctor prints "hub at <path> has origin x/other, expected o/r-kb"
-and every command that needs the hub stops there.
+directory's origin is `github.com/x/other`, doctor fails naming both remotes, the CLI uses the
+derived clone anyway, and the harness grant is withheld until the origin is fixed.
 ## Relations
 Absorbs 0011, 0012, 0023, 0042, 0043, the address half of 0044, 0045, 0047. Enforced by `src/hub-url.ts:257`
 (`deriveHubPath`), `:292` (`chosenHubRoot`), `src/paths.ts:869` (`resolveHubGrant`), `:836`, `src/scan.ts:38`.
-Code still contradicts this: `src/paths.ts:686` falls back to `hub_path` on a mismatch (#191); `src/commands/init.ts:186`
+Code still contradicts this: `src/commands/init.ts:186`
 writes `hub_repo: null` for `--local` instead of a `local://` address (no issue builds it); `code_repo_path` leaves in PR #242.

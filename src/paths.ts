@@ -453,7 +453,6 @@ export type HubUnreachableReason =
   | "no-hub-target"
   | "hub-absent"
   | "hub-corrupted"
-  | "hub-mismatch"
   | "hub-origin-unreadable"
   | "unknown-failure";
 
@@ -461,7 +460,12 @@ export type HubUnreachableReason =
 // (where does this repo's hub resolve to) and must stay in agreement — ADR-0043
 // §5's one-shared-function rule. Converging them is issue #158's follow-up.
 export type ExternalDocsRootResult =
-  | { kind: "resolved"; value: ResolvedDocsRoot }
+  | {
+      kind: "resolved";
+      value: ResolvedDocsRoot;
+      /** The clone at the derived path has a different origin; used anyway, loudly (#191). Redacted. */
+      originMismatch?: string;
+    }
   | { kind: "not-external" }
   | {
       kind: "hub-unreachable";
@@ -557,8 +561,6 @@ export function hubUnreachableMessage(
     }
     case "hub-corrupted":
       return `${head}: something exists${at}${addr} but is not a mage hub (no projects/ + metadata.json). Move or remove it, then run \`mage connect\`.${dontInit}`;
-    case "hub-mismatch":
-      return `${head}: ${r.detail ?? `hub origin mismatch${at}`}.${dontInit}`;
     case "hub-origin-unreadable":
       return `${head}: ${r.detail ?? `could not read the origin remote${at}`}.${dontInit}`;
     case "no-hub-target":
@@ -646,9 +648,10 @@ async function missingHubReason(root: string): Promise<"hub-absent" | "hub-corru
  *
  *   1. `hub_repo` present → derive its path, and use it only if BOTH arrival
  *      checks pass ({@link verifyHubArrival}: hub-shaped + origin matches).
- *   2. Else (absent, wrong shape, unreadable origin, OR a hard origin
- *      MISMATCH) fall back to `hub_path`, gated on the same shape check —
- *      the deprecated transition path (ADR-0043 §6).
+ *   2. On a hard origin MISMATCH use the derived root anyway and carry the
+ *      detail as `originMismatch` (#191 ruling); never `hub_path`. On absent,
+ *      wrong shape or unreadable origin fall back to `hub_path`, gated on the
+ *      same shape check — the deprecated transition path (ADR-0043 §6).
  *   3. Else hub-unreachable — returns `{ kind: "hub-unreachable", reason,
  *      expectedAddress, expectedPath }`;
  *      {@link resolveDocsRoot} returns null (does NOT degrade to repo KB).
@@ -678,21 +681,23 @@ export async function externalDocsRoot(dir: string): Promise<ExternalDocsRootRes
     }
 
     let hubRoot: string;
+    let originMismatch: string | undefined;
     if (chosen.source === "derived") {
       const arrival = await verifyHubArrival(chosen.root, meta.hub_repo as string);
       if (arrival.ok) {
         hubRoot = chosen.root;
+      } else if (arrival.reason === "origin-mismatch") {
+        hubRoot = chosen.root;
+        originMismatch = arrival.detail;
       } else if (meta.hub_path && (await looksLikeHub(meta.hub_path))) {
-        hubRoot = meta.hub_path; // fall back to the deprecated hub_path (incl. on a mismatch)
+        hubRoot = meta.hub_path;
       } else {
         const reason: HubUnreachableReason =
-          arrival.reason === "origin-mismatch"
-            ? "hub-mismatch"
-            : arrival.reason === "origin-unreadable"
-              ? "hub-origin-unreadable"
-              : arrival.reason === "not-a-hub"
-                ? "hub-corrupted"
-                : "hub-absent";
+          arrival.reason === "origin-unreadable"
+            ? "hub-origin-unreadable"
+            : arrival.reason === "not-a-hub"
+              ? "hub-corrupted"
+              : "hub-absent";
         return {
           kind: "hub-unreachable",
           reason,
@@ -720,6 +725,7 @@ export async function externalDocsRoot(dir: string): Promise<ExternalDocsRootRes
         kind: "hub",
         repo: hubRoot,
       },
+      ...(originMismatch ? { originMismatch } : {}),
     };
   } catch {
     return {
@@ -859,12 +865,12 @@ export interface HubGrantResolution {
  *   - source "derived" → the full ADR-0043 §3 arrival check
  *     ({@link verifyHubArrival}: shape + origin match).
  *       - ok → "derived", grant the derived root.
- *       - origin MISMATCH → "mismatch", root null — a hard, named failure that
- *         never silently falls back (never reused, never clobbered).
+ *       - origin MISMATCH → "mismatch", root null — never granted and never a
+ *         `hub_path` fallback. `externalDocsRoot` uses the derived root anyway
+ *         (#191 ruling); the grant stays refused (ADR-0056).
  *       - absent / wrong shape / unreadable origin → fall back to `hub_path`
- *         when the pair carries one and it's hub-shaped (mirrors
- *         `externalDocsRoot`'s fallback, so a grant decision never drifts from
- *         a docs-root decision); else "absent", root null.
+ *         when the pair carries one and it's hub-shaped (the same fallback as
+ *         `externalDocsRoot`); else "absent", root null.
  */
 export async function resolveHubGrant(target: HubTarget): Promise<HubGrantResolution> {
   if (target.source === "hub_path") {
