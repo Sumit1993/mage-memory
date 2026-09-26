@@ -161,7 +161,12 @@ confirm; you batch-review the drafts later with \`mage:groom\`. Don't wait for a
 session boundary — capture at first sight.
 
 **Commit hygiene:** mage never commits for you. It suggests \`git\` commands; you
-run them.`;
+run them. The one exception is \`mage groom --accept … --propose\`, which you have
+to turn on per knowledge base (\`grooming.proposals\`) and invoke by hand: it
+commits to a branch under \`mage/proposal/\` and opens a pull request, and can
+produce nothing else — never a commit on a default branch (ADR-0057). Example:
+a KB opted in, the operator runs \`mage groom --accept onboarding --propose\`, the
+command commits to a proposal branch and opens a PR.`;
 }
 
 function mageBlock(opts: AgentsMdOptions): string {
@@ -198,7 +203,12 @@ confirm; you batch-review the drafts later with \`mage:groom\`. Don't wait for a
 session boundary — capture at first sight.
 
 **Commit hygiene:** mage never commits for you. It suggests \`git\` commands; you
-run them.`;
+run them. The one exception is \`mage groom --accept … --propose\`, which you have
+to turn on per knowledge base (\`grooming.proposals\`) and invoke by hand: it
+commits to a branch under \`mage/proposal/\` and opens a pull request, and can
+produce nothing else — never a commit on a default branch (ADR-0057). Example:
+a KB opted in, the operator runs \`mage groom --accept onboarding --propose\`, the
+command commits to a proposal branch and opens a PR.`;
 }
 
 /**

@@ -144,7 +144,7 @@ trigger has no signal to optimize against yet.
    ```bash
    git -C <repo> add -A && git -C <repo> commit -m "optimize: reword <skill> trigger"
    ```
-   Review the diff first. mage never commits for you — it suggests, you run.
+   Review the diff first. mage never commits for you here — it suggests, you run.
 
 ## Worked example — a trigger that kept mis-firing
 
