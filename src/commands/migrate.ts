@@ -27,8 +27,9 @@
 // pre-existing target or any fs error leaves the OLD artifact untouched — a draft or a
 // ledger is never lost to a half-migration.
 
+import { existsSync } from "node:fs";
 import { mkdir, readdir, rename, rm } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import {
   type AgentsMdOptions,
   type AgentsMdWriteResult,
@@ -128,8 +129,10 @@ export interface MigrateResult {
   work: { root: string; files: number }[];
   /** Null when no KB root carries a settings file to re-upsert. */
   hooks: HooksEntry | null;
-  /** Null when the AGENTS.md block could not be targeted (hub path unknown). */
+  /** Null when the AGENTS.md block could not be targeted (hub path unknown) or its write failed. */
   agentsMd: AgentsMdWriteResult | null;
+  /** Why the AGENTS.md write failed, when it was targeted and threw. */
+  agentsMdError?: string;
   /** A hub's registered projects, each of which needs its own `mage migrate`. */
   projectsToVisit: string[];
 }
@@ -266,8 +269,12 @@ export async function mageMigrate(opts: MigrateOptions = {}): Promise<MigrateRes
   }
   const hooks = settingsRoot ? await reupsertHooks(settingsRoot) : null;
   let agentsMd: AgentsMdWriteResult | null = null;
+  let agentsMdError: string | undefined;
   if (agentsTarget?.opts) {
-    agentsMd = await writeAgentsMd(agentsTarget.root, agentsTarget.opts).catch(() => null);
+    agentsMd = await writeAgentsMd(agentsTarget.root, agentsTarget.opts).catch((err: unknown) => {
+      agentsMdError = err instanceof Error ? err.message : String(err);
+      return null;
+    });
   }
 
   return {
@@ -279,6 +286,7 @@ export async function mageMigrate(opts: MigrateOptions = {}): Promise<MigrateRes
     work,
     hooks,
     agentsMd,
+    ...(agentsMdError ? { agentsMdError } : {}),
     projectsToVisit,
   };
 }
@@ -510,7 +518,7 @@ export function reportMigrate(result: MigrateResult): void {
       logger.success(`Moved ${m.kind} under .mage/ at ${m.root}`);
     }
     for (const c of removed) {
-      logger.success(`Removed ${c.kind} at ${c.root} (its writer retired in #208)`);
+      logger.success(`Removed ${c.kind} at ${c.root} (${RETIRED_BY[c.kind]})`);
     }
     for (const p of result.alreadyCurrent) {
       logger.detail(`Already current: ${p}`);
@@ -553,6 +561,8 @@ export function reportMigrate(result: MigrateResult): void {
     } else {
       logger.detail(`AGENTS.md: ${result.agentsMd.agents}`);
     }
+  } else if (result.agentsMdError) {
+    logger.warn(`AGENTS.md left as is: ${result.agentsMdError}`);
   } else {
     logger.warn("AGENTS.md left as is: hub path unknown — run `mage link`");
   }
@@ -561,13 +571,28 @@ export function reportMigrate(result: MigrateResult): void {
     logger.detail(`run \`mage migrate\` in the code repo for ${name}`);
   }
 
-  if (changed) {
+  const commitPaths = committedChanges(result);
+  if (commitPaths.length > 0) {
     logger.blank();
     logger.info("Review the diff and commit yourself (mage never commits):");
-    logger.detail(
-      '  git add AGENTS.md CLAUDE.md metadata.json mage/metadata.json 2>/dev/null; git commit -m "chore: migrate mage state"',
-    );
+    logger.detail(`  git add -- ${commitPaths.join(" ")} && git commit -m "chore: migrate mage state"`);
   }
+}
+
+const RETIRED_BY: Record<ClearedEntry["kind"], string> = {
+  "promote-tally": "its writer retired in #208",
+  "distill-watermark": "its writer retired in #208",
+  "nudge-throttle": "the nudge dropped it in #210",
+};
+
+/** The committed files this run changed and that exist, relative to cwd; the rest is gitignored state. */
+function committedChanges(result: MigrateResult): string[] {
+  const agents = result.agentsMd;
+  const paths = result.migrated.map((m) => m.path);
+  if (agents && (agents.agents === "created" || agents.agents === "written")) {
+    paths.push(agents.path, join(dirname(agents.path), "CLAUDE.md"));
+  }
+  return paths.filter((p) => existsSync(p)).map((p) => relative(process.cwd(), p) || p);
 }
 
 /** Shown in the "already current" line to name the layout the fold targets. */

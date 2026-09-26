@@ -90,16 +90,13 @@ Here it is on a 0.0.17 knowledge base, then a second time:
 ```console
 $ mage migrate
 ✓ Removed promote-tally at /repo/mage (its writer retired in #208)
-✓ Removed nudge-throttle at /repo/mage (its writer retired in #208)
+✓ Removed nudge-throttle at /repo/mage (the nudge dropped it in #210)
   Already current: /repo/mage/metadata.json
 staging: 1 draft(s) pending at /repo/mage — run `mage groom`
 ⚠ work/ is retired (ADR-0050): 1 file(s) left in place at /repo/mage; links in notes and decisions are not rewritten
   hooks: written (/repo/.claude/settings.local.json); observe arm: added
 ⚠ /repo/AGENTS.md: the mage block between <!-- BEGIN mage --> and <!-- END mage --> predates hash stamps and was left as is. …
     mage migrate never overwrites it. To take the current block, move any text of your own below <!-- END mage -->, delete the block, and run mage migrate again.
-
-Review the diff and commit yourself (mage never commits):
-    git add AGENTS.md CLAUDE.md metadata.json mage/metadata.json 2>/dev/null; git commit -m "chore: migrate mage state"
 $ mage migrate
 ✓ Already current (mage.v2, .mage/ layout); nothing to migrate.
 staging: 1 draft(s) pending at /repo/mage — run `mage groom`
