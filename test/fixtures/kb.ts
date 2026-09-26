@@ -21,6 +21,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { onTestFinished } from "vitest";
+import { gitInit } from "../../src/git.js";
 import {
   type GroomingConfig,
   type HubProject,
@@ -34,6 +35,7 @@ import {
   metadataPath,
   resolveDocsRoot,
 } from "../../src/paths.js";
+import { run } from "../../src/shell.js";
 
 /** Create a temp dir removed when the current test finishes — no afterEach/made[] needed. */
 export async function tmpDir(prefix = "mage-test-"): Promise<string> {
@@ -42,6 +44,16 @@ export async function tmpDir(prefix = "mage-test-"): Promise<string> {
     await rm(dir, { recursive: true, force: true });
   });
   return dir;
+}
+
+/**
+ * A temp repo that git will actually commit in. CI runners carry no user.name /
+ * user.email, so production `gitCommit` fails there while passing on a dev box.
+ */
+export async function initRepoWithIdentity(repo: string): Promise<void> {
+  await gitInit(repo);
+  await run("git", ["-C", repo, "config", "user.email", "t@e.com"]);
+  await run("git", ["-C", repo, "config", "user.name", "t"]);
 }
 
 /**
