@@ -9,6 +9,8 @@ The [lesson path](./stage-groom.md) catches what is striking the *first* time yo
 
 While the command is still named `mage promote` for historical reasons, it now exclusively drives **graduation** — when a proven procedural note earns its own auto-loadable skill. (An older version of this path used to propose new notes based on keyword recurrence; that was deleted in ADR-0038 because deterministic note-selection proved too noisy.)
 
+**Retired (#208).** `mage promote` now prints a signpost and exits 0, so this path finds no candidates today. Graduation comes back as one proposal type in `mage groom` (#219). The rest of this page describes the path as it worked until then.
+
 ## It counts chapters, not sessions
 
 The unit of usage is the **compact-chapter** — one stretch of work between context compactions (or session ends), not a session id. This distinction is load-bearing. A session id stays constant across compaction, so if usage counted sessions, one long continuously-compacted chat would never accrue any. Counting chapters means even a single ongoing chat keeps building up usage as it compacts.

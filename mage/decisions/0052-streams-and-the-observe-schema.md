@@ -30,5 +30,6 @@ is one `prevented` for `kit/guard/webfetch`. A kit hook that blocks pipes
 `{"type":"guard_fired","guard_id":"kit/guard/no-haiku"}` to `mage observe` on stdin within 500 ms, fail-open.
 ## Relations
 Absorbs 0015, 0027, 0028, 0029 and decision 3 of 0048. Enforced by `src/observe/types.ts:10` (the event union),
-`src/observe/scrub.ts` (Gate-1), `src/adapters/claude-code/settings.ts:80` (hook groups). Not yet in the union:
-`tool_attempt` (#209, PR #260) and `guard_fired` (#230, PR #254). Puller #217; corrections with a rule id #244.
+`src/observe/scrub.ts` (Gate-1), `src/adapters/claude-code/settings.ts:80` (hook groups), `isGuardId` in
+`src/observe/types.ts` (the `guard_fired` boundary, #230). Not yet in the union: `tool_attempt` (#209, PR #260).
+Puller #217; corrections with a rule id #244.

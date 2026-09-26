@@ -86,6 +86,10 @@ export const MAGE_HOOKS: ReadonlyArray<{
   // session is already ending).
   { event: "SessionStart", id: "mage:nudge:SessionStart", command: "mage nudge" },
   { event: "UserPromptSubmit", id: "mage:observe:UserPromptSubmit", command: "mage observe" },
+  // A tool_attempt row on PreToolUse, paired with tool_use via tool_use_id (#209):
+  // a blocked call (settings deny, hook block) never reaches PostToolUse, so an
+  // attempt with no matching use is the signal for a prevented call.
+  { event: "PreToolUse", id: "mage:observe:PreToolUse", command: "mage observe" },
   { event: "PostToolUse", id: "mage:observe:PostToolUse", command: "mage observe" },
   { event: "PostToolUseFailure", id: "mage:observe:PostToolUseFailure", command: "mage observe" },
   { event: "PreCompact", id: "mage:observe:PreCompact", command: "mage observe" },
@@ -94,6 +98,7 @@ export const MAGE_HOOKS: ReadonlyArray<{
   // Second Stop group: capture the agent's final reply (ADR-0019 amendment to
   // ADR-0015). Distinct id from mage:metrics:Stop, so both coexist on Stop.
   { event: "Stop", id: "mage:observe:Stop", command: "mage observe" },
+  { event: "Stop", id: "mage:nudge:Stop", command: "mage nudge" },
   // Capture autonomous SUBagent work (0.0.11 Candidate 4): a Task subagent's tool
   // calls never reach the main-session PostToolUse hook, so its final reply — read
   // from the subagent transcript, exactly like Stop → assistant_msg — is the one

@@ -4,6 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 import { logger } from "../logger.js";
 import { dashboard } from "./dashboard-cmd.js";
 import { init } from "./init.js";
+import { buildProgram } from "../cli-program.js";
+import { RETIRED_VERB_MESSAGES } from "./retired.js";
 import { codeRepoDocsRoot } from "../paths.js";
 import { tmpDir } from "../../test/fixtures/kb.js";
 
@@ -109,6 +111,24 @@ describe("dashboard — an unreachable external hub is not a missing KB (#158)",
       expect(said).toMatch(/Do NOT run `mage init`/);
     } finally {
       err.mockRestore();
+    }
+  });
+});
+
+describe("mage dashboard signpost", () => {
+  it("prints that dashboard has retired and exits 0", async () => {
+    const program = buildProgram();
+    program.exitOverride();
+    const lines: string[] = [];
+    const origLog = console.log;
+    console.log = (...msgs: unknown[]) => {
+      lines.push(msgs.map((m) => String(m)).join(" "));
+    };
+    try {
+      await program.parseAsync(["dashboard"], { from: "user" });
+      expect(lines.join("\n")).toBe(RETIRED_VERB_MESSAGES.dashboard);
+    } finally {
+      console.log = origLog;
     }
   });
 });

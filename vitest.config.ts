@@ -8,5 +8,6 @@ export default defineConfig({
   test: {
     include: ["src/**/*.test.ts", "test/**/*.test.ts"],
     exclude: ["**/node_modules/**", "**/dist/**", "docs/**", "test/integration/**"],
+    setupFiles: ["test/setup/isolate-home.ts"],
   },
 });

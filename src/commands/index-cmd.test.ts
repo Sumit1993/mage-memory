@@ -1,5 +1,9 @@
+import { execFile } from "node:child_process";
+import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 import { tmpDir } from "../../test/fixtures/kb.js";
 import {
@@ -1253,4 +1257,77 @@ describe("mage index — recall surface filtering & metadata genre overrides (AD
     // The root recall surface does not advertise the document-only wing.
     expect(await readIndex(join(dir, "mage"))).not.toContain("**paperwork**");
   });
+
+  describe("admission and readability checks", () => {
+    it("report mode writes the index and returns non-zero problem counts", async () => {
+      const dir = await vault();
+      // Note without admission fields
+      await note(dir, "unadmitted.md", "---\ntype: gotcha\ntags: [core/test]\n---\n# Unadmitted Note\n");
+      const r = await index({ dir });
+      expect(r.written.length).toBeGreaterThan(0);
+      expect(r.admissionProblems).toBeGreaterThan(0);
+      expect(typeof r.readabilityProblems).toBe("number");
+    });
+
+    it("strict mode writes nothing when admission or readability problems exist", async () => {
+      const dir = await vault();
+      await note(dir, "failing.md", "---\ntype: gotcha\ntags: [core/test]\n---\n# Failing Note\n");
+      const r = await index({ dir, strictAdmission: true });
+      expect(r.written).toEqual([]);
+      expect(r.passed).toBe(false);
+      expect(r.admissionProblems).toBeGreaterThan(0);
+    });
+
+    it("quiet suppresses the report but still counts problems", async () => {
+      const dir = await vault();
+      await note(dir, "silent.md", "---\ntype: gotcha\ntags: [core/test]\n---\n# Silent Note\n");
+      const r = await index({ dir, quiet: true });
+      expect(r.written.length).toBeGreaterThan(0);
+      expect(r.admissionProblems).toBeGreaterThan(0);
+      expect(typeof r.readabilityProblems).toBe("number");
+    });
+
+    it("CLI: --strict-admission exits non-zero on admission failure", async () => {
+      const dir = await vault();
+      await note(dir, "failing.md", "---\ntype: gotcha\ntags: [core/test]\n---\n# Failing Note\n");
+      const repoRoot = resolve(fileURLToPath(new URL(".", import.meta.url)), "../..");
+      const cliBin = join(repoRoot, "dist", "cli.js");
+      // Without the build, node exits 1 with MODULE_NOT_FOUND and the exit-code check
+      // below would pass for the wrong reason.
+      expect(existsSync(cliBin), `${cliBin} is missing: run pnpm build first`).toBe(true);
+      const strict = await promisify(execFile)(process.execPath, [
+        cliBin,
+        "index",
+        "--strict-admission",
+        "-d",
+        dir,
+      ]).then(
+        () => null,
+        (err: { code?: number; stdout?: string }) => err,
+      );
+      expect(strict, "index --strict-admission should exit non-zero").not.toBeNull();
+      expect(strict?.code).toBe(1);
+      expect(strict?.stdout).toContain("notes/failing.md");
+      expect(strict?.stdout).toMatch(/Total: \d+ problem\(s\) \(\d+ admission/);
+
+      // Proves that without --strict-admission, the same failing note reports problems but exits 0
+      const ok = await promisify(execFile)(process.execPath, [cliBin, "index", "-d", dir]);
+      expect(ok.stdout).toContain("problem(s)");
+    });
+
+    it("strict mode at a hub root refuses on a project's note, writes nothing, counts once", async () => {
+      const root = await hub([
+        { name: "engine", storage: "hub-owned", code_repo_url: "git@github.com:me/engine.git" },
+      ]);
+      await put(root, "projects/engine/notes/bad.md", "---\ntype: note\ntags: [engine/api]\n---\n# Bad\n");
+      const report = await index({ dir: root, quiet: true });
+      const strict = await index({ dir: root, quiet: true, strictAdmission: true });
+      expect(strict.passed).toBe(false);
+      expect(strict.written).toEqual([]);
+      expect(strict.admissionProblems).toBeGreaterThan(0);
+      // The fan-out indexes projects with skipChecks, so report mode counts the note once.
+      expect(report.admissionProblems).toBe(strict.admissionProblems);
+    });
+  });
 });
+

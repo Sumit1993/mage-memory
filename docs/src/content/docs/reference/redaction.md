@@ -20,7 +20,7 @@ flowchart LR
 
 ## Gate 1 — scrub and continue (on capture)
 
-The first boundary is every write into the gitignored capture scratch (`mage observe`) and the note/lesson drafts mage distills. Here the engine runs in **scrub-and-continue** mode: it finds secret-shaped values, replaces them in place, and keeps going. Nothing blocks.
+The first boundary is every write into the gitignored capture scratch (`mage observe`) and the drafts mage grooms. Here the engine runs in **scrub-and-continue** mode: it finds secret-shaped values, replaces them in place, and keeps going. Nothing blocks.
 
 The replacement keeps the surrounding context but masks the value, so a draft stays readable:
 

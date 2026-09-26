@@ -55,6 +55,15 @@ jobs:
       - name: Test
         run: pnpm test
 
+      # The integration suite exercises the built CLI against a real filesystem
+      # and git. Measured at ~8s including the build (#243). MAGE_LIVE is unset,
+      # so the billed live tests skip themselves. vitest directly, not
+      # `pnpm test:integration`: that script builds again, and the Build step above
+      # already produced dist/.
+      - name: Integration tests
+        if: matrix.node-version == 22
+        run: pnpm exec vitest run -c vitest.integration.config.ts
+
       - name: Pack the publishable tarball
         if: matrix.node-version == 22
         run: |

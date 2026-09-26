@@ -101,13 +101,19 @@
       "event": "SessionStart",
       "id": "mage:nudge:SessionStart",
       "command": "mage nudge",
-      "purpose": "The boundary nudge: on a post-compaction SessionStart, surface the just-closed chapter's earned-signal digest (failures, external commands, corrections) as additionalContext for the agent to mine and `mage stage` (ADR-0029). The additionalContext is scaled by the per-KB autonomy level (Operator/Approver/Overseer, ADR-0030): at Operator it is a reminder; at Approver/Overseer it becomes the agent's mandate to groom and write durable notes into the working tree (uncommitted, Gate-2 enforced). It also carries a deterministic capped backlog tally — staged drafts, unmined closed chapters (capped at 9+), and graduation-eligible signatures from the persisted promote tally — rendered as one work-list line. Fires on SessionStart source compact/startup/resume (clear stays a fast no-op); the backlog scan is mtime-gated so a no-new-scratch startup/resume stays ~instant."
+      "purpose": "Alert on SessionStart when a proposal is waiting or an external hub/grant check failed; stays silent on plain startup."
     },
     {
       "event": "UserPromptSubmit",
       "id": "mage:observe:UserPromptSubmit",
       "command": "mage observe",
       "purpose": "Capture the prompt's intent."
+    },
+    {
+      "event": "PreToolUse",
+      "id": "mage:observe:PreToolUse",
+      "command": "mage observe",
+      "purpose": "Capture a tool_attempt — a call was requested. Paired with the tool_use it produces by tool_use_id; an attempt with no matching use means the call was blocked (#209)."
     },
     {
       "event": "PostToolUse",
@@ -144,6 +150,12 @@
       "id": "mage:observe:Stop",
       "command": "mage observe",
       "purpose": "Capture the agent's final reply (ADR-0019 amendment to ADR-0015)."
+    },
+    {
+      "event": "Stop",
+      "id": "mage:nudge:Stop",
+      "command": "mage nudge",
+      "purpose": "Emit a one-line session receipt (denied, corrected, new signatures, guard fires) at turn-end."
     },
     {
       "event": "SubagentStop",
@@ -224,6 +236,10 @@
         {
           "flags": "--no-connect",
           "description": "skip auto-wiring capture hooks after an in-repo init"
+        },
+        {
+          "flags": "--force-agents-md",
+          "description": "regenerate the mage block in AGENTS.md even when it carries hand edits or predates hash stamps (edits inside the block are lost)"
         }
       ]
     },
@@ -236,12 +252,16 @@
         {
           "flags": "-d, --dir <path>",
           "description": "where to look for the knowledge base (default: cwd; walks up for in-repo)"
+        },
+        {
+          "flags": "--strict-admission",
+          "description": ""
         }
       ]
     },
     {
       "name": "skills",
-      "summary": "(Re)generate one auto-loaded skill per wing into .claude/skills/ and .agents/skills/",
+      "summary": "Retired signpost; `--metrics` still folds the context-match rollup until `mage ledger` (#237)",
       "aliases": [],
       "hidden": false,
       "options": [
@@ -265,7 +285,7 @@
     },
     {
       "name": "footprint",
-      "summary": "report mage's context-window cost: launch surfaces, yield, pointer leverage",
+      "summary": "Retired signpost: use `mage doctor` instead",
       "aliases": [],
       "hidden": false,
       "options": [
@@ -325,7 +345,7 @@
     },
     {
       "name": "distill",
-      "summary": "Read observed .mage/learnings into note candidates (plumbing behind mage:groom Phase 1)",
+      "summary": "Retired signpost: use `mage groom` instead",
       "aliases": [],
       "hidden": true,
       "options": [
@@ -345,7 +365,7 @@
     },
     {
       "name": "promote",
-      "summary": "Fold note-read usage into graduate proposals (plumbing behind mage:graduate)",
+      "summary": "Retired signpost: use `mage groom` instead",
       "aliases": [],
       "hidden": true,
       "options": [
@@ -364,8 +384,15 @@
       ]
     },
     {
+      "name": "graduate",
+      "summary": "Retired signpost: use `mage groom` instead",
+      "aliases": [],
+      "hidden": true,
+      "options": []
+    },
+    {
       "name": "stage",
-      "summary": "Stage a short lesson draft into .mage/staging/ (frictionless inline capture — the organic grooming loop)",
+      "summary": "Retired signpost: use `mage observe` instead",
       "aliases": [],
       "hidden": true,
       "options": [
@@ -445,7 +472,7 @@
     },
     {
       "name": "nudge",
-      "summary": "Hook-fired boundary nudge: on a SessionStart (compact/startup/resume), surface the closed chapter's earned-signal digest plus the autonomy-scaled grooming backlog for the agent to mine and `mage stage`/`mage:groom` (ADR-0029/0030; never blocks the host)",
+      "summary": "Hook-fired boundary nudge: on Stop, emit a one-line session receipt; on SessionStart (compact/startup/resume), alert if a proposal is waiting or a check failed (never blocks the host)",
       "aliases": [],
       "hidden": true,
       "options": [
@@ -532,6 +559,10 @@
         {
           "flags": "--no-connect",
           "description": "skip auto-wiring capture hooks after link"
+        },
+        {
+          "flags": "--force-agents-md",
+          "description": "regenerate the mage block in AGENTS.md even when it carries hand edits or predates hash stamps (edits inside the block are lost)"
         }
       ]
     },
@@ -656,7 +687,7 @@
     },
     {
       "name": "dashboard",
-      "summary": "Generate this KB's dashboard (Dashboard.md + Knowledge.base; --html adds the interactive cockpit)",
+      "summary": "Retired signpost: use `mage index` instead",
       "aliases": [],
       "hidden": false,
       "options": [

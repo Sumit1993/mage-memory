@@ -34,6 +34,11 @@ write through the single applier.
 
 ## Steps
 
+**Retired (#208).** `mage promote` now prints a signpost and exits 0, so step 2 returns
+no candidates and this skill has nothing to graduate. Do not substitute `mage groom --json`:
+it returns the staged batch, not a graduation manifest. Graduation comes back as one
+proposal type in `mage groom` (#219).
+
 1. **Resolve the knowledge base.** Find the nearest `mage/metadata.json` (walk
    up). docs root = `<repo>/mage/` (in-repo) or `<hub root>/projects/<project>/`
    (external — the hub root is derived from `hub_repo`, ADR-0043). The deprecated
