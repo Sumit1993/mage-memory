@@ -8,6 +8,9 @@ on:
   # A closed PR is swept at once; the weekly run catches late thread changes and missed closes.
   pull_request:
     types: [closed]
+  # Each submitted review, a reply included, sweeps that one open PR (gh-workflows#218).
+  pull_request_review:
+    types: [submitted]
   schedule:
     # Mondays 05:41 UTC. Off the hour on purpose: GitHub delays cron at peak hours.
     - cron: '41 5 * * 1'
