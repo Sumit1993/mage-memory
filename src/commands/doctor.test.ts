@@ -970,6 +970,33 @@ describe("doctor — redact pre-commit hook (detect+nudge)", () => {
     expect(check(r.checks, "redact hook")).toBeUndefined();
   });
 
+  it("an external-mode project checks its code repo, where connect installs the hook (#195)", async () => {
+    const hub = await freshDir("mage-hub-");
+    await mkdir(join(hub, "projects", "engine", "notes"), { recursive: true });
+    await writeFile(
+      join(hub, "metadata.json"),
+      JSON.stringify({ schema: METADATA_SCHEMA, name: "h", created_at: "", projects: [] }),
+    );
+    const code = await freshDir("mage-code-");
+    await gitInit(code);
+    await mkdir(join(code, "mage"), { recursive: true });
+    await writeFile(
+      join(code, "mage", "metadata.json"),
+      JSON.stringify({
+        schema: METADATA_SCHEMA,
+        mode: "external",
+        project: "engine",
+        hub_path: hub,
+        hub_repo: null,
+        hub_refs: [],
+        linked_at: "",
+      }),
+    );
+    expect(check((await doctor({ cwd: code })).checks, "redact hook")?.ok).toBe(false);
+    await installRedactHook(code);
+    expect(check((await doctor({ cwd: code })).checks, "redact hook")?.ok).toBe(true);
+  });
+
   it("--fix never installs the redact hook (detect-only)", async () => {
     const dir = await freshDir();
     await makeInRepoKb(dir, { gitignoreSinks: true });

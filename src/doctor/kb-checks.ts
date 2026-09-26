@@ -90,7 +90,7 @@ export async function pushKbChecks(
   await pushReachGrantCheck(checks, opts);
   // Gate-2 redaction pre-commit hook (detect+nudge; never installed by --fix) and
   // metadata schema drift (advisory; --fix migrates in place). Both fail-open.
-  await pushRedactHookCheck(checks, kb, conn.diff.connected);
+  await pushRedactHookCheck(checks, kb, opts, conn.diff.connected);
   await pushSchemaDriftCheck(checks, kb, opts);
   // Pre-fold state layout drift (ADR-0025): an OLD `.learnings`/`.metrics`/`.staging`
   // dir at a docs root; --fix relocates it under `.mage/`.
@@ -694,11 +694,9 @@ async function pushReachGrantCheck(checks: DoctorCheck[], opts: DoctorOptions): 
  * a commit that stages a live secret. `mage connect` installs it; `doctor` only
  * DETECTS — it never installs (Decision 7: --fix repairs drift, it does not wire
  * from scratch). Scope:
- *   - kind "hub" is skipped — this covers BOTH true hubs (not a code repo mage
- *     connects, Decision 5) AND external-mode projects (resolveDocsRoot reports them
- *     as kind "hub"; their notes commit to the hub, not the code repo, so the code
- *     repo has no note-commit to gate). External-mode Gate-2 placement is a
- *     deliberate deferral, not an oversight.
+ *   - a true hub is skipped: it is not a code repo mage connects (Decision 5).
+ *   - an external-mode project checks its CODE repo, where `mage connect` installs the
+ *     hook (#195); resolveDocsRoot reports it as kind "hub", so the kind alone can't tell.
  *   - non-git KBs are skipped: there is no pre-commit hook to speak of.
  * Severity is advisory throughout: Gate 1 (inline `mage redact`) still applies, and
  * a human's own pre-commit hook (foreign) is theirs to keep — we only suggest
@@ -707,11 +705,14 @@ async function pushReachGrantCheck(checks: DoctorCheck[], opts: DoctorOptions): 
 async function pushRedactHookCheck(
   checks: DoctorCheck[],
   kb: Kb,
+  opts: DoctorOptions,
   connected: boolean,
 ): Promise<void> {
-  if (kb.kind !== "repo") return; // hubs + external-mode KBs (see doc above)
+  const repo =
+    kb.kind === "repo" ? kb.repo : await findCodeRepoRoot(opts.cwd ?? process.cwd()).catch(() => null);
+  if (!repo) return; // a true hub (see doc above)
 
-  const status = await detectRedactHook(kb.repo);
+  const status = await detectRedactHook(repo);
   if (status === "not-a-repo") return; // no pre-commit hook concept here
 
   if (status === "present") {
