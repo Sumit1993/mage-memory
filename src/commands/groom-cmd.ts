@@ -30,6 +30,7 @@ import {
   getDirtyPaths,
   getRepoRoot,
   gitAdd,
+  gitTrackedPaths,
   branchHasUniqueCommits,
   resolveBranchRef,
   getCurrentBranch,
@@ -384,10 +385,9 @@ async function proposeBatch(
     // Scoped strictly to concrete paths so unrelated dirty or pre-staged files in the repo
     // (inside or outside the KB) are not swept into the proposal commit (ADR-0057).
     const commitPaths = [
-      ...accepted,
-      ...indexed.written,
-      ...indexed.deleted,
-    ].map((rel) => join(root, rel));
+      ...[...accepted, ...indexed.written].map((rel) => join(root, rel)),
+      ...(await gitTrackedPaths(kbRepo, indexed.deleted.map((rel) => join(root, rel)))),
+    ];
     await gitAdd(kbRepo, commitPaths);
 
     // Gate-2 over what is ACTUALLY staged. The earlier scan ran before anything was

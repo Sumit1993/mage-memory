@@ -190,6 +190,17 @@ export async function gitAdd(repoPath: string, paths: string[]): Promise<void> {
 }
 
 /**
+ * The subset of `paths` that git tracks in `repoPath`; an untracked path that no longer exists
+ * would make `git add`/`git commit` fail with "pathspec did not match".
+ */
+export async function gitTrackedPaths(repoPath: string, paths: string[]): Promise<string[]> {
+  const tracked = await Promise.all(
+    paths.map(async (p) => (await run("git", ["-C", repoPath, "ls-files", "--error-unmatch", "--", p])).code === 0),
+  );
+  return paths.filter((_, i) => tracked[i]);
+}
+
+/**
  * Unstage paths in `repoPath`, leaving the working tree as it is.
  */
 export async function gitUnstage(repoPath: string, paths: string[]): Promise<void> {

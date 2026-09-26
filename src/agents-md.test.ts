@@ -116,7 +116,7 @@ describe("writeAgentsMd — KB shape blocks (kind repo/hub · mode in-repo/hybri
       const agents = await readAgents(repo);
       expect(agents).toContain("Commit hygiene");
       expect(agents).toContain(
-        "Example:\na KB opted in, the operator runs `mage groom --propose`, the command commits\nto a proposal branch and opens a PR.",
+        "Example:\na KB opted in, the operator runs `mage groom --accept onboarding --propose`, the\ncommand commits to a proposal branch and opens a PR.",
       );
     }
   });

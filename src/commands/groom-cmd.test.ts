@@ -1,6 +1,6 @@
 import { mkdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as gitModule from "../git.js";
 import { run } from "../shell.js";
 import { exists, stagingPath } from "../paths.js";
@@ -198,6 +198,13 @@ describe("mage groom — guards", () => {
 });
 
 describe("mage groom --accept … --propose (ADR-0057)", () => {
+  // Step 4 checks for `gh` before it cuts the branch; a runner without it would stop every test there.
+  let ghSpy: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    ghSpy = vi.spyOn(gitModule, "hasGh").mockResolvedValue(true);
+  });
+  afterEach(() => ghSpy.mockRestore());
+
   it("refuses when grooming.proposals is not enabled", async () => {
     const { dir, repo } = await withKb({ kind: "repo" });
     // A real git repo: getRepoRoot must succeed here so the run reaches judgeProposal's
@@ -255,7 +262,6 @@ describe("mage groom --accept … --propose (ADR-0057)", () => {
     await symlink(repo, link);
 
     const [slug] = await stageDistinct(dir, 1);
-    const ghSpy = vi.spyOn(gitModule, "hasGh").mockResolvedValue(true);
     const pushSpy = vi.spyOn(gitModule, "gitPush").mockResolvedValue();
     const prSpy = vi.spyOn(gitModule, "createPullRequest").mockResolvedValue("https://x/pull/1");
     // getRepoRoot returns a symlinked path with a trailing slash — differs only in form
@@ -266,7 +272,6 @@ describe("mage groom --accept … --propose (ADR-0057)", () => {
       expect(res.accepted).toEqual([`notes/${slug}.md`]);
       expect(res.proposalPr).toBe("https://x/pull/1");
     } finally {
-      ghSpy.mockRestore();
       pushSpy.mockRestore();
       prSpy.mockRestore();
       rootSpy.mockRestore();
@@ -287,7 +292,6 @@ describe("mage groom --accept … --propose (ADR-0057)", () => {
     await writeFile(join(repo, "metadata.json"), await readFile(join(repo, "metadata.json"), "utf8"));
     await writeFile(join(repo, "INDEX.md"), "# regenerated\n");
 
-    const ghSpy = vi.spyOn(gitModule, "hasGh").mockResolvedValue(true);
     const pushSpy = vi.spyOn(gitModule, "gitPush").mockResolvedValue();
     const prSpy = vi.spyOn(gitModule, "createPullRequest").mockResolvedValue("https://x/pull/1");
     try {
@@ -298,7 +302,6 @@ describe("mage groom --accept … --propose (ADR-0057)", () => {
       expect(prSpy).toHaveBeenCalledOnce();
       expect(pushSpy).toHaveBeenCalled();
     } finally {
-      ghSpy.mockRestore();
       pushSpy.mockRestore();
       prSpy.mockRestore();
     }
@@ -438,7 +441,6 @@ describe("mage groom --accept … --propose (ADR-0057)", () => {
     await mkdir(join(root, "notes"), { recursive: true });
     await writeFile(join(root, "notes", "unrelated.md"), "aws key: AKIAIOSFODNN7EXAMPLE\n");
 
-    const ghSpy = vi.spyOn(gitModule, "hasGh").mockResolvedValue(true);
     const pushSpy = vi.spyOn(gitModule, "gitPush").mockResolvedValue();
     const prSpy = vi.spyOn(gitModule, "createPullRequest").mockResolvedValue("https://x/pull/1");
     try {
@@ -449,7 +451,6 @@ describe("mage groom --accept … --propose (ADR-0057)", () => {
       const status = await run("git", ["-C", repo, "status", "--porcelain"]);
       expect(status.stdout).toContain("unrelated.md");
     } finally {
-      ghSpy.mockRestore();
       pushSpy.mockRestore();
       prSpy.mockRestore();
     }
@@ -466,7 +467,6 @@ describe("mage groom --accept … --propose (ADR-0057)", () => {
     const before = (await run("git", ["-C", repo, "rev-parse", "--abbrev-ref", "HEAD"])).stdout.trim();
 
     const [slug] = await stageDistinct(dir, 1);
-    const ghSpy = vi.spyOn(gitModule, "hasGh").mockResolvedValue(true);
     const pushSpy = vi.spyOn(gitModule, "gitPush").mockRejectedValue(new Error("no remote"));
     try {
       // The draft is already consumed by promoteBatch, so the commit on the proposal
@@ -477,7 +477,6 @@ describe("mage groom --accept … --propose (ADR-0057)", () => {
       const branches = (await run("git", ["-C", repo, "branch", "--list", "mage/proposal/*"])).stdout;
       expect(branches).toContain("mage/proposal/");
     } finally {
-      ghSpy.mockRestore();
       pushSpy.mockRestore();
     }
   });
@@ -523,7 +522,6 @@ describe("mage groom --accept … --propose (ADR-0057)", () => {
     await run("git", ["-C", repo, "commit", "-m", "init"]);
 
     const [slug] = await stageDistinct(dir, 1);
-    const ghSpy = vi.spyOn(gitModule, "hasGh").mockResolvedValue(true);
     const pushSpy = vi.spyOn(gitModule, "gitPush").mockResolvedValue();
     const prSpy = vi
       .spyOn(gitModule, "createPullRequest")
@@ -537,7 +535,6 @@ describe("mage groom --accept … --propose (ADR-0057)", () => {
       expect(err).toMatch(/gh pr create --head mage\/proposal\//);
       expect(err).not.toMatch(/has NOT been pushed/i);
     } finally {
-      ghSpy.mockRestore();
       pushSpy.mockRestore();
       prSpy.mockRestore();
     }
@@ -614,7 +611,6 @@ describe("mage groom --accept … --propose (ADR-0057)", () => {
 
     // Spy on gitPush and createPullRequest
     const prUrl = "https://github.com/acme/repo/pull/42";
-    const ghSpy = vi.spyOn(gitModule, "hasGh").mockResolvedValue(true);
     const prSpy = vi.spyOn(gitModule, "createPullRequest").mockResolvedValue(prUrl);
     const pushSpy = vi.spyOn(gitModule, "gitPush").mockResolvedValue();
 
@@ -645,7 +641,6 @@ describe("mage groom --accept … --propose (ADR-0057)", () => {
       expect(log.stdout).toContain(`feat(memory): propose note ${slug}`);
       expect(log.stdout).toContain(`chore(provenance): record review ${prUrl}`);
     } finally {
-      ghSpy.mockRestore();
       prSpy.mockRestore();
       pushSpy.mockRestore();
     }
@@ -661,7 +656,6 @@ describe("mage groom --accept … --propose (ADR-0057)", () => {
     await run("git", ["-C", repo, "-c", "user.email=t@e.com", "-c", "user.name=t", "commit", "-m", "init"]);
 
     const prUrl = "https://github.com/acme/repo/pull/99";
-    const ghSpy = vi.spyOn(gitModule, "hasGh").mockResolvedValue(true);
     const prSpy = vi.spyOn(gitModule, "createPullRequest").mockResolvedValue(prUrl);
     // Second gitPush fails
     let pushCount = 0;
@@ -678,7 +672,6 @@ describe("mage groom --accept … --propose (ADR-0057)", () => {
       expect(res.accepted).toEqual([`notes/${slug}.md`]);
       expect(res.proposalPr).toBe(prUrl);
     } finally {
-      ghSpy.mockRestore();
       prSpy.mockRestore();
       pushSpy.mockRestore();
     }
