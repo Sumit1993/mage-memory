@@ -113,6 +113,8 @@ export interface AgentsMdWriteResult {
     | "kept-unstamped";
   /** Absolute path of the AGENTS.md examined. */
   path: string;
+  /** Whether the sibling CLAUDE.md was created or had its import appended. */
+  claudeChanged: boolean;
 }
 
 function rel(docsRel: string, child: string): string {
@@ -226,8 +228,8 @@ export async function writeAgentsMd(
 ): Promise<AgentsMdWriteResult> {
   const filePath = absolutePath(join(root, AGENTS_FILE));
   const agents = await upsertAgentsFile(filePath, opts, write);
-  await ensureClaudeImport(join(root, CLAUDE_FILE));
-  return { agents, path: filePath };
+  const claudeChanged = await ensureClaudeImport(join(root, CLAUDE_FILE));
+  return { agents, path: filePath, claudeChanged };
 }
 
 async function upsertAgentsFile(
@@ -294,12 +296,13 @@ async function upsertAgentsFile(
   return onDiskStamp === null ? "kept-unstamped" : "kept-hand-edits";
 }
 
-async function ensureClaudeImport(path: string): Promise<void> {
+async function ensureClaudeImport(path: string): Promise<boolean> {
   if (!(await exists(path))) {
     await writeFile(path, `# CLAUDE.md\n\n${CLAUDE_IMPORT}\n`);
-    return;
+    return true;
   }
   const current = await readFile(path, "utf8");
-  if (current.includes(CLAUDE_IMPORT)) return;
+  if (current.includes(CLAUDE_IMPORT)) return false;
   await writeFile(path, `${current.replace(/\n*$/, "")}\n\n${CLAUDE_IMPORT}\n`);
+  return true;
 }

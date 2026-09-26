@@ -279,8 +279,8 @@ describe("writeAgentsMd — KB shape blocks (kind repo/hub · mode in-repo/hybri
     expect(keptUnstampedWarning("/some/path/AGENTS.md")).toBe(
       "/some/path/AGENTS.md: the mage block between <!-- BEGIN mage --> and <!-- END mage --> predates hash stamps and was left as is. mage cannot tell whether you edited it. Re-run with --force-agents-md once to regenerate it (any edits inside the block are lost); the regenerated block is stamped and refreshes on its own from then on.",
     );
-    expect(keptWarning({ agents: "unchanged", path: "/p" })).toBeNull();
-    expect(keptWarning({ agents: "kept-unstamped", path: "/p" })).toBe(
+    expect(keptWarning({ agents: "unchanged", path: "/p", claudeChanged: false })).toBeNull();
+    expect(keptWarning({ agents: "kept-unstamped", path: "/p", claudeChanged: false })).toBe(
       keptUnstampedWarning("/p"),
     );
   });

@@ -506,7 +506,8 @@ export function reportMigrate(result: MigrateResult): void {
     removed.length > 0 ||
     result.hooks?.outcome === "written" ||
     agents === "created" ||
-    agents === "written";
+    agents === "written" ||
+    result.agentsMd?.claudeChanged === true;
 
   if (!changed) {
     logger.success(`Already current (${METADATA_SCHEMA}, ${STATE_DIR_NOTE}); nothing to migrate.`);
@@ -589,9 +590,8 @@ const RETIRED_BY: Record<ClearedEntry["kind"], string> = {
 function committedChanges(result: MigrateResult): string[] {
   const agents = result.agentsMd;
   const paths = result.migrated.map((m) => m.path);
-  if (agents && (agents.agents === "created" || agents.agents === "written")) {
-    paths.push(agents.path, join(dirname(agents.path), "CLAUDE.md"));
-  }
+  if (agents && (agents.agents === "created" || agents.agents === "written")) paths.push(agents.path);
+  if (agents?.claudeChanged) paths.push(join(dirname(agents.path), "CLAUDE.md"));
   return paths.filter((p) => existsSync(p)).map((p) => relative(process.cwd(), p) || p);
 }
 

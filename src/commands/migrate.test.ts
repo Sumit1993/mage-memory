@@ -15,7 +15,7 @@ import {
   hasCommandeerHooks,
   upsertMageHooks,
 } from "../adapters/claude-code/settings.js";
-import { mageMigrate } from "./migrate.js";
+import { mageMigrate, reportMigrate } from "./migrate.js";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -465,5 +465,25 @@ describe("mage migrate — 0.0.x clearing (#207)", () => {
     await writeFile(file, legacy);
     expect((await mageMigrate({ dir })).agentsMd?.agents).toBe("kept-unstamped");
     expect(await readFile(file, "utf8")).toBe(legacy);
+  });
+
+  it("names CLAUDE.md in the commit hint when only its import changed", async () => {
+    const { dir } = await withKb();
+    await mageMigrate({ dir });
+    await writeFile(join(dir, "CLAUDE.md"), "# CLAUDE.md\n");
+    const result = await mageMigrate({ dir });
+    expect(result.agentsMd).toMatchObject({ agents: "unchanged", claudeChanged: true });
+
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const cwd = vi.spyOn(process, "cwd").mockReturnValue(dir);
+    try {
+      reportMigrate(result);
+      const out = log.mock.calls.map((c) => String(c[0])).join("\n");
+      expect(out).toMatch(/git add -- CLAUDE\.md && git commit/);
+      expect(out).not.toMatch(/AGENTS\.md &&/);
+    } finally {
+      log.mockRestore();
+      cwd.mockRestore();
+    }
   });
 });
