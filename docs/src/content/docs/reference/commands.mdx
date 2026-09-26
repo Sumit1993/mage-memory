@@ -352,7 +352,10 @@ mage index
 `mage doctor` diagnoses environment, knowledge-base, and connection health, including read-only genre-tell annotations (memory-genre over-cap size, done-state vocabulary, issue-ref density, checkboxes).
 `--fix` repairs missing capture-sink ignore rules; `--report` prints a redacted,
 content-free support bundle to attach to bug reports. `mage migrate` upgrades a
-knowledge base's metadata to the current schema (idempotent; it never commits).
+knowledge base's metadata to the current schema, clears state whose writers retired,
+refreshes the hook groups and the `AGENTS.md` block, and at a hub names each project
+that needs its own run. It is idempotent and never commits; see
+[Upgrading from 0.0.x](../guides/uninstall-and-pause.md#upgrading-from-00x).
 
 Whenever you link a hub (`mage link`) or wire up capture for a single repo (`mage connect`), mage runs a fast readiness check and prints a **readiness footer**. This serves as a mini-doctor report to confirm your environment is ready to capture and recall notes without requiring a full manual `mage doctor` run.
 
@@ -367,7 +370,7 @@ mage doctor --fix
 # Print a redacted, content-free support bundle for an issue
 mage doctor --report
 
-# Upgrade this KB's metadata to the current schema
+# Upgrade this KB: metadata, retired state, hooks, AGENTS.md block
 mage migrate
 ```
 

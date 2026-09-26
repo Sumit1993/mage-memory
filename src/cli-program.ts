@@ -482,7 +482,7 @@ export function buildProgram(): Command {
   program
     .command("migrate")
     .description(
-      "Upgrade this KB's metadata to the current schema (idempotent; never commits)",
+      "Upgrade a 0.0.x KB: metadata schema, retired state cleared, hook groups refreshed, AGENTS.md block refreshed without clobbering (idempotent; never commits)",
     )
     .option(
       "--dir <path>",
