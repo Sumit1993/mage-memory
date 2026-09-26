@@ -1,42 +1,13 @@
 reviews:
   profile: chill
-  # Rate-limit discipline. This repo is on CodeRabbit's OSS tier: 1-10 PR reviews per
-  # developer per hour, scaling with project popularity — a young repo sits near the
-  # bottom. EVERY review run spends one, including the automatic incremental review
-  # after each push, so a fix-push loop drains the whole budget on a single PR.
-  # Pausing after 1 reviewed commit means one review per PR; push your fixes as a batch,
-  # then re-request explicitly with an `@coderabbitai review` comment.
+  # Admission (Sumit1993/rig#150): automatic review is off. The hourly `CodeRabbit summoner`
+  # routine (Sumit1993/rig scripts/coderabbit-routine) summons one PR per hour across every repo,
+  # because the allowance is one review per developer per hour. Sessions never summon by hand:
+  # fix, push once, reply in each thread, and the routine re-reviews. `coderabbit_review` is the
+  # operator's override for a review now. The Claude lane reviews every PR here (its test bed).
   auto_review:
-    # CLI-FIRST LANE. Online review is opt-in, not automatic.
-    #
-    # The rate limit is per DEVELOPER, not per repo — all three repos draw one
-    # counter. Measured over 180 merged PRs: 7.5/day, worst hour 8 opens, and at
-    # 1 review/hr 61% of PRs arrived with the counter already empty. Reviewing
-    # everything automatically means the reviews land where they happen to fall,
-    # not where they are worth spending.
-    #
-    # So: the CodeRabbit CLI (a separate, larger counter) reviews every push via
-    # the kit's pre-push gate, and this scarce online counter is no longer spent
-    # automatically — only on PRs explicitly labelled `coderabbit_review`.
-    #
-    # SCOPE, precisely: `labels` gates AUTOMATIC review only. Manual triggers —
-    # `@coderabbitai review` and `@coderabbitai full review` — run regardless of
-    # these settings and still spend the online counter, on a labelled PR or not.
-    # That is deliberate and wanted: it is the escape hatch for re-requesting a
-    # review after `auto_pause_after_reviewed_commits` stops incremental ones.
-    # But it means this is a DEFAULT, not a hard cap. The cap is discipline, plus
-    # the fact that a manual trigger is an explicit act rather than a side effect
-    # of opening a PR — which is exactly the 61%-empty-counter problem above.
-    #
-    # This is NOT a reduction in review. `review-evidence` is a required check
-    # (ruleset 17441632): a PR with neither a CodeRabbit review nor a CLI review
-    # marker at its head SHA cannot merge. Removing automatic review without that
-    # gate in place would have made "unreviewed" the silent default — which is why
-    # the gate shipped first (prismalens/prismalens#301).
-    #
     # No dry run exists for this setting: CodeRabbit applies base-branch config
     # only for open-source repos, so it takes effect the moment it lands on main.
-    # The revert is one commit — see ci/cli-first-valve-REVERT.
     enabled: false
     labels:
       - "coderabbit_review"
