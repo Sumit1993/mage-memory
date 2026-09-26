@@ -600,6 +600,14 @@ async function pushExternalHubCheck(checks: DoctorCheck[], opts: DoctorOptions):
   if (!codeRepo) return;
   const external = await externalDocsRoot(codeRepo);
   if (external.kind === "not-external") return;
+  if (external.kind === "resolved" && external.originMismatch) {
+    checks.push({
+      name: "external hub",
+      ok: false,
+      detail: `origin mismatch — using ${external.value.repo} anyway: ${external.originMismatch}. Fix that clone's origin, or re-run \`mage link <address>\``,
+    });
+    return;
+  }
   if (external.kind === "resolved") {
     checks.push({
       name: "external hub",
@@ -634,8 +642,8 @@ async function pushExternalHubCheck(checks: DoctorCheck[], opts: DoctorOptions):
  *                                     neither must fail a CI runner or nag for a fix that will
  *                                     never be made.
  *   - hub present, grant missing    → FAIL, with `mage connect` as the fix
- *   - hub present, origin mismatch  → FAIL, hard error naming both remotes — never reused,
- *                                     never clobbered (ADR-0043 §2)
+ *   - hub present, origin mismatch  → FAIL naming both remotes — never granted, never
+ *                                     clobbered (ADR-0056)
  *
  * Detect-and-instruct only. ADR-0037 §2 holds doctor to read-only over host config, so
  * even though this repair passes §3's auto-fix test (idempotent ∧ mage-owned ∧ local ∧
@@ -654,7 +662,7 @@ async function pushReachGrantCheck(checks: DoctorCheck[], opts: DoctorOptions): 
       checks.push({
         name: "KB access grant",
         ok: false,
-        detail: `hub mismatch — never reused, never clobbered: ${status.details.join("; ")}`,
+        detail: `hub mismatch — not granted: ${status.details.join("; ")}`,
       });
       return;
     case "missing":

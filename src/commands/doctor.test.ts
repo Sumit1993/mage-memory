@@ -593,8 +593,8 @@ describe("doctor — link integrity", () => {
       expect(c?.detail).toBe(
         `hub at ${derivedRoot} is a clone of a different remote ` +
           `(hub_repo https://github.com/acme/expected-hub.git does not match the clone's origin ` +
-          `https://github.com/unrelated/stranger-hub.git found at ${derivedRoot} — never reused, never clobbered)` +
-          " — not reused and not repaired; re-run `mage link <hub>` to re-point this repo",
+          `https://github.com/unrelated/stranger-hub.git found at ${derivedRoot})` +
+          " — not repaired; fix that clone's origin or re-run `mage link <hub>` to re-point this repo",
       );
 
       const afterMeta = await readFile(join(derivedRoot, "metadata.json"), "utf8");
@@ -1586,7 +1586,7 @@ describe("doctor — KB access grant, the reach tier (ADR-0042)", () => {
       expect(check((await doctor({ cwd: repo })).checks, "external hub")).toBeUndefined();
     });
 
-    it("origin-mismatch hub → an `external hub` failure naming the mismatch and never suggesting init (#158)", async () => {
+    it("origin-mismatch hub → an `external hub` failure: used anyway, never granted, never suggesting init (#191)", async () => {
       const saved = process.env.MAGE_HOME;
       const home = await freshDir("mage-doctor-home-");
       process.env.MAGE_HOME = home;
@@ -1617,9 +1617,12 @@ describe("doctor — KB access grant, the reach tier (ADR-0042)", () => {
         const r = await doctor({ cwd: code });
         const c = check(r.checks, "external hub");
         expect(c?.ok).toBe(false);
-        expect(c?.detail).toMatch(/unreachable \(hub-mismatch\)/);
+        expect(c?.detail).toMatch(/origin mismatch — using .* anyway/);
         expect(c?.detail).toMatch(/does not match the clone's origin/);
-        expect(c?.detail).not.toMatch(/is not a mage hub/);
+        expect(c?.detail).not.toMatch(/mage init/);
+        const grant = check(r.checks, "KB access grant");
+        expect(grant?.ok).toBe(false);
+        expect(grant?.detail).toMatch(/not granted/);
       } finally {
         if (saved === undefined) delete process.env.MAGE_HOME;
         else process.env.MAGE_HOME = saved;

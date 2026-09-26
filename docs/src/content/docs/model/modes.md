@@ -157,26 +157,28 @@ inferred pattern).
 
 `hub_path` — an absolute, machine-specific path that used to be the only address
 — is now a **deprecated fallback**, read only when `hub_repo` is absent or
-doesn't resolve. `mage link` still writes both fields during the transition
+doesn't resolve, and never on an origin mismatch. `mage link` still writes both fields during the transition
 window; new code should never need to read `hub_path` directly.
 
 **Verify on arrival, not a cleverer hash.** A derived path is deterministic, but
 a genuinely case-sensitive host (or a rename) could in principle put two
 different repos at one derived path. So mage never trusts the clone it finds
 there on sight: it canonicalizes that clone's `origin` and requires it to match
-`hub_repo`. A mismatch is a **hard, named error** — both remotes named,
-credentials redacted — and mage never reuses or clobbers what it finds. A
+`hub_repo`. A mismatch is **loud** — `mage doctor` fails naming both remotes,
+credentials redacted — but the derived path still wins: the CLI uses that clone,
+never `hub_path`, and never clobbers it. The harness grant is withheld until the
+origin is fixed, so the agent cannot read the notes meanwhile. A
 clone already sitting somewhere ELSE with a matching origin is detected (a
 scan under the hubs root, sorted and deterministic) and mage prints the exact
 `mv` to relocate it — it never performs the move itself. When nothing is found
 at all, `mage connect` offers to clone `hub_repo` there on the spot.
 
-```mermaid Verify on arrival: at the derived hub path, a hub-shaped clone whose origin matches hub_repo is reused; an origin mismatch is a hard error; with nothing usable there, a displaced clone elsewhere under the hubs root earns a printed mv, and otherwise mage connect offers to clone.
+```mermaid Verify on arrival: at the derived hub path, a hub-shaped clone whose origin matches hub_repo is reused; an origin mismatch is used anyway, loudly, with the harness grant withheld; with nothing usable there, a displaced clone elsewhere under the hubs root earns a printed mv, and otherwise mage connect offers to clone.
 flowchart TD
   a["arrive at the derived path<br/>~/.mage/hubs/host/owner/repo"] --> f{"a hub-shaped clone here?"}
   f -->|yes| o{"its origin matches hub_repo?"}
   o -->|match| r["reuse it"]
-  o -->|mismatch| e["hard error — both remotes named,<br/>nothing reused, nothing clobbered"]
+  o -->|mismatch| e["use it anyway, loudly —<br/>doctor fails, harness grant withheld"]
   f -->|no| s{"a clone of the same remote<br/>elsewhere under the hubs root?"}
   s -->|found| m["print the exact mv —<br/>mage never moves it itself"]
   s -->|none| c["mage connect offers to<br/>clone hub_repo there"]
@@ -197,7 +199,6 @@ Every interactive command reports the reason and **the command that obtains the 
 | --- | --- | --- |
 | `hub-absent` | The address resolves, but nothing is cloned at the derived path yet — the normal state on a fresh clone of the code repo. | `mage connect` (it offers to clone it) |
 | `hub-corrupted` | Something *is* at that path, but it is not a mage hub (no `projects/` + `metadata.json`). | Move or remove it, then `mage connect` |
-| `hub-mismatch` | A mage hub exists at that path, but its origin remote does not match `hub_repo`. | Fix the clone's remote, or re-run `mage link <address>` |
 | `hub-origin-unreadable` | A mage hub exists at that path, but its origin remote could not be read from `.git/config`. | Check `.git` permissions and configuration |
 | `no-hub-target` | `mage/metadata.json` is `mode: external` but records no usable `hub_repo`/`hub_path`. | `mage link <address>`, then `mage connect` |
 | `malformed-config` | `mode: external` with no `project` name, so there is no `projects/<name>/` to resolve to. | `mage link <address>` |
@@ -217,7 +218,8 @@ $ mage doctor
 
 $ cd ~/code/svc-mismatch  # hub exists at derived path but origin remote points to a different repo
 $ mage doctor
-✗ external hub        : unreachable (hub-mismatch) — This repo is in external mode, so its knowledge base lives in a hub — but the hub is unreachable: hub_repo https://github.com/acme/expected.git does not match the clone's origin https://github.com/acme/other.git found at ~/.mage/hubs/github.com/acme/expected — never reused, never clobbered. Do NOT run `mage init` here: it would mint a SECOND knowledge base.
+✗ external hub        : origin mismatch — using ~/.mage/hubs/github.com/acme/expected anyway: hub_repo https://github.com/acme/expected.git does not match the clone's origin https://github.com/acme/other.git found at ~/.mage/hubs/github.com/acme/expected. Fix that clone's origin, or re-run `mage link <address>`
+✗ KB access grant     : hub mismatch — not granted: hub_repo https://github.com/acme/expected.git does not match the clone's origin https://github.com/acme/other.git found at ~/.mage/hubs/github.com/acme/expected
 
 $ cd ~/code/svc-notarget   # mode: external, but hub_repo and hub_path are both null
 $ mage doctor

@@ -248,7 +248,7 @@ export async function connect(opts: ConnectOptions): Promise<ConnectResult> {
  *     whether because the pair had no usable hub_repo, or because a derived
  *     root failed arrival and hub_path rescued it — is always the deprecated
  *     fallback; warn naming it).
- *   - resolved "mismatch" → loud, NEVER granted, NEVER reused, NEVER clobbered.
+ *   - resolved "mismatch" → loud, NEVER granted, NEVER clobbered (the CLI still uses it, #191).
  *   - resolved "absent" with a `hubRepo` on the pair (i.e. hub_repo derived
  *     but nothing usable was found there OR at hub_path) → scan for a
  *     displaced clone of the same remote (ADR-0043 §4) before offering
