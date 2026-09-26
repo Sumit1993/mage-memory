@@ -14,7 +14,9 @@ export type ObserveEventType =
   | "skill_load"
   | "tool_use"
   | "compact"
-  | "session_end";
+  | "session_end"
+  | "guard_fired"
+  | "tool_attempt";
 
 /** The event-type literals as a runtime set, for boundary validation. */
 const OBSERVE_EVENT_TYPES: ReadonlySet<string> = new Set<ObserveEventType>([
@@ -25,6 +27,8 @@ const OBSERVE_EVENT_TYPES: ReadonlySet<string> = new Set<ObserveEventType>([
   "tool_use",
   "compact",
   "session_end",
+  "guard_fired",
+  "tool_attempt",
 ]);
 
 /**
@@ -35,6 +39,12 @@ const OBSERVE_EVENT_TYPES: ReadonlySet<string> = new Set<ObserveEventType>([
  */
 export function isObserveEventType(v: unknown): v is ObserveEventType {
   return typeof v === "string" && OBSERVE_EVENT_TYPES.has(v);
+}
+
+/** `<scope>/guard/<slug>` — lowercase, digits and single hyphens in each segment. */
+const GUARD_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*\/guard\/[a-z0-9]+(?:-[a-z0-9]+)*$/;
+export function isGuardId(v: unknown): v is string {
+  return typeof v === "string" && GUARD_ID.test(v);
 }
 
 /**
@@ -111,6 +121,8 @@ export interface ToolUseEvent extends ObserveEnvelope {
   type: "tool_use";
   /** tool_name verbatim (e.g. "Bash", "Read"). */
   tool: string;
+  /** Shared with the matching tool_attempt; null on rows written before this field existed. */
+  tool_use_id: string | null;
   /** Structured-input path extraction only (§5); [] for Bash. */
   paths: string[];
   /** Per-tool salient field, scrubbed, ≤ DETAIL_MAX; null when paths carry it. */
@@ -133,6 +145,30 @@ export interface SessionEndEvent extends ObserveEnvelope {
   reason?: string;
 }
 
+/** guard_fired — a kit guard (deny rule, hook, check) blocked or rewrote a tool call. */
+export interface GuardFiredEvent extends ObserveEnvelope {
+  type: "guard_fired";
+  /** `<scope>/guard/<slug>`, e.g. `kit/guard/no-haiku`. Validated at the boundary. */
+  guard_id: string;
+  /** The tool the guard fired on, verbatim (e.g. "Bash", "Agent"). */
+  tool: string;
+  /** Scrubbed, ≤ DETAIL_MAX; null when the hook sent none. */
+  detail: string | null;
+}
+
+/** tool_attempt — a tool call was requested. A matching tool_use means it ran. */
+export interface ToolAttemptEvent extends ObserveEnvelope {
+  type: "tool_attempt";
+  /** tool_name verbatim. */
+  tool: string;
+  /** The harness invocation id, shared with the matching tool_use. */
+  tool_use_id: string;
+  /** Structured-input path extraction only; [] for Bash. */
+  paths: string[];
+  /** Per-tool salient field, scrubbed, ≤ DETAIL_MAX; null when paths carry it. */
+  detail: string | null;
+}
+
 export type ObserveEvent =
   | SessionStartEvent
   | UserPromptEvent
@@ -140,7 +176,9 @@ export type ObserveEvent =
   | SkillLoadEvent
   | ToolUseEvent
   | CompactEvent
-  | SessionEndEvent;
+  | SessionEndEvent
+  | GuardFiredEvent
+  | ToolAttemptEvent;
 
 // ─── bounds (named, exported) ────────────────────────────────────────────────
 
@@ -156,3 +194,8 @@ export const ERROR_SUMMARY_MAX = 200;
 export const ARGS_MAX = 200;
 /** Per-entry cap for a structured path (caps line size; paths are not scrubbed). */
 export const PATH_MAX = 400;
+/** guard_fired.guard_id cap. */
+export const GUARD_ID_MAX = 200;
+/** guard_fired.tool cap. */
+export const GUARD_TOOL_MAX = 100;
+

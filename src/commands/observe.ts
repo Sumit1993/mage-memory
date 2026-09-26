@@ -10,9 +10,11 @@ import { Command } from "commander";
 import {
   buildAssistantMsg,
   buildCompact,
+  buildGuardFired,
   buildSessionEnd,
   buildSessionStart,
   buildSkillLoad,
+  buildToolAttempt,
   buildToolUse,
   buildUserPrompt,
   type EventBase,
@@ -27,6 +29,9 @@ import {
   ASSISTANT_MSG_MAX,
   DETAIL_MAX,
   ERROR_SUMMARY_MAX,
+  GUARD_ID_MAX,
+  GUARD_TOOL_MAX,
+  isGuardId,
   isObserveEventType,
   type ObserveEvent,
   type ObserveEventType,
@@ -165,6 +170,9 @@ async function mapEvent(
     case "tool_use":
       return mapToolUse(payload, base);
 
+    case "tool_attempt":
+      return mapToolAttempt(payload, base);
+
     case "compact":
       return buildCompact(base, payload.trigger === "manual" ? "manual" : "auto");
 
@@ -172,7 +180,23 @@ async function mapEvent(
       const reason = str(payload.reason);
       return reason === undefined ? buildSessionEnd(base) : buildSessionEnd(base, reason);
     }
+
+    case "guard_fired":
+      return mapGuardFired(payload, base);
   }
+}
+
+function mapGuardFired(payload: Record<string, unknown>, base: EventBase): ObserveEvent | null {
+  const guardId = payload.guard_id;
+  if (typeof guardId !== "string" || guardId.length > GUARD_ID_MAX || !isGuardId(guardId)) {
+    return null;
+  }
+  const tool = payload.tool;
+  if (typeof tool !== "string" || tool.trim().length === 0 || tool.length > GUARD_TOOL_MAX) {
+    return null;
+  }
+  const detail = scrubField(str(payload.detail) ?? null, DETAIL_MAX);
+  return buildGuardFired(base, guardId, tool, detail);
 }
 
 /**
@@ -184,8 +208,13 @@ async function mapEvent(
  * subagent's final reply, 0.0.11 Candidate 4) map to assistant_msg: a subagent's
  * tool calls never reach the main-session `PostToolUse` hook, so its `transcript_path`
  * (the subagent transcript) is the one capture seam for autonomous work.
+ * `PreToolUse` maps to tool_attempt (#209): a blocked call never reaches
+ * PostToolUse, so an attempt with no matching tool_use is a prevented call.
  */
 function inferType(payload: Record<string, unknown>): ObserveEventType | null {
+  if (typeof payload.guard_id === "string") {
+    return "guard_fired";
+  }
   const hook = str(payload.hook_event_name);
   switch (hook) {
     case "SessionStart":
@@ -199,6 +228,8 @@ function inferType(payload: Record<string, unknown>): ObserveEventType | null {
       return "compact";
     case "SessionEnd":
       return "session_end";
+    case "PreToolUse":
+      return "tool_attempt";
     case "PostToolUse":
     case "PostToolUseFailure":
       return str(payload.tool_name) === "Skill" ? "skill_load" : "tool_use";
@@ -310,11 +341,32 @@ function mapToolUse(payload: Record<string, unknown>, base: EventBase): ObserveE
   const { ok, errorSignal } = deriveOk(payload);
   return buildToolUse(base, {
     tool,
+    // Shared with the matching tool_attempt (#209); null when absent, never rejected —
+    // the pairing key is a bonus on this row, not a gate on it.
+    tool_use_id: str(payload.tool_use_id) ?? null,
     paths,
     detail,
     ok,
     error_summary: ok ? null : scrubField(errorSignal, ERROR_SUMMARY_MAX),
   });
+}
+
+/**
+ * PreToolUse → tool_attempt (#209): a call was requested, before the host runs it.
+ * `tool_name` and `tool_use_id` are both keys a paired row needs, so either
+ * missing/non-string rejects the whole row (fail-open no-op, never a throw) —
+ * a row that cannot be paired is worse than no row.
+ */
+function mapToolAttempt(payload: Record<string, unknown>, base: EventBase): ObserveEvent | null {
+  const tool = str(payload.tool_name);
+  if (tool === undefined) return null;
+  const toolUseId = str(payload.tool_use_id);
+  if (toolUseId === undefined) return null;
+
+  const input = obj(payload.tool_input);
+  const paths = extractPaths(tool, input);
+  const detail = scrubField(extractDetail(tool, input, paths), DETAIL_MAX);
+  return buildToolAttempt(base, { tool, tool_use_id: toolUseId, paths, detail });
 }
 
 /** PostToolUse + tool_name === "Skill" → skill_load (ADR-0015 §3). */

@@ -4,6 +4,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { logger } from "../logger.js";
 import { tmpDir, withKb } from "../../test/fixtures/kb.js";
 import { stageCmd } from "./stage-cmd.js";
+import { buildProgram } from "../cli-program.js";
+import { RETIRED_VERB_MESSAGES } from "./retired.js";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -117,5 +119,23 @@ describe("mage stage", () => {
   it("errors with a friendly message when there is no KB", async () => {
     const empty = await tmpDir("mage-nokb-");
     await expect(stageCmd({ dir: empty, title: "X", body: "y" })).rejects.toThrow(/No mage knowledge base/);
+  });
+});
+
+describe("mage stage signpost", () => {
+  it("prints that stage has retired and exits 0", async () => {
+    const program = buildProgram();
+    program.exitOverride();
+    const lines: string[] = [];
+    const origLog = console.log;
+    console.log = (...msgs: unknown[]) => {
+      lines.push(msgs.map((m) => String(m)).join(" "));
+    };
+    try {
+      await program.parseAsync(["stage"], { from: "user" });
+      expect(lines.join("\n")).toBe(RETIRED_VERB_MESSAGES.stage);
+    } finally {
+      console.log = origLog;
+    }
   });
 });

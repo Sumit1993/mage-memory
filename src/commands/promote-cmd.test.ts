@@ -14,6 +14,8 @@ import type { PromoteManifest } from "../grooming/types.js";
 import { readTally } from "../grooming/tally.js";
 import { writeRejected } from "../grooming/proposals.js";
 import { promoteCmd } from "./promote-cmd.js";
+import { buildProgram } from "../cli-program.js";
+import { RETIRED_VERB_MESSAGES } from "./retired.js";
 
 // ─── tmp fixture plumbing (mirrors distill-cmd.test.ts) ───────────────────────
 
@@ -310,6 +312,24 @@ describe("promoteCmd — --seen disposition", () => {
   it("rejects a trailing-colon (empty offset)", async () => {
     const { repo } = await tmpRepo();
     await expect(promoteCmd({ dir: repo, seen: "sess-1:" })).rejects.toThrow(/expected "<session>:<offset>"/);
+  });
+});
+
+describe("mage promote signpost", () => {
+  it("prints that promote has retired and exits 0", async () => {
+    const program = buildProgram();
+    program.exitOverride();
+    const lines: string[] = [];
+    const origLog = console.log;
+    console.log = (...msgs: unknown[]) => {
+      lines.push(msgs.map((m) => String(m)).join(" "));
+    };
+    try {
+      await program.parseAsync(["promote"], { from: "user" });
+      expect(lines.join("\n")).toBe(RETIRED_VERB_MESSAGES.promote);
+    } finally {
+      console.log = origLog;
+    }
   });
 });
 

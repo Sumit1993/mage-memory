@@ -131,8 +131,7 @@ to avoid), and **pointers** to canonical sources — never a copy of the source
 
 10. **Suggest follow-ups (never auto-run):**
     ```bash
-    mage index          # refresh INDEX.md
-    mage skills         # refresh per-wing skills (if a new wing appeared)
+    mage index          # refresh INDEX.md and MEMORY.md
     git -C <repo> add mage && git -C <repo> commit -m "note: <title> (#<wing>)"
     ```
 
@@ -170,8 +169,8 @@ adopting an authored skill is *remembering*, not copying a source (ADR-0013 §5)
 
 4. **Human-confirm in bulk.** Present the full batch — new notes, adopted
    skills, minted backing notes, and any items the redaction gate blocked — as
-   one review. Write only after the user confirms; then suggest `mage index` /
-   `mage skills` and the `git` commands (never auto-run, never auto-commit).
+   one review. Write only after the user confirms; then suggest `mage index`
+   and the `git` commands (never auto-run, never auto-commit).
 
 > **Observed scratch is a different lane.** `--from` imports *foreign* docs by
 > pointer. Distilling mage's **own** observed `.learnings/*.jsonl` into notes
@@ -185,7 +184,7 @@ adopting an authored skill is *remembering*, not copying a source (ADR-0013 §5)
 - Points to canonical sources; doesn't mirror them.
 - Tagged with one `#<wing>/<room>` so it lands in the index and the wing skill.
 - Links to related notes as graph edges.
-- **Keep it short.** A lesson captured inline during work (via `mage stage`) targets
+- **Keep it short.** A lesson captured inline during work (via `mage observe`) targets
   the CC-memory-sized `lessonNoteCap` (~1200 chars) — one durable fact, tersely. The
   larger 6000-char `noteSizeCap` is for deliberately authored design/reference notes.
 
