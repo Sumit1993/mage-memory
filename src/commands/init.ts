@@ -17,7 +17,6 @@ import {
   METADATA_SCHEMA,
   NOTES_DIR,
   PROJECTS_DIR,
-  WORK_DIR,
   absolutePath,
   codeRepoDocsRoot,
   exists,
@@ -160,12 +159,12 @@ async function resolveVisibility(opts: InitOptions): Promise<InitVisibility> {
 // ─── shared vault scaffolding ──────────────────────────────────────────────
 
 /**
- * Create the core vault subdirs (notes/, work/, decisions/, archive/) with
- * .gitkeep placeholders and a seed INDEX.md. `artifacts/` and `.learnings/`
- * are created lazily (by work + /learn) and are git-ignored.
+ * Create the core vault subdirs (notes/, decisions/, archive/) with .gitkeep
+ * placeholders and a seed INDEX.md. No `work/`: it is retired (ADR-0050), and plans
+ * live in the issue tracker.
  */
 async function scaffoldVaultDirs(docsRoot: string): Promise<void> {
-  for (const d of [NOTES_DIR, WORK_DIR, DECISIONS_DIR, ARCHIVE_DIR]) {
+  for (const d of [NOTES_DIR, DECISIONS_DIR, ARCHIVE_DIR]) {
     await mkdir(join(docsRoot, d), { recursive: true });
     await writeFile(join(docsRoot, d, ".gitkeep"), "");
   }

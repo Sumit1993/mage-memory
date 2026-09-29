@@ -139,13 +139,13 @@ describe("mage link", () => {
     await init({ mode: "in-repo", yes: true, codeRepo: code, project: "web" });
     const original = await readFile(join(code, "AGENTS.md"), "utf8");
     const stripped = original.replace(/^<!-- mage-block-hash: [0-9a-f]{12} -->\n/m, "");
-    const legacy = stripped.replace("mage:groom", "/mage-groom");
+    const legacy = stripped.replace("/mage:learn", "/mage-learn");
     expect(legacy).not.toBe(original);
     await writeFile(join(code, "AGENTS.md"), legacy);
     const r = await link(hub, { codeRepo: code, project: "web", yes: true, connect: false });
     expect(r.agentsMd).toBe("kept-unstamped");
     const current = await readFile(join(code, "AGENTS.md"), "utf8");
-    expect(current).toContain("/mage-groom");
+    expect(current).toContain("/mage-learn");
   });
 
   it("link --force-agents-md regenerates", async () => {

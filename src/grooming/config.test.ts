@@ -154,15 +154,17 @@ describe("readAutonomy — the opt-in autonomy ladder read", () => {
 // ─── readGrooming — one read, every field narrowed ────────────────────────────
 
 describe("readGrooming — the deep one-read view", () => {
-  it("narrows all three fields together from a single read", async () => {
+  it("narrows all fields together from a single read", async () => {
     const { resolved } = await withKb({
       kind: "repo",
-      grooming: { sensitivity: "high", autonomy: "overseer", nudgeThrottleHours: 8 },
+      grooming: { sensitivity: "high", autonomy: "overseer", proposals: true, nudgeThrottleHours: 8 },
     });
     expect(await readGrooming(resolved)).toEqual({
       sensitivity: "high",
       autonomy: "overseer",
+      proposals: true,
       nudgeThrottleHours: 8,
+      crownThreshold: undefined,
     });
   });
 
@@ -171,8 +173,25 @@ describe("readGrooming — the deep one-read view", () => {
     expect(await readGrooming(resolved)).toEqual({
       sensitivity: "normal",
       autonomy: "operator",
+      proposals: false,
       nudgeThrottleHours: undefined,
+      crownThreshold: undefined,
     });
+  });
+
+  it("narrows proposals boolean: absent, junk, or non-boolean means false", async () => {
+    const repo = await tmpDir("mage-config-");
+    await writeRepoMeta(repo, { proposals: "yes" });
+    expect((await readGrooming(repoRef(repo))).proposals).toBe(false);
+
+    await writeRepoMeta(repo, { proposals: 1 });
+    expect((await readGrooming(repoRef(repo))).proposals).toBe(false);
+
+    await writeRepoMeta(repo, { proposals: false });
+    expect((await readGrooming(repoRef(repo))).proposals).toBe(false);
+
+    await writeRepoMeta(repo, { proposals: true });
+    expect((await readGrooming(repoRef(repo))).proposals).toBe(true);
   });
 
   it("drops a non-number throttle window to undefined", async () => {

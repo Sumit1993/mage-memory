@@ -141,7 +141,7 @@ Concretely, with a hub whose derived root is `~/.mage/hubs/github.com/acme/hub`:
 
 This is why you can run `mage` commands from anywhere inside a repo or hub and they find the right knowledge base. It is also why an `external`-mode code repo's captures end up in the hub even though you were working in the code repo — the metadata pointer redirects them.
 
-The on-disk schema is stamped as `mage.v2`. Older `mage.v1` metadata is read leniently and upgraded in memory; `mage migrate` rewrites it to the current schema (and, like `init`, never commits).
+The on-disk schema is stamped as `mage.v2`. Older `mage.v1` metadata is read leniently and upgraded in memory; `mage migrate` rewrites it to the current schema, and also clears what a 0.0.x release left behind (see [Upgrading from 0.0.x](../guides/uninstall-and-pause.md#upgrading-from-00x)). Like `init`, it never commits.
 
 ## Where a hub actually lives — derived, not recorded
 
