@@ -26,21 +26,20 @@ the reusable insight, the procedure, and pointers back to the original file,
 capture path, the [redaction gate](../reference/redaction.md) scrubs each draft
 before it can touch disk, and **you** commit.
 
-## Preview what would be ingested
+## What gets picked up
 
-`/mage:learn --from` is driven by a deterministic manifest you can inspect first.
-The read-only `mage ingest` plumbing verb enumerates and classifies the sources
-under a folder without writing anything:
+The skill classifies each file under the folder itself, with no plumbing verb
+(`mage ingest` retired, #208):
 
-```bash
-# What would be picked up, as a human-readable list
-mage ingest ./docs
+| File | Kind | What happens |
+| --- | --- | --- |
+| `SKILL.md` | skill | adopted in place |
+| `.md` with `type` or `tags` in its frontmatter | note | distilled to a note |
+| any other `.md`, `.markdown`, `.txt` | prose | distilled to a note |
+| `.jsonl` | transcript | distilled to a note |
+| YAML, code, binaries | — | skipped |
 
-# The same manifest as JSON, for tooling
-mage ingest ./docs --json
-```
-
-Nothing is created until you run `/mage:learn --from` and accept the drafts.
+Nothing is created until you accept the drafts.
 
 ## Onboarding agent memories instead of a folder
 
