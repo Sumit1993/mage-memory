@@ -4,7 +4,7 @@
 // fallback) and the hub registry's project entry.
 //
 // What doctor validates: hub reachability at its derived location, origin match
-// between that clone and `hub_repo` (never reused, never clobbered — ADR-0043 §2),
+// between that clone and `hub_repo` (never granted, never clobbered — ADR-0056),
 // and project registration — all needing an explicit `mage link <hub>` or a manual clone/move.
 
 import { dirname, join } from "node:path";
@@ -91,7 +91,7 @@ async function checkExternalLink(
       detail:
         `hub at ${chosen.root} is a clone of a different remote` +
         `${resolution.detail ? ` (${resolution.detail})` : ""}` +
-        " — not reused and not repaired; re-run `mage link <hub>` to re-point this repo",
+        " — not repaired; fix that clone's origin or re-run `mage link <hub>` to re-point this repo",
     });
     return;
   }
