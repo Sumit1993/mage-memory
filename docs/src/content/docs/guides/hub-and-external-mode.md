@@ -107,7 +107,7 @@ base at all", and **KB access grant** answers "is the agent allowed to read it".
 - **pass** — `hub reachable — this repo's notes live at <hub>/projects/my-service`.
 - **failing** — the hub is unreachable, so mage resolves *nothing* and every
   capture is dropped. The line names the reason (`hub-absent`, `hub-corrupted`,
-  `hub-mismatch`, `hub-origin-unreadable`, `no-hub-target`, `malformed-config`,
+  `hub-origin-unreadable`, `no-hub-target`, `malformed-config`,
   `unknown-failure`), the path or address it
   expected, and the command that obtains the hub — usually `mage connect`. It
   will never tell you to run `mage init`: that would mint a **second** knowledge
@@ -127,8 +127,9 @@ base at all", and **KB access grant** answers "is the agent allowed to read it".
   hub to its derived location on the spot (or clones it non-interactively with
   `--yes`), or prints the exact command to do it yourself.
 - **failing (mismatch)** — a clone exists at the derived location, but its
-  `origin` doesn't match `hub_repo`. A hard error naming both remotes — never
-  reused, never clobbered.
+  `origin` doesn't match `hub_repo`. mage uses it anyway (the `external hub` line
+  fails too, naming both remotes) and never clobbers it, but the grant is
+  withheld until you fix that clone's origin or re-run `mage link <address>`.
 
 `doctor` also reports index freshness against the right root for external mode,
 so a stale index shows up here rather than as mysteriously missing recall.

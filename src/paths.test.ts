@@ -168,7 +168,7 @@ describe("paths", () => {
     }
   });
 
-  it("resolveDocsRoot degrades to hub_path when the derived hub's origin MISMATCHES (never throws, never reuses)", async () => {
+  it("resolveDocsRoot uses the derived root on an origin MISMATCH, never hub_path (#191)", async () => {
     const mageHome = await tmpDir("mage-derive-mismatch-home-");
     const saved = process.env.MAGE_HOME;
     process.env.MAGE_HOME = mageHome;
@@ -210,10 +210,9 @@ describe("paths", () => {
       );
 
       const r = await resolveDocsRoot(code);
-      // Never throws, never silently reuses the mismatched derived clone —
-      // degrades to the deprecated hub_path fallback instead.
-      expect(r?.repo).toBe(legacyHub);
-      expect(r?.root).toBe(hubProjectDocsRoot(legacyHub, "engine"));
+      // The #191 ruling: the derived path wins even with a valid hub_path present.
+      expect(r?.repo).toBe(derived);
+      expect(r?.root).toBe(hubProjectDocsRoot(derived, "engine"));
     } finally {
       if (saved === undefined) delete process.env.MAGE_HOME;
       else process.env.MAGE_HOME = saved;
@@ -330,7 +329,7 @@ describe("paths", () => {
       });
     });
 
-    it("Finding 2 regression: returns hub-unreachable (hub-mismatch) when clone origin does not match hub_repo (#158)", async () => {
+    it("resolves to the derived hub and carries the origin mismatch when clone origin does not match hub_repo (#191)", async () => {
       const saved = process.env.MAGE_HOME;
       const home = await tmpDir("mage-mismatch-home-");
       process.env.MAGE_HOME = home;
@@ -360,18 +359,11 @@ describe("paths", () => {
 
         const res = await externalDocsRoot(code);
         expect(res).toEqual({
-          kind: "hub-unreachable",
-          reason: "hub-mismatch",
-          expectedAddress: "https://example.com/acme/expected-hub.git",
-          expectedPath: derivedHub,
-          detail: expect.stringMatching(/does not match the clone's origin/),
+          kind: "resolved",
+          value: { root: hubProjectDocsRoot(derivedHub, "engine"), kind: "hub", repo: derivedHub },
+          originMismatch: expect.stringMatching(/does not match the clone's origin/),
         });
-
-        const why = await explainNoDocsRoot(code);
-        expect(why.hubUnreachable).toBe(true);
-        expect(why.reason).toBe("hub-mismatch");
-        expect(why.message).toMatch(/does not match the clone's origin/);
-        expect(why.message).not.toMatch(/is not a mage hub/);
+        expect(await resolveDocsRoot(code)).not.toBeNull();
       } finally {
         if (saved === undefined) delete process.env.MAGE_HOME;
         else process.env.MAGE_HOME = saved;

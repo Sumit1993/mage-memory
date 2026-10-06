@@ -413,7 +413,7 @@ export async function verifyHubArrival(derivedPath: string, hubRepo: string): Pr
       reason: "origin-mismatch",
       detail:
         `hub_repo ${redactUrl(hubRepo)} does not match the clone's origin ` +
-        `${redactUrl(origin)} found at ${derivedPath} — never reused, never clobbered`,
+        `${redactUrl(origin)} found at ${derivedPath}`,
     };
   }
   return { ok: true };
