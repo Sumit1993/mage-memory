@@ -20,7 +20,13 @@ async function runCli(args: string[]): Promise<{ stdout: string; exitCode: numbe
   }
 }
 
-describe("retired verbs signposts (graduate)", () => {
+describe("retired verbs signposts (graduate, ingest)", () => {
+  it("mage ingest prints that ingest has retired and exits 0, whatever its args (#208)", async () => {
+    const res = await runCli(["ingest", "some/dir", "--json"]);
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).toBe(RETIRED_VERB_MESSAGES.ingest);
+  });
+
   it("mage graduate prints that graduate has retired and exits 0", async () => {
     const res = await runCli(["graduate"]);
     expect(res.exitCode).toBe(0);

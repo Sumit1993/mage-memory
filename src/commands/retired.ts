@@ -11,6 +11,8 @@ export const RETIRED_VERB_MESSAGES = {
     "mage dashboard has retired. Use `mage index` instead.\nGraph and dashboard generation are folded into index.",
   footprint:
     "mage footprint has retired. Use `mage doctor` instead.\nContext footprint diagnostics are folded into doctor.",
+  ingest:
+    "mage ingest has retired. Use `mage groom` instead.\nIts inventory fed the retired grooming loop; `/mage:learn --from` classifies sources itself.",
   stage:
     "mage stage has retired. Use `mage observe` instead.\nDirect capture will route through observe, but the finding event is not built yet.",
 } as const;

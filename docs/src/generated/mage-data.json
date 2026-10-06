@@ -333,15 +333,10 @@
     },
     {
       "name": "ingest",
-      "summary": "Enumerate + classify ingestable sources under <dir> (read-only) — what `mage:learn --from` distills.",
+      "summary": "Retired signpost: use `mage groom` instead",
       "aliases": [],
       "hidden": true,
-      "options": [
-        {
-          "flags": "--json",
-          "description": "emit the manifest as JSON to stdout (machine-readable)"
-        }
-      ]
+      "options": []
     },
     {
       "name": "distill",
