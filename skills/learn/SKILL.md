@@ -144,7 +144,10 @@ adopting an authored skill is *remembering*, not copying a source (ADR-0013 §5)
 1. **Inventory `<dir>`.** List its files and give each a `kind`: a `SKILL.md`
    is `skill`; a `.md` whose frontmatter has `type` or `tags` is `note`; any
    other `.md`, `.markdown` or `.txt` is `prose`; a `.jsonl` is `transcript`.
-   Skip YAML, code and binaries. Drive the rest of the flow per `kind`:
+   Skip YAML, code and binaries. For example: `deploy/SKILL.md` → `skill`,
+   `runbook.md` with `tags:` → `note`, `ideas.txt` → `prose`,
+   `chat.jsonl` → `transcript`, `config.yaml` skipped.
+   Drive the rest of the flow per `kind`:
    - `skill` → **adopt-in-place** (step 3).
    - `prose` | `transcript` | `note` → **distill to notes** (step 2 / normal
      capture via the **Steps** above).
