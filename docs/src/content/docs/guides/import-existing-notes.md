@@ -39,6 +39,17 @@ The skill classifies each file under the folder itself, with no plumbing verb
 | `.jsonl` | transcript | distilled to a note |
 | YAML, code, binaries | — | skipped |
 
+For example, `/mage:learn --from notes-export/` on this folder:
+
+```text
+notes-export/
+├── deploy/SKILL.md      skill       adopted in place
+├── runbook.md           note        distilled (its frontmatter has tags)
+├── ideas.txt            prose       distilled
+├── chat-2026-08.jsonl   transcript  distilled
+└── config.yaml          —           skipped
+```
+
 Nothing is created until you accept the drafts.
 
 ## Onboarding agent memories instead of a folder
