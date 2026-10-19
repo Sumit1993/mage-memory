@@ -3,7 +3,7 @@ title: Stage and groom (retired)
 description: Retired in 0.0.18; see the ladder and mage groom.
 ---
 
-This page described part of the self-grooming loop (streams, digests, proposals, a ledger and a counting gate). 0.0.18 cut that loop from the surface; see [ADR-0060, the ladder reset](https://github.com/Sumit1993/mage-memory/blob/main/mage/decisions/0060-the-ladder-reset.md).
+This page is a retired pointer to ADR-0060. It described part of the self-grooming loop (streams, digests, proposals, a ledger and a counting gate). 0.0.18 cut that loop from the surface; see [ADR-0060, the ladder reset](https://github.com/Sumit1993/mage-memory/blob/main/mage/decisions/0060-the-ladder-reset.md).
 
 What replaced it:
 
