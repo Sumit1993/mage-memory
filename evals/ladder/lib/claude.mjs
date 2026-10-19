@@ -6,7 +6,7 @@ export const DEFAULT_MODEL = "gemma4:31b-cloud";
 export const RUNS_DIR =
   process.env.LADDER_RUNS_DIR || "C:\\Users\\sumit\\ai-context\\mage-memory\\204-ladder-reset\\eval-runs";
 
-export function claudeEnv({ model = DEFAULT_MODEL, configDir, hookLog }) {
+export function claudeEnv({ model = DEFAULT_MODEL, configDir, hookLog, hookState }) {
   const env = { ...process.env };
   for (const k of Object.keys(env)) {
     if (k.startsWith("ANTHROPIC_") || k.startsWith("CLAUDE_CODE_USE_") || k === "CLAUDE_CONFIG_DIR") delete env[k];
@@ -25,6 +25,7 @@ export function claudeEnv({ model = DEFAULT_MODEL, configDir, hookLog }) {
     DISABLE_TELEMETRY: "1",
     CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
     ...(hookLog ? { LADDER_LOG: hookLog } : {}),
+    ...(hookState ? { LADDER_STATE: hookState } : {}),
   };
 }
 
