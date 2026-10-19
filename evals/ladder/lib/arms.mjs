@@ -15,7 +15,30 @@ export function git(dir, ...args) {
   return execFileSync("git", args, { cwd: dir, encoding: "utf8" });
 }
 
-export function claudeMdFor(arm, rules) {
+export const loadNoise = () =>
+  readFileSync(join(LADDER_DIR, "fixture-noise", "rules-heavy.md"), "utf8")
+    .split(/\r?\n/)
+    .filter((l) => l.startsWith("- "));
+
+/** Heavy load: the same distractors in every arm; this arm's target rules slot in between them, never first or last. */
+function heavyClaudeMd(arm, rules) {
+  const noise = loadNoise();
+  const targets = rules.filter((r) => arm === "A" || (arm === "B" && r.rung === "note"));
+  const slots = rules.map((_, i) => Math.round(((i + 1) * noise.length) / (rules.length + 1)));
+  const lines = [];
+  noise.forEach((line, i) => {
+    lines.push(line);
+    rules.forEach((r, j) => {
+      if (slots[j] === i + 1 && targets.includes(r)) lines.push(`- ${r.text}`);
+    });
+  });
+  return [HEADER, "## Project rules", ...lines, ""].join("\n");
+}
+
+export function claudeMdFor(arm, rules, load = "light") {
+  if (!["A", "B", "C"].includes(arm)) throw new Error(`unknown arm ${arm}`);
+  if (load === "heavy") return heavyClaudeMd(arm, rules);
+  if (load !== "light") throw new Error(`unknown load ${load}`);
   if (arm === "A") return `${HEADER}\n## Remembered\n${rules.map((r) => `- ${r.text}`).join("\n")}\n`;
   if (arm === "B") return `${HEADER}\n## Remembered\n${rules.filter((r) => r.rung === "note").map((r) => `- ${r.text}`).join("\n")}\n`;
   if (arm === "C") return HEADER;
@@ -26,16 +49,16 @@ export function hookSettings(arm) {
   return {
     hooks: {
       PreToolUse: [
-        { matcher: "Edit|Write|MultiEdit|Bash", hooks: [{ type: "command", command: HOOK_CMD(arm) }] },
+        { matcher: "Read|Edit|Write|MultiEdit|Bash", hooks: [{ type: "command", command: HOOK_CMD(arm) }] },
       ],
     },
   };
 }
 
 /** Build one arm into destDir: fixture copy, arm files, git init and an initial commit. */
-export function buildArm(arm, destDir, { rules = loadRules() } = {}) {
+export function buildArm(arm, destDir, { rules = loadRules(), load = "light" } = {}) {
   cpSync(FIXTURE_DIR, destDir, { recursive: true });
-  writeFileSync(join(destDir, "CLAUDE.md"), claudeMdFor(arm, rules));
+  writeFileSync(join(destDir, "CLAUDE.md"), claudeMdFor(arm, rules, load));
   writeFileSync(join(destDir, ".gitignore"), ".claude/\n");
 
   if (arm === "B" || arm === "C") {
