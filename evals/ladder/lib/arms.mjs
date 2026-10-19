@@ -35,7 +35,13 @@ function heavyClaudeMd(arm, rules) {
   return [HEADER, "## Project rules", ...lines, ""].join("\n");
 }
 
-export function claudeMdFor(arm, rules, load = "light") {
+/** Arm D is arm B with R5 moved from recall to the pre-commit check. */
+export const rulesFor = (arm, rules) => (arm === "D" ? rules.map((r) => (r.id === "R5" ? { ...r, rung: "check" } : r)) : rules);
+const baseArm = (arm) => (arm === "D" ? "B" : arm);
+
+export function claudeMdFor(armName, allRules, load = "light") {
+  const arm = baseArm(armName);
+  const rules = rulesFor(armName, allRules);
   if (!["A", "B", "C"].includes(arm)) throw new Error(`unknown arm ${arm}`);
   if (load === "heavy") return heavyClaudeMd(arm, rules);
   if (load !== "light") throw new Error(`unknown load ${load}`);
@@ -56,17 +62,19 @@ export function hookSettings(arm) {
 }
 
 /** Build one arm into destDir: fixture copy, arm files, git init and an initial commit. */
-export function buildArm(arm, destDir, { rules = loadRules(), load = "light" } = {}) {
+export function buildArm(armName, destDir, { rules: allRules = loadRules(), load = "light" } = {}) {
+  const arm = baseArm(armName);
+  const rules = rulesFor(armName, allRules);
   cpSync(FIXTURE_DIR, destDir, { recursive: true });
-  writeFileSync(join(destDir, "CLAUDE.md"), claudeMdFor(arm, rules, load));
+  writeFileSync(join(destDir, "CLAUDE.md"), claudeMdFor(armName, allRules, load));
   writeFileSync(join(destDir, ".gitignore"), ".claude/\n");
 
   if (arm === "B" || arm === "C") {
     const hooksDir = join(destDir, ".claude", "hooks");
     mkdirSync(hooksDir, { recursive: true });
     cpSync(join(LADDER_DIR, "hooks", "ladder-hook.mjs"), join(hooksDir, "ladder-hook.mjs"));
-    cpSync(join(LADDER_DIR, "rules.json"), join(hooksDir, "rules.json"));
-    writeFileSync(join(destDir, ".claude", "settings.json"), `${JSON.stringify(hookSettings(arm), null, 2)}\n`);
+    writeFileSync(join(hooksDir, "rules.json"), JSON.stringify(rules, null, 2));
+    writeFileSync(join(destDir, ".claude", "settings.json"), `${JSON.stringify(hookSettings(armName), null, 2)}\n`);
   }
   if (arm === "B") {
     cpSync(join(LADDER_DIR, "arms", "check.js"), join(destDir, "scripts", "check.js"));
@@ -78,7 +86,7 @@ export function buildArm(arm, destDir, { rules = loadRules(), load = "light" } =
   git(destDir, "config", "core.autocrlf", "false");
   if (arm === "B") {
     const hook = join(destDir, ".git", "hooks", "pre-commit");
-    writeFileSync(hook, "#!/bin/sh\nexec node scripts/check.js\n");
+    writeFileSync(hook, `#!/bin/sh\nexec node scripts/check.js${armName === "D" ? " --changelog" : ""}\n`);
     chmodSync(hook, 0o755);
   }
   git(destDir, "add", "-A");
