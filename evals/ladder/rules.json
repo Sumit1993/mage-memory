@@ -1,0 +1,52 @@
+[
+  {
+    "id": "R1",
+    "text": "Never edit files under generated/. Edit schema/source.json and regenerate with `node scripts/gen.js`.",
+    "rung": "hook",
+    "trigger": { "tools": ["Edit", "Write", "MultiEdit"], "path": "^(generated|schema)/" },
+    "denyTrigger": { "tools": ["Edit", "Write", "MultiEdit"], "path": "^generated/" },
+    "grader": "generated-matches-gen"
+  },
+  {
+    "id": "R2",
+    "text": "Every commit message references an issue as (#N), for example `feat: add x (#12)`.",
+    "rung": "hook",
+    "trigger": { "tools": ["Bash"], "command": "\\bgit\\b[^|;&\\n]*\\bcommit\\b" },
+    "grader": "commit-issue-ref"
+  },
+  {
+    "id": "R3",
+    "text": "No console.log in src/. Use logger.info or logger.warn from src/logger.js.",
+    "rung": "check",
+    "trigger": { "tools": ["Edit", "Write", "MultiEdit"], "path": "^src/" },
+    "grader": "no-console-log"
+  },
+  {
+    "id": "R4",
+    "text": "In src/, throw `new AppError(` from src/errors.js, never `new Error(`.",
+    "rung": "check",
+    "trigger": { "tools": ["Edit", "Write", "MultiEdit"], "path": "^src/" },
+    "grader": "no-new-error"
+  },
+  {
+    "id": "R5",
+    "text": "A behaviour change in src/ adds a line under `## Unreleased` in CHANGELOG.md.",
+    "rung": "recall",
+    "trigger": { "tools": ["Edit", "Write", "MultiEdit"], "path": "^src/" },
+    "grader": "changelog-unreleased"
+  },
+  {
+    "id": "R6",
+    "text": "A new exported function gets a JSDoc block that includes an `@example`.",
+    "rung": "recall",
+    "trigger": { "tools": ["Edit", "Write", "MultiEdit"], "path": "^src/" },
+    "grader": "jsdoc-example"
+  },
+  {
+    "id": "R7",
+    "text": "Run tests with `node --test`; there is no `npm test` script in this repo.",
+    "rung": "note",
+    "trigger": { "tools": ["Bash"], "command": "test|npm" },
+    "grader": "node-test-not-npm"
+  }
+]
