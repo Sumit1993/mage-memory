@@ -19,6 +19,10 @@ import {
 } from "../paths.js";
 import { type ScannedNote, scanNotes } from "../scan.js";
 import { recoverCcFrontmatter } from "../adapters/claude-code/cc-note.js";
+import { readSensitivity } from "../grooming/config.js";
+import { readTally } from "../grooming/tally.js";
+import type { PromoteTally } from "../grooming/types.js";
+import { thresholdsFor } from "../grooming/thresholds.js";
 import { parseNote } from "../note.js";
 import { type AdmissionProblem, checkAdmission } from "../scanner/admission.js";
 import { genreOf } from "../scanner/genre-map.js";
@@ -60,7 +64,10 @@ export interface IndexResult {
 
 /**
  * Generate the hierarchical INDEX (the always-loaded "closet"). Deterministic
- * and idempotent: same notes → identical output, re-run → no diff (ADR-0006).
+ * and idempotent: same notes → identical output, re-run → no diff (ADR-0006) —
+ * with one documented exception: MEMORY.md's roster order consults the local
+ * promote tally when present (ADR-0041 Amendment §3), so a machine without
+ * metrics renders the recency fallback order.
  */
 export async function index(opts: IndexOptions = {}): Promise<IndexResult> {
   const resolved = await requireDocsRoot(opts.dir);
@@ -210,6 +217,9 @@ export async function index(opts: IndexOptions = {}): Promise<IndexResult> {
   // multi-wing hierarchical KB it stays the bounded wings-map twin.
   // The host's own budget, derived HERE and passed in (ADR-0041 Amendment §2): K falls
   // out of these two numbers, so a second harness supplies its own and gets its own K.
+  const sensitivity = await readSensitivity(resolved);
+  const { graduateSessions } = thresholdsFor(sensitivity);
+  const tally = await readTally(root);
   const budget: RosterBudget = {
     byteThreshold: Math.floor(BREACH_RATIO * AUTO_MEMORY_MAX_BYTES),
     lineThreshold: Math.floor(BREACH_RATIO * AUTO_MEMORY_MAX_LINES),
@@ -223,6 +233,8 @@ export async function index(opts: IndexOptions = {}): Promise<IndexResult> {
     !opts.quiet,
     acceptedDecisionsCount,
     new Set(reviews.filter((r) => r.admission.length === 0).map((r) => r.relPath)),
+    tally,
+    graduateSessions,
     budget,
   );
   await writeFile(join(root, MEMORY_FILE), memoryContent);
@@ -450,23 +462,49 @@ function renderRootHierarchical(
 }
 
 /**
- * Roster order (#282): admitted notes first, each group by `created` ascending (missing
- * last), then relPath. Pure of local state, so a re-run is byte-identical everywhere.
+ * Roster order (#282): admitted notes first (created ascending), then every other note in
+ * the 0.0.17 order: usage-proven first (local promote tally), newest-reviewed first, relPath.
+ * Without a tally the order is a pure function of the notes.
  */
 function rankMemoryNotes(
   entries: ScannedNote[],
   admitted: ReadonlySet<string>,
+  tally: PromoteTally | undefined,
+  graduateSessions: number,
 ): ScannedNote[] {
-  return [...entries].sort((a, b) => {
-    const aAdmitted = admitted.has(a.relPath);
-    if (aAdmitted !== admitted.has(b.relPath)) return aAdmitted ? -1 : 1;
-    if (a.created !== b.created) {
-      if (a.created === undefined) return 1;
-      if (b.created === undefined) return -1;
-      return a.created < b.created ? -1 : 1;
-    }
-    return a.relPath < b.relPath ? -1 : a.relPath > b.relPath ? 1 : 0;
-  });
+  const noteChapters = (relPath: string): number => tally?.notes?.[relPath]?.chapters ?? 0;
+  const noteRecency = (e: ScannedNote): string | undefined => e.lastReviewed ?? e.updated ?? e.created;
+  const byPath = (a: ScannedNote, b: ScannedNote): number =>
+    a.relPath < b.relPath ? -1 : a.relPath > b.relPath ? 1 : 0;
+
+  const admittedFirst = entries
+    .filter((e) => admitted.has(e.relPath))
+    .sort((a, b) => {
+      if (a.created !== b.created) {
+        if (a.created === undefined) return 1;
+        if (b.created === undefined) return -1;
+        return a.created < b.created ? -1 : 1;
+      }
+      return byPath(a, b);
+    });
+
+  const rest = entries
+    .filter((e) => !admitted.has(e.relPath))
+    .sort((a, b) => {
+      const aProven = noteChapters(a.relPath) >= graduateSessions;
+      const bProven = noteChapters(b.relPath) >= graduateSessions;
+      if (aProven !== bProven) return aProven ? -1 : 1;
+      const aDate = noteRecency(a);
+      const bDate = noteRecency(b);
+      if (aDate !== bDate) {
+        if (aDate !== undefined && bDate !== undefined) return aDate > bDate ? -1 : 1;
+        if (aDate !== undefined) return -1;
+        if (bDate !== undefined) return 1;
+      }
+      return byPath(a, b);
+    });
+
+  return [...admittedFirst, ...rest];
 }
 
 /**
@@ -610,6 +648,8 @@ export function renderMemory(
   logWarn: boolean,
   acceptedDecisionsCount: number,
   admitted: ReadonlySet<string>,
+  tally: PromoteTally | undefined,
+  graduateSessions: number,
   budget: RosterBudget,
 ): { content: string; tier: 0 | 1 | 2 } {
   const foldInline = !hierarchical || wings.length <= 1;
@@ -627,7 +667,7 @@ export function renderMemory(
     };
   }
 
-  const ranked = rankMemoryNotes(entries, admitted);
+  const ranked = rankMemoryNotes(entries, admitted, tally, graduateSessions);
   const roster = fillRoster(ranked, acceptedDecisionsCount, budget);
 
   if (!roster.structureBreaches) {

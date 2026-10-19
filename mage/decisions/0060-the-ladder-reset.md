@@ -14,9 +14,12 @@ that passes admission (`rung`, `trigger`, `pointer`) and whose `trigger.match` g
 MultiEdit or NotebookEdit call is injected as context by a PreToolUse hook, once per session; only admitted
 notes are recalled. The gate stays, once: the first memory write of a session, at the root or under `notes/`,
 that carries no `rung` is denied with the ladder and a template per rung; every later write passes, a write
-carrying `rung` always passes, and a failed secret scan denies. `mage groom` walks existing notes up the ladder
-and lands the result by pull request. The loop is cut: streams beyond hook capture, the digest, the proposal
-engine, the ledger and the two-count release. Success is fewer operator corrections per session, read from the
+carrying `rung` always passes, and a failed secret scan denies. Reserved root files (AGENTS.md, CLAUDE.md,
+IDENTITY.md, README.md, Dashboard.md) are not memory targets; only INDEX.md, MEMORY.md and `_index.*.md` are
+denied, because `mage index` regenerates them. Recall de-dup and the ladder marker are keyed per `session_id`,
+so subagents that share their parent's `session_id` share both. `mage groom` walks existing notes up the ladder
+and lands the result by pull request. The loop is cut from the surface: its verbs, skills and docs, the ledger and the two-count release. Its code
+(observe on its hook events, distill, the proposal engine, the dashboard) stays until #223 removes it. Success is fewer operator corrections per session, read from the
 receipt's `corrected`.
 ## Why
 3 of 126 sessions read a note (0050). In eval E2 (n=3, one model) plain scored 1 of 5, attach-only 1.00 and

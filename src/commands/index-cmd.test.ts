@@ -831,7 +831,62 @@ keywords: [kw${i}, ${"k".repeat(25)}]
     expect(countLines(mem)).toBeLessThanOrEqual(thresholdLines);
   });
 
-  it("3. a promote tally no longer changes the roster; re-runs are byte-identical", async () => {
+  it("2d. notes without admission fields keep the 0.0.17 order: proven, then newest reviewed, then relPath", async () => {
+    const dir = await vault();
+    await note(dir, "b.md", "---\ntype: note\nlast_reviewed: '2026-01-01'\n---\n# B\n");
+    await note(dir, "c.md", "---\ntype: note\nlast_reviewed: '2026-07-29'\n---\n# C\n");
+    await note(dir, "a.md", "---\ntype: note\nlast_reviewed: '2026-01-01'\n---\n# A\n");
+    await note(dir, "d.md", "---\ntype: note\nupdated: '2026-03-03'\n---\n# D\n");
+    await note(dir, "e.md", "---\ntype: note\ncreated: '2026-09-09'\n---\n# E\n");
+    await tally(dir, { "notes/a.md": 5 });
+
+    await index({ dir, quiet: true });
+    const mem = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
+    const order = ["A", "E", "C", "D", "B"].map((t) => mem.indexOf(`[${t}](notes/${t.toLowerCase()}.md)`));
+    expect(order.every((i) => i >= 0)).toBe(true);
+    expect([...order].sort((x, y) => x - y)).toEqual(order);
+  });
+
+  it("2e. a KB with no admitted notes ranks exactly as the 0.0.17 comparator would", async () => {
+    const dir = await vault();
+    const specs = [
+      { f: "p1", fm: "last_reviewed: '2025-05-05'" },
+      { f: "p2", fm: "updated: '2026-02-02'" },
+      { f: "p3", fm: "created: '2026-04-04'" },
+      { f: "p4", fm: "last_reviewed: '2026-02-02'" },
+      { f: "p5", fm: "" },
+      { f: "p6", fm: "created: '2024-01-01'" },
+      { f: "p7", fm: "last_reviewed: '2026-02-02'" },
+    ];
+    for (const { f, fm } of specs) {
+      await note(dir, `${f}.md`, `---\ntype: note\n${fm ? `${fm}\n` : ""}---\n# T${f}\n`);
+    }
+    await tally(dir, { "notes/p6.md": 5, "notes/p3.md": 7 });
+
+    const chapters: Record<string, number> = { p6: 5, p3: 7 };
+    const date = (f: string): string | undefined => /'(.+)'/.exec(specs.find((x) => x.f === f)?.fm ?? "")?.[1];
+    const legacy = specs
+      .map((x) => x.f)
+      .sort((a, b) => {
+        const pa = (chapters[a] ?? 0) >= 5;
+        const pb = (chapters[b] ?? 0) >= 5;
+        if (pa !== pb) return pa ? -1 : 1;
+        const da = date(a);
+        const db = date(b);
+        if (da !== db) {
+          if (da !== undefined && db !== undefined) return da > db ? -1 : 1;
+          return da !== undefined ? -1 : 1;
+        }
+        return a < b ? -1 : 1;
+      });
+
+    await index({ dir, quiet: true });
+    const mem = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
+    const actual = [...mem.matchAll(/\[T(p\d)\]/g)].map((m) => m[1]);
+    expect(actual).toEqual(legacy);
+  });
+
+  it("3. a promote tally does not reorder admitted notes; re-runs are byte-identical", async () => {
     const dir = await vault();
     await note(dir, "old.md", ADMITTED("2026-01-01", "Old"));
     await note(dir, "new.md", ADMITTED("2026-07-29", "New"));
@@ -968,6 +1023,8 @@ keywords: [kw1, ${"k".repeat(30000)}]
       false,
       3,
       new Set<string>(),
+      undefined,
+      5,
       { byteThreshold: 20, lineThreshold: 3 },
     );
     expect(tier).toBe(2);
@@ -991,7 +1048,7 @@ keywords: [kw1, ${"k".repeat(30000)}]
       inRepoMembers: [],
     };
     const render = (lineThreshold: number) =>
-      renderMemory(entries, ["w"], false, reg, false, 0, new Set<string>(), {
+      renderMemory(entries, ["w"], false, reg, false, 0, new Set<string>(), undefined, 5, {
         byteThreshold: 23040,
         lineThreshold,
       });

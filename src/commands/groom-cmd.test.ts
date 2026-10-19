@@ -6,7 +6,7 @@ import { run } from "../shell.js";
 import { exists, stagingPath } from "../paths.js";
 import { parseNote } from "../note.js";
 import { initRepoWithIdentity, tmpDir, withKb } from "../../test/fixtures/kb.js";
-import { LADDER_TEXT } from "../adapters/claude-code/memory-hook.js";
+import { GROOM_LADDER_TEXT } from "../adapters/claude-code/memory-hook.js";
 import { groomCmd } from "./groom-cmd.js";
 import { stageCmd } from "./stage-cmd.js";
 
@@ -97,7 +97,7 @@ describe("mage groom — the walk", () => {
         "",
       ].join("\n"),
     )).toBe(true);
-    expect(out.endsWith(LADDER_TEXT)).toBe(true);
+    expect(out.endsWith(GROOM_LADDER_TEXT)).toBe(true);
     expect(out).not.toContain("more: mage groom --all");
   });
 

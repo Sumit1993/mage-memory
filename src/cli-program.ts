@@ -334,7 +334,7 @@ export function buildProgram(): Command {
   // The boundary-nudge adapter (adapters/claude-code/nudge.ts) — fired from the SessionStart hook.
   program.addCommand(buildNudgeCommand(), { hidden: true });
   // The Gate-0 capture adapter (adapters/claude-code/memory-hook.ts) — fired from
-  // PreToolUse + PostToolUse to redirect/scrub native-memory writes (ADR-0032).
+  // PreToolUse (Write|Edit) to scrub native-memory writes and ask the ladder once (ADR-0032, #282).
   program.addCommand(buildMemoryHookCommand(), { hidden: true });
   // The PreToolUse recall hook. cli.ts short-circuits to it before this program is built;
   // the command exists for the docs inventory and a direct `buildProgram()` caller (#282).
