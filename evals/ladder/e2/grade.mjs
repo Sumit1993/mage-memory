@@ -109,7 +109,9 @@ export function classify(blobs) {
 
 export function gradeE2({ dir, base, configDir }) {
   const corrections = classify(rungBlobs({ dir, base, configDir }));
-  return { corrections, score: corrections.filter((c) => c.ok).length, of: corrections.length };
+  const cfg = walk(join(configDir ?? "", "projects")).filter((p) => /[\\/]memory[\\/]/.test(p));
+  const written = [...changedFiles(dir, base), ...cfg.map((p) => `config:${p.slice(configDir.length + 1)}`)];
+  return { corrections, score: corrections.filter((c) => c.ok).length, of: corrections.length, written };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

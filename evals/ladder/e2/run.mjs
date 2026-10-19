@@ -16,12 +16,12 @@ const runMage = (cwd, ...args) => {
 };
 
 /**
- * Register mage's memory hook the way `mage connect` does: run the real `mage init --in-repo`
+ * Both E2 arms get the same mage setup; only E2-mage keeps the memory hook groups. Registered the way `mage connect` does: run the real `mage init --in-repo`
  * and `mage connect` in the copy, then keep only the mage:memory:* hook groups (the unit under
  * test) and point their command at this worktree's built CLI instead of a `mage` on PATH.
  * Returns the settings object written to .claude/settings.local.json.
  */
-export function registerMageMemoryHook(dir) {
+export function registerMageSetup(dir, { withHook }) {
   runMage(dir, "init", "--in-repo", "--yes", "--no-connect");
   runMage(dir, "connect", "--yes", "--no-git-hook");
   const path = join(dir, ".claude", "settings.local.json");
@@ -34,9 +34,10 @@ export function registerMageMemoryHook(dir) {
         ...g,
         hooks: g.hooks.map((h) => ({ ...h, command: h.command.replace(/^mage /, `node "${MAGE_CLI}" `) })),
       }));
-    if (memory.length > 0) kept[event] = memory;
+    if (withHook && memory.length > 0) kept[event] = memory;
   }
-  settings.hooks = kept;
+  if (withHook) settings.hooks = kept;
+  else delete settings.hooks;
   writeFileSync(path, `${JSON.stringify(settings, null, 2)}\n`);
   return settings;
 }
@@ -49,7 +50,7 @@ export function buildE2(arm, dir) {
   git(dir, "config", "user.email", "eval@example.invalid");
   git(dir, "config", "core.autocrlf", "false");
   let registered = null;
-  if (arm === "E2-mage") registered = registerMageMemoryHook(dir);
+  registered = registerMageSetup(dir, { withHook: arm === "E2-mage" });
   git(dir, "add", "-A");
   git(dir, "commit", "-q", "--no-verify", "-m", "chore: initial shopcart");
   return { base: git(dir, "rev-parse", "HEAD").trim(), registered };
