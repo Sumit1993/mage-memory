@@ -57,7 +57,7 @@ function settingsFiles(dir) {
     });
 }
 
-const isMageGroup = (g) => typeof g?.id === "string" && g.id.startsWith("mage:");
+const isMageGroup = (g) => typeof g?.id === "string" && /^(mage|proto):/.test(g.id);
 
 /** The text each rung holds, drawn from the final state of a run. */
 export function rungBlobs({ dir, base, configDir }) {

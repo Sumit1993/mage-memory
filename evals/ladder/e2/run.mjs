@@ -42,6 +42,17 @@ export function registerMageSetup(dir, { withHook }) {
   return settings;
 }
 
+const PROTO_HOOK = join(HERE, "proto-ladder-hook.mjs");
+
+/** E2-proto: E2-mage plus the prototype ladder gate as the first PreToolUse group on Write|Edit. */
+export function addProtoHook(dir, settings) {
+  const group = { id: "proto:ladder:PreToolUse", matcher: "Write|Edit", hooks: [{ type: "command", command: `node "${PROTO_HOOK}"` }] };
+  const next = { ...settings, hooks: { ...settings.hooks, PreToolUse: [group, ...(settings.hooks?.PreToolUse ?? [])] } };
+  writeFileSync(join(dir, ".claude", "settings.local.json"), `${JSON.stringify(next, null, 2)}
+`);
+  return next;
+}
+
 export function buildE2(arm, dir) {
   cpSync(FIXTURE_DIR, dir, { recursive: true });
   writeFileSync(join(dir, "CLAUDE.md"), "# shopcart\n\nA tiny cart library. See README.md.\n");
@@ -50,7 +61,8 @@ export function buildE2(arm, dir) {
   git(dir, "config", "user.email", "eval@example.invalid");
   git(dir, "config", "core.autocrlf", "false");
   let registered = null;
-  registered = registerMageSetup(dir, { withHook: arm === "E2-mage" });
+  registered = registerMageSetup(dir, { withHook: arm === "E2-mage" || arm === "E2-proto" });
+  if (arm === "E2-proto") registered = addProtoHook(dir, registered);
   git(dir, "add", "-A");
   git(dir, "commit", "-q", "--no-verify", "-m", "chore: initial shopcart");
   return { base: git(dir, "rev-parse", "HEAD").trim(), registered };
