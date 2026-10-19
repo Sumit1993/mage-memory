@@ -68,7 +68,7 @@ describe("connect", () => {
     const { dir, root } = await withKb({ kind: "repo" });
     const r = await connect({ cwd: dir, yes: true, gitHook: false });
     expect(r.commandeer).toBe(true);
-    expect(r.wired).toBe(14);
+    expect(r.wired).toBe(15);
     const settings = JSON.parse(await readFile(r.path, "utf8")) as {
       autoMemoryDirectory?: string;
       hooks: Record<string, Array<{ id?: string; matcher?: string }>>;

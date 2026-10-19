@@ -169,6 +169,8 @@ const HOOK_PURPOSE: Record<string, string> = {
     "Gate-0 (ADR-0032): scrub a native-memory write before it touches disk, deny a write to a generated index, and ask the ladder once per session (ADR-0060).",
   "mage:flatten:Stop":
     "ADR-0035 working-tree sweep: at turn-end, after CC's async restamp settles, flatten any note CC restamped this turn back to mage's flat schema — keeping the working tree neutral between commits (commit-flatten stays the durable guarantee).",
+  "mage:index:Stop":
+    "At turn-end, re-index quietly when a note changed since the last index, so a note the host saved mid-session is listed in INDEX.md and MEMORY.md (#282). Never fails the turn.",
 };
 
 /**
