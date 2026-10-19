@@ -2,12 +2,13 @@ import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { DEFAULT_MODEL, RUNS_DIR } from "../lib/claude.mjs";
-import { CORRECTIONS } from "./grade.mjs";
+import { CORRECTION_SETS } from "./grade.mjs";
 import { runE2 } from "./run.mjs";
 
-export function summarizeE2(results) {
+export function summarizeE2(results, prompt = results[0]?.prompt ?? "default") {
+  const corrections = CORRECTION_SETS[prompt] ?? CORRECTION_SETS.default;
   const arms = [...new Set(results.map((r) => r.arm))].sort();
-  const lines = ["# E2 summary", "", `Runs: ${results.length}`, ""];
+  const lines = [`# E2 summary (${prompt} prompt)`, "", `Runs: ${results.length}`, ""];
   lines.push("## Score (corrections landed at or above the expected rung)", "", "| Arm | Runs | Scores | Mean |", "| --- | --- | --- | --- |");
   for (const arm of arms) {
     const rs = results.filter((r) => r.arm === arm);
@@ -16,7 +17,7 @@ export function summarizeE2(results) {
   }
   lines.push("", "## Rung landed per correction (counts across reps; ok = at or above expected)", "");
   lines.push(`| Correction | Expected | ${arms.join(" | ")} |`, `| --- | --- | ${arms.map(() => "---").join(" | ")} |`);
-  for (const c of CORRECTIONS) {
+  for (const c of corrections) {
     const cells = arms.map((arm) => {
       const rs = results.filter((r) => r.arm === arm);
       const counts = {};
@@ -38,7 +39,7 @@ export function summarizeE2(results) {
   return `${lines.join("\n")}\n`;
 }
 
-export async function runE2Batch({ arms, reps, concurrency, model, runId }) {
+export async function runE2Batch({ arms, reps, concurrency, model, runId, prompt = "default" }) {
   const jobs = [];
   for (let rep = 1; rep <= reps; rep++) for (const arm of arms) jobs.push({ arm, rep });
   const dir = join(RUNS_DIR, runId);
@@ -50,7 +51,7 @@ export async function runE2Batch({ arms, reps, concurrency, model, runId }) {
       const job = jobs[next++];
       let result;
       try {
-        result = await runE2({ ...job, model, runId });
+        result = await runE2({ ...job, model, runId, prompt });
       } catch (e) {
         result = { ...job, error: String(e) };
       }
@@ -59,7 +60,7 @@ export async function runE2Batch({ arms, reps, concurrency, model, runId }) {
     }
   }
   await Promise.all(Array.from({ length: Math.min(concurrency, jobs.length) }, worker));
-  writeFileSync(join(dir, "summary.md"), summarizeE2(results.filter((r) => !r.error)));
+  writeFileSync(join(dir, "summary.md"), summarizeE2(results.filter((r) => !r.error), prompt));
   return results;
 }
 
@@ -74,6 +75,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     concurrency: Number(o.concurrency || 2),
     model: o.model || DEFAULT_MODEL,
     runId,
+    prompt: o.prompt || "default",
   });
   process.stdout.write(`${results.length} runs; see ${join(RUNS_DIR, runId, "summary.md")}\n`);
 }
