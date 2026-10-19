@@ -82,7 +82,7 @@ describe("integration: memory-hook asks the ladder once (deterministic)", () => 
       hookSpecificOutput: { permissionDecision: string; permissionDecisionReason: string };
     };
     expect(first.hookSpecificOutput.permissionDecision).toBe("deny");
-    expect(first.hookSpecificOutput.permissionDecisionReason).toContain("mage:ladder");
+    expect(first.hookSpecificOutput.permissionDecisionReason).toContain("Not saved yet");
 
     const second = hook("memory-hook", write, dir);
     expect(second.code).toBe(0);
