@@ -15,7 +15,36 @@ export function git(dir, ...args) {
   return execFileSync("git", args, { cwd: dir, encoding: "utf8" });
 }
 
-export function claudeMdFor(arm, rules) {
+export const loadNoise = () =>
+  readFileSync(join(LADDER_DIR, "fixture-noise", "rules-heavy.md"), "utf8")
+    .split(/\r?\n/)
+    .filter((l) => l.startsWith("- "));
+
+/** Heavy load: the same distractors in every arm; this arm's target rules slot in between them, never first or last. */
+function heavyClaudeMd(arm, rules) {
+  const noise = loadNoise();
+  const targets = rules.filter((r) => arm === "A" || (arm === "B" && r.rung === "note"));
+  const slots = rules.map((_, i) => Math.round(((i + 1) * noise.length) / (rules.length + 1)));
+  const lines = [];
+  noise.forEach((line, i) => {
+    lines.push(line);
+    rules.forEach((r, j) => {
+      if (slots[j] === i + 1 && targets.includes(r)) lines.push(`- ${r.text}`);
+    });
+  });
+  return [HEADER, "## Project rules", ...lines, ""].join("\n");
+}
+
+/** Arm D is arm B with R5 moved from recall to the pre-commit check. */
+export const rulesFor = (arm, rules) => (arm === "D" ? rules.map((r) => (r.id === "R5" ? { ...r, rung: "check" } : r)) : rules);
+const baseArm = (arm) => (arm === "D" ? "B" : arm);
+
+export function claudeMdFor(armName, allRules, load = "light") {
+  const arm = baseArm(armName);
+  const rules = rulesFor(armName, allRules);
+  if (!["A", "B", "C"].includes(arm)) throw new Error(`unknown arm ${arm}`);
+  if (load === "heavy") return heavyClaudeMd(arm, rules);
+  if (load !== "light") throw new Error(`unknown load ${load}`);
   if (arm === "A") return `${HEADER}\n## Remembered\n${rules.map((r) => `- ${r.text}`).join("\n")}\n`;
   if (arm === "B") return `${HEADER}\n## Remembered\n${rules.filter((r) => r.rung === "note").map((r) => `- ${r.text}`).join("\n")}\n`;
   if (arm === "C") return HEADER;
@@ -26,24 +55,26 @@ export function hookSettings(arm) {
   return {
     hooks: {
       PreToolUse: [
-        { matcher: "Edit|Write|MultiEdit|Bash", hooks: [{ type: "command", command: HOOK_CMD(arm) }] },
+        { matcher: "Read|Edit|Write|MultiEdit|Bash", hooks: [{ type: "command", command: HOOK_CMD(arm) }] },
       ],
     },
   };
 }
 
 /** Build one arm into destDir: fixture copy, arm files, git init and an initial commit. */
-export function buildArm(arm, destDir, { rules = loadRules() } = {}) {
+export function buildArm(armName, destDir, { rules: allRules = loadRules(), load = "light" } = {}) {
+  const arm = baseArm(armName);
+  const rules = rulesFor(armName, allRules);
   cpSync(FIXTURE_DIR, destDir, { recursive: true });
-  writeFileSync(join(destDir, "CLAUDE.md"), claudeMdFor(arm, rules));
+  writeFileSync(join(destDir, "CLAUDE.md"), claudeMdFor(armName, allRules, load));
   writeFileSync(join(destDir, ".gitignore"), ".claude/\n");
 
   if (arm === "B" || arm === "C") {
     const hooksDir = join(destDir, ".claude", "hooks");
     mkdirSync(hooksDir, { recursive: true });
     cpSync(join(LADDER_DIR, "hooks", "ladder-hook.mjs"), join(hooksDir, "ladder-hook.mjs"));
-    cpSync(join(LADDER_DIR, "rules.json"), join(hooksDir, "rules.json"));
-    writeFileSync(join(destDir, ".claude", "settings.json"), `${JSON.stringify(hookSettings(arm), null, 2)}\n`);
+    writeFileSync(join(hooksDir, "rules.json"), JSON.stringify(rules, null, 2));
+    writeFileSync(join(destDir, ".claude", "settings.json"), `${JSON.stringify(hookSettings(armName), null, 2)}\n`);
   }
   if (arm === "B") {
     cpSync(join(LADDER_DIR, "arms", "check.js"), join(destDir, "scripts", "check.js"));
@@ -55,7 +86,7 @@ export function buildArm(arm, destDir, { rules = loadRules() } = {}) {
   git(destDir, "config", "core.autocrlf", "false");
   if (arm === "B") {
     const hook = join(destDir, ".git", "hooks", "pre-commit");
-    writeFileSync(hook, "#!/bin/sh\nexec node scripts/check.js\n");
+    writeFileSync(hook, `#!/bin/sh\nexec node scripts/check.js${armName === "D" ? " --changelog" : ""}\n`);
     chmodSync(hook, 0o755);
   }
   git(destDir, "add", "-A");

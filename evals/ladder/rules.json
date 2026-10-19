@@ -3,50 +3,185 @@
     "id": "R1",
     "text": "Never edit files under generated/. Edit schema/source.json and regenerate with `node scripts/gen.js`.",
     "rung": "hook",
-    "trigger": { "tools": ["Edit", "Write", "MultiEdit"], "path": "^(generated|schema)/" },
-    "denyTrigger": { "tools": ["Edit", "Write", "MultiEdit"], "path": "^generated/" },
-    "grader": "generated-matches-gen"
+    "trigger": {
+      "tools": [
+        "Edit",
+        "Write",
+        "MultiEdit"
+      ],
+      "path": "^(generated|schema)/"
+    },
+    "denyTrigger": {
+      "tools": [
+        "Edit",
+        "Write",
+        "MultiEdit"
+      ],
+      "path": "^generated/"
+    },
+    "grader": "generated-matches-gen",
+    "inject": [
+      {
+        "tools": [
+          "Edit",
+          "Write",
+          "MultiEdit",
+          "Read"
+        ],
+        "path": "^(generated|schema)/"
+      }
+    ]
   },
   {
     "id": "R2",
     "text": "Every commit message references an issue as (#N), for example `feat: add x (#12)`.",
     "rung": "hook",
-    "trigger": { "tools": ["Bash"], "command": "\\bgit\\b[^|;&\\n]*\\bcommit\\b" },
-    "grader": "commit-issue-ref"
+    "trigger": {
+      "tools": [
+        "Bash"
+      ],
+      "command": "\\bgit\\b[^|;&\\n]*\\bcommit\\b"
+    },
+    "grader": "commit-issue-ref",
+    "inject": [
+      {
+        "tools": [
+          "Edit",
+          "Write",
+          "MultiEdit"
+        ]
+      },
+      {
+        "tools": [
+          "Bash"
+        ],
+        "command": "\\bgit\\b[^|;&\\n]*\\b(add|commit)\\b"
+      }
+    ]
   },
   {
     "id": "R3",
     "text": "No console.log in src/. Use logger.info or logger.warn from src/logger.js.",
     "rung": "check",
-    "trigger": { "tools": ["Edit", "Write", "MultiEdit"], "path": "^src/" },
-    "grader": "no-console-log"
+    "trigger": {
+      "tools": [
+        "Edit",
+        "Write",
+        "MultiEdit"
+      ],
+      "path": "^src/"
+    },
+    "grader": "no-console-log",
+    "inject": [
+      {
+        "tools": [
+          "Edit",
+          "Write",
+          "MultiEdit"
+        ],
+        "path": "^src/"
+      }
+    ]
   },
   {
     "id": "R4",
     "text": "In src/, throw `new AppError(` from src/errors.js, never `new Error(`.",
     "rung": "check",
-    "trigger": { "tools": ["Edit", "Write", "MultiEdit"], "path": "^src/" },
-    "grader": "no-new-error"
+    "trigger": {
+      "tools": [
+        "Edit",
+        "Write",
+        "MultiEdit"
+      ],
+      "path": "^src/"
+    },
+    "grader": "no-new-error",
+    "inject": [
+      {
+        "tools": [
+          "Edit",
+          "Write",
+          "MultiEdit"
+        ],
+        "path": "^src/"
+      }
+    ]
   },
   {
     "id": "R5",
     "text": "A behaviour change in src/ adds a line under `## Unreleased` in CHANGELOG.md.",
     "rung": "recall",
-    "trigger": { "tools": ["Edit", "Write", "MultiEdit"], "path": "^src/" },
-    "grader": "changelog-unreleased"
+    "trigger": {
+      "tools": [
+        "Edit",
+        "Write",
+        "MultiEdit"
+      ],
+      "path": "^src/"
+    },
+    "grader": "changelog-unreleased",
+    "inject": [
+      {
+        "tools": [
+          "Edit",
+          "Write",
+          "MultiEdit"
+        ],
+        "path": "^src/"
+      }
+    ]
   },
   {
     "id": "R6",
     "text": "A new exported function gets a JSDoc block that includes an `@example`.",
     "rung": "recall",
-    "trigger": { "tools": ["Edit", "Write", "MultiEdit"], "path": "^src/" },
-    "grader": "jsdoc-example"
+    "trigger": {
+      "tools": [
+        "Edit",
+        "Write",
+        "MultiEdit"
+      ],
+      "path": "^src/"
+    },
+    "grader": "jsdoc-example",
+    "inject": [
+      {
+        "tools": [
+          "Edit",
+          "Write",
+          "MultiEdit"
+        ],
+        "path": "^src/"
+      }
+    ]
   },
   {
     "id": "R7",
     "text": "Run tests with `node --test`; there is no `npm test` script in this repo.",
     "rung": "note",
-    "trigger": { "tools": ["Bash"], "command": "test|npm" },
-    "grader": "node-test-not-npm"
+    "trigger": {
+      "tools": [
+        "Bash"
+      ],
+      "command": "test|npm"
+    },
+    "grader": "node-test-not-npm",
+    "inject": [
+      {
+        "tools": [
+          "Edit",
+          "Write",
+          "MultiEdit"
+        ],
+        "path": "^test/"
+      },
+      {
+        "tools": [
+          "Edit",
+          "Write",
+          "MultiEdit"
+        ]
+      }
+    ]
   }
 ]

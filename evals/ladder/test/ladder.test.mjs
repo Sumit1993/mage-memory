@@ -4,7 +4,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, writeFileSync, appendFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buildArm, git, loadRules } from "../lib/arms.mjs";
+import { buildArm, git, loadNoise, loadRules } from "../lib/arms.mjs";
 import { decide } from "../hooks/ladder-hook.mjs";
 import { grade } from "../grade.mjs";
 import { expandTasks, summarize } from "../batch.mjs";
@@ -183,22 +183,81 @@ test("arm B hooks: recall R5/R6 on src edits only, as context not deny", () => {
   assert.match(r.output.hookSpecificOutput.additionalContext, /Unreleased/);
   assert.equal(r.output.hookSpecificOutput.permissionDecision, undefined);
   assert.equal(decide("B", edit("/work/repo/test/cart.test.js"), rules).action, "none");
+  assert.equal(decide("B", edit("/work/repo/src/cart.js"), rules, new Set(["R5", "R6"])).action, "none");
 });
 
 test("arm C injector: context only for matching inputs, never a deny", () => {
   const ctx = (p) => decide("C", p, rules);
-  assert.deepEqual(ctx(edit("/work/repo/generated/schema.js")).fired, ["R1"]);
-  assert.deepEqual(ctx(edit("/work/repo/schema/source.json", "Write")).fired, ["R1"]);
-  assert.deepEqual(ctx(edit("/work/repo/src/cart.js")).fired, ["R3", "R4", "R5", "R6"]);
+  assert.deepEqual(ctx(edit("/work/repo/generated/schema.js")).fired, ["R1", "R2", "R7"]);
+  assert.deepEqual(ctx(edit("/work/repo/schema/source.json", "Write")).fired, ["R1", "R2", "R7"]);
+  assert.deepEqual(ctx(edit("/work/repo/src/cart.js")).fired, ["R2", "R3", "R4", "R5", "R6", "R7"]);
+  assert.deepEqual(ctx({ tool_name: "Read", cwd, tool_input: { file_path: "/work/repo/schema/source.json" } }).fired, ["R1"]);
   assert.deepEqual(ctx(bash('git commit -m "x"')).fired, ["R2"]);
-  assert.deepEqual(ctx(bash("node --test")).fired, ["R7"]);
-  assert.deepEqual(ctx(bash("npm test")).fired, ["R7"]);
+  assert.deepEqual(ctx(bash("git add -A")).fired, ["R2"]);
+  assert.equal(ctx(bash("node --test")).action, "none");
+  assert.equal(ctx(bash("npm test")).action, "none");
   assert.equal(ctx(bash("ls")).action, "none");
-  assert.equal(ctx(edit("/work/repo/README.md")).action, "none");
+  assert.deepEqual(ctx(edit("/work/repo/README.md")).fired, ["R2", "R7"]);
   assert.equal(ctx({ tool_name: "Read", cwd, tool_input: { file_path: "/work/repo/src/cart.js" } }).action, "none");
   for (const p of [edit("/work/repo/generated/schema.js"), bash('git commit -m "x"')]) {
     assert.equal(ctx(p).output.hookSpecificOutput.permissionDecision, undefined);
   }
+});
+
+test("arm C timing: R2 and R7 fire on the first edit anywhere, before the governed command", () => {
+  const seen = new Set();
+  const first = decide("C", edit("/work/repo/README.md"), rules, seen);
+  assert.deepEqual(first.fired, ["R2", "R7"]);
+  assert.match(first.output.hookSpecificOutput.additionalContext, /\(#N\)/);
+  assert.match(first.output.hookSpecificOutput.additionalContext, /node --test/);
+  assert.equal(decide("C", bash("git add -A"), rules, seen).action, "none");
+  assert.equal(decide("C", bash('git commit -m "x"'), rules, seen).action, "none");
+  const fresh = new Set();
+  assert.deepEqual(decide("C", bash("git add -A"), rules, fresh).fired, ["R2"]);
+  assert.deepEqual(decide("C", edit("/work/repo/test/cart.test.js"), rules, fresh).fired, ["R7"]);
+});
+
+test("arm C dedupe: each rule injected once per session, then only new rules", () => {
+  const seen = new Set();
+  assert.deepEqual(decide("C", edit("/work/repo/src/cart.js"), rules, seen).fired, ["R2", "R3", "R4", "R5", "R6", "R7"]);
+  assert.equal(decide("C", edit("/work/repo/src/cart.js"), rules, seen).action, "none");
+  assert.deepEqual(decide("C", edit("/work/repo/generated/schema.js"), rules, seen).fired, ["R1"]);
+  assert.equal(decide("C", edit("/work/repo/generated/schema.js"), rules, seen).action, "none");
+});
+
+test("hook script: state file dedupes across processes", () => {
+  const dir = buildArm("C", join(tmp(), "repo"));
+  const state = join(tmp(), "state.json");
+  const run = (payload) =>
+    spawnSync("node", [join(dir, ".claude", "hooks", "ladder-hook.mjs"), "C"], {
+      input: JSON.stringify(payload),
+      encoding: "utf8",
+      env: { ...process.env, LADDER_STATE: state },
+    });
+  const first = run({ tool_name: "Write", cwd: dir, tool_input: { file_path: join(dir, "README.md"), content: "x" } });
+  assert.match(JSON.parse(first.stdout).hookSpecificOutput.additionalContext, /R2/);
+  assert.equal(run({ tool_name: "Write", cwd: dir, tool_input: { file_path: join(dir, "README.md"), content: "y" } }).stdout, "");
+  assert.deepEqual(JSON.parse(readFileSync(state, "utf8")), ["R2", "R7"]);
+});
+
+test("heavy load: all 50 distractors in every arm, targets only in A (R7 also in B), none at the edges", () => {
+  const noise = loadNoise();
+  assert.equal(noise.length, 50);
+  const md = Object.fromEntries(["A", "B", "C"].map((a) => [a, read(buildArm(a, join(tmp(), "repo"), { load: "heavy" }), "CLAUDE.md")]));
+  for (const a of ["A", "B", "C"]) for (const n of noise) assert.ok(md[a].includes(n + "\n"), `${a} has distractor`);
+  for (const r of rules) {
+    assert.ok(md.A.includes(r.text), `A has ${r.id}`);
+    assert.equal(md.B.includes(r.text), r.rung === "note", `B ${r.id}`);
+    assert.ok(!md.C.includes(r.text), `C lacks ${r.id}`);
+  }
+  const bullets = md.A.split("\n").filter((l) => l.startsWith("- "));
+  assert.equal(bullets.length, 57);
+  for (const r of rules) {
+    const i = bullets.indexOf(`- ${r.text}`);
+    assert.ok(i > 0 && i < bullets.length - 1, `${r.id} not at an edge`);
+  }
+  for (const a of ["A", "B", "C"]) assert.deepEqual(md[a].split("\n").filter((l) => noise.includes(l)), noise);
+  assert.deepEqual(md.C.split("\n").filter((l) => l.startsWith("- ")), noise);
 });
 
 test("hook script: stdin JSON in, hook JSON out, with a fired log", () => {
@@ -221,11 +280,41 @@ test("batch: task range and summary counts", () => {
   assert.deepEqual(expandTasks("T1..T4"), ["T1", "T2", "T3", "T4"]);
   assert.deepEqual(expandTasks("T2,T4"), ["T2", "T4"]);
   const md = summarize([
-    { arm: "A", rules: { R1: "pass", R2: "fail" }, task_done: true, turns: 4, duration_ms: 2000 },
-    { arm: "A", rules: { R1: "na", R2: "fail" }, task_done: false, turns: 6, duration_ms: 4000 },
-    { arm: "B", rules: { R1: "pass", R2: "pass" }, task_done: true, hook_fired: true, hook_denials: 1, turns: 5, duration_ms: 1000 },
+    { arm: "A", load: "light", rules: { R1: "pass", R2: "fail" }, task_done: true, turns: 4, duration_ms: 2000 },
+    { arm: "A", load: "light", rules: { R1: "na", R2: "fail" }, task_done: false, turns: 6, duration_ms: 4000 },
+    { arm: "A", load: "heavy", rules: { R1: "fail", R2: "fail" }, task_done: true, turns: 6, duration_ms: 4000 },
+    { arm: "B", load: "light", rules: { R1: "pass", R2: "pass" }, task_done: true, hook_fired: true, hook_denials: 1, turns: 5, duration_ms: 1000 },
   ]);
-  assert.match(md, /\| A \| 1\/3 \(33%\) \| 1\/2 \(50%\) \| 2 \|/);
-  assert.match(md, /\| B \| 2\/2 \(100%\) \| 1\/1 \(100%\) \| 1 \|/);
-  assert.match(md, /\| R2 \| 0\/2 \(0%\) \| 1\/1 \(100%\) \|/);
+  assert.match(md, /\| light \/ A \| 1\/3 \(33%\) \| 1\/2 \(50%\) \| 2 \|/);
+  assert.match(md, /\| light \/ B \| 2\/2 \(100%\) \| 1\/1 \(100%\) \| 1 \|/);
+  assert.match(md, /\| R2 \| 0\/1 \(0%\) \| 0\/2 \(0%\) \| 1\/1 \(100%\) \|/);
+});
+
+test("arm D: R5 is a pre-commit check, not recall; B is unchanged", () => {
+  const d = buildArm("D", join(tmp(), "repo"));
+  assert.match(read(d, ".git/hooks/pre-commit"), /check\.js --changelog/);
+  const dRules = JSON.parse(read(d, ".claude/hooks/rules.json"));
+  assert.equal(dRules.find((r) => r.id === "R5").rung, "check");
+  assert.equal(decide("D", edit("/work/repo/src/cart.js"), dRules).fired.includes("R5"), false);
+  assert.deepEqual(decide("D", edit("/work/repo/src/cart.js"), dRules).fired, ["R6"]);
+  assert.equal(decide("D", edit("/work/repo/generated/x.js"), dRules).action, "deny");
+  const b = buildArm("B", join(tmp(), "repo"));
+  assert.doesNotMatch(read(b, ".git/hooks/pre-commit"), /--changelog/);
+});
+
+test("arm D check: commit with src change fails without a changelog line, passes with one", () => {
+  const dir = buildArm("D", join(tmp(), "repo"));
+  const tryCommit = () => {
+    git(dir, "add", "-A");
+    return spawnSync("git", ["commit", "-q", "-m", "x (#1)"], { cwd: dir, encoding: "utf8" });
+  };
+  write(dir, "src/x.js", "export const x = () => 1;\n");
+  let res = tryCommit();
+  assert.notEqual(res.status, 0);
+  assert.match(res.stderr, /R5/);
+  write(dir, "CHANGELOG.md", read(dir, "CHANGELOG.md").replace("## Unreleased\n", "## Unreleased\n- Add x.\n"));
+  res = tryCommit();
+  assert.equal(res.status, 0, res.stderr);
+  write(dir, "README.md", `${read(dir, "README.md")}more\n`);
+  assert.equal(tryCommit().status, 0);
 });
