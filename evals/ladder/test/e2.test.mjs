@@ -92,3 +92,30 @@ test("e2 batch: summary counts rungs per correction per arm", async () => {
   assert.ok(md.includes("| note | note x1 (ok 1/1) | note x1, nothing x1 (ok 1/2) |"));
   assert.match(md, /E2-plain rep 2: \(nothing written\)/);
 });
+
+test("proto hook: first memory write denied, second allowed, non-KB paths ignored", async () => {
+  const { decide, REASON } = await import("../e2/proto-ladder-hook.mjs");
+  const cwd = mkdtempSync(join(tmpdir(), "proto-"));
+  const marks = join(cwd, ".claude");
+  const w = (file_path, tool_name = "Write", session_id = "s1") => ({ tool_name, cwd, session_id, tool_input: { file_path } });
+  assert.equal(decide(w(join(cwd, "src", "cart.js")), marks), null);
+  assert.equal(decide(w(join(cwd, "CLAUDE.md")), marks), null);
+  assert.equal(decide(w(join(cwd, "mage", "MEMORY.md")), marks), null);
+  assert.equal(decide(w(join(cwd, "mage", "INDEX.md")), marks), null);
+  assert.equal(decide({ tool_name: "Read", cwd, session_id: "s1", tool_input: { file_path: join(cwd, "mage", "a.md") } }, marks), null);
+  const first = decide(w(join(cwd, "mage", "corrections.md")), marks);
+  assert.equal(first.hookSpecificOutput.permissionDecision, "deny");
+  assert.equal(first.hookSpecificOutput.permissionDecisionReason, REASON);
+  assert.equal(decide(w(join(cwd, "mage", "corrections.md")), marks), null);
+  assert.equal(decide(w("mage/notes/x.md", "Edit", "s2"), marks).hookSpecificOutput.permissionDecision, "deny");
+});
+
+test("e2 setup: E2-proto is E2-mage plus the proto group first", { skip: !existsSync(MAGE_CLI) }, () => {
+  const mage = buildE2("E2-mage", tmp()).registered;
+  const proto = buildE2("E2-proto", tmp()).registered;
+  const pre = proto.hooks.PreToolUse;
+  assert.equal(pre[0].id, "proto:ladder:PreToolUse");
+  assert.match(pre[0].hooks[0].command, /proto-ladder-hook\.mjs/);
+  assert.deepEqual(pre.slice(1).map((g) => g.id), mage.hooks.PreToolUse.map((g) => g.id));
+  assert.deepEqual(proto.hooks.PostToolUse.map((g) => g.id), mage.hooks.PostToolUse.map((g) => g.id));
+});
