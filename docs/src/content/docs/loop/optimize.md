@@ -1,9 +1,9 @@
 ---
 title: Optimize (context-match)
-description: How context-match feedback rewords a mis-firing skill trigger or demotes a skill that never fits — the post-graduation tuning half of the loop.
+description: How context-match feedback rewords a mis-firing wing-skill trigger or demotes a skill that never fits.
 ---
 
-Once a note [graduates](./promote-graduate.md) into a `mage-skill-<slug>`, that skill auto-loads into the agent's context whenever its trigger matches. But a trigger can be wrong — too broad, firing on look-alike work where the skill does no good. The **optimize** stage is the feedback that fixes that: it measures whether a loaded skill actually matched the work that followed, and tunes the trigger accordingly.
+`mage skills` generates a wing skill per wing of the graph, and each skill auto-loads into the agent's context whenever its trigger matches. But a trigger can be wrong — too broad, firing on look-alike work where the skill does no good. The **optimize** stage is the feedback that fixes that: it measures whether a loaded skill actually matched the work that followed, and tunes the trigger accordingly.
 
 ## Context-match: did the skill match the work?
 
@@ -16,7 +16,7 @@ The match data is rolled up by a hook: `mage:metrics:Stop` runs `mage skills --m
 Optimize is driven by the `/mage:optimize` skill. It reads the read-only context-match report and acts on each skill's match rate. There are exactly two corrective moves, and a match-rate threshold gates each:
 
 - **Reword** — the trigger matches *some* of the time but mis-fires on look-alike work. Triggered when the match rate is at least **0.2** and below **0.4**. The fix is one sharper single-line `description` that names the real scenario tighter and excludes the work it kept catching wrongly.
-- **Demote** — the skill matches almost never; the trigger is unsalvageable. Triggered when the match rate falls below **0.2** — demote takes precedence over reword at and below that floor. Demote archives the skill and keeps the backing note. The knowledge survives; only its auto-loaded form retires. Demote is the exact reverse of graduation.
+- **Demote** — the skill matches almost never; the trigger is unsalvageable. Triggered when the match rate falls below **0.2** — demote takes precedence over reword at and below that floor. Demote archives the skill and keeps the backing note. The knowledge survives; only its auto-loaded form retires.
 
 ```bash
 # (Plumbing the /mage:optimize skill reads for you.) The read-only report:
@@ -29,9 +29,9 @@ Three rows, one per status (each row also carries a `trigger_hash` and per-dimen
 
 ```jsonc
 [
-  { "skill": "mage-skill-redact-strip",   "loads": 20, "matchRate": 0.1,  "status": "demote-suggested" }, // below 0.2 over enough loads
+  { "skill": "mage-wing-redact",         "loads": 20, "matchRate": 0.1,  "status": "demote-suggested" }, // below 0.2 over enough loads
   { "skill": "mage-wing-billing",         "loads": 4,  "matchRate": 0.25, "status": "ok" },               // only 4 loads — under the 5-load floor, left alone
-  { "skill": "mage-skill-migration-lock", "loads": 10, "matchRate": 0.3,  "status": "reword-suggested" }  // at least 0.2 and below 0.4
+  { "skill": "mage-wing-migrations", "loads": 10, "matchRate": 0.3,  "status": "reword-suggested" }  // at least 0.2 and below 0.4
 ]
 ```
 
@@ -46,15 +46,6 @@ A new trigger has no signal to optimize against. So context-match only suggests 
 Optimize applies at most **3 edits per pass**. This bound is deliberate. Each reword resets that skill's context-match bucket so the *next* loads measure the new trigger, not the old one — it opens a fresh measurement window. Too many open windows at once make the next report unreadable, and a skill that retriggers every pass thrashes instead of converging. A few rewords plus any clear demotes per pass, never a catalog-wide sweep.
 
 A reword that does worse is reversible: you back it off and restore the prior trigger, both through the single writer.
-
-## Keep the two gates distinct
-
-This is the one distinction to hold onto across the whole loop:
-
-- **Recurrence gates graduation** — how many distinct chapters a pattern recurred across decides whether a note becomes a skill. (See [Promote and graduate](./promote-graduate.md).)
-- **Context-match gates reword and demote** — how well a *graduated* skill's trigger matches the following work decides whether to sharpen or retire it.
-
-They are different signals on different sides of graduation. Recurrence has no skill-load data to read before a skill exists; context-match has no recurrence count to read after one does.
 
 ## Nothing auto-commits
 

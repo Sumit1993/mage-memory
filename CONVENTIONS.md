@@ -139,7 +139,7 @@ not `#billing/payments`). The `#` form is how they read inside Obsidian.
 its **first tag, not its file path** — a note can live **anywhere** in the
 knowledge base and still group correctly. `mage index`, `mage skills`, and
 `mage dream` **recurse the whole tree** and index every `.md` except a fixed
-skip-set: `.obsidian/`, `.git/`, `node_modules/`, `artifacts/`, `.mage/` (covers learnings, metrics, staging),
+skip-set: `.obsidian/`, `.git/`, `node_modules/`, `artifacts/`, `.mage/` (covers metrics and recall state),
 `archive/`, `.claude/`, `.agents/`, and mage's own generated/scaffolding files
 (`INDEX.md`, `MEMORY.md`, `Dashboard.md`, `_index.*.md`, `AGENTS.md`,
 `CLAUDE.md`, `IDENTITY.md`). So `notes/`,
@@ -192,7 +192,7 @@ archive of what you read, it doesn't belong.
 
 | `type:` | Genre | Recall Rung | Purpose & Lifecycle |
 |---|---|---|---|
-| `gotcha` `procedure` `pointer` `principle` `feedback` `reference` `note` | **memory** | 2 (1 when graduated) | Recall-bearing memories (edit-in-place). Default destination for captured knowledge. |
+| `gotcha` `procedure` `pointer` `principle` `feedback` `reference` `note` | **memory** | 2 | Recall-bearing memories (edit-in-place). Default destination for captured knowledge. |
 | `decision` | **decision** | 3 (on demand) | Settled architectural choice (supersede/amend, never edit in place; `mage/decisions/`). |
 | `plan` `tasks` | **work** | 3 (on demand) | Legacy only. New plans and task lists are issues (ADR-0050); existing `mage/work/` files stay read-only until migrated. |
 | `spec` `doc` | **doc** | 3 (on demand) | System specification / current truth (expire on falsification). |
@@ -287,13 +287,12 @@ clean names, no `mage-` baked into each one (see [ADR-0013 (now ADR-0057)](mage/
 |---|---|---|
 | `/mage:learn` | capture a durable note | plugin (`skills/learn/`) |
 | `/mage:guide` | how to use the knowledge base | plugin (`skills/guide/`) |
-| `/mage:groom` · `/mage:graduate` · `/mage:optimize` | the self-grooming loop (scratch → note → skill) | plugin (`skills/<name>/`) |
+| `/mage:groom` · `/mage:optimize` | walk notes up the ladder · keep recall sharp | plugin (`skills/<name>/`) |
 | `mage-wing-<wing>` | per-wing awareness skill | **generated** by `mage skills` into `.claude/skills/` + `.agents/skills/` |
-| `mage-skill-<slug>` | **Procedure skill** (a graduated Playbook/Gotcha note) | **generated** on graduate |
 
 Install the static group with `/plugin marketplace add Sumit1993/mage-memory` then
 `/plugin install mage@mage`; `mage init` prints these (user-driven — mage never runs
-slash commands). **Generated** per-repo skills keep a `mage-wing-*` / `mage-skill-*`
+slash commands). **Generated** per-repo skills keep a `mage-wing-*`
 prefix because they are written into a bare skills dir with no plugin namespace to
 group them.
 
@@ -311,9 +310,9 @@ mage's CLI is one binary but **three tiers**, sorted by the deterministic/judgme
 
 | Tier | Commands | Invoked by | Notes |
 |---|---|---|---|
-| **Hook-fired** (plumbing seams) | `observe`, `skills --metrics --quiet` (Stop rollup fold), `index --if-changed`, `skills`, `verify --check`, `redact --check[ --staged]`, `ingest --json`, `distill --json` / `--seen`, `promote --json` / `--seen`, `groom` (accept/reject the staged lesson batch), `dream --apply` / `--reject` (the single-writer applier reading ONE Proposal JSON from stdin) | host hooks · git pre-commit · the learn/graduate/optimize skills | Deterministic. **Users never type these.** They are commands only because hooks/skills/git reach mage across a process boundary. |
-| **Judgment — nudged** | `learn` (`/mage:learn`), `/mage:groom` (distill+promote phases, drives the hidden `groom` command), `graduate` (`/mage:graduate`), `optimize` (`/mage:optimize`), `dream` | the agent, *nudged* by a hook | The hook prints a nudge; the **agent** reasons. Never blindly auto-run. `/mage:graduate`/`optimize` apply by piping a Proposal JSON to `mage dream --apply` — there is no `mage graduate`/`mage optimize` verb. |
-| **Human verbs** | `init`, `connect`, `disconnect`, `link`, `unlink`, `list`, `status`, `verify`, `doctor`, `dashboard`, `dream`, `migrate`, `skills --metrics` (read-only report), `footprint`, `adopt`, `autonomy` | a person | Setup + read-only queries + judgment-invoked mutations. **The only tier `mage --help` shows** — the hook-fired plumbing commands (`observe`, `ingest`, `distill`, `promote`, `redact`, `stage`, `groom`, `flatten`, `nudge`, `memory-hook`, and hook-fired `index --if-changed`) are registered `hidden` in the CLI (0.0.10); the visible `mage index` is not. `dream`/`skills`/`verify` are dual-tier (a visible human face + unadvertised plumbing flags). |
+| **Hook-fired** (plumbing seams) | `memory-hook`, `recall-hook`, `index --hook` (Stop), `skills --metrics --quiet` (Stop rollup fold), `skills`, `verify --check`, `redact --check[ --staged]`, `flatten --quiet`, `dream --apply` / `--reject` (the single-writer applier reading ONE Proposal JSON from stdin) | host hooks · git pre-commit · the learn/optimize skills | Deterministic. **Users never type these.** They are commands only because hooks/skills/git reach mage across a process boundary. |
+| **Judgment — nudged** | `learn` (`/mage:learn`), `/mage:groom` (walks notes up the ladder, drives `mage groom`), `optimize` (`/mage:optimize`), `dream` | the agent, *nudged* by a hook | The hook prints a nudge; the **agent** reasons. Never blindly auto-run. `/mage:optimize` applies by piping a Proposal JSON to `mage dream --apply` — there is no `mage optimize` verb. |
+| **Human verbs** | `init`, `connect`, `disconnect`, `link`, `unlink`, `list`, `status`, `verify`, `doctor`, `dream`, `migrate`, `skills --metrics` (read-only report), `adopt`, `autonomy` | a person | Setup + read-only queries + judgment-invoked mutations. **The only tier `mage --help` shows** — the hook-fired plumbing commands (`observe`, `nudge`, `memory-hook`, `recall-hook`, `redact`, `flatten`, and the retired signposts `distill`, `promote`, `graduate`, `ingest`, `stage`) are registered `hidden` in the CLI (0.0.10); the visible `mage index` is not. `dream`/`skills`/`verify` are dual-tier (a visible human face + unadvertised plumbing flags). |
 
 **Guardrails (all tiers):**
 - **Never auto-commit.** Hook-fired `index`/`skills`/`verify` *write* files (auto-write
@@ -337,7 +336,7 @@ guess a consequential choice. So `mage connect --yes` runs in one go (agents); b
 `mage connect` prompts (humans). Applies to `init`/`link`/`unlink`/`connect`/`disconnect`.
 
 **`mage connect` / `mage disconnect`** ([ADR-0017](mage/decisions/0055-connect-doctor-migrate.md), 0.0.6):
-because mage ships as an npm `bin`, the wired hook lines are clean one-liners (`mage observe`)
+because mage ships as an npm `bin`, the wired hook lines are clean one-liners (`mage recall-hook`)
 — no plugin-root resolution. connect writes the hook block to **`.claude/settings.local.json`**
 (per-repo, gitignored; `--user` for `~/.claude/settings.json`), `id:"mage:*"`-prefixed;
 re-running is idempotent (replace-by-id), malformed JSON is refused (never clobbered), and
@@ -350,7 +349,7 @@ a `.bak` is written first. `mage disconnect` removes only the `mage:*` entries.
 block: refuse-don't-clobber an existing hook, idempotent by marker, `.bak` first. This is
 the deterministic, un-skippable backstop the skill-step `mage redact` (judgment-tier) can't be.
 
-There is **no `mage clean`** — `.mage/learnings/` rotation + purge are internal to `mage observe`.
+There is **no `mage clean`**; `.mage/` is disposable, delete it for a clean slate.
 
 ---
 
