@@ -1,5 +1,5 @@
 // `mage nudge` (ADR-0009; ADR-0029; ADR-0030).
-// On the Stop hook, emits a one-line session receipt (denied, corrected, new signatures, guard fires).
+// On the Stop hook, emits a one-line session receipt (corrected, new signatures, guard fires).
 // On SessionStart (compact/startup/resume), plain startup is quiet unless a proposal is waiting or
 // an external hub/grant check failed.
 // Never blocks or throws to the host (fail-open, exit 0).
@@ -17,6 +17,7 @@ import {
   resolveDocsRoot,
 } from "../../paths.js";
 import { reachGrantStatus } from "../../reach-grant.js";
+import { clearRecallState } from "./recall-hook.js";
 import {
   type SessionReceiptCounts,
   computeReceipt,
@@ -97,6 +98,9 @@ export async function nudgeCmd(opts: NudgeOptions): Promise<NudgeResult> {
 
   const resolved = await resolveDocsRoot(abs).catch(() => null);
   if (!resolved) return NONE;
+
+  // Compaction drops injected notes from context; let recall inject them again (#282).
+  if (opts.source === "compact") await clearRecallState(resolved.root, opts.sessionId);
 
   const grant = await grantNudge(abs).catch(() => null); // fail-open: a broken grant must never break a session
 

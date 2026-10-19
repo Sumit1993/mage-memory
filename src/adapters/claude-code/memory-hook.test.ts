@@ -1,18 +1,27 @@
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { tmpDir, withKb } from "../../../test/fixtures/kb.js";
+import { ladderMarkerPath } from "../../paths.js";
+import { redact } from "../../redact.js";
 import {
+  LADDER_TEXT,
   type MemoryDecision,
   buildMemoryHookCommand,
-  ADMISSION_DENY_REASON,
-  emitPostToolUseContext,
   emitPreToolUse,
-  memoryPostToolUse,
   memoryPreToolUse,
 } from "./memory-hook.js";
 
+vi.mock("../../redact.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../redact.js")>();
+  return { ...actual, redact: vi.fn(actual.redact) };
+});
+
+const { redact: realRedact } = await vi.importActual<typeof import("../../redact.js")>("../../redact.js");
+
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.mocked(redact).mockImplementation(realRedact);
 });
 
 function preWrite(cwd: string, filePath: string, content: string): Record<string, unknown> {
@@ -39,11 +48,6 @@ const CC_NOTE = [
 const VALID_ADMISSION_NOTE = [
   "---",
   "rung: note",
-  "skipped:",
-  "  impossible: cannot be ruled out by types",
-  "  check: behavioral, not static",
-  "  hook: cannot observe across sessions",
-  "  rule: agent needs a lesson",
   "trigger: when soak monitor misses an incident",
   "pointer: '[issue #229](https://github.com/Sumit1993/mage-memory/issues/229)'",
   "---",
@@ -52,53 +56,47 @@ const VALID_ADMISSION_NOTE = [
   "Body text.",
 ].join("\n");
 
+const RUNG_ONLY_NOTE = ["---", "rung: note", "---", "# Rung only"].join("\n");
+
+const NESTED_RUNG_NOTE = [
+  "---",
+  "name: nested",
+  "description: a memory",
+  "metadata:",
+  "  node_type: memory",
+  "  type: feedback",
+  "  rung: rule",
+  "---",
+  "Body.",
+].join("\n");
+
 const NOTE_MISSING_RUNG = [
   "---",
-  "skipped:",
-  "  impossible: cannot be ruled out by types",
-  "  check: behavioral, not static",
-  "  hook: cannot observe across sessions",
-  "  rule: agent needs a lesson",
   "trigger: when soak monitor misses an incident",
   "pointer: '[issue #229](https://github.com/Sumit1993/mage-memory/issues/229)'",
   "---",
   "# Note",
 ].join("\n");
 
-const NOTE_MISSING_SKIPPED = [
+/** The e2-smoke shape: Claude Code frontmatter, no rung. */
+const E2_SMOKE_NOTE = [
   "---",
-  "rung: note",
-  "trigger: when soak monitor misses an incident",
-  "pointer: '[issue #229](https://github.com/Sumit1993/mage-memory/issues/229)'",
+  "name: user-correction",
+  "description: Do not use em dashes.",
+  "metadata:",
+  "  type: feedback",
   "---",
-  "# Note",
+  "Do not use em dashes in commit messages.",
 ].join("\n");
 
-const NOTE_MISSING_TRIGGER = [
-  "---",
-  "rung: note",
-  "skipped:",
-  "  impossible: cannot be ruled out by types",
-  "  check: behavioral, not static",
-  "  hook: cannot observe across sessions",
-  "  rule: agent needs a lesson",
-  "pointer: '[issue #229](https://github.com/Sumit1993/mage-memory/issues/229)'",
-  "---",
-  "# Note",
-].join("\n");
-
-const NOTE_MISSING_POINTER = [
-  "---",
-  "rung: note",
-  "skipped:",
-  "  impossible: cannot be ruled out by types",
-  "  check: behavioral, not static",
-  "  hook: cannot observe across sessions",
-  "  rule: agent needs a lesson",
-  "trigger: when soak monitor misses an incident",
-  "---",
-  "# Note",
-].join("\n");
+function sessionWrite(
+  cwd: string,
+  filePath: string,
+  content: string,
+  session: string | null = "sess-1",
+): Record<string, unknown> {
+  return { ...preWrite(cwd, filePath, content), ...(session === null ? {} : { session_id: session }) };
+}
 
 describe("memoryPreToolUse", () => {
   it("passes a non-Write/Edit tool untouched", async () => {
@@ -177,89 +175,6 @@ describe("memoryPreToolUse", () => {
     }
   });
 
-  it("does not deny a note carrying all four admission fields under the notes folder", async () => {
-    const kb = await withKb();
-    const d = await memoryPreToolUse(
-      preWrite(kb.dir, join(kb.root, "notes", "valid.md"), VALID_ADMISSION_NOTE),
-    );
-    expect(d.kind).toBe("pass");
-  });
-
-  it("denies a note under the notes folder missing rung", async () => {
-    const kb = await withKb();
-    const d = await memoryPreToolUse(
-      preWrite(kb.dir, join(kb.root, "notes", "no-rung.md"), NOTE_MISSING_RUNG),
-    );
-    expect(d.kind).toBe("deny");
-    if (d.kind === "deny") {
-      expect(d.reason).toContain("mage:mage/guard/note-admission");
-    }
-  });
-
-  it("denies a note under the notes folder missing skipped", async () => {
-    const kb = await withKb();
-    const d = await memoryPreToolUse(
-      preWrite(kb.dir, join(kb.root, "notes", "no-skipped.md"), NOTE_MISSING_SKIPPED),
-    );
-    expect(d.kind).toBe("deny");
-    if (d.kind === "deny") {
-      expect(d.reason).toContain("mage:mage/guard/note-admission");
-    }
-  });
-
-  it("denies a note under the notes folder missing trigger", async () => {
-    const kb = await withKb();
-    const d = await memoryPreToolUse(
-      preWrite(kb.dir, join(kb.root, "notes", "no-trigger.md"), NOTE_MISSING_TRIGGER),
-    );
-    expect(d.kind).toBe("deny");
-    if (d.kind === "deny") {
-      expect(d.reason).toContain("mage:mage/guard/note-admission");
-    }
-  });
-
-  it("denies a note under the notes folder missing pointer", async () => {
-    const kb = await withKb();
-    const d = await memoryPreToolUse(
-      preWrite(kb.dir, join(kb.root, "notes", "no-pointer.md"), NOTE_MISSING_POINTER),
-    );
-    expect(d.kind).toBe("deny");
-    if (d.kind === "deny") {
-      expect(d.reason).toContain("mage:mage/guard/note-admission");
-    }
-  });
-
-  it("deny reason is under ten lines and contains the guard id line", async () => {
-    const kb = await withKb();
-    const d = await memoryPreToolUse(
-      preWrite(kb.dir, join(kb.root, "notes", "invalid.md"), NOTE_MISSING_RUNG),
-    );
-    expect(d.kind).toBe("deny");
-    if (d.kind === "deny") {
-      const lines = d.reason.split(/\r?\n/);
-      expect(lines.length).toBeLessThan(10);
-      expect(lines).toContain("mage:mage/guard/note-admission");
-    }
-  });
-
-  it("denies every invalid attempt, not only the first one in a session", async () => {
-    const kb = await withKb();
-    const payload = {
-      ...preWrite(kb.dir, join(kb.root, "notes", "repeated.md"), NOTE_MISSING_RUNG),
-      session_id: "test-session-1",
-    };
-    expect((await memoryPreToolUse(payload)).kind).toBe("deny");
-    // A second pass would hand the unchanged write back to the host (ADR-0051).
-    expect((await memoryPreToolUse(payload)).kind).toBe("deny");
-  });
-
-  it("denies a notes/ write whose frontmatter is malformed YAML", async () => {
-    const kb = await withKb();
-    const broken = "---\nrung: note\nskipped: [oops\n---\n# Broken\n";
-    const d = await memoryPreToolUse(preWrite(kb.dir, join(kb.root, "notes", "broken.md"), broken));
-    expect(d).toEqual({ kind: "deny", reason: ADMISSION_DENY_REASON });
-  });
-
   it("scrubs a secret out of an admitted note before it reaches disk", async () => {
     const kb = await withKb();
     const leaky = `${VALID_ADMISSION_NOTE}\ntoken AKIA1234567890ABCD56 leaked here\n`;
@@ -321,20 +236,139 @@ describe("memoryPreToolUse", () => {
   });
 });
 
-describe("memoryPostToolUse", () => {
-  it("nudges `mage groom` after a topic-note write", async () => {
+describe("the ladder, asked once per session (#282)", () => {
+  const markerOf = (root: string, session: string): string => ladderMarkerPath(root, session);
+  const exists = (p: string): Promise<boolean> => stat(p).then(() => true, () => false);
+
+  it("denies the first rung-less write of a session with the ladder, and creates the marker", async () => {
     const kb = await withKb();
-    const ctx = await memoryPostToolUse(preWrite(kb.dir, join(kb.root, "my-lesson.md"), CC_NOTE));
-    expect(ctx).toContain("my-lesson");
-    expect(ctx).toContain("mage groom");
+    const d = await memoryPreToolUse(
+      sessionWrite(kb.dir, join(kb.root, "notes", "first.md"), NOTE_MISSING_RUNG),
+    );
+    expect(d).toEqual({ kind: "deny", reason: LADDER_TEXT });
+    const lines = LADDER_TEXT.split("\n");
+    for (const n of ["1 impossible:", "2 check:", "3 hook:", "4 rule:", "5 note:"]) {
+      expect(lines.some((l) => l.startsWith(n)), n).toBe(true);
+    }
+    expect(await exists(markerOf(kb.root, "sess-1"))).toBe(true);
   });
 
-  it("is silent for an index write or a subdir write", async () => {
+  it("passes the second rung-less write in the same session", async () => {
     const kb = await withKb();
-    expect(await memoryPostToolUse(preWrite(kb.dir, join(kb.root, "MEMORY.md"), "x"))).toBeNull();
-    expect(
-      await memoryPostToolUse(preWrite(kb.dir, join(kb.root, "notes", "x.md"), "x")),
-    ).toBeNull();
+    const target = join(kb.root, "notes", "again.md");
+    expect((await memoryPreToolUse(sessionWrite(kb.dir, target, NOTE_MISSING_RUNG))).kind).toBe("deny");
+    expect((await memoryPreToolUse(sessionWrite(kb.dir, target, NOTE_MISSING_RUNG))).kind).toBe("pass");
+  });
+
+  it("denies once more in a new session", async () => {
+    const kb = await withKb();
+    const target = join(kb.root, "notes", "x.md");
+    await memoryPreToolUse(sessionWrite(kb.dir, target, NOTE_MISSING_RUNG, "a"));
+    expect((await memoryPreToolUse(sessionWrite(kb.dir, target, NOTE_MISSING_RUNG, "b"))).kind).toBe("deny");
+  });
+
+  it("passes a write carrying rung, also nested under metadata, and writes no marker", async () => {
+    const kb = await withKb();
+    for (const [name, text] of [
+      ["valid.md", VALID_ADMISSION_NOTE],
+      ["nested.md", NESTED_RUNG_NOTE],
+    ] as const) {
+      const d = await memoryPreToolUse(sessionWrite(kb.dir, join(kb.root, "notes", name), text));
+      expect(d.kind).toBe("pass");
+    }
+    expect(await exists(markerOf(kb.root, "sess-1"))).toBe(false);
+  });
+
+  it("passes with rung present but trigger, pointer and skipped missing", async () => {
+    const kb = await withKb();
+    const d = await memoryPreToolUse(sessionWrite(kb.dir, join(kb.root, "notes", "bare.md"), RUNG_ONLY_NOTE));
+    expect(d.kind).toBe("pass");
+  });
+
+  it("counts malformed YAML as rung-less", async () => {
+    const kb = await withKb();
+    const broken = "---\nrung: note\nskipped: [oops\n---\n# Broken\n";
+    const d = await memoryPreToolUse(sessionWrite(kb.dir, join(kb.root, "notes", "broken.md"), broken));
+    expect(d).toEqual({ kind: "deny", reason: LADDER_TEXT });
+  });
+
+  it("passes without a session id and without a usable one", async () => {
+    const kb = await withKb();
+    const target = join(kb.root, "notes", "nosession.md");
+    expect((await memoryPreToolUse(sessionWrite(kb.dir, target, NOTE_MISSING_RUNG, null))).kind).toBe("pass");
+    expect((await memoryPreToolUse(sessionWrite(kb.dir, target, NOTE_MISSING_RUNG, "../x"))).kind).toBe("pass");
+    expect(await exists(join(kb.root, ".mage", "ladder"))).toBe(false);
+  });
+
+  it("passes when the marker cannot be written", async () => {
+    const kb = await withKb();
+    await mkdir(markerOf(kb.root, "sess-1"), { recursive: true });
+    const d = await memoryPreToolUse(sessionWrite(kb.dir, join(kb.root, "notes", "m.md"), NOTE_MISSING_RUNG));
+    expect(d.kind).toBe("pass");
+  });
+
+  it("denies the e2-smoke shape once, on the root and under notes/", async () => {
+    for (const where of [[], ["notes"]]) {
+      const kb = await withKb();
+      const target = join(kb.root, ...where, "correction.md");
+      const first = await memoryPreToolUse(sessionWrite(kb.dir, target, E2_SMOKE_NOTE));
+      expect(first).toEqual({ kind: "deny", reason: LADDER_TEXT });
+      const second = await memoryPreToolUse(sessionWrite(kb.dir, target, E2_SMOKE_NOTE));
+      expect(second.kind).toBe(where.length === 0 ? "rewrite" : "pass");
+    }
+  });
+
+  it("judges an Edit by the file as it will read, not by the fragment", async () => {
+    const kb = await withKb();
+    const target = join(kb.root, "notes", "has-rung.md");
+    await mkdir(join(kb.root, "notes"), { recursive: true });
+    await writeFile(target, VALID_ADMISSION_NOTE);
+    const d = await memoryPreToolUse({
+      hook_event_name: "PreToolUse",
+      tool_name: "Edit",
+      cwd: kb.dir,
+      session_id: "sess-1",
+      tool_input: { file_path: target, old_string: "Body text.", new_string: "Better body." },
+    });
+    expect(d.kind).toBe("pass");
+    expect(await exists(markerOf(kb.root, "sess-1"))).toBe(false);
+  });
+
+  it("denies, without a marker, when the secret scan throws, on both paths", async () => {
+    const kb = await withKb();
+    vi.mocked(redact).mockImplementation(() => {
+      throw new Error("boom");
+    });
+    for (const target of [join(kb.root, "flat.md"), join(kb.root, "notes", "n.md")]) {
+      const d = await memoryPreToolUse(sessionWrite(kb.dir, target, NOTE_MISSING_RUNG));
+      expect(d).toEqual({ kind: "deny", reason: "mage could not scan this write for secrets" });
+    }
+    expect(await exists(markerOf(kb.root, "sess-1"))).toBe(false);
+  });
+
+  it("still denies a generated index, in or out of a session", async () => {
+    const kb = await withKb();
+    const d = await memoryPreToolUse(sessionWrite(kb.dir, join(kb.root, "MEMORY.md"), "x"));
+    expect(d).toEqual({
+      kind: "deny",
+      reason: "mage owns this file; `mage index` regenerates it. Do not add lines here.",
+    });
+    expect(await exists(markerOf(kb.root, "sess-1"))).toBe(false);
+  });
+
+  it("still scrubs a passing write", async () => {
+    const kb = await withKb();
+    const note = `${RUNG_ONLY_NOTE}
+ping admin@example.com
+`;
+    const d = await memoryPreToolUse(sessionWrite(kb.dir, join(kb.root, "notes", "s.md"), note));
+    expect(d.kind).toBe("rewrite");
+  });
+
+  it("writes an empty marker file", async () => {
+    const kb = await withKb();
+    await memoryPreToolUse(sessionWrite(kb.dir, join(kb.root, "notes", "e.md"), NOTE_MISSING_RUNG));
+    expect(await readFile(markerOf(kb.root, "sess-1"), "utf8")).toBe("");
   });
 });
 
@@ -372,13 +406,6 @@ describe("emit", () => {
     expect(out.hookSpecificOutput.updatedInput.content).toBe("scrubbed");
   });
 
-  it("emits a PostToolUse additionalContext nudge", () => {
-    const spy = spyStdout();
-    emitPostToolUseContext("mage captured `a`");
-    const out = JSON.parse((spy.mock.calls[0]?.[0] as string).trim());
-    expect(out.hookSpecificOutput.hookEventName).toBe("PostToolUse");
-    expect(out.hookSpecificOutput.additionalContext).toBe("mage captured `a`");
-  });
 });
 
 describe("buildMemoryHookCommand", () => {

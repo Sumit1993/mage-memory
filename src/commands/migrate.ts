@@ -16,7 +16,7 @@
 //      promote tally, the distill watermark, the nudge throttle. Counts, never deletes,
 //      staged drafts (groom Phase 0 still reads them) and retired `work/` files.
 //      Re-upserts the hook groups in the KB's own `settings.local.json` at the tier it
-//      already has, which repoints the memory hook and adds the PreToolUse observe arm.
+//      already has, which repoints the memory hook, adds the PreToolUse recall arm and reaps retired mage:* ids.
 //      Refreshes the AGENTS.md block through the no-clobber path (#198).
 //
 // Every step probes the artifact it touches instead of reading a version stamp: the
@@ -112,8 +112,8 @@ export interface ClearedEntry {
 export interface HooksEntry {
   path: string;
   outcome: "written" | "unchanged" | "not-connected" | "malformed";
-  /** Whether `mage:observe:PreToolUse` was already there, was added, or does not apply. */
-  observeArm: "present" | "added" | "n/a";
+  /** Whether `mage:recall:PreToolUse` was already there, was added, or does not apply. */
+  recallArm: "present" | "added" | "n/a";
 }
 
 export interface MigrateResult {
@@ -137,7 +137,7 @@ export interface MigrateResult {
   projectsToVisit: string[];
 }
 
-const OBSERVE_PRETOOLUSE_ID = `${MAGE_ID_PREFIX}observe:PreToolUse`;
+const RECALL_PRETOOLUSE_ID = `${MAGE_ID_PREFIX}recall:PreToolUse`;
 
 /**
  * The pre-fold dot-dir for each `.mage/` leaf — what the layout migration relocates.
@@ -352,27 +352,27 @@ async function reupsertHooks(root: string): Promise<HooksEntry> {
   const { path } = resolveSettingsTarget({ cwd: root });
   const read = await readClaudeSettings(path).catch(() => null);
   if (!read || read.malformed) {
-    return { path, outcome: read?.malformed ? "malformed" : "not-connected", observeArm: "n/a" };
+    return { path, outcome: read?.malformed ? "malformed" : "not-connected", recallArm: "n/a" };
   }
   const groups = Object.values(read.settings?.hooks ?? {}).flat();
   if (!read.settings || !groups.some((g) => isMageGroup(g))) {
-    return { path, outcome: "not-connected", observeArm: "n/a" };
+    return { path, outcome: "not-connected", recallArm: "n/a" };
   }
   const hadArm = (read.settings.hooks?.PreToolUse ?? []).some(
-    (g) => g.id === OBSERVE_PRETOOLUSE_ID,
+    (g) => g.id === RECALL_PRETOOLUSE_ID,
   );
   const { settings } = upsertMageHooks(read.settings, {
     commandeer: hasCommandeerHooks(read.settings),
   });
-  const observeArm = hadArm ? "present" : "added";
+  const recallArm = hadArm ? "present" : "added";
   if (JSON.stringify(settings) === JSON.stringify(read.settings)) {
-    return { path, outcome: "unchanged", observeArm };
+    return { path, outcome: "unchanged", recallArm };
   }
   try {
     await writeClaudeSettings(path, settings);
-    return { path, outcome: "written", observeArm };
+    return { path, outcome: "written", recallArm };
   } catch {
-    return { path, outcome: "malformed", observeArm: "n/a" };
+    return { path, outcome: "malformed", recallArm: "n/a" };
   }
 }
 
@@ -549,7 +549,7 @@ export function reportMigrate(result: MigrateResult): void {
   } else if (h?.outcome === "malformed") {
     logger.warn(`hooks: ${h.path} is not valid JSON — left as is`);
   } else if (h) {
-    logger.detail(`hooks: ${h.outcome} (${h.path}); observe arm: ${h.observeArm}`);
+    logger.detail(`hooks: ${h.outcome} (${h.path}); recall arm: ${h.recallArm}`);
   }
 
   if (result.agentsMd) {

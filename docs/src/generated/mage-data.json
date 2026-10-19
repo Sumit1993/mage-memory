@@ -111,9 +111,9 @@
     },
     {
       "event": "PreToolUse",
-      "id": "mage:observe:PreToolUse",
-      "command": "mage observe",
-      "purpose": "Capture a tool_attempt — a call was requested. Paired with the tool_use it produces by tool_use_id; an attempt with no matching use means the call was blocked (#209)."
+      "id": "mage:recall:PreToolUse",
+      "command": "mage recall-hook",
+      "purpose": "Recall at the action (#282): before a Bash, Write, Edit, MultiEdit or NotebookEdit call, inject the admitted notes whose trigger.match hits it, once per session. Adds context only; never blocks."
     },
     {
       "event": "PostToolUse",
@@ -155,7 +155,7 @@
       "event": "Stop",
       "id": "mage:nudge:Stop",
       "command": "mage nudge",
-      "purpose": "Emit a one-line session receipt (denied, corrected, new signatures, guard fires) at turn-end."
+      "purpose": "Emit a one-line session receipt (corrected, new signatures, guard fires) at turn-end."
     },
     {
       "event": "SubagentStop",
@@ -167,13 +167,7 @@
       "event": "PreToolUse",
       "id": "mage:memory:PreToolUse",
       "command": "mage memory-hook",
-      "purpose": "Gate-0 (ADR-0032): redirect + scrub a native-memory write into mage's note schema before it touches disk, or deny a write to a generated index."
-    },
-    {
-      "event": "PostToolUse",
-      "id": "mage:memory:PostToolUse",
-      "command": "mage memory-hook",
-      "purpose": "Nudge `mage groom` after a captured topic-note write (ADR-0032)."
+      "purpose": "Gate-0 (ADR-0032): scrub a native-memory write before it touches disk, deny a write to a generated index, and ask the ladder once per session (ADR-0060)."
     },
     {
       "event": "Stop",
@@ -483,13 +477,29 @@
     },
     {
       "name": "memory-hook",
-      "summary": "Hook-fired Claude Code Gate-0 capture gate: on PreToolUse, redirect + scrub a native-memory write into mage's note schema (or deny a write to a generated index); on PostToolUse, nudge `mage groom` (ADR-0032/0033; never blocks the host)",
+      "summary": "Hook-fired Claude Code Gate-0 capture gate: on PreToolUse, scrub a native-memory write, deny a write to a generated index, and ask the ladder once per session (ADR-0032/0035/0060; never blocks the host on error)",
       "aliases": [],
       "hidden": true,
       "options": [
         {
           "flags": "--cwd <dir>",
           "description": "working directory used to locate the knowledge base (overrides the hook JSON cwd; defaults to it, then process.cwd())"
+        }
+      ]
+    },
+    {
+      "name": "recall-hook",
+      "summary": "Hook-fired PreToolUse recall: inject admitted notes whose trigger.match hits the tool call as additionalContext (never blocks the host)",
+      "aliases": [],
+      "hidden": true,
+      "options": [
+        {
+          "flags": "--cwd <dir>",
+          "description": "working directory used to locate the knowledge base (defaults to the hook JSON cwd)"
+        },
+        {
+          "flags": "--explain",
+          "description": "print which admitted notes match the call on stdin, reading and writing no state"
         }
       ]
     },
