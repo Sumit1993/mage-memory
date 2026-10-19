@@ -1,9 +1,24 @@
-import { writeFileSync } from "node:fs";
+import { cpSync, existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { buildArm, loadTasks } from "./lib/arms.mjs";
 import { claudeEnv, DEFAULT_MODEL, makeRunDir, runClaude } from "./lib/claude.mjs";
 import { grade } from "./grade.mjs";
+
+/** Arm M: the notes mage's recall hook injected, read from the KB's per-session state under mage/.mage/recall/. */
+export function recallStats(repo, runDir) {
+  const dir = join(repo, "mage", ".mage", "recall");
+  if (!existsSync(dir)) return {};
+  cpSync(dir, join(runDir, "recall-state"), { recursive: true });
+  const injected = readdirSync(dir).flatMap((f) => {
+    try {
+      return JSON.parse(readFileSync(join(dir, f), "utf8")).injected ?? [];
+    } catch {
+      return [];
+    }
+  });
+  return { recall_injected: injected };
+}
 
 export async function runOne({ task, arm, rep = 1, load = "light", model = DEFAULT_MODEL, runId, timeoutMs }) {
   const prompt = loadTasks()[task];
@@ -23,7 +38,7 @@ export async function runOne({ task, arm, rep = 1, load = "light", model = DEFAU
     timeoutMs,
   });
   const graded = grade({ dir: repo, transcript, hookLog, durationMs: run.durationMs });
-  const result = { task, arm, rep, load, model, runId, exit_code: run.exitCode, timed_out: run.timedOut, ...graded };
+  const result = { task, arm, rep, load, model, runId, exit_code: run.exitCode, timed_out: run.timedOut, ...graded, ...recallStats(repo, runDir) };
   writeFileSync(join(runDir, "grade.json"), `${JSON.stringify(result, null, 2)}\n`);
   return result;
 }
