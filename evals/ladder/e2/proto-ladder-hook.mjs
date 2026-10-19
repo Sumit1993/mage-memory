@@ -23,7 +23,7 @@ export function isMemoryPath(filePath, cwd) {
 }
 
 /** Returns hook output for a denial, or null. Creates the marker on the first denial. */
-export function decide(payload, markerDir) {
+export function decide(payload, markerDir, mode = "deny") {
   if (payload.tool_name !== "Write" && payload.tool_name !== "Edit") return null;
   const cwd = payload.cwd || process.cwd();
   if (!isMemoryPath(payload.tool_input?.file_path, cwd)) return null;
@@ -31,6 +31,7 @@ export function decide(payload, markerDir) {
   if (existsSync(marker)) return null;
   mkdirSync(markerDir, { recursive: true });
   writeFileSync(marker, "denied once\n");
+  if (mode === "attach") return { hookSpecificOutput: { hookEventName: "PreToolUse", additionalContext: REASON } };
   return {
     hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: REASON },
   };
@@ -45,7 +46,7 @@ async function main() {
   } catch {
     return;
   }
-  const out = decide(payload, join(payload.cwd || process.cwd(), ".claude"));
+  const out = decide(payload, join(payload.cwd || process.cwd(), ".claude"), process.argv[2] === "attach" ? "attach" : "deny");
   if (out) process.stdout.write(`${JSON.stringify(out)}\n`);
 }
 
