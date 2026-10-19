@@ -29,21 +29,20 @@ mage init --help
 
 The `mage` binary above is only part of the surface — there are agent skills too. Sorting every name into one of **three channels** is the fastest way to keep them straight:
 
-**A · Agent skills** — invoked *inside* your coding agent as `/mage:<name>`, not in a terminal. These are the verbs of everyday use; each one orchestrates plumbing calls for you. There are exactly five:
+**A · Agent skills** — invoked *inside* your coding agent as `/mage:<name>`, not in a terminal. These are the verbs of everyday use; each one orchestrates plumbing calls for you. There are exactly four:
 
 | Skill | What you get |
 |---|---|
 | `/mage:guide` | orient in the knowledge base — navigate notes and decisions |
 | `/mage:learn` | capture a note now, or bulk-import a folder (`--from`) |
-| `/mage:groom` | turn captured scratch into notes — accept or reject the batch |
-| `/mage:graduate` | elevate a proven procedural note into a loadable skill |
-| `/mage:optimize` | sharpen a skill's trigger — reword or demote weak ones |
+| `/mage:groom` | walk the notes up the ladder — climb, delete or keep each one |
+| `/mage:optimize` | keep recall sharp — test each note's match, then reword or demote weak skills |
 
-**B · CLI commands you type** — the terminal verbs for setup and housekeeping that doesn't belong inside the agent (`init`, `link`, `connect`, `index`, `doctor`, `dream`, and friends). The rest of this page is their reference.
+**B · CLI commands you type** — the terminal verbs for setup and housekeeping that doesn't belong inside the agent (`init`, `link`, `connect`, `index`, `groom`, `doctor`, `dream`, and friends). The rest of this page is their reference.
 
-**C · Plumbing** — hidden CLI verbs you never type by hand (`observe`, `groom`, `nudge`, `memory-hook`, `redact`, `ingest`, `flatten`, and friends). A skill or a host hook runs them for you; the complete, generated set is in [the full inventory](#the-full-inventory) — that table, not this list, is the authoritative roster.
+**C · Plumbing** — hidden CLI verbs you never type by hand (`observe`, `nudge`, `memory-hook`, `recall-hook`, `redact`, `flatten`, and friends). A skill or a host hook runs them for you; the complete, generated set is in [the full inventory](#the-full-inventory) — that table, not this list, is the authoritative roster.
 
-**The rhythm:** skills (A) when you curate · CLI (B) at setup and check-ups · plumbing (C) never by hand. **The one hybrid:** `groom` is both the `/mage:groom` skill (what you use) and a hidden `mage groom` CLI verb (what the skill calls) — every other name is cleanly one channel.
+**The rhythm:** skills (A) when you curate · CLI (B) at setup and check-ups · plumbing (C) never by hand. **The one hybrid:** `groom` is both the `/mage:groom` skill (what you use) and the `mage groom` verb (what the skill calls) — every other name is cleanly one channel.
 
 ```mermaid The rhythm of the three channels: set up with the CLI, then work is captured automatically, you curate with skills, and you check health with the CLI — looping back to the work.
 flowchart LR
@@ -142,13 +141,13 @@ surfaces: `mage/INDEX.md`, the full one-line-per-note index of every
 **memory-genre** note, and `mage/MEMORY.md`, the ranked, budget-bounded roster
 the host pushes at session launch (idempotent; never hand-edit either output;
 see [The two recall surfaces](../model/graph.md#the-two-recall-surfaces)).
-Generating navigation skills is folded into `index` (`mage skills` has retired).
+`mage skills` generates the per-wing skills.
 
 There are two classes of generated skill:
 
 - **Per-wing skills (`mage-wing-*`)** are derived from notes, exactly like
-  the index. `mage index` is their writer; re-running it rebuilds them
-  deterministically.
+  the index. `mage skills` is their writer; re-running it rebuilds them
+  deterministically, and `mage skills --metrics` folds the context-match rollup.
 - **Graduated skills (`mage-skill-*`)** come out of the grooming loop, when a
   proven procedural note earns its own skill. `mage dream --apply` is the
   **single writer** that mints those, and the ceilings it enforces are the reason
@@ -157,19 +156,21 @@ There are two classes of generated skill:
 Each generated wing skill includes a "Governing decisions" section listing the accepted, non-superseded decision records (ADRs) that the wing's **memory-genre** notes link to. The recall/footprint ceilings stay as a whole-file backstop (use `mage doctor` to diagnose breaches).
 
 ```bash
-# Rebuild recall surfaces and navigation skills
+# Rebuild recall surfaces, then the per-wing skills
 mage index
+mage skills
 ```
 
 ### Admission and readability checks
 
 Every `mage index` run checks each note under `notes/` for the admission fields
-(`id`, `rung`, `skipped`, `trigger`, `pointer`) and the readability rules (one
-screen, no unlinked references, plain words), and prints one line per problem. It
-indexes anyway and exits 0. That is report mode, the default, because the existing
-notes have not been backfilled yet.
+(`rung`, `trigger`, `pointer`; `id` and `skipped` when present) and the readability
+rules (one screen, no unlinked references, plain words), and prints one line per
+problem. It indexes anyway and exits 0. That is report mode, the default.
+Readability findings are warnings only. It also prints
+`Roster: A of N notes admitted; M recalled at the action.`
 
-`mage index --strict-admission` turns the report into a refusal. On any problem it
+`mage index --strict-admission` turns admission problems into a refusal. On any of them it
 prints the same report, writes nothing (no `INDEX.md`, no `MEMORY.md`, no project
 pair), and exits 1. At a hub root the check covers every project's notes too. See
 [Notes](../model/notes.md) for a failing note and the exact report.
@@ -374,23 +375,34 @@ mage doctor --report
 mage migrate
 ```
 
+## Verbs in 0.0.18
+
+| verb | 0.0.17 | 0.0.18 |
+| --- | --- | --- |
+| `init`, `connect`, `disconnect`, `doctor`, `index` | visible | visible; `connect` wires the recall hook, `index` prints the roster and recall counts |
+| `groom` | hidden: staged-draft batch | visible: walks notes up the ladder |
+| `skills` | visible: generate, `--metrics` | visible: generate, `--metrics` |
+| `link`, `unlink`, `verify`, `list`, `migrate`, `adopt`, `status`, `autonomy`, `dream` | visible | visible, unchanged |
+| `footprint` | visible | retired: use `mage doctor` |
+| `dashboard` | visible | retired: use `mage index` |
+| `distill`, `promote`, `stage`, `ingest` | hidden, ran | hidden, retired: `mage groom` or `/mage:learn` |
+| `graduate` | skill only | hidden, retired: `mage groom` |
+| `recall-hook` | none | hidden plumbing (PreToolUse recall) |
+| `observe`, `nudge`, `memory-hook`, `redact`, `flatten` | hidden plumbing | hidden plumbing |
+
 ## Retired verbs
 
-Seven verbs stop doing their work, print a signpost and exit 0. Where the
-replacement is not built yet, the signpost says so:
+Seven verbs stop doing their work, print a signpost and exit 0:
 
-| Retired verb | Where its work goes | Note |
-|---|---|---|
-| `distill` | `mage groom` | Not built yet: the proposal digest (#219). |
-| `promote` | `mage groom` | Not built yet: the proposal digest (#219). |
-| `graduate` | `mage groom` | Not built yet: a skill becomes one proposal type (#219, #235). |
-| `skills` | `mage index` | The wing skill is retired; `mage index` regenerates `INDEX.md` and `MEMORY.md`. `skills --metrics` still runs until `mage ledger` (#237). |
-| `dashboard` | `mage index` | Graph and dashboard generation are folded into index. |
-| `footprint` | `mage doctor` | Context footprint diagnostics are folded into doctor. |
-| `stage` | `mage observe`, as a `finding` event | Not built yet (ADR-0052). |
-
-`ingest` stays working as hidden plumbing under `/mage:learn --from`: nothing
-else enumerates a folder yet.
+| Retired verb | Where its work goes |
+|---|---|
+| `distill` | `mage groom`, or `/mage:learn` to write a note |
+| `promote` | `mage groom`: a note climbs to a rule, hook or check |
+| `graduate` | `mage groom`: a note climbs to a rule, hook or check, not to a skill |
+| `stage` | `/mage:learn` to write a note, then `mage groom` to judge its rung |
+| `ingest` | `/mage:learn --from <dir>` |
+| `dashboard` | `mage index`: graph and dashboard generation are folded into index |
+| `footprint` | `mage doctor`: context footprint diagnostics are folded into doctor |
 
 ## The full inventory
 

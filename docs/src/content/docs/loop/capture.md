@@ -42,88 +42,61 @@ The `mage observe` seam above records the *trail*; the lesson and recurrence sta
 
 Claude Code writes memories on its own. `mage connect` points its `autoMemoryDirectory` at the knowledge base and wires a **Gate-0** `PreToolUse` hook on `Write`/`Edit`. When the host saves a memory, Gate-0 fires before the file touches disk and:
 
-- **scrubs** secrets and PII out of the content before it touches disk (the same redactor the rest of the pipeline uses), so the write lands redacted — the frontmatter is deliberately left alone, since normalization to mage's schema happens later, at the durable boundary. The scrub is a pure-regex rewrite of the raw bytes — no parse step that could fail — and the hook honors the same fail-open contract as `mage observe`: an infrastructure error passes the write through rather than breaking the session (deny exists only for generated-index targets); or
-- **denies** the write outright if it targets a generated index (`INDEX.md`, `MEMORY.md`, a wing index) — mage owns those and regenerates them.
+- **scrubs** secrets and PII out of the content before it touches disk (the same redactor the rest of the pipeline uses), so the write lands redacted — the frontmatter is deliberately left alone, since normalization to mage's schema happens later, at the durable boundary. The scrub is a pure-regex rewrite of the raw bytes — no parse step that could fail — and the hook honors the same fail-open contract as `mage observe`: an infrastructure error passes the write through rather than breaking the session (a generated-index target, a failed secret scan and the first rung-less write of a session are the only denials); or
+- **denies** the write outright if it targets a generated index (`INDEX.md`, `MEMORY.md`, a wing index) — mage owns those and regenerates them; or
+- **asks the ladder once** per session when the memory carries no `rung` (below).
 
-The result lands flat at the docs-root top as a **capture inbox** file. It is not committed knowledge yet: the next `mage groom` ingests the inbox into `.mage/staging/` and routes it through the same human-confirm gate as every other draft. See [Stage and groom](./stage-groom.md).
+The result lands flat at the docs-root top. `mage groom` lists it where it lies and walks it up the ladder with the other notes. See [Stage and groom](./stage-groom.md).
 
-```mermaid Gate-0 on Claude Code: a native-memory write is intercepted before disk — a generated-index target is denied, a flat topic note is scrubbed in-flight and lands as a capture-inbox note, and the next groom ingests it into staging. Anything else passes untouched.
+```mermaid Gate-0 on Claude Code: a native-memory write is intercepted before disk — a generated-index target is denied, a flat topic note is scrubbed in-flight and lands at the docs-root top, and groom walks it up the ladder. Anything else passes untouched.
 flowchart TD
   w["host native-memory Write / Edit"] --> g0{"Gate-0 · PreToolUse intercept"}
   g0 -->|"targets a generated index<br/>(INDEX.md · MEMORY.md · _index.*.md)"| d["deny — mage owns it;<br/>mage index regenerates it"]
   g0 -->|"a flat .md note at the docs root"| s["scrub secrets in-flight —<br/>redacted before any byte hits disk"]
   g0 -->|"anything else"| p["pass untouched"]
-  s --> i["capture-inbox note at the docs-root top"]
-  i --> gr["mage groom ingests it into .mage/staging/ —<br/>the same human-confirm gate as every draft"]
+  s --> i["flat note at the docs-root top"]
+  i --> gr["mage groom lists it where it lies —<br/>climb, delete or keep"]
 ```
 
 Like `mage observe`, Gate-0 is **fail-open**: any stdin/parse/redact/filesystem error emits nothing and exits clean, so a capture gate can never block the host's write. It is adapter-specific and active only when Claude Code's `autoMemoryEnabled` is on; on other harnesses the volitional directive (write a mage note to the inbox) is the capture path.
 
 For the exact event names, hook ids, and the command each runs, see the [Hooks reference](../reference/hooks.mdx).
 
-## Note admission under the notes folder
+## The ladder, asked once per session
 
-When a write or edit targets a file under the `notes/` directory, Gate-0 runs an admission check on the frontmatter before bytes reach disk.
+A memory write is a Write or Edit to a file under `notes/`, or to a flat `.md` file at the docs root where Claude Code's native memory lands. Gate-0 looks at the file as it will read after the write.
 
-A note must explain why it belongs on the note rung rather than a higher rung. It provides this explanation through four frontmatter fields:
+If that frontmatter carries a `rung`, the write passes. If it does not, the first such write of a session is denied with the ladder below. The agent can take a fact up a rung, or add `rung` and write again. Every later write in that session passes, and so does any write that carries a `rung`, so the gate never stops the same session twice. The fields a note needs after that are in [Admission and triggers](../model/notes.md#admission-and-triggers).
 
-- `rung`: the rung name (such as `note`).
-- `skipped`: a map stating why each higher rung was skipped (for `note`: `impossible`, `check`, `hook`, and `rule`).
-- `trigger`: a single line describing the condition that brings this note back.
-- `pointer`: a markdown link pointing to the issue, pull request, or file behind the note.
+The decision path:
 
-The hook evaluates writes along this decision path:
+1. **Target check**: a write outside `notes/` and outside the flat root passes untouched. A write to a generated index (`MEMORY.md`, `INDEX.md`, `_index.*.md`) is denied, because `mage index` regenerates it.
+2. **Scrub**: the content goes through redaction first. If the scan itself fails, the write is denied and no marker is written; a secret in a committed knowledge base is published. Otherwise a secret is masked in place, and a clean `notes/` write is left to your normal permission prompt.
+3. **Ladder**: a write with no `rung`, in a session with an id, where this session has not been asked yet, is denied with the text below. Asking is recorded in a marker file under `.mage/ladder/`. If the marker cannot be written, the write passes.
 
-1. **Target check**: If the target sits outside `notes/`, the write passes untouched. Nothing in the codebase yet marks a file as a proposal, so this check is the only gate; a proposal-file exemption is future work, not implemented here.
-2. **Admission validation**: If any of the four fields is missing or invalid, the hook refuses the write with a fixed plain-text reply. It refuses every such attempt, not only the first. If the frontmatter does not parse, or the check itself fails, the hook refuses too: this gate never fails open.
-3. **Scrub**: An admitted write goes through the same redaction as any other memory write. If a secret is found, the hook rewrites the content with the secret masked. Otherwise the write passes untouched and your normal permission prompt still applies.
+The reply, quoted from `LADDER_TEXT` in `memory-hook.ts`:
 
-### Worked example: passing frontmatter
+```text
+mage:ladder (asked once this session; write again and it passes)
+Before saving this memory, take each fact in it to the highest rung that can carry it.
+Build that, then keep as a note only what no rung above can carry. Copy the template that fits.
 
-This note supplies all four admission fields, so the hook admits it:
-
-```markdown
----
-rung: note
-skipped:
-  impossible: cannot be ruled out by types
-  check: behavioral, not static
-  hook: cannot observe across sessions
-  rule: agent needs a lesson
-trigger: when soak monitor misses an incident
-pointer: "[issue #229](https://github.com/Sumit1993/mage-memory/issues/229)"
----
-# Soak monitor blind spots
-
-Body text.
-```
-
-### Worked example: refused frontmatter
-
-This note lacks `rung`, `skipped`, `trigger`, and `pointer`:
-
-```markdown
----
-title: Soak monitor blind spots
-tags:
-  - monitoring
----
-# Soak monitor blind spots
-
-Body text.
-```
-
-Gate-0 refuses this write with the following reply:
-
-```
-mage:mage/guard/note-admission
-
-This write was stopped because the note does not say why it is a note.
-A note is the last rung. Four rungs sit above it: impossible, check,
-hook, rule. Say in one line each why this cannot be one of those, in a
-`skipped:` block, and add `rung:`, `trigger:` and `pointer:`.
-
-Then write it again, or open a proposal instead.
+1 impossible: a deny rule in .claude/settings.json
+  {"permissions": {"deny": ["Edit(generated/**)", "Write(generated/**)"]}}
+2 check: a test, lint rule or pre-commit check that fails on the mistake
+  # .git/hooks/pre-commit
+  if git diff --cached -U0 -- src | grep -q '^+.*console\.log'; then echo "use logger, not console.log"; exit 1; fi
+3 hook: a PreToolUse hook in .claude/settings.json that blocks with a reason
+  {"hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [{"type": "command", "command": "node .claude/hooks/commit-issue.mjs"}]}]}}
+  The script reads the tool call JSON on stdin; to block it prints
+  {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "commit subjects need (#N)"}}
+4 rule: one line in AGENTS.md carrying an id
+  - Keep commit subjects under 60 characters. [mage:repo/rule/short-commit-subjects]
+5 note: add to the note's frontmatter
+  rung: note
+  trigger: {when: "<the moment it matters>", match: ["Bash(<cmd> *)", "Edit(<glob>)"]}
+  pointer: "[<source>](<path or issue>)"
+A memory that carries rung: is never stopped.
 ```
 
 ## What happens to the scratch
