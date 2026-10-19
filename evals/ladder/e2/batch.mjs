@@ -39,7 +39,7 @@ export function summarizeE2(results, prompt = results[0]?.prompt ?? "default") {
   return `${lines.join("\n")}\n`;
 }
 
-export async function runE2Batch({ arms, reps, concurrency, model, runId, prompt = "default" }) {
+export async function runE2Batch({ arms, reps, concurrency, model, runId, prompt = "default", gate, auth = "ollama" }) {
   const jobs = [];
   for (let rep = 1; rep <= reps; rep++) for (const arm of arms) jobs.push({ arm, rep });
   const dir = join(RUNS_DIR, runId);
@@ -51,7 +51,7 @@ export async function runE2Batch({ arms, reps, concurrency, model, runId, prompt
       const job = jobs[next++];
       let result;
       try {
-        result = await runE2({ ...job, model, runId, prompt });
+        result = await runE2({ ...job, model, runId, prompt, gate, auth });
       } catch (e) {
         result = { ...job, error: String(e) };
       }
@@ -76,6 +76,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     model: o.model || DEFAULT_MODEL,
     runId,
     prompt: o.prompt || "default",
+    gate: o.gate,
+    auth: o.auth || "ollama",
   });
   process.stdout.write(`${results.length} runs; see ${join(RUNS_DIR, runId, "summary.md")}\n`);
 }

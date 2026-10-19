@@ -116,6 +116,11 @@ export interface GroomingConfig {
   crownThreshold?: number;
 }
 
+/** How the memory hook treats the first rung-less memory write of a session (#282); absent ⇒ "ask". */
+export interface LadderConfig {
+  gate?: "ask" | "deny-once";
+}
+
 /**
  * Code-repo-side metadata. Lives at `<code-repo>/mage/metadata.json`.
  *
@@ -149,6 +154,8 @@ export interface MageMetadata {
   linked_at: string;
   /** Self-grooming dial (ADR-0019 §7 + ADR-0030); absent ⇒ sensitivity "normal", autonomy "operator". */
   grooming?: GroomingConfig;
+  /** The memory-hook ladder gate (#282); absent ⇒ "ask". */
+  ladder?: LadderConfig;
   /** Gate-2 false-positive allowlist (ADR-0025); absent ⇒ no allowances. */
   redact?: RedactConfig;
   /** Custom type-to-genre overrides (ADR-0041 §3). */
@@ -178,6 +185,8 @@ export interface HubMetadata {
   projects: HubProject[];
   /** Self-grooming dial (ADR-0019 §7 + ADR-0030); absent ⇒ sensitivity "normal", autonomy "operator". */
   grooming?: GroomingConfig;
+  /** The memory-hook ladder gate (#282); absent ⇒ "ask". */
+  ladder?: LadderConfig;
   /** Gate-2 false-positive allowlist (ADR-0025); absent ⇒ no allowances. */
   redact?: RedactConfig;
   /** Custom type-to-genre overrides (ADR-0041 §3). */

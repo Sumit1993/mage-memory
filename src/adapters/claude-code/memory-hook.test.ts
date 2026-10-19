@@ -2,9 +2,11 @@ import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { tmpDir, withKb } from "../../../test/fixtures/kb.js";
+import { readLadderGate, narrowLadderGate, resetLadderGateWarning } from "../../ladder-config.js";
 import { ladderMarkerPath } from "../../paths.js";
 import { redact } from "../../redact.js";
 import {
+  LADDER_ASK_TEXT,
   LADDER_TEXT,
   type MemoryDecision,
   buildMemoryHookCommand,
@@ -69,6 +71,8 @@ const NESTED_RUNG_NOTE = [
   "---",
   "Body.",
 ].join("\n");
+
+const DENY_ONCE = { gate: "deny-once" } as const;
 
 const NOTE_MISSING_RUNG = [
   "---",
@@ -236,12 +240,12 @@ describe("memoryPreToolUse", () => {
   });
 });
 
-describe("the ladder, asked once per session (#282)", () => {
+describe("the ladder under gate=deny-once (#282)", () => {
   const markerOf = (root: string, session: string): string => ladderMarkerPath(root, session);
   const exists = (p: string): Promise<boolean> => stat(p).then(() => true, () => false);
 
   it("denies the first rung-less write of a session with the ladder, and creates the marker", async () => {
-    const kb = await withKb();
+    const kb = await withKb({ ladder: DENY_ONCE });
     const d = await memoryPreToolUse(
       sessionWrite(kb.dir, join(kb.root, "notes", "first.md"), NOTE_MISSING_RUNG),
     );
@@ -254,21 +258,21 @@ describe("the ladder, asked once per session (#282)", () => {
   });
 
   it("passes the second rung-less write in the same session", async () => {
-    const kb = await withKb();
+    const kb = await withKb({ ladder: DENY_ONCE });
     const target = join(kb.root, "notes", "again.md");
     expect((await memoryPreToolUse(sessionWrite(kb.dir, target, NOTE_MISSING_RUNG))).kind).toBe("deny");
     expect((await memoryPreToolUse(sessionWrite(kb.dir, target, NOTE_MISSING_RUNG))).kind).toBe("pass");
   });
 
   it("denies once more in a new session", async () => {
-    const kb = await withKb();
+    const kb = await withKb({ ladder: DENY_ONCE });
     const target = join(kb.root, "notes", "x.md");
     await memoryPreToolUse(sessionWrite(kb.dir, target, NOTE_MISSING_RUNG, "a"));
     expect((await memoryPreToolUse(sessionWrite(kb.dir, target, NOTE_MISSING_RUNG, "b"))).kind).toBe("deny");
   });
 
   it("passes a write carrying rung, also nested under metadata, and writes no marker", async () => {
-    const kb = await withKb();
+    const kb = await withKb({ ladder: DENY_ONCE });
     for (const [name, text] of [
       ["valid.md", VALID_ADMISSION_NOTE],
       ["nested.md", NESTED_RUNG_NOTE],
@@ -280,20 +284,20 @@ describe("the ladder, asked once per session (#282)", () => {
   });
 
   it("passes with rung present but trigger, pointer and skipped missing", async () => {
-    const kb = await withKb();
+    const kb = await withKb({ ladder: DENY_ONCE });
     const d = await memoryPreToolUse(sessionWrite(kb.dir, join(kb.root, "notes", "bare.md"), RUNG_ONLY_NOTE));
     expect(d.kind).toBe("pass");
   });
 
   it("counts malformed YAML as rung-less", async () => {
-    const kb = await withKb();
+    const kb = await withKb({ ladder: DENY_ONCE });
     const broken = "---\nrung: note\nskipped: [oops\n---\n# Broken\n";
     const d = await memoryPreToolUse(sessionWrite(kb.dir, join(kb.root, "notes", "broken.md"), broken));
     expect(d).toEqual({ kind: "deny", reason: LADDER_TEXT });
   });
 
   it("passes without a session id and without a usable one", async () => {
-    const kb = await withKb();
+    const kb = await withKb({ ladder: DENY_ONCE });
     const target = join(kb.root, "notes", "nosession.md");
     expect((await memoryPreToolUse(sessionWrite(kb.dir, target, NOTE_MISSING_RUNG, null))).kind).toBe("pass");
     expect((await memoryPreToolUse(sessionWrite(kb.dir, target, NOTE_MISSING_RUNG, "../x"))).kind).toBe("pass");
@@ -301,7 +305,7 @@ describe("the ladder, asked once per session (#282)", () => {
   });
 
   it("passes when the marker cannot be written", async () => {
-    const kb = await withKb();
+    const kb = await withKb({ ladder: DENY_ONCE });
     await mkdir(markerOf(kb.root, "sess-1"), { recursive: true });
     const d = await memoryPreToolUse(sessionWrite(kb.dir, join(kb.root, "notes", "m.md"), NOTE_MISSING_RUNG));
     expect(d.kind).toBe("pass");
@@ -309,7 +313,7 @@ describe("the ladder, asked once per session (#282)", () => {
 
   it("denies the e2-smoke shape once, on the root and under notes/", async () => {
     for (const where of [[], ["notes"]]) {
-      const kb = await withKb();
+      const kb = await withKb({ ladder: DENY_ONCE });
       const target = join(kb.root, ...where, "correction.md");
       const first = await memoryPreToolUse(sessionWrite(kb.dir, target, E2_SMOKE_NOTE));
       expect(first).toEqual({ kind: "deny", reason: LADDER_TEXT });
@@ -319,7 +323,7 @@ describe("the ladder, asked once per session (#282)", () => {
   });
 
   it("judges an Edit by the file as it will read, not by the fragment", async () => {
-    const kb = await withKb();
+    const kb = await withKb({ ladder: DENY_ONCE });
     const target = join(kb.root, "notes", "has-rung.md");
     await mkdir(join(kb.root, "notes"), { recursive: true });
     await writeFile(target, VALID_ADMISSION_NOTE);
@@ -335,7 +339,7 @@ describe("the ladder, asked once per session (#282)", () => {
   });
 
   it("denies, without a marker, when the secret scan throws, on both paths", async () => {
-    const kb = await withKb();
+    const kb = await withKb({ ladder: DENY_ONCE });
     vi.mocked(redact).mockImplementation(() => {
       throw new Error("boom");
     });
@@ -347,18 +351,18 @@ describe("the ladder, asked once per session (#282)", () => {
   });
 
   it("still denies a generated index, in or out of a session", async () => {
-    const kb = await withKb();
+    const kb = await withKb({ ladder: DENY_ONCE });
     const d = await memoryPreToolUse(sessionWrite(kb.dir, join(kb.root, "MEMORY.md"), "x"));
     expect(d).toEqual({
       kind: "deny",
       reason:
-        "MEMORY.md is regenerated by `mage index`; write the memory as its own file under mage/notes/<slug>.md instead (it will be listed automatically).",
+        "MEMORY.md is regenerated by `mage index`; write the memory as its own file under mage/notes/<slug>.md instead (it will be listed automatically). If a memory write was refused earlier this session, repeat it now as its own file.",
     });
     expect(await exists(markerOf(kb.root, "sess-1"))).toBe(false);
   });
 
   it("passes writes to the reserved root files at a hub root, in or out of a session", async () => {
-    const kb = await withKb({ kind: "hub" });
+    const kb = await withKb({ kind: "hub", ladder: DENY_ONCE });
     for (const name of ["AGENTS.md", "CLAUDE.md", "IDENTITY.md", "README.md", "Dashboard.md"]) {
       const d = await memoryPreToolUse(sessionWrite(kb.dir, join(kb.root, name), NOTE_MISSING_RUNG));
       expect(d, name).toEqual({ kind: "pass" });
@@ -367,7 +371,7 @@ describe("the ladder, asked once per session (#282)", () => {
   });
 
   it("still asks the ladder for a rung-less memory note at a hub root, and denies only regenerated indexes", async () => {
-    const kb = await withKb({ kind: "hub" });
+    const kb = await withKb({ kind: "hub", ladder: DENY_ONCE });
     for (const name of ["INDEX.md", "MEMORY.md", "_index.mage.md"]) {
       const d = await memoryPreToolUse(sessionWrite(kb.dir, join(kb.root, name), "x"));
       expect(d.kind, name).toBe("deny");
@@ -387,21 +391,21 @@ describe("the ladder, asked once per session (#282)", () => {
   });
 
   it("redirects a write to MEMORY.md to its own file under mage/notes/, and that file then passes", async () => {
-    const kb = await withKb();
+    const kb = await withKb({ ladder: DENY_ONCE });
     const first = await memoryPreToolUse(sessionWrite(kb.dir, join(kb.root, "notes", "lesson.md"), NOTE_MISSING_RUNG));
     expect(first).toEqual({ kind: "deny", reason: LADDER_TEXT });
     const index = await memoryPreToolUse(sessionWrite(kb.dir, join(kb.root, "MEMORY.md"), "- [x](x.md)"));
     expect(index).toEqual({
       kind: "deny",
       reason:
-        "MEMORY.md is regenerated by `mage index`; write the memory as its own file under mage/notes/<slug>.md instead (it will be listed automatically).",
+        "MEMORY.md is regenerated by `mage index`; write the memory as its own file under mage/notes/<slug>.md instead (it will be listed automatically). If a memory write was refused earlier this session, repeat it now as its own file.",
     });
     const retry = await memoryPreToolUse(sessionWrite(kb.dir, join(kb.root, "notes", "lesson.md"), NOTE_MISSING_RUNG));
     expect(retry.kind).toBe("pass");
   });
 
   it("names the denied file in the redirect for INDEX.md and a wing index", async () => {
-    const kb = await withKb();
+    const kb = await withKb({ ladder: DENY_ONCE });
     for (const name of ["INDEX.md", "_index.mage.md"]) {
       const d = await memoryPreToolUse(sessionWrite(kb.dir, join(kb.root, name), "x"));
       expect(d.kind === "deny" && d.reason.startsWith(`${name} is regenerated by \`mage index\`; write the memory as its own file under mage/notes/<slug>.md`)).toBe(true);
@@ -418,7 +422,7 @@ describe("the ladder, asked once per session (#282)", () => {
   });
 
   it("still scrubs a passing write", async () => {
-    const kb = await withKb();
+    const kb = await withKb({ ladder: DENY_ONCE });
     const note = `${RUNG_ONLY_NOTE}
 ping admin@example.com
 `;
@@ -427,9 +431,96 @@ ping admin@example.com
   });
 
   it("writes an empty marker file", async () => {
-    const kb = await withKb();
+    const kb = await withKb({ ladder: DENY_ONCE });
     await memoryPreToolUse(sessionWrite(kb.dir, join(kb.root, "notes", "e.md"), NOTE_MISSING_RUNG));
     expect(await readFile(markerOf(kb.root, "sess-1"), "utf8")).toBe("");
+  });
+});
+
+describe("the ladder under gate=ask, the default (#282)", () => {
+  const markerOf = (root: string, session: string): string => ladderMarkerPath(root, session);
+  const exists = (p: string): Promise<boolean> => stat(p).then(() => true, () => false);
+
+  it("allows the first rung-less write and attaches the ladder as context, once per session", async () => {
+    const kb = await withKb();
+    const target = join(kb.root, "notes", "first.md");
+    const first = await memoryPreToolUse(sessionWrite(kb.dir, target, NOTE_MISSING_RUNG));
+    expect(first).toEqual({ kind: "context", context: LADDER_ASK_TEXT });
+    expect(await exists(markerOf(kb.root, "sess-1"))).toBe(true);
+    expect((await memoryPreToolUse(sessionWrite(kb.dir, target, NOTE_MISSING_RUNG))).kind).toBe("pass");
+    expect((await memoryPreToolUse(sessionWrite(kb.dir, target, NOTE_MISSING_RUNG, "sess-2"))).kind).toBe("context");
+  });
+
+  it("never denies a rung-less memory write, on the root or under notes/", async () => {
+    const kb = await withKb();
+    const flat = await memoryPreToolUse(sessionWrite(kb.dir, join(kb.root, "feedback_x.md"), NOTE_MISSING_RUNG));
+    expect(flat.kind).toBe("rewrite");
+    if (flat.kind === "rewrite") expect(flat.context).toBe(LADDER_ASK_TEXT);
+    const unknown = await withKb({ ladder: { gate: "sometimes" as "ask" } });
+    const d = await memoryPreToolUse(sessionWrite(unknown.dir, join(unknown.root, "notes", "y.md"), NOTE_MISSING_RUNG));
+    expect(d.kind).toBe("context");
+  });
+
+  it("words the ask as a save plus a question, with the templates, and no refusal", () => {
+    const lines = LADDER_ASK_TEXT.split("\n");
+    expect(lines[0]).toBe("Saved. Before more memory writes this session: could any of these lessons live on a higher rung?");
+    for (const n of ["1 impossible:", "2 check:", "3 hook:", "4 rule:", "5 note:"]) {
+      expect(lines.some((l) => l.startsWith(n)), n).toBe(true);
+    }
+    expect(LADDER_ASK_TEXT).not.toContain("Not saved yet");
+  });
+
+  it("passes a write that carries a rung without context or a marker", async () => {
+    const kb = await withKb();
+    const d = await memoryPreToolUse(sessionWrite(kb.dir, join(kb.root, "notes", "ok.md"), RUNG_ONLY_NOTE));
+    expect(d.kind).toBe("pass");
+    expect(await exists(markerOf(kb.root, "sess-1"))).toBe(false);
+  });
+
+  it("still fails closed on a secret scan failure and redirects a generated index", async () => {
+    const kb = await withKb();
+    const idx = await memoryPreToolUse(sessionWrite(kb.dir, join(kb.root, "MEMORY.md"), "x"));
+    expect(idx.kind).toBe("deny");
+    if (idx.kind === "deny") expect(idx.reason).toContain("If a memory write was refused earlier this session, repeat it now as its own file.");
+    vi.mocked(redact).mockImplementation(() => {
+      throw new Error("boom");
+    });
+    const d = await memoryPreToolUse(sessionWrite(kb.dir, join(kb.root, "notes", "n.md"), NOTE_MISSING_RUNG));
+    expect(d).toEqual({ kind: "deny", reason: "mage could not scan this write for secrets" });
+    expect(await exists(markerOf(kb.root, "sess-1"))).toBe(false);
+  });
+
+  it("emits the ask as additionalContext only, with no permission decision", () => {
+    const write = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    emitPreToolUse({ kind: "context", context: "ladder" });
+    const out = JSON.parse(String(write.mock.calls[0]?.[0])) as { hookSpecificOutput: Record<string, unknown> };
+    expect(out.hookSpecificOutput).toEqual({ hookEventName: "PreToolUse", additionalContext: "ladder" });
+  });
+});
+
+describe("ladder.gate config", () => {
+  it("reads ask by default, deny-once when set, in a repo KB and in a hub", async () => {
+    expect(await readLadderGate((await withKb()).resolved)).toBe("ask");
+    expect(await readLadderGate((await withKb({ ladder: { gate: "deny-once" } })).resolved)).toBe("deny-once");
+    expect(await readLadderGate((await withKb({ ladder: { gate: "ask" } })).resolved)).toBe("ask");
+    expect(await readLadderGate((await withKb({ kind: "hub", ladder: { gate: "deny-once" } })).resolved)).toBe("deny-once");
+    expect(await readLadderGate((await withKb({ kind: "external", ladder: { gate: "deny-once" } })).resolved)).toBe("deny-once");
+  });
+
+  it("reads an unknown value as ask and logs it once to stderr", () => {
+    resetLadderGateWarning();
+    const err = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    expect(narrowLadderGate("sometimes")).toBe("ask");
+    expect(narrowLadderGate("sometimes")).toBe("ask");
+    expect(narrowLadderGate(undefined)).toBe("ask");
+    expect(err).toHaveBeenCalledTimes(1);
+    expect(String(err.mock.calls[0]?.[0])).toContain('ladder.gate "sometimes" is not "ask" or "deny-once"');
+  });
+
+  it("reads ask when the metadata is unreadable", async () => {
+    const kb = await withKb();
+    await writeFile(join(kb.repo, "mage", "metadata.json"), "{");
+    expect(await readLadderGate(kb.resolved)).toBe("ask");
   });
 });
 
