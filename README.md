@@ -71,8 +71,8 @@ no `git diff` for what your agent believes. When memory is files, every
 claim your agent carries into a session has a history, a provenance line,
 and a reviewable diff; a wrong memory gets caught the same way a wrong line
 of code does — in review. mage's redaction gate runs at commit time because
-a memory *has* a commit, and its self-grooming loop (distill → promote →
-graduate → demote) is only possible because the memory is legible. That
+a memory *has* a commit, and `mage groom`, which walks notes up the ladder and lands
+the change by pull request, is only possible because the memory is legible. That
 review gate is only as strong as your repo's own — a KB without PR review
 trusts notes on write, with provenance and `git log` as the audit trail when
 doubt arises.

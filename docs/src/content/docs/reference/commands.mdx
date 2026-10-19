@@ -83,19 +83,19 @@ It is idempotent and backs up the file before touching it. `mage disconnect`
 removes exactly what `connect` added.
 
 ```bash
-# Wire capture hooks into this repo (.claude/settings.local.json)
+# Wire the hooks into this repo (.claude/settings.local.json)
 mage connect
 
 # Wire them into your personal settings instead (~/.claude/settings.json)
 mage connect --user
 
-# Remove mage's capture hooks again (host hooks stay intact)
+# Remove mage's hooks again (host hooks stay intact)
 mage disconnect
 ```
 
-Capture is strictly opt-in — it is not bundled with the skills plugin. For what
-the hooks actually capture, see [Capture](../loop/capture.md) and the
-[Hooks reference](./hooks.mdx).
+The hooks are strictly opt-in — they are not bundled with the skills plugin. For
+what they do, see [Capture](../loop/capture.md), [Recall at the action](../model/recall.md)
+and the [Hooks reference](./hooks.mdx).
 
 ### Reaching a knowledge base outside the repo
 
@@ -143,15 +143,9 @@ the host pushes at session launch (idempotent; never hand-edit either output;
 see [The two recall surfaces](../model/graph.md#the-two-recall-surfaces)).
 `mage skills` generates the per-wing skills.
 
-There are two classes of generated skill:
-
-- **Per-wing skills (`mage-wing-*`)** are derived from notes, exactly like
-  the index. `mage skills` is their writer; re-running it rebuilds them
-  deterministically, and `mage skills --metrics` folds the context-match rollup.
-- **Graduated skills (`mage-skill-*`)** come out of the grooming loop, when a
-  proven procedural note earns its own skill. `mage dream --apply` is the
-  **single writer** that mints those, and the ceilings it enforces are the reason
-  it is the only one. See [Promote and graduate](../loop/promote-graduate.md).
+Per-wing skills (`mage-wing-*`) are derived from notes, exactly like
+the index. `mage skills` is their writer; re-running it rebuilds them
+deterministically, and `mage skills --metrics` folds the context-match rollup.
 
 Each generated wing skill includes a "Governing decisions" section listing the accepted, non-superseded decision records (ADRs) that the wing's **memory-genre** notes link to. The recall/footprint ceilings stay as a whole-file backstop (use `mage doctor` to diagnose breaches).
 
@@ -203,8 +197,7 @@ legitimately produce different orderings: regenerate, never hand-merge.
 The hooks and the `/mage:learn` flow also run it for you
 automatically, so you rarely need to run it manually.
 
-`mage skills` has retired, but its read-only metrics mode still works until
-`mage ledger` takes it over (#237). It reports context-match (whether the skills
+`mage skills --metrics` is a read-only report. It reports context-match (whether the skills
 that auto-loaded matched the work that followed), and the `mage:metrics:Stop` hook
 runs it quietly to keep the rollup current:
 
@@ -217,7 +210,7 @@ mage skills --metrics --json
 ```
 
 See [Optimize](../loop/optimize.md) for how those match rates drive reword and
-demote decisions, and [Thresholds and the dial](./thresholds.mdx) for the rates
+demote decisions, and [Thresholds](./thresholds.mdx) for the rates
 involved.
 
 ## Checking knowledge-base health
@@ -240,9 +233,8 @@ mage dream --strict
 ```
 
 `mage dream` also carries the `--apply` and `--reject` plumbing flags — the
-single-writer seam the grooming skills drive. You do not type those by hand; they
-are covered under the plumbing table below and in
-[Promote and graduate](../loop/promote-graduate.md).
+single-writer seam the `/mage:optimize` skill drives. You do not type those by hand;
+they are covered under the plumbing table below.
 
 Context footprint diagnostics are folded into `mage doctor` (`mage footprint` has retired). `mage doctor` measures the byte and line occupancy of the generated auto-memory file against the host agent's recall budget (such as 25,600 bytes or 200 lines). A recall-budget breach means the host will silently truncate the file, dropping your earliest memories.
 
