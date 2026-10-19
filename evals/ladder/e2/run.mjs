@@ -68,21 +68,23 @@ export function buildE2(arm, dir) {
   return { base: git(dir, "rev-parse", "HEAD").trim(), registered };
 }
 
-export async function runE2({ arm, rep = 1, model = DEFAULT_MODEL, runId, timeoutMs }) {
+export const promptFile = (prompt = "default") => join(HERE, prompt === "heldout" ? "prompt-heldout.md" : "prompt.md");
+
+export async function runE2({ arm, rep = 1, model = DEFAULT_MODEL, runId, timeoutMs, prompt = "default" }) {
   const runDir = makeRunDir(runId, `${arm}-${rep}`);
   const repo = join(runDir, "repo");
   const configDir = join(runDir, "config");
   const { base, registered } = buildE2(arm, repo);
   if (registered) writeFileSync(join(runDir, "registered-settings.json"), `${JSON.stringify(registered, null, 2)}\n`);
   const run = await runClaude({
-    prompt: readFileSync(join(HERE, "prompt.md"), "utf8"),
+    prompt: readFileSync(promptFile(prompt), "utf8"),
     cwd: repo,
     env: claudeEnv({ model, configDir }),
     transcriptPath: join(runDir, "transcript.jsonl"),
     stderrPath: join(runDir, "stderr.log"),
     timeoutMs,
   });
-  const result = { arm, rep, model, exit_code: run.exitCode, timed_out: run.timedOut, ...gradeE2({ dir: repo, base, configDir }) };
+  const result = { arm, rep, model, prompt, exit_code: run.exitCode, timed_out: run.timedOut, ...gradeE2({ dir: repo, base, configDir, prompt }) };
   writeFileSync(join(runDir, "grade.json"), `${JSON.stringify(result, null, 2)}\n`);
   return result;
 }
@@ -95,6 +97,6 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const arms = (o.arms || "E2-plain,E2-mage").split(",");
   const reps = Number(o.reps || 1);
   const results = [];
-  for (const arm of arms) for (let rep = 1; rep <= reps; rep++) results.push(await runE2({ arm, rep, model: o.model || DEFAULT_MODEL, runId }));
+  for (const arm of arms) for (let rep = 1; rep <= reps; rep++) results.push(await runE2({ arm, rep, model: o.model || DEFAULT_MODEL, runId, prompt: o.prompt || "default" }));
   process.stdout.write(`${JSON.stringify(results.map((r) => ({ arm: r.arm, rep: r.rep, score: `${r.score}/${r.of}`, landed: Object.fromEntries(r.corrections.map((c) => [c.id, c.landed])) })), null, 2)}\n`);
 }

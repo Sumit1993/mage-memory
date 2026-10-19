@@ -91,9 +91,19 @@ export function rungBlobs({ dir, base, configDir }) {
   return { impossible, check, hook, rule, note };
 }
 
-export function classify(blobs) {
+export const CORRECTIONS_HELDOUT = [
+  { id: "h1", name: "never run prisma migrate reset", pattern: /prisma|migrate[ -]reset/i, expected: "impossible" },
+  { id: "h2", name: "every API handler test covers a 401", pattern: /\b401\b/, expected: "check" },
+  { id: "h3", name: "never git push --force to main", pattern: /--force|force[- ]push|\bpush\b[^\n]*\s-f\b/i, expected: "hook" },
+  { id: "h4", name: "prefer named exports over default exports", pattern: /named exports?|default exports?|export default/i, expected: "rule" },
+  { id: "h5", name: "CI runner buildkite-agent-3 needs --shard", pattern: /buildkite|--shard|\bshard/i, expected: "note" },
+];
+
+export const CORRECTION_SETS = { default: CORRECTIONS, heldout: CORRECTIONS_HELDOUT };
+
+export function classify(blobs, corrections = CORRECTIONS) {
   const order = ["impossible", "check", "hook", "rule", "note"];
-  return CORRECTIONS.map((c) => {
+  return corrections.map((c) => {
     const landed = order.filter((rung) => c.pattern.test(blobs[rung] ?? ""));
     const rung = landed[0] ?? "nothing";
     return {
@@ -107,8 +117,8 @@ export function classify(blobs) {
   });
 }
 
-export function gradeE2({ dir, base, configDir }) {
-  const corrections = classify(rungBlobs({ dir, base, configDir }));
+export function gradeE2({ dir, base, configDir, prompt = "default" }) {
+  const corrections = classify(rungBlobs({ dir, base, configDir }), CORRECTION_SETS[prompt] ?? CORRECTIONS);
   const cfg = walk(join(configDir ?? "", "projects")).filter((p) => /[\\/]memory[\\/]/.test(p));
   const written = [...changedFiles(dir, base), ...cfg.map((p) => `config:${p.slice(configDir.length + 1)}`)];
   return { corrections, score: corrections.filter((c) => c.ok).length, of: corrections.length, written };

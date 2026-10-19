@@ -1,11 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { git } from "../lib/arms.mjs";
-import { buildE2, MAGE_CLI } from "../e2/run.mjs";
-import { gradeE2 } from "../e2/grade.mjs";
+import { buildE2, MAGE_CLI, promptFile } from "../e2/run.mjs";
+import { CORRECTIONS_HELDOUT, gradeE2 } from "../e2/grade.mjs";
 
 const tmp = () => join(mkdtempSync(join(tmpdir(), "e2-test-")), "repo");
 const put = (dir, rel, text) => {
@@ -134,4 +134,75 @@ test("attach hook: allows the first memory write and attaches the ladder text on
 test("e2 setup: E2-attach registers the proto hook in attach mode", { skip: !existsSync(MAGE_CLI) }, () => {
   const s = buildE2("E2-attach", tmp()).registered;
   assert.match(s.hooks.PreToolUse[0].hooks[0].command, /proto-ladder-hook\.mjs" attach$/);
+});
+
+test("e2 grade heldout: each held-out correction is classified to the highest rung that mentions it", () => {
+  const dir = tmp();
+  const { base } = buildE2("E2-plain", dir);
+  put(dir, "CLAUDE.md", "# shopcart\n\nA tiny cart library. See README.md.\n- Prefer named exports over default exports.\n- Big suites need --shard on buildkite-agent-3.\n");
+  put(dir, ".claude/settings.json", JSON.stringify({
+    permissions: { deny: ["Bash(prisma migrate reset*)"] },
+    hooks: { PreToolUse: [{ matcher: "Bash", hooks: [{ type: "command", command: "node block-force-push.mjs --force" }] }] },
+  }));
+  put(dir, "scripts/check-401.sh", "#!/bin/sh\ngrep -L '401' test/api/*.test.js && exit 1\n");
+  put(dir, "mage/notes/runner.md", "---\nrung: note\n---\nthe runner is buildkite-agent-3, use --shard\n");
+  const g = gradeE2({ dir, base, configDir: join(dir, "none"), prompt: "heldout" });
+  const byId = Object.fromEntries(g.corrections.map((c) => [c.id, c]));
+  assert.equal(g.of, 5);
+  assert.equal(byId.h1.landed, "impossible");
+  assert.equal(byId.h2.landed, "check");
+  assert.equal(byId.h3.landed, "hook");
+  assert.equal(byId.h4.landed, "rule");
+  assert.equal(byId.h5.landed, "rule");
+  assert.deepEqual(byId.h5.also, ["note"]);
+  assert.equal(g.score, 5);
+});
+
+test("e2 grade heldout: nothing landed scores 0, and the default set is untouched", () => {
+  const dir = tmp();
+  const { base } = buildE2("E2-plain", dir);
+  const none = join(dir, "none");
+  const heldout = gradeE2({ dir, base, configDir: none, prompt: "heldout" });
+  assert.equal(heldout.score, 0);
+  assert.deepEqual(heldout.corrections.map((c) => c.id), ["h1", "h2", "h3", "h4", "h5"]);
+  assert.deepEqual(heldout.corrections.map((c) => c.expected), ["impossible", "check", "hook", "rule", "note"]);
+  assert.deepEqual(gradeE2({ dir, base, configDir: none }).corrections.map((c) => c.id), ["c1", "c2", "c3", "c4", "c5"]);
+});
+
+test("e2 grade heldout: the h3 pattern needs a force push, not any push", () => {
+  const h3 = CORRECTIONS_HELDOUT.find((c) => c.id === "h3").pattern;
+  assert.ok(h3.test("git push --force origin main"));
+  assert.ok(h3.test("git push -f origin main"));
+  assert.ok(h3.test("never force-push to main"));
+  assert.ok(!h3.test("git push origin main"));
+});
+
+test("e2 prompt heldout: five corrections, none shared with the default prompt or the ladder text", () => {
+  const heldout = readFileSync(promptFile("heldout"), "utf8");
+  const standard = readFileSync(promptFile("default"), "utf8");
+  assert.equal(heldout.split("\n").filter((l) => /^\d\. /.test(l)).length, 5);
+  const ladder = readFileSync(join(import.meta.dirname, "..", "..", "..", "src", "adapters", "claude-code", "memory-hook.ts"), "utf8");
+  for (const word of ["prisma", "401", "force", "named export", "default export", "buildkite", "shard"]) {
+    assert.ok(new RegExp(word, "i").test(heldout), word);
+    assert.ok(!new RegExp(word, "i").test(standard), `${word} in the default prompt`);
+    assert.ok(!new RegExp(word, "i").test(ladder), `${word} in the ladder text`);
+  }
+});
+
+test("e2 batch: the summary uses the held-out correction set", async () => {
+  const { summarizeE2 } = await import("../e2/batch.mjs");
+  const mk = (arm, landed) => ({
+    arm, rep: 1, score: 0, of: 5, prompt: "heldout", written: [],
+    corrections: ["h1", "h2", "h3", "h4", "h5"].map((id) => ({ id, landed, ok: false })),
+  });
+  const md = summarizeE2([mk("E2-plain", "nothing"), mk("E2-mage", "rule")]);
+  assert.match(md, /heldout prompt/);
+  assert.match(md, /\| h1 never run prisma migrate reset \| impossible \|/);
+  assert.match(md, /\| h5 CI runner buildkite-agent-3 needs --shard \| note \|/);
+});
+
+test("e2 run: --prompt heldout reads the held-out prompt file", () => {
+  assert.match(promptFile("heldout"), /prompt-heldout\.md$/);
+  assert.match(promptFile("default"), /prompt\.md$/);
+  assert.match(promptFile(), /prompt\.md$/);
 });
