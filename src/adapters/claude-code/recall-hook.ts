@@ -1,11 +1,11 @@
 // Runs from cli.ts before the command program loads: never import commander or
 // cli-program here (latency, #239). Injects context only, never a decision (#282).
 
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { basename, dirname, join } from "node:path";
+import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { basename, dirname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { parseNote } from "../../note.js";
-import { DECISIONS_DIR, recallStatePath, resolveDocsRoot } from "../../paths.js";
+import { DECISIONS_DIR, findCodeRepoRoot, recallStatePath, resolveDocsRoot } from "../../paths.js";
 import { isGeneratedArtifact, listNotePaths, safeSegment } from "../../scan.js";
 import { checkAdmission } from "../../scanner/admission.js";
 import {
@@ -140,6 +140,23 @@ interface Context {
   target: ToolTarget;
 }
 
+/** The git toplevel above `start`, or null. */
+async function gitToplevel(start: string): Promise<string | null> {
+  for (let dir = start; ; ) {
+    if (await access(join(dir, ".git")).then(() => true, () => false)) return dir;
+    const parent = dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+}
+
+/** Edit globs are relative to the code repo being edited, not the hub holding the notes (#282). */
+async function codeRepoOf(input: Record<string, unknown>, cwd: string, fallback: string): Promise<string> {
+  const path = str(input.file_path) ?? str(input.notebook_path);
+  const start = path ? dirname(resolve(cwd, path)) : resolve(cwd);
+  return (await gitToplevel(start)) ?? (await findCodeRepoRoot(start).catch(() => null)) ?? fallback;
+}
+
 async function contextOf(payload: Record<string, unknown>, cwdOverride?: string): Promise<Context | null> {
   const tool = str(payload.tool_name);
   const input = obj(payload.tool_input);
@@ -147,7 +164,8 @@ async function contextOf(payload: Record<string, unknown>, cwdOverride?: string)
   const cwd = cwdOverride ?? str(payload.cwd) ?? process.cwd();
   const resolved = await resolveDocsRoot(cwd).catch(() => null);
   if (!resolved) return null;
-  const target = toolTarget(tool, input, { cwd, repo: resolved.repo });
+  const repo = await codeRepoOf(input, cwd, resolved.repo);
+  const target = toolTarget(tool, input, { cwd, repo });
   return target ? { root: resolved.root, tool, target } : null;
 }
 

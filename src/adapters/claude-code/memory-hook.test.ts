@@ -356,6 +356,35 @@ describe("the ladder, asked once per session (#282)", () => {
     expect(await exists(markerOf(kb.root, "sess-1"))).toBe(false);
   });
 
+  it("passes writes to the reserved root files at a hub root, in or out of a session", async () => {
+    const kb = await withKb({ kind: "hub" });
+    for (const name of ["AGENTS.md", "CLAUDE.md", "IDENTITY.md", "README.md", "Dashboard.md"]) {
+      const d = await memoryPreToolUse(sessionWrite(kb.dir, join(kb.root, name), NOTE_MISSING_RUNG));
+      expect(d, name).toEqual({ kind: "pass" });
+    }
+    expect(await exists(markerOf(kb.root, "sess-1"))).toBe(false);
+  });
+
+  it("still asks the ladder for a rung-less memory note at a hub root, and denies only regenerated indexes", async () => {
+    const kb = await withKb({ kind: "hub" });
+    for (const name of ["INDEX.md", "MEMORY.md", "_index.mage.md"]) {
+      const d = await memoryPreToolUse(sessionWrite(kb.dir, join(kb.root, name), "x"));
+      expect(d.kind, name).toBe("deny");
+    }
+    const note = await memoryPreToolUse(sessionWrite(kb.dir, join(kb.root, "feedback_x.md"), NOTE_MISSING_RUNG));
+    expect(note).toEqual({ kind: "deny", reason: LADDER_TEXT });
+  });
+
+  it("LADDER_TEXT shares no wording with the E2 corrections and sends a check to versioned files", () => {
+    for (const phrase of ["generated/", "console.log", "(#N)", "60 char", "hermes", "commit subject", "issue number"]) {
+      expect(LADDER_TEXT.toLowerCase(), phrase).not.toContain(phrase.toLowerCase());
+    }
+    const gitHooks = LADDER_TEXT.split("\n").filter((l) => l.includes("git/hooks"));
+    expect(gitHooks).toHaveLength(1);
+    expect(gitHooks[0]).toContain("Do not edit .git/hooks/pre-commit");
+    expect(LADDER_TEXT).toContain("committed to the repo");
+  });
+
   it("still scrubs a passing write", async () => {
     const kb = await withKb();
     const note = `${RUNG_ONLY_NOTE}

@@ -14,7 +14,7 @@ It is a PreToolUse hook, `mage recall-hook`, that `mage connect` wires. It adds 
 1. **Frontmatter.** The note carries `rung`, a `trigger` with a `when` and a `match` list, and a `pointer`. The fields are in [Admission and triggers](./notes.md#admission-and-triggers).
 2. **Index admission.** `mage index` checks every memory note and prints how many are admitted and how many carry a valid `match`. A note that fails admission stays in the index and the roster; it is only ineligible for recall.
 3. **Matcher.** On each Bash, Write, Edit, MultiEdit or NotebookEdit call the hook tests the command or file path against each admitted note's `match` globs. Read, Grep, Glob and Task never run it.
-4. **De-dup.** A note is injected once per session. The state is a small file under `.mage/recall/`, and a compaction clears it so the note can come back.
+4. **De-dup.** A note is injected once per session. The state is a small file under `.mage/recall/`, and a compaction clears it so the note can come back. The state is keyed by `session_id`, so subagents that share their parent's `session_id` share it too.
 
 The caps (notes per call, bytes per call, bytes per body, time budget) are the `RECALL_LIMITS` constant in `src/adapters/claude-code/recall-hook.ts`. A note that would push past the byte cap is skipped and not marked as injected, so it is offered on a later call.
 

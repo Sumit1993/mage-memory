@@ -4,43 +4,43 @@
 
 > 11 accepted decisions govern this repo — read `decisions/` before architectural or scope changes.
 
-- `reference` [Mining agentmemory's design into mage — conclusions](notes/agentmemory-mining-map.md) — iii, server-inverse, obsidian-ui, roadmap
-- `reference` [Field notes — first external migrations (v0.1 dogfood)](notes/migration-field-notes.md) — field-test, bulk-import, byte-safe, onboarding, v0.2
-- `gotcha` [Gotcha — key bodies with `-`/`_` partially leak past the high-entropy detector](notes/redaction-anthropic-key-detector.md) — mage
-- `gotcha` [Gotcha — scope Gate-2 to the knowledge base, not the whole repo](notes/gate2-blocks-own-redaction-fixtures.md) — pre-commit, hook, docs-root, connect, dogfood
-- `gotcha` [Gotcha — `mage connect` turns on capture but does not ensure the sink is gitignored](notes/connect-doesnt-ensure-ignores.md) — gitignore, learnings, metrics, drift, migration, doctor, safe-by-default, leak, version-bump, hook-block
-- `gotcha` [A release bump touches MORE than package.json — release-please now owns it](notes/release-bump-touches-many-artifacts.md) — version, changelog, readme, badge, plugin, marketplace, consistency, hygiene, pat
-- `gotcha` [Test files were never type-checked (tsconfig excluded them)](notes/test-files-were-excluded-from-typecheck.md) — tsc, tests, exclude, vitest, tsup, esbuild, ci, fixture
-- `reference` [Replay-gate methodology — does a capture mechanism produce USEFUL knowledge?](notes/replay-gate-methodology.md) — calibration, lessons, paid, three
-- `gotcha` [Gotcha — a Gate-2 false positive can stall an autonomous groom; never disable the hook to unblock](notes/gate2-fp-blocks-autonomy.md) — redaction, overseer, approver, capture, soak
+- `reference` [The boundary nudge — internals + where each piece lives](notes/boundary-nudge-internals.md) — digest, startup, session-start, watermark, once-per-chapter, teaser, two-channel, systemMessage, additionalContext, offer-first
+- `gotcha` [Gotcha — distill's corrections lens counts harness notifications as user corrections](notes/harness-notifications-pollute-the-corrections-lens.md) — task-notification, monitor-event, user-prompt, capture-schema, signal-to-noise, background-agents, groom
+- `principle` [mage is one durable memory — of hard-earned knowledge](notes/mage-is-durable-memory.md) — charter, identity, unified-memory, portable, notes-are-memories, insight, procedure, gotcha, pointer
+- `gotcha` [Gotcha — which `mage` binary am I actually running? Bare runs working tree, `npx` runs published](notes/npx-mage-runs-the-published-release.md) — dogfood, stale-binary, global-install, dist, dream, index, false-positive, self-hosting, verification, npm-link
+- `gotcha` [The soak monitor reports "absent" and "healthy" the same way — three blind spots that cost an observation window](notes/soak-monitor-blind-spots.md) — blind-spot, dark-unit, keep-rate, capture-vs-adopt, baseline-flag, code-repo-path, absolute-path, evidence-pipeline, ratification-gate, cron
+- `feedback` [Agent-maintained files carry standing rules only — no decision history, no trivial negatives](notes/agent-maintained-files-carry-standing-rules-only.md) — claude-md, skills, trim, context-cost
+- `gotcha` [Gotcha — ctx_execute_file refuses paths outside the project root, and the scratchpad is always outside it](notes/context-mode-blocks-files-outside-project-root.md) — ai-context, file-access-blocked, allow-rule, sandbox
 - `feedback` [Dogfood before release](notes/dogfood-before-release.md) — mage
+- `gotcha` [Gotcha — the harness memory layer rewrites mage frontmatter on every Write/Edit under mage/](notes/harness-memory-layer-rewrites-mage-frontmatter.md) — auto-memory, cc-schema, node-type, write-tool, edit-tool, contamination, repair
 - `note` [Mage integration test framework](notes/mage-integration-test-framework.md) — build
 - `note` [Mage main branch protected](notes/mage-main-branch-protected.md) — build
 - `note` [Mage no biome 2space](notes/mage-no-biome-2space.md) — build
 - `feedback` [No emojis in releases](notes/no-emojis-in-releases.md) — mage, release
-- `principle` [mage is one durable memory — of hard-earned knowledge](notes/mage-is-durable-memory.md) — charter, identity, unified-memory, portable, notes-are-memories, insight, procedure, gotcha, pointer
-- `pointer` [mage soak — the external dogfood targets + the read-only monitor](notes/soak-targets.md) — prismalens, sreforge, lesson-path, digest
-- `reference` [The boundary nudge — internals + where each piece lives](notes/boundary-nudge-internals.md) — digest, startup, session-start, watermark, once-per-chapter, teaser, two-channel, systemMessage, additionalContext, offer-first
+- `principle` [Route a memory to the store that matches its scope, not the KB you happen to be in](notes/route-memories-to-the-matching-store.md) — memory-routing, user-level, repo-kb, hub, capture, ft-20
+- `gotcha` [Gotcha — a stopped background workflow leaves no transcript marker, so absence proves nothing](notes/stopped-background-workflows-leave-no-record.md) — taskstop, compaction, resume, absence-of-evidence, anti-stall, sentinel
+- `gotcha` [Gotcha — a directory-source plugin marketplace copies your UNTRACKED tree, then serves it stale](notes/plugin-directory-source-copies-untracked-tree.md) — plugin-cache, github-source, node-modules, snapshot, dogfood, disk-bloat
+- `reference` [Mining agentmemory's design into mage — conclusions](notes/agentmemory-mining-map.md) — iii, server-inverse, obsidian-ui, roadmap
+- `gotcha` [Gotcha — Gemini re-indents entire files with tabs; diff-stat inflation is the tell](notes/gemini-reindents-whole-files-with-tabs.md) — agy, indentation, diff-churn, delegation
+- `gotcha` [Gotcha — a link-graph harvest must genre-filter its SOURCES, not just its targets](notes/link-harvests-must-genre-filter-sources.md) — cross-links, recall
+- `reference` [Field notes — first external migrations (v0.1 dogfood)](notes/migration-field-notes.md) — field-test, bulk-import, byte-safe, onboarding, v0.2
+- `reference` [Replay-gate methodology — does a capture mechanism produce USEFUL knowledge?](notes/replay-gate-methodology.md) — calibration, lessons, paid, three
+- `gotcha` [Gotcha — filter on a frontmatter enum only after a census; vocabulary drifts silently](notes/status-vocabulary-drift-undercounts-filters.md) — accepted, active, census-first
 - `gotcha` [Gotcha — a throwaway measurement script is code, and its bug becomes an ADR's evidence](notes/ad-hoc-measurement-scripts-are-code.md) — analysis-script, parser, false-precision, cross-check, decision-input
 - `gotcha` [Gotcha — agy reports byte-exact compliance it did not deliver; verify the artifact, not the report](notes/agy-commit-message-compliance-is-unreliable.md) — gemini, delegation, false-compliance, trailer, verify-do-not-trust
 - `gotcha` [Gotcha — a delegate sent after a command that does not exist will find the one you forbade](notes/delegation-prompts-must-name-real-commands.md) — agy, prompt, verification-commands, nonexistent-script, house-rules
 - `gotcha` [Gotcha — a mature KB emits no capture terminals, so the keep-rate gate cannot calibrate on it](notes/mature-kb-emits-no-capture-terminals.md) — crown-threshold, a1-bake, calibration, soak, prismalens, 0.1.0, autonomy
-- `gotcha` [Gotcha — which `mage` binary am I actually running? Bare runs working tree, `npx` runs published](notes/npx-mage-runs-the-published-release.md) — dogfood, stale-binary, global-install, dist, dream, index, false-positive, self-hosting, verification, npm-link
 - `gotcha` [Gotcha — a lock on a hook path is the wrong mechanism; mage already folds append-only JSONL](notes/prefer-the-repos-lock-free-convention.md) — concurrency, lockfile, read-modify-write, fold-on-read, toctou, existing-convention
 - `gotcha` [Gotcha — promote's recurrence fold has near-zero precision on a mature KB](notes/promote-folds-mechanical-tokens.md) — denoise, signature, keyword-fold, watermark, rejected-buffer, soak
 - `gotcha` [Gotcha — a constant that is defined but never imported reports a false state while every test passes](notes/unreachable-constant-reports-a-false-state.md) — dead-code, green-tests, wiring-bug, regression-test, default-parameter
 - `gotcha` [Gotcha — weakening a test's assertions to make it pass can delete its purpose](notes/weakening-a-test-can-delete-its-purpose.md) — vacuous, green-suite, false-confidence, behaviour-change, fixture, regression, code-review, coderabbit
-- `gotcha` [Gotcha — Gemini re-indents entire files with tabs; diff-stat inflation is the tell](notes/gemini-reindents-whole-files-with-tabs.md) — agy, indentation, diff-churn, delegation
-- `gotcha` [Gotcha — a link-graph harvest must genre-filter its SOURCES, not just its targets](notes/link-harvests-must-genre-filter-sources.md) — cross-links, recall
-- `gotcha` [Gotcha — filter on a frontmatter enum only after a census; vocabulary drifts silently](notes/status-vocabulary-drift-undercounts-filters.md) — accepted, active, census-first
-- `gotcha` [Gotcha — a directory-source plugin marketplace copies your UNTRACKED tree, then serves it stale](notes/plugin-directory-source-copies-untracked-tree.md) — plugin-cache, github-source, node-modules, snapshot, dogfood, disk-bloat
-- `gotcha` [The soak monitor reports "absent" and "healthy" the same way — three blind spots that cost an observation window](notes/soak-monitor-blind-spots.md) — blind-spot, dark-unit, keep-rate, capture-vs-adopt, baseline-flag, code-repo-path, absolute-path, evidence-pipeline, ratification-gate, cron
-- `feedback` [Agent-maintained files carry standing rules only — no decision history, no trivial negatives](notes/agent-maintained-files-carry-standing-rules-only.md) — claude-md, skills, trim, context-cost
-- `gotcha` [Gotcha — ctx_execute_file refuses paths outside the project root, and the scratchpad is always outside it](notes/context-mode-blocks-files-outside-project-root.md) — ai-context, file-access-blocked, allow-rule, sandbox
-- `gotcha` [Gotcha — the harness memory layer rewrites mage frontmatter on every Write/Edit under mage/](notes/harness-memory-layer-rewrites-mage-frontmatter.md) — auto-memory, cc-schema, node-type, write-tool, edit-tool, contamination, repair
-- `principle` [Route a memory to the store that matches its scope, not the KB you happen to be in](notes/route-memories-to-the-matching-store.md) — memory-routing, user-level, repo-kb, hub, capture, ft-20
-- `gotcha` [Gotcha — a stopped background workflow leaves no transcript marker, so absence proves nothing](notes/stopped-background-workflows-leave-no-record.md) — taskstop, compaction, resume, absence-of-evidence, anti-stall, sentinel
-- `gotcha` [Gotcha — distill's corrections lens counts harness notifications as user corrections](notes/harness-notifications-pollute-the-corrections-lens.md) — task-notification, monitor-event, user-prompt, capture-schema, signal-to-noise, background-agents, groom
+- `pointer` [mage soak — the external dogfood targets + the read-only monitor](notes/soak-targets.md) — prismalens, sreforge, lesson-path, digest
+- `gotcha` [Gotcha — a Gate-2 false positive can stall an autonomous groom; never disable the hook to unblock](notes/gate2-fp-blocks-autonomy.md) — redaction, overseer, approver, capture, soak
+- `gotcha` [A release bump touches MORE than package.json — release-please now owns it](notes/release-bump-touches-many-artifacts.md) — version, changelog, readme, badge, plugin, marketplace, consistency, hygiene, pat
+- `gotcha` [Test files were never type-checked (tsconfig excluded them)](notes/test-files-were-excluded-from-typecheck.md) — tsc, tests, exclude, vitest, tsup, esbuild, ci, fixture
+- `gotcha` [Gotcha — `mage connect` turns on capture but does not ensure the sink is gitignored](notes/connect-doesnt-ensure-ignores.md) — gitignore, learnings, metrics, drift, migration, doctor, safe-by-default, leak, version-bump, hook-block
+- `gotcha` [Gotcha — scope Gate-2 to the knowledge base, not the whole repo](notes/gate2-blocks-own-redaction-fixtures.md) — pre-commit, hook, docs-root, connect, dogfood
+- `gotcha` [Gotcha — key bodies with `-`/`_` partially leak past the high-entropy detector](notes/redaction-anthropic-key-detector.md) — mage
 - `feedback` [notes-must-read-in-one-screen](notes/notes-must-read-in-one-screen.md)
 - `feedback` [point-in-time-research-stays-private](notes/point-in-time-research-stays-private.md)
 
