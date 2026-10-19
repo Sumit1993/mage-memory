@@ -39,13 +39,13 @@ describe("docs generated data", () => {
     }
 
     // Hook-only plumbing is hidden from `mage --help`.
-    for (const name of ["observe", "nudge", "promote", "stage", "groom", "redact"]) {
+    for (const name of ["observe", "nudge", "promote", "stage", "recall-hook", "redact"]) {
       expect(byName.get(name)?.hidden, `${name} should be hidden`).toBe(true);
     }
 
     // The human-facing verbs are visible. `index` is user-facing — the
     // quickstart and the external-mode guide both instruct running it.
-    for (const name of ["init", "connect", "doctor", "index"]) {
+    for (const name of ["init", "connect", "doctor", "index", "groom", "skills"]) {
       expect(byName.get(name)?.hidden, `${name} should be visible`).toBe(false);
     }
 
