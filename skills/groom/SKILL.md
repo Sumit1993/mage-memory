@@ -80,8 +80,8 @@ judge, `mage groom` lists and the tools you already have build.
 - Run the redaction gate (`mage redact <file>`) before a new tracked file holds
   anything copied from a note (ADR-0053).
 - Notes are insight, procedure and pointers, never a copy of a source.
-- Staged drafts from 0.0.17 can still wait in `.mage/staging/`; clear them with
-  `mage groom --accept|--reject <slugs|all>`.
+- Drafts a 0.0.17 session left in `.mage/staging/` are not read by anything in
+  0.0.18; `mage groom --accept|--reject <slugs|all>` still clears them.
 
 ## See also
 

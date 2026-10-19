@@ -244,8 +244,7 @@ index` refuses with that message rather than the generic
 tier, and `mage adopt` reports such an origin as `origin-hub-unreachable`
 rather than `origin-has-no-kb`.
 
-**The capture path stays silent on purpose, with one exception.** The PostToolUse
-observer, the memory hook, and the Gate-2 staged-secret scan all **fail open** on
+**The capture path stays silent on purpose, with one exception.** The recall hook, the memory hook, and the Gate-2 staged-secret scan all **fail open** on
 an unreachable hub: they capture nothing and return normally, so a machine
 without the hub still starts sessions, runs tools, and commits. Silence there is
 the mechanism; the message belongs on the commands you actually invoke.

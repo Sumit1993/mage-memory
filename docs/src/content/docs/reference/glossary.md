@@ -9,18 +9,15 @@ Every mage term in one place. Each links to the page where it is explained in fu
 
 | Term | Meaning |
 |---|---|
-| **memory** | what your agent remembers across sessions. In mage, **a memory *is* a note** — there is no separate store. mage is the agent's memory, made durable, curated, portable, and shareable. See [The loop](../loop/overview.md). |
+| **memory** | what your agent remembers across sessions. In mage, **a memory *is* a note** — there is no separate store. mage is the agent's memory, made durable, curated, portable, and shareable. See [The ladder](../loop/overview.md). |
 | **note** | one such memory: a committed markdown unit of *hard-earned knowledge* under `notes/` — insight + procedure + pointers, never a copy of a source (not a fact you can re-derive in seconds). See [Notes](../model/notes.md). |
-| **compact-chapter** | one stretch of work between context compactions. mage counts *chapters*, not session ids — so one long, continuously-compacted chat still accrues recurrence. See [Promote and graduate](../loop/promote-graduate.md). |
 | **wing / room** | how the index is organised: a **wing** is a top-level grouping (by tag); a **room** is a sub-group within a wing. See [The graph](../model/graph.md). |
-| **learnings** (`.mage/learnings/`) | the raw, auto-pruned trail of session events — git-ignored, not knowledge yet. See [Capture](../loop/capture.md) and [The .mage/ layout](./layout.md). |
-| **staging** (`.mage/staging/`) | drafts awaiting your accept/reject — scrubbed and deduped, git-ignored. See [Stage and groom](../loop/stage-groom.md). |
+| **rung** | where a fix sits on the ladder: `impossible`, `check`, `hook`, `rule` or `note`. See [The ladder](../loop/overview.md). |
+| **recall at the action** | a PreToolUse hook injects an admitted note when a tool call matches its `trigger.match`. See [Recall at the action](../model/recall.md). |
 | **INDEX.md / MEMORY.md** | the two generated recall surfaces. `INDEX.md` is the full, portable index of every memory note. `MEMORY.md` is the file Claude Code's auto-load looks for, and it is a **bounded roster** rather than a copy: the governance line, the top-ranked entries that fit the host's budget, then one overflow line pointing back at `INDEX.md` for the rest. See [The graph](../model/graph.md). |
 | **hub / project** | a **hub** is a shared knowledge base; a **project** is one repo's slice of it, at `<hub>/projects/<name>/`. See [Modes and storage](../model/modes.md). |
 | **hub_repo** | the hub's git remote, recorded in a code repo's `metadata.json` as the *authoritative* address (ADR-0043) — a hub's local clone is **derived** from it, never itself recorded. See [Where a hub actually lives](../model/modes.md#where-a-hub-actually-lives--derived-not-recorded). |
 | **in-repo / external / hybrid** | the three storage modes = where a repo's notes live: in the repo · in the hub · in the repo but registered to a hub. See [Modes and storage](../model/modes.md). |
-| **K / M** | recurrence gates: a pattern becomes a note candidate after **K** chapters; a proven procedural note graduates to a skill after **M**. One sensitivity dial scales both. See [Thresholds and the dial](./thresholds.mdx). |
-| **redaction gates** | secrets are scrubbed before they can persist — at `stage` and again at `git commit` (the two gates); on Claude Code a capture-time scrub (**Gate-0**) is added too. Secrets block; PII warns. See [Redaction](./redaction.md). |
-| **autonomy ladder** | how much grooming the agent may do unattended: *operator* (propose only) → *approver* (write notes) → *overseer* (write + graduate). Set per knowledge base. See [Autonomy levels](../loop/autonomy.mdx). |
+| **redaction gates** | secrets are scrubbed before they can persist: when the memory hook sees a write, and again at `git commit` (the two gates). Secrets block; PII warns. See [Redaction](./redaction.md). |
 
-For the verbs and skills themselves, see [Commands](./commands.mdx); for the loop those terms move through, see [The self-grooming loop](../loop/overview.md).
+For the verbs and skills themselves, see [Commands](./commands.mdx); for the ladder those terms hang on, see [The ladder](../loop/overview.md).

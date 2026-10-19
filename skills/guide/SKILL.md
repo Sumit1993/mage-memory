@@ -143,7 +143,7 @@ See `CONVENTIONS.md` for the full spec. Essentials:
 
 | `type:` | genre | rung |
 |---|---|---|
-| `gotcha` `procedure` | memory | 2 — `INDEX.md` line, `MEMORY.md`-eligible (1 once graduated) |
+| `gotcha` `procedure` | memory | 2 — `INDEX.md` line, `MEMORY.md`-eligible |
 | `pointer` `principle` `feedback` `reference` `note` | memory | 2 — `INDEX.md` line, `MEMORY.md`-eligible |
 | `decision` | decision | 3 — on demand |
 | `plan` `tasks` | work | 3 — on demand |

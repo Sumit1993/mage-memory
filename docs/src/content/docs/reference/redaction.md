@@ -5,14 +5,14 @@ sidebar:
   order: 5
 ---
 
-mage captures what you do as you work, and turns the recurring parts into committed notes. That is exactly the kind of pipeline where a secret can leak: an API key pasted into a prompt, a token in a tool output, a connection string in an error. mage's job is to keep those out of anything that gets written — and especially out of anything that gets committed and shared.
+mage writes what your agent learns into committed notes. That is exactly the kind of pipeline where a secret can leak: an API key pasted into a prompt, a token in a tool output, a connection string in an error. mage's job is to keep those out of anything that gets written — and especially out of anything that gets committed and shared.
 
 It does this with **one deterministic redaction engine applied at two write boundaries** (ADR-0014). The engine is pure mage code: regex detectors plus a high-entropy check, no model and no network. What differs between the two gates is *behaviour at the boundary*, not the strength of the rules.
 
-```mermaid The two redaction gates: Gate 1 scrubs secrets in place and continues on capture into the gitignored scratch; Gate 2 scans staged files at git commit and blocks the commit on a live secret, or lets a clean commit land.
+```mermaid The two redaction gates: Gate 1 scrubs secrets in place and continues on a memory write; Gate 2 scans staged files at git commit and blocks the commit on a live secret, or lets a clean commit land.
 flowchart LR
-  capture[Capture and distill] --> g1[Gate 1: scrub and continue]
-  g1 --> scratch[Gitignored scratch]
+  write[Memory write] --> g1[Gate 1: scrub and continue]
+  g1 --> note[Note on disk]
   commit[git commit] --> g2{Gate 2: scan staged}
   g2 -->|live secret| block[Commit blocked]
   g2 -->|clean| land[Commit lands]
@@ -20,16 +20,16 @@ flowchart LR
 
 ## Gate 1 — scrub and continue (on capture)
 
-The first boundary is every write into the gitignored capture scratch (`mage observe`) and the drafts mage grooms. Here the engine runs in **scrub-and-continue** mode: it finds secret-shaped values, replaces them in place, and keeps going. Nothing blocks.
+The first boundary is every memory write the memory hook sees. Here the engine runs in **scrub-and-continue** mode: it finds secret-shaped values, replaces them in place, and keeps going. Nothing blocks.
 
-The replacement keeps the surrounding context but masks the value, so a draft stays readable:
+The replacement keeps the surrounding context but masks the value, so a note stays readable:
 
 ```text
 before:  api_key=sk-ant-XXXXXXXXXXXXXXXXXXXX
 after:   api_key=[REDACTED:generic-key-value]
 ```
 
-This is defense-in-depth. The scratch is gitignored, so it never commits — but it can still escape a machine via a sync, a backup, or sharing a file for debugging, so mage scrubs it before it is written, not before it is displayed. By the time a secret is on disk unredacted, redaction is already too late.
+This is defense-in-depth. A note is tracked and shared, and a memory file can still escape a machine through a sync or a backup before it is committed, so mage scrubs it before it is written, not before it is displayed. By the time a secret is on disk unredacted, redaction is already too late.
 
 Because Gate 1 follows the [capture insight, not copies](../model/notes.md) principle, most verbatim secrets never reach a note in the first place — a note records the *insight*, not a paste of the source. Gate 1 is the net under that.
 
