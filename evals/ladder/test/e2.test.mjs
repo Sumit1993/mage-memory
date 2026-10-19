@@ -206,3 +206,40 @@ test("e2 run: --prompt heldout reads the held-out prompt file", () => {
   assert.match(promptFile("default"), /prompt\.md$/);
   assert.match(promptFile(), /prompt\.md$/);
 });
+
+test("e2 setup: --gate writes ladder.gate into the mage arm's metadata and leaves the plain arm alone", { skip: !existsSync(MAGE_CLI) }, () => {
+  const meta = (dir) => JSON.parse(readFileSync(join(dir, "mage", "metadata.json"), "utf8"));
+  const deny = tmp();
+  buildE2("E2-mage", deny, { gate: "deny-once" });
+  assert.deepEqual(meta(deny).ladder, { gate: "deny-once" });
+  const dflt = tmp();
+  buildE2("E2-mage", dflt);
+  assert.equal(meta(dflt).ladder, undefined);
+  const plain = tmp();
+  buildE2("E2-plain", plain, { gate: "deny-once" });
+  assert.equal(meta(plain).ladder, undefined);
+});
+
+test("e2 claude auth: no ollama endpoint or token, config dir set, credentials removable", async () => {
+  const { claudeEnv, removeCredentials } = await import("../lib/claude.mjs");
+  const before = { ...process.env };
+  process.env.ANTHROPIC_BASE_URL = "http://elsewhere";
+  process.env.ANTHROPIC_AUTH_TOKEN = "x";
+  try {
+    const configDir = mkdtempSync(join(tmpdir(), "e2-claude-"));
+    const env = claudeEnv({ model: "haiku", configDir, auth: "claude" });
+    assert.equal(env.CLAUDE_CONFIG_DIR, configDir);
+    for (const k of Object.keys(env)) assert.ok(!k.startsWith("ANTHROPIC_"), k);
+    const ollama = claudeEnv({ model: "m", configDir });
+    assert.equal(ollama.ANTHROPIC_BASE_URL, "http://localhost:11434");
+    writeFileSync(join(configDir, ".credentials.json"), "{}");
+    removeCredentials(configDir);
+    assert.ok(!existsSync(join(configDir, ".credentials.json")));
+    removeCredentials(configDir);
+  } finally {
+    process.env.ANTHROPIC_BASE_URL = before.ANTHROPIC_BASE_URL;
+    process.env.ANTHROPIC_AUTH_TOKEN = before.ANTHROPIC_AUTH_TOKEN;
+    if (before.ANTHROPIC_BASE_URL === undefined) delete process.env.ANTHROPIC_BASE_URL;
+    if (before.ANTHROPIC_AUTH_TOKEN === undefined) delete process.env.ANTHROPIC_AUTH_TOKEN;
+  }
+});

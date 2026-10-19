@@ -2,7 +2,7 @@
 // over the BUILT CLI and a real KB (#282). No external tools, no billing.
 
 import { spawnSync } from "node:child_process";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import { MAGE_BIN, assertBuilt, initKb } from "./lib/harness.js";
@@ -65,18 +65,24 @@ describe("integration: recall hook (deterministic)", () => {
 describe("integration: memory-hook asks the ladder once (deterministic)", () => {
   beforeAll(() => assertBuilt());
 
-  it("two rung-less root writes in one session give one deny, then a non-deny", async () => {
-    const { dir, root } = await initKb();
-    const write = JSON.stringify({
+  const rungless = (root: string, dir: string): string =>
+    JSON.stringify({
       hook_event_name: "PreToolUse",
       session_id: "s1",
       tool_name: "Write",
       tool_input: {
         file_path: join(root, "feedback_commit_style.md"),
-        content: "---\nname: commit-style\ndescription: No em dashes.\nmetadata:\n  type: feedback\n---\nNo em dashes.\n",
+        content: ["---", "name: commit-style", "description: No em dashes.", "metadata:", "  type: feedback", "---", "No em dashes."].join("\n"),
       },
       cwd: dir,
     });
+
+  it("gate=deny-once: two rung-less root writes in one session give one deny, then a non-deny", async () => {
+    const { dir, root } = await initKb();
+    const metaPath = join(root, "metadata.json");
+    const meta = JSON.parse(await readFile(metaPath, "utf8")) as Record<string, unknown>;
+    await writeFile(metaPath, JSON.stringify({ ...meta, ladder: { gate: "deny-once" } }, null, 2));
+    const write = rungless(root, dir);
 
     const first = JSON.parse(hook("memory-hook", write, dir).stdout) as {
       hookSpecificOutput: { permissionDecision: string; permissionDecisionReason: string };
@@ -91,5 +97,22 @@ describe("integration: memory-hook asks the ladder once (deterministic)", () => 
           .permissionDecision
       : "pass";
     expect(decision).not.toBe("deny");
+  });
+
+  it("gate=ask (the default): the first rung-less write is allowed with the ladder as context, once", async () => {
+    const { dir, root } = await initKb();
+    const write = rungless(root, dir);
+
+    const first = JSON.parse(hook("memory-hook", write, dir).stdout) as {
+      hookSpecificOutput: { permissionDecision?: string; additionalContext?: string };
+    };
+    expect(first.hookSpecificOutput.permissionDecision).not.toBe("deny");
+    expect(first.hookSpecificOutput.additionalContext).toContain("Saved. Before more memory writes this session");
+
+    const second = hook("memory-hook", write, dir);
+    const again = second.stdout
+      ? (JSON.parse(second.stdout) as { hookSpecificOutput: { additionalContext?: string } }).hookSpecificOutput
+      : {};
+    expect(again.additionalContext).toBeUndefined();
   });
 });

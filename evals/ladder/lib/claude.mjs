@@ -1,15 +1,40 @@
 import { spawn } from "node:child_process";
-import { createWriteStream, mkdirSync } from "node:fs";
+import { copyFileSync, createWriteStream, mkdirSync, rmSync } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 
 export const DEFAULT_MODEL = "gemma4:31b-cloud";
 export const RUNS_DIR =
   process.env.LADDER_RUNS_DIR || "C:\\Users\\sumit\\ai-context\\mage-memory\\204-ladder-reset\\eval-runs";
 
-export function claudeEnv({ model = DEFAULT_MODEL, configDir, hookLog, hookState }) {
+export const CLAUDE_CREDENTIALS = join(homedir(), ".claude", ".credentials.json");
+
+/**
+ * Run on the operator's Claude login instead of ollama: copy the credentials file into the run's
+ * fresh config dir. The caller removes it with {@link removeCredentials} once the run ends.
+ */
+export function stageCredentials(configDir) {
+  copyFileSync(CLAUDE_CREDENTIALS, join(configDir, ".credentials.json"));
+}
+
+export function removeCredentials(configDir) {
+  rmSync(join(configDir, ".credentials.json"), { force: true });
+}
+
+export function claudeEnv({ model = DEFAULT_MODEL, configDir, hookLog, hookState, auth = "ollama" }) {
   const env = { ...process.env };
   for (const k of Object.keys(env)) {
     if (k.startsWith("ANTHROPIC_") || k.startsWith("CLAUDE_CODE_USE_") || k === "CLAUDE_CONFIG_DIR") delete env[k];
+  }
+  if (auth === "claude") {
+    return {
+      ...env,
+      CLAUDE_CONFIG_DIR: configDir,
+      DISABLE_TELEMETRY: "1",
+      CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
+      ...(hookLog ? { LADDER_LOG: hookLog } : {}),
+      ...(hookState ? { LADDER_STATE: hookState } : {}),
+    };
   }
   return {
     ...env,
@@ -30,12 +55,12 @@ export function claudeEnv({ model = DEFAULT_MODEL, configDir, hookLog, hookState
 }
 
 /** Run `claude -p` in cwd, stream stdout to transcriptPath. Resolves { exitCode, timedOut, durationMs }. */
-export function runClaude({ prompt, cwd, env, transcriptPath, stderrPath, timeoutMs = 12 * 60 * 1000, maxTurns = 40 }) {
+export function runClaude({ prompt, cwd, env, transcriptPath, stderrPath, timeoutMs = 12 * 60 * 1000, maxTurns = 40, cliModel }) {
   return new Promise((resolve) => {
     const start = Date.now();
     const child = spawn(
       "claude",
-      ["-p", prompt, "--output-format", "stream-json", "--verbose", "--permission-mode", "bypassPermissions", "--max-turns", String(maxTurns)],
+      ["-p", prompt, "--output-format", "stream-json", "--verbose", "--permission-mode", "bypassPermissions", "--max-turns", String(maxTurns), ...(cliModel ? ["--model", cliModel] : [])],
       { cwd, env, stdio: ["ignore", "pipe", "pipe"], windowsHide: true },
     );
     const out = createWriteStream(transcriptPath);

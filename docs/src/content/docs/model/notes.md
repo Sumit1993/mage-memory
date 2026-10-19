@@ -131,6 +131,14 @@ A matcher is a subset of Claude Code's permission-rule syntax. Anything else is 
 | `Edit(pattern)` | Write, Edit, MultiEdit and NotebookEdit paths | the path relative to the code repo being edited (the git repository of the edited file, which in external and hub modes is not the repo holding the notes), with `/` separators; a pattern with no `/` matches the file name at any depth |
 | `Write(pattern)` | the same as `Edit(pattern)` | an alias |
 
+The memory-hook gate that asks the ladder is set in `mage/metadata.json` (a hub reads its own root metadata, like `grooming`):
+
+```json
+{ "ladder": { "gate": "ask" } }
+```
+
+`ask` is the default: the first memory write of a session that carries no `rung` is allowed, and the ladder is attached as context once. `deny-once` refuses that write once, with a reply that ends in a retry; every later write passes. Any other value reads as `ask` and is reported once on stderr. The default asks because deny-once lost lessons in a measured run ([#282](https://github.com/Sumit1993/mage-memory/issues/282)). The secret scan fails closed in both modes.
+
 Notes must also satisfy three readability rules ([#253](https://github.com/Sumit1993/mage-memory/issues/253)): length under 40 lines and 350 words, self-contained references with no unlinked documents, and plain words with no unslop words or em dashes. Readability findings are warnings. They never exclude a note from the roster and never fail `--strict-admission`; admission problems under `notes/` do.
 
 A failing note, saved as `notes/failing.md`, from a real run:
