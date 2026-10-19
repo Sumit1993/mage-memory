@@ -1,5 +1,5 @@
-import { readdir, readFile, rm, writeFile } from "node:fs/promises";
-import { join, relative } from "node:path";
+import { readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { dirname, join, relative } from "node:path";
 import {
   AUTO_MEMORY_MAX_BYTES,
   AUTO_MEMORY_MAX_LINES,
@@ -11,13 +11,16 @@ import {
   type HubProject,
   INDEX_FILE,
   MEMORY_FILE,
+  NOTES_DIR,
+  absolutePath,
   exists,
   ownedDocsRoots,
   readGenreOverrides,
   readHubMetadata,
   requireDocsRoot,
+  resolveDocsRoot,
 } from "../paths.js";
-import { type ScannedNote, scanNotes } from "../scan.js";
+import { type ScannedNote, isGeneratedArtifact, listNotePaths, scanNotes } from "../scan.js";
 import { recoverCcFrontmatter } from "../adapters/claude-code/cc-note.js";
 import { readSensitivity } from "../grooming/config.js";
 import { readTally } from "../grooming/tally.js";
@@ -856,4 +859,42 @@ async function cleanGeneratedWingIndexes(
     }
   }
   return deleted;
+}
+
+/**
+ * True when INDEX.md and MEMORY.md exist and no note is as new as INDEX.md, nor any note
+ * directory newer than the last generated file (a deleted note only moves its directory).
+ */
+async function indexIsFresh(root: string): Promise<boolean> {
+  const stamp = async (p: string): Promise<number | null> => (await stat(p).catch(() => null))?.mtimeMs ?? null;
+  const indexed = await stamp(join(root, INDEX_FILE));
+  const memory = await stamp(join(root, MEMORY_FILE));
+  if (indexed === null || memory === null) return false;
+  const generated = Math.max(indexed, memory);
+  const paths = (await listNotePaths(root)).filter((n) => !isGeneratedArtifact(n));
+  for (const n of paths) {
+    const t = await stamp(join(root, n));
+    if (t !== null && t >= indexed) return false;
+  }
+  const dirs = new Set([root, join(root, NOTES_DIR), ...paths.map((n) => join(root, dirname(n)))]);
+  for (const d of dirs) {
+    const t = await stamp(d);
+    if (t !== null && t > generated) return false;
+  }
+  return true;
+}
+
+/**
+ * The Stop hook body (`mage index --hook`): re-index only when a note changed since the last
+ * index, quietly, and never fail (a hook must not break the turn). Notes saved mid-session by
+ * the host are otherwise missing from MEMORY.md and INDEX.md (#282).
+ */
+export async function indexForHook(opts: { dir?: string } = {}): Promise<void> {
+  try {
+    const resolved = await resolveDocsRoot(absolutePath(opts.dir ?? process.cwd()));
+    if (!resolved || (await indexIsFresh(resolved.root))) return;
+    await index({ dir: opts.dir, quiet: true });
+  } catch {
+    // Fail open.
+  }
 }
