@@ -119,3 +119,20 @@ test("e2 setup: E2-proto is E2-mage plus the proto group first", { skip: !exists
   assert.deepEqual(pre.slice(1).map((g) => g.id), mage.hooks.PreToolUse.map((g) => g.id));
   assert.deepEqual(proto.hooks.PostToolUse.map((g) => g.id), mage.hooks.PostToolUse.map((g) => g.id));
 });
+
+test("attach hook: allows the first memory write and attaches the ladder text once", async () => {
+  const { decide, REASON } = await import("../e2/proto-ladder-hook.mjs");
+  const cwd = mkdtempSync(join(tmpdir(), "attach-"));
+  const marks = join(cwd, ".claude");
+  const w = (file_path) => ({ tool_name: "Write", cwd, session_id: "s1", tool_input: { file_path } });
+  assert.equal(decide(w(join(cwd, "src", "a.js")), marks, "attach"), null);
+  const first = decide(w(join(cwd, "mage", "c.md")), marks, "attach");
+  assert.equal(first.hookSpecificOutput.additionalContext, REASON);
+  assert.equal(first.hookSpecificOutput.permissionDecision, undefined);
+  assert.equal(decide(w(join(cwd, "mage", "c.md")), marks, "attach"), null);
+});
+
+test("e2 setup: E2-attach registers the proto hook in attach mode", { skip: !existsSync(MAGE_CLI) }, () => {
+  const s = buildE2("E2-attach", tmp()).registered;
+  assert.match(s.hooks.PreToolUse[0].hooks[0].command, /proto-ladder-hook\.mjs" attach$/);
+});
