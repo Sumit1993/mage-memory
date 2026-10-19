@@ -289,3 +289,32 @@ test("batch: task range and summary counts", () => {
   assert.match(md, /\| light \/ B \| 2\/2 \(100%\) \| 1\/1 \(100%\) \| 1 \|/);
   assert.match(md, /\| R2 \| 0\/1 \(0%\) \| 0\/2 \(0%\) \| 1\/1 \(100%\) \|/);
 });
+
+test("arm D: R5 is a pre-commit check, not recall; B is unchanged", () => {
+  const d = buildArm("D", join(tmp(), "repo"));
+  assert.match(read(d, ".git/hooks/pre-commit"), /check\.js --changelog/);
+  const dRules = JSON.parse(read(d, ".claude/hooks/rules.json"));
+  assert.equal(dRules.find((r) => r.id === "R5").rung, "check");
+  assert.equal(decide("D", edit("/work/repo/src/cart.js"), dRules).fired.includes("R5"), false);
+  assert.deepEqual(decide("D", edit("/work/repo/src/cart.js"), dRules).fired, ["R6"]);
+  assert.equal(decide("D", edit("/work/repo/generated/x.js"), dRules).action, "deny");
+  const b = buildArm("B", join(tmp(), "repo"));
+  assert.doesNotMatch(read(b, ".git/hooks/pre-commit"), /--changelog/);
+});
+
+test("arm D check: commit with src change fails without a changelog line, passes with one", () => {
+  const dir = buildArm("D", join(tmp(), "repo"));
+  const tryCommit = () => {
+    git(dir, "add", "-A");
+    return spawnSync("git", ["commit", "-q", "-m", "x (#1)"], { cwd: dir, encoding: "utf8" });
+  };
+  write(dir, "src/x.js", "export const x = () => 1;\n");
+  let res = tryCommit();
+  assert.notEqual(res.status, 0);
+  assert.match(res.stderr, /R5/);
+  write(dir, "CHANGELOG.md", read(dir, "CHANGELOG.md").replace("## Unreleased\n", "## Unreleased\n- Add x.\n"));
+  res = tryCommit();
+  assert.equal(res.status, 0, res.stderr);
+  write(dir, "README.md", `${read(dir, "README.md")}more\n`);
+  assert.equal(tryCommit().status, 0);
+});

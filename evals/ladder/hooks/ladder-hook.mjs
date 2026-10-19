@@ -42,7 +42,7 @@ function deniedByHook(rule, payload) {
 
 /** Returns { action, output, fired }. `seen` is a Set of rule ids already injected this session; it is updated. */
 export function decide(arm, payload, rules, seen = new Set()) {
-  if (arm === "B") {
+  if (arm === "B" || arm === "D") {
     const denied = rules.filter((r) => deniedByHook(r, payload));
     if (denied.length > 0) {
       const reason = denied.map((r) => `${r.id}: ${r.text}`).join("\n");
