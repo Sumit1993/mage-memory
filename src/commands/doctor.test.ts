@@ -120,7 +120,7 @@ describe("diffMageHooks", () => {
     const d = diffMageHooks(base, { commandeer: true });
     expect(d.matches).toBe(false);
     expect(new Set(d.missingIds)).toEqual(
-      new Set(["mage:memory:PreToolUse", "mage:memory:PostToolUse", "mage:flatten:Stop"]),
+      new Set(["mage:memory:PreToolUse", "mage:flatten:Stop"]),
     );
   });
 
@@ -430,8 +430,8 @@ describe("doctor env checks still run", () => {
     }
   });
 
-  it("MAGE_HOOKS length is the expected hook count (12 base + 3 commandeer)", () => {
-    expect(MAGE_HOOKS.length).toBe(15);
+  it("MAGE_HOOKS length is the expected hook count (12 base + 2 commandeer)", () => {
+    expect(MAGE_HOOKS.length).toBe(14);
   });
 
   it("skips the GitHub network probe under test (no 5s fetch → no timeout flake)", async () => {

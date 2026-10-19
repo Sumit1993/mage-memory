@@ -279,6 +279,22 @@ export function stagingPath(docsRoot: string): string {
   return join(stateDir(docsRoot), STAGING_DIR);
 }
 
+/**
+ * Per-session recall de-dup state — `<docsRoot>/.mage/recall/<session>.json` (#282).
+ * The caller must have checked `session` with `safeSegment`.
+ */
+export function recallStatePath(docsRoot: string, session: string): string {
+  return join(stateDir(docsRoot), "recall", `${session}.json`);
+}
+
+/**
+ * The once-per-session marker for the memory-write ladder deny —
+ * `<docsRoot>/.mage/ladder/<session>` (#282). Same `safeSegment` precondition.
+ */
+export function ladderMarkerPath(docsRoot: string, session: string): string {
+  return join(stateDir(docsRoot), "ladder", session);
+}
+
 // ─── reading ─────────────────────────────────────────────────────────────
 
 /**

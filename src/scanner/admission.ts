@@ -1,20 +1,21 @@
 import { recoverCcFrontmatter } from "../adapters/claude-code/cc-note.js";
 import type { NoteFrontmatter } from "../note.js";
+import { parseTrigger } from "./trigger.js";
 
 /** The rungs, lowest first. A note is the rung-5 case. */
 export const RUNGS = ["impossible", "check", "hook", "rule", "note"] as const;
 export type Rung = (typeof RUNGS)[number];
 
 export interface AdmissionFields {
-  /** `<unit>/<rung>/<slug>`, e.g. `repo/note/soak-monitor-blind-spots`. */
-  id: string;
   rung: Rung;
-  /** One reason per rung above this one. A `note` needs four. */
-  skipped: Record<string, string>;
-  /** What situation should bring this guard back. One line. */
-  trigger: string;
+  /** The moment it matters: prose, or `{when, match}` for recall at the action (#282). */
+  trigger: string | { when: string; match?: string | string[] };
   /** A markdown link to the issue, file or decision this guard points at. */
   pointer: string;
+  /** Optional; `<unit>/<rung>/<slug>`, e.g. `repo/note/soak-monitor-blind-spots`. */
+  id?: string;
+  /** Optional; one reason per rung passed over. A missing rung is fine. */
+  skipped?: Record<string, string>;
 }
 
 export interface AdmissionProblem {
@@ -53,7 +54,8 @@ function findFrontmatterLine(rawFile: string, field: string): number | null {
 }
 
 /**
- * Validate note frontmatter against the admission schema.
+ * Validate note frontmatter against the admission schema (#282): `rung`, `trigger` and
+ * `pointer` are required; `id` and `skipped` are checked only when present.
  * Reports every problem found; returns an empty array when valid.
  */
 export function checkAdmission(
@@ -77,19 +79,15 @@ export function checkAdmission(
   const rawTrigger = recovered.trigger;
   const rawPointer = recovered.pointer;
 
-  // 1. Validate id
-  if (rawId === undefined || rawId === null) {
-    problems.push({
-      field: "id",
-      message: "id is required",
-      line: null,
-    });
-  } else if (typeof rawId !== "string") {
-    problems.push({
-      field: "id",
-      message: "id must be a string",
-      line: findFrontmatterLine(rawFile, "id"),
-    });
+  // 1. Validate id (optional, checked when present)
+  if (typeof rawId !== "string") {
+    if (rawId !== undefined && rawId !== null) {
+      problems.push({
+        field: "id",
+        message: "id must be a string",
+        line: findFrontmatterLine(rawFile, "id"),
+      });
+    }
   } else {
     const match = ID_PATTERN.exec(rawId);
     if (!match) {
@@ -111,7 +109,6 @@ export function checkAdmission(
   }
 
   // 2. Validate rung
-  let validRung: Rung | undefined;
   if (rawRung === undefined || rawRung === null) {
     problems.push({
       field: "rung",
@@ -124,41 +121,25 @@ export function checkAdmission(
       message: `rung "${String(rawRung)}" must be one of: ${RUNGS.join(", ")}`,
       line: findFrontmatterLine(rawFile, "rung"),
     });
-  } else {
-    validRung = rawRung as Rung;
   }
 
-  // 3. Validate skipped
-  if (rawSkipped === undefined || rawSkipped === null) {
-    problems.push({
-      field: "skipped",
-      message: "skipped is required",
-      line: null,
-    });
-  } else if (typeof rawSkipped !== "object" || Array.isArray(rawSkipped)) {
-    problems.push({
-      field: "skipped",
-      message: "skipped must be a mapping",
-      line: findFrontmatterLine(rawFile, "skipped"),
-    });
-  } else if (validRung) {
-    const skippedMap = rawSkipped as Record<string, unknown>;
-    const rungIndex = RUNGS.indexOf(validRung);
-    const requiredRungs = RUNGS.slice(0, rungIndex);
-    for (const r of requiredRungs) {
-      const val = skippedMap[r];
-      if (val === undefined || val === null) {
-        problems.push({
-          field: "skipped",
-          message: `missing required skipped reason for "${r}"`,
-          line: findFrontmatterLine(rawFile, "skipped"),
-        });
-      } else if (typeof val !== "string" || !val.trim()) {
-        problems.push({
-          field: "skipped",
-          message: `skipped reason for "${r}" must be a non-empty string`,
-          line: findFrontmatterLine(rawFile, "skipped"),
-        });
+  // 3. Validate skipped (optional, checked when present)
+  if (rawSkipped !== undefined && rawSkipped !== null) {
+    if (typeof rawSkipped !== "object" || Array.isArray(rawSkipped)) {
+      problems.push({
+        field: "skipped",
+        message: "skipped must be a mapping",
+        line: findFrontmatterLine(rawFile, "skipped"),
+      });
+    } else {
+      for (const [r, val] of Object.entries(rawSkipped as Record<string, unknown>)) {
+        if (typeof val !== "string" || !val.trim()) {
+          problems.push({
+            field: "skipped",
+            message: `skipped reason for "${r}" must be a non-empty string`,
+            line: findFrontmatterLine(rawFile, "skipped"),
+          });
+        }
       }
     }
   }
@@ -170,10 +151,10 @@ export function checkAdmission(
       message: "trigger is required",
       line: null,
     });
-  } else if (typeof rawTrigger !== "string" || !rawTrigger.trim()) {
+  } else if (parseTrigger(rawTrigger) === null) {
     problems.push({
       field: "trigger",
-      message: "trigger must be a non-empty string",
+      message: "trigger must be a non-empty string, or a mapping with a non-empty when",
       line: findFrontmatterLine(rawFile, "trigger"),
     });
   }
