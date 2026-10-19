@@ -18,9 +18,8 @@ The boundary nudge is wired to two hooks in Claude Code:
 
 ## The Stop session receipt
 
-At the `Stop` boundary, `mage nudge` reads the session events recorded in the capture scratch. It aggregates four key signals:
+At the `Stop` boundary, `mage nudge` reads the session events recorded in the capture scratch. It aggregates three key signals:
 
-- `denied`: Tool calls that were requested and never ran: a `tool_attempt` with no `tool_use` sharing its id. A deny rule and a blocking hook both count; a guard that only rewrote the call does not.
 - `corrected`: Substantive user corrections following assistant messages or tool use.
 - `new signatures`: Distinct failure signatures observed in the current session.
 - `guard fires`: Total guard events recorded for this session.
@@ -28,10 +27,10 @@ At the `Stop` boundary, `mage nudge` reads the session events recorded in the ca
 The receipt is formatted as a single concise line:
 
 ```text
-mage: <N> denied · <N> corrected · <N> new signatures · <N> guard fires
+mage: <N> corrected · <N> new signatures · <N> guard fires
 ```
 
-If all four counts are zero, or if the directory lacks a knowledge base, `mage nudge` remains completely silent and exits with status 0. It never clutters sessions that ran without issue.
+If all three counts are zero, or if the directory lacks a knowledge base, `mage nudge` remains completely silent and exits with status 0. It never clutters sessions that ran without issue.
 
 ## Quiet SessionStart
 
@@ -56,10 +55,10 @@ $ claude
 > Run git push origin main --force
 # Guard intercepts the dangerous command
 
-mage: 1 denied · 0 corrected · 0 new signatures · 1 guard fires
+mage: 0 corrected · 0 new signatures · 1 guard fires
 ```
 
-When a session finishes with zero denied actions, zero corrections, zero new signatures, and zero guard fires, the receipt produces no output:
+When a session finishes with zero corrections, zero new signatures, and zero guard fires, the receipt produces no output:
 
 ```text
 $ claude

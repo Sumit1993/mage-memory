@@ -70,6 +70,7 @@ export default defineConfig({
           label: 'The Model',
           items: [
             { label: 'Notes', slug: 'model/notes' },
+            { label: 'Recall at the action', slug: 'model/recall' },
             { label: 'The graph: wings and rooms', slug: 'model/graph' },
             { label: 'Modes and storage', slug: 'model/modes' },
           ],

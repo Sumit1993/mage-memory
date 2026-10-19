@@ -99,56 +99,66 @@ The lifecycle-relevant fields:
 
 The note's **title** is simply its first markdown `# H1`, falling back to the filename. You do not set a title in frontmatter.
 
-## Admission fields and readability rules
+## Admission and triggers
 
-Notes carry five admission fields checked during `mage index` ([#231](https://github.com/Sumit1993/mage-memory/issues/231)): `id` (`<unit>/<rung>/<slug>`), `rung` (`note`), `skipped` (reasons for skipping rungs above `note`), `trigger` (when to consult this guard), and `pointer` (a markdown link). Notes must also satisfy three readability rules ([#253](https://github.com/Sumit1993/mage-memory/issues/253)): length under 40 lines and 350 words, self-contained references with no unlinked documents, and plain words with no unslop words or em dashes.
+A note is **admitted** when it says where it sits on the ladder, when it matters, and where its source is. `mage index` checks every memory note and prints `Roster: A of N notes admitted; M recalled at the action.` A note that is not admitted is still listed in `INDEX.md` and the `MEMORY.md` roster; it is only ineligible for [recall at the action](./recall.md).
 
-Both checks run in report mode today and exit 0. They will reject only after the backfill in [#213](https://github.com/Sumit1993/mage-memory/issues/213) and [#214](https://github.com/Sumit1993/mage-memory/issues/214) lands.
+| field | required | meaning |
+| --- | --- | --- |
+| `rung` | yes | one of `impossible`, `check`, `hook`, `rule`, `note` |
+| `trigger` | yes | the moment it matters: a string, or `{when, match}` |
+| `pointer` | yes | a markdown link to the issue, file or decision behind the note |
+| `id` | no | `<unit>/<rung>/<slug>`; checked when present |
+| `skipped` | no | a reason for each rung passed over; each value must be a non-empty string when present |
 
-Passing example:
+`trigger` has two forms. The plain string is read by people and sits on the roster; it is never matched. The mapping adds `match`, a string or a list, and makes the note eligible for recall:
 
-```markdown
----
-id: repo/note/soak-monitor-blind-spots
-rung: note
-skipped:
-  impossible: "needs runtime context"
-  check: "behavioral, not static"
-  hook: "cannot observe cross-session"
-  rule: "agent ignored instruction"
-trigger: "when soak monitor misses an incident"
-pointer: "[issue #231](https://github.com/Sumit1993/mage-memory/issues/231)"
----
-# Soak monitor blind spots
-
-Monitor logs for missed incidents.
+```yaml
+trigger: "deciding which mage binary a verify command runs"
 ```
 
-Failing example:
+```yaml
+trigger:
+  when: "deciding which mage binary a verify command runs"
+  match: ["Bash(npx mage *)", "Edit(package.json)"]
+```
+
+A matcher is a subset of Claude Code's permission-rule syntax. Anything else is reported by `mage index` as `trigger.match: "…" is not Bash(...) or Edit(...); ignored` and the hook skips it. Patterns are globs, never regex.
+
+| matcher | tests | how |
+| --- | --- | --- |
+| `Bash(pattern)` | the Bash command | the whole command, or any part between `&&`, `||`, `;`, `|` or a newline, matches the glob |
+| `Edit(pattern)` | Write, Edit, MultiEdit and NotebookEdit paths | the path relative to the repo, with `/` separators; a pattern with no `/` matches the file name at any depth |
+| `Write(pattern)` | the same as `Edit(pattern)` | an alias |
+
+Notes must also satisfy three readability rules ([#253](https://github.com/Sumit1993/mage-memory/issues/253)): length under 40 lines and 350 words, self-contained references with no unlinked documents, and plain words with no unslop words or em dashes. Readability findings are warnings. They never exclude a note from the roster and never fail `--strict-admission`; admission problems under `notes/` do.
+
+A failing note, saved as `notes/failing.md`, from a real run:
 
 ```markdown
 ---
 id: repo/rule/mismatch
 rung: note
-trigger: ""
+trigger:
+  match: ["Read(x)"]
 ---
 # Failing note
 
 Consult section 12.3 for details.
 ```
 
-Saved as `notes/failing.md`, it gives four admission problems and one readability problem:
-
 ```console
 $ mage index
 notes/failing.md
   id: id middle segment "rule" does not match rung "note" (line 2)
-  skipped: skipped is required (line null)
-  trigger: trigger must be a non-empty string (line 4)
+  trigger: trigger must be a non-empty string, or a mapping with a non-empty when (line 4)
   pointer: pointer is required (line null)
-  self-contained: unlinked reference to "section 12.3" (line 8)
-Total: 5 problem(s) (4 admission, 1 readability) across 1 file(s).
-✓ Indexed 1 note(s) across 0 wing(s) → 2 file(s) (flat).
+  self-contained: unlinked reference to "section 12.3" (line 9)
+Total: 4 problem(s) (3 admission, 1 readability warning(s)) across 1 file(s).
+✓ Indexed 4 note(s) across 0 wing(s) → 2 file(s) (flat).
+  INDEX.md
+  MEMORY.md
+Roster: 3 of 4 notes admitted; 2 recalled at the action.
 $ echo $?
 0
 $ mage index --strict-admission
