@@ -1,20 +1,18 @@
 export const RETIRED_VERB_MESSAGES = {
   distill:
-    "mage distill has retired. Nothing replaces it yet.\nIts work moves to `mage groom` with the proposal digest (#219).",
+    "mage distill has retired. Run `mage groom` to walk your notes up the ladder, or `/mage:learn` to write one.",
   promote:
-    "mage promote has retired. Nothing replaces it yet.\nIts work moves to `mage groom` with the proposal digest (#219).",
+    "mage promote has retired. Run `mage groom`: a note climbs to a rule, hook or check instead.",
   graduate:
-    "mage graduate has retired. Nothing replaces it yet.\nA skill becomes one proposal type in `mage groom` (#219, #235).",
-  skills:
-    "mage skills has retired. The wing skill is retired; `mage index` regenerates INDEX.md and MEMORY.md.\n`mage skills --metrics` keeps folding the context-match rollup until `mage ledger` (#237).",
+    "mage graduate has retired. Run `mage groom`: a note climbs to a rule, hook or check, not to a skill.",
   dashboard:
     "mage dashboard has retired. Use `mage index` instead.\nGraph and dashboard generation are folded into index.",
   footprint:
     "mage footprint has retired. Use `mage doctor` instead.\nContext footprint diagnostics are folded into doctor.",
   ingest:
-    "mage ingest has retired. Use `mage groom` instead.\nIts inventory fed the retired grooming loop; `/mage:learn --from` classifies sources itself.",
+    "mage ingest has retired. Use `/mage:learn --from <dir>` to turn a folder into notes.",
   stage:
-    "mage stage has retired. Use `mage observe` instead.\nDirect capture will route through observe, but the finding event is not built yet.",
+    "mage stage has retired. Use `/mage:learn` to write a note, then `mage groom` to judge its rung.",
 } as const;
 
 export type RetiredVerb = keyof typeof RETIRED_VERB_MESSAGES;
@@ -23,4 +21,3 @@ export function printRetiredVerb(verb: RetiredVerb, quiet: boolean): void {
   if (quiet) return;
   console.log(RETIRED_VERB_MESSAGES[verb]);
 }
-

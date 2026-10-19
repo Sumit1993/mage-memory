@@ -6,6 +6,7 @@ import { run } from "../shell.js";
 import { exists, stagingPath } from "../paths.js";
 import { parseNote } from "../note.js";
 import { initRepoWithIdentity, tmpDir, withKb } from "../../test/fixtures/kb.js";
+import { LADDER_TEXT } from "../adapters/claude-code/memory-hook.js";
 import { groomCmd } from "./groom-cmd.js";
 import { stageCmd } from "./stage-cmd.js";
 
@@ -15,7 +16,6 @@ async function makeKb(): Promise<string> {
 }
 
 const stagingFile = (dir: string, slug: string) => join(dir, "mage", ".staging", `${slug}.md`);
-const stagingFile2 = (dir: string, slug: string) => join(stagingPath(join(dir, "mage")), `${slug}.md`);
 const noteFile = (dir: string, slug: string) => join(dir, "mage", "notes", `${slug}.md`);
 
 /** Stage N distinct drafts; returns their slugs in stage order. */
@@ -38,39 +38,164 @@ async function stageDistinct(dir: string, n: number): Promise<string[]> {
   return slugs;
 }
 
-describe("mage groom — surface", () => {
-  it("lists the pending batch and caps it at the budget (no silent truncation)", async () => {
+const ADMITTED_FM = "rung: note\ntrigger: when it matters\npointer: '[src](a.md)'\n";
+
+async function writeAt(dir: string, rel: string, text: string): Promise<void> {
+  const p = join(dir, "mage", rel);
+  await mkdir(join(p, ".."), { recursive: true });
+  await writeFile(p, text);
+}
+
+/** Capture what a run prints to console.log. */
+async function captureLog<T>(run: () => Promise<T>): Promise<{ value: T; out: string }> {
+  const lines: string[] = [];
+  const spy = vi.spyOn(console, "log").mockImplementation((...a: unknown[]) => {
+    lines.push(a.join(" "));
+  });
+  try {
+    return { value: await run(), out: lines.join("\n") };
+  } finally {
+    spy.mockRestore();
+  }
+}
+
+describe("mage groom — the walk", () => {
+  it("lists notes without a rung first, then by created ascending, missing last", async () => {
     const dir = await makeKb();
-    await stageDistinct(dir, 4);
+    await writeAt(dir, "notes/c-admitted-late.md", `---\ntype: gotcha\ncreated: '2026-05-01'\n${ADMITTED_FM}---\n# C late\n`);
+    await writeAt(dir, "notes/b-bare-new.md", "---\ntype: gotcha\ncreated: '2026-04-01'\n---\n# B new\n");
+    await writeAt(dir, "notes/a-bare-old.md", "---\ntype: gotcha\ncreated: '2026-01-01'\n---\n# A old\n");
+    await writeAt(dir, "notes/d-bare-undated.md", "---\ntype: gotcha\n---\n# D undated\n");
+    await writeAt(dir, "notes/e-admitted-early.md", `---\ntype: gotcha\ncreated: '2026-02-01'\n${ADMITTED_FM}---\n# E early\n`);
     const r = await groomCmd({ dir });
-    expect(r.pending).toBe(4);
-    expect(r.drafts).toHaveLength(3); // stagingBudget = 3
-    expect(r.drafts?.every((d) => d.type === "gotcha")).toBe(true);
+    expect(r.notes?.map((n) => n.relPath)).toEqual([
+      "notes/a-bare-old.md",
+      "notes/b-bare-new.md",
+      "notes/d-bare-undated.md",
+      "notes/e-admitted-early.md",
+      "notes/c-admitted-late.md",
+    ]);
+    expect(r).toMatchObject({ shown: 5, total: 5, staged: 0 });
   });
 
-  it("reports an empty batch", async () => {
+  it("prints the exact human shape, ending with the ladder", async () => {
     const dir = await makeKb();
-    const r = await groomCmd({ dir });
-    expect(r).toEqual({ drafts: [], pending: 0 });
-  });
-
-  it("drops a staged draft that a committed note now covers (stale → not surfaced)", async () => {
-    const dir = await makeKb();
-    const [slug] = await stageDistinct(dir, 1); // "Alpha redaction rule" → wing mage
-    expect((await groomCmd({ dir })).pending).toBe(1);
-
-    // A note covering the lesson lands in notes/ (e.g. another session committed it).
-    // The draft's keywords derive from its title + tags → [alpha, redaction, rule,
-    // mage, redact]; the note must share >= 3 of them to clear the lesson bar.
-    await mkdir(join(dir, "mage", "notes"), { recursive: true });
-    await writeFile(
-      join(dir, "mage", "notes", "covers.md"),
-      "---\ntype: gotcha\ntags: [mage/redact]\nkeywords: [alpha, redaction, rule, mage]\n---\n# Alpha redaction\n",
+    await writeAt(dir, "notes/bare.md", "---\ntype: gotcha\ncreated: '2026-01-01'\n---\n# Bare note\n");
+    await writeAt(
+      dir,
+      "notes/good.md",
+      "---\ntype: gotcha\ncreated: '2026-02-01'\nrung: rule\ntrigger:\n  when: the moment\n  match: ['Bash(x *)']\npointer: '[s](a.md)'\n---\n# Good note\n",
     );
+    const { out } = await captureLog(() => groomCmd({ dir }));
+    expect(out.startsWith(
+      [
+        "mage groom: 2 of 2 notes to judge (notes without a rung come first).",
+        '  1. notes/bare.md  "Bare note"  rung: -  trigger: -  pointer: -',
+        '  2. notes/good.md  "Good note"  rung: rule  trigger: the moment  pointer: [s](a.md)',
+        "For each note: climb (build the rung below, then delete the note), delete (stale, or a copy of a source),",
+        "or keep (add rung, trigger and pointer). mage never commits: land the whole diff as one pull request.",
+        "",
+      ].join("\n"),
+    )).toBe(true);
+    expect(out.endsWith(LADDER_TEXT)).toBe(true);
+    expect(out).not.toContain("more: mage groom --all");
+  });
+
+  it("caps at --limit with a pointer to --all, and --all lifts the cap", async () => {
+    const dir = await makeKb();
+    for (let i = 0; i < 4; i++) {
+      await writeAt(dir, `notes/n${i}.md`, `---\ntype: gotcha\ncreated: '2026-01-0${i + 1}'\n---\n# N${i}\n`);
+    }
+    const limited = await captureLog(() => groomCmd({ dir, limit: 3 }));
+    expect(limited.value).toMatchObject({ shown: 3, total: 4 });
+    expect(limited.out).toContain("mage groom: 3 of 4 notes to judge");
+    expect(limited.out).toContain("  1 more: mage groom --all");
+
+    const all = await groomCmd({ dir, limit: 1, all: true });
+    expect(all).toMatchObject({ shown: 4, total: 4 });
+  });
+
+  it("shows ten by default", async () => {
+    const dir = await makeKb();
+    for (let i = 0; i < 12; i++) {
+      await writeAt(dir, `notes/n${String(i).padStart(2, "0")}.md`, "---\ntype: gotcha\n---\n# N\n");
+    }
+    expect(await groomCmd({ dir })).toMatchObject({ shown: 10, total: 12 });
+  });
+
+  it("rejects a --limit that is not a positive integer", async () => {
+    const dir = await makeKb();
+    for (const limit of [0, -2, 1.5, Number.NaN]) {
+      await expect(groomCmd({ dir, limit })).rejects.toThrow("mage groom: --limit takes a positive integer");
+    }
+  });
+
+  it("walks a flat native-memory capture at the root and does not move it", async () => {
+    const dir = await makeKb();
+    const capture =
+      "---\nname: user-correction\ndescription: No em dashes.\nmetadata:\n  node_type: memory\n  type: feedback\n---\nNo em dashes.\n";
+    await writeAt(dir, "feedback_dashes.md", capture);
     const r = await groomCmd({ dir });
-    expect(r.pending).toBe(0); // the now-covered draft is filtered from the surface
-    expect(r.drafts).toHaveLength(0);
-    expect(slug).toBe("alpha-redaction-rule");
+    expect(r.notes?.map((n) => n.relPath)).toEqual(["feedback_dashes.md"]);
+    expect(r.notes?.[0]).toMatchObject({ rung: null, trigger: null, pointer: null });
+    expect(r.notes?.[0]?.problems).toContain("rung is required");
+    expect(await readFile(join(dir, "mage", "feedback_dashes.md"), "utf8")).toBe(capture);
+    expect(await exists(stagingPath(join(dir, "mage")))).toBe(false);
+  });
+
+  it("never lists a decision", async () => {
+    const dir = await makeKb();
+    await writeAt(dir, "decisions/0001-x.md", "---\ntype: decision\nstatus: accepted\n---\n# 0001 X\n");
+    await writeAt(dir, "notes/n.md", "---\ntype: gotcha\n---\n# N\n");
+    const r = await groomCmd({ dir });
+    expect(r.notes?.map((n) => n.relPath)).toEqual(["notes/n.md"]);
+  });
+
+  it("mentions 0.0.17 staged drafts and leaves them where they are", async () => {
+    const dir = await makeKb();
+    await stageDistinct(dir, 2);
+    const { value, out } = await captureLog(() => groomCmd({ dir }));
+    expect(value.staged).toBe(2);
+    expect(out).toContain(
+      "2 staged draft(s) from 0.0.17 wait in .mage/staging/: mage groom --accept|--reject <slugs|all>",
+    );
+  });
+
+  it("--json prints one parseable line with the documented shape", async () => {
+    const dir = await makeKb();
+    await writeAt(dir, "notes/n.md", "---\ntype: gotcha\n---\n# N\n");
+    const out: string[] = [];
+    const log: string[] = [];
+    const w = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation((m: unknown) => (out.push(String(m)), true) as never);
+    const l = vi.spyOn(console, "log").mockImplementation((m?: unknown) => void log.push(String(m)));
+    try {
+      await groomCmd({ dir, json: true });
+    } finally {
+      w.mockRestore();
+      l.mockRestore();
+    }
+    expect(log).toHaveLength(0);
+    const text = out.join("");
+    expect(text.trim().split("\n")).toHaveLength(1);
+    const parsed = JSON.parse(text);
+    expect(Object.keys(parsed)).toEqual(["notes", "shown", "total", "staged"]);
+    expect(parsed.notes[0]).toMatchObject({
+      relPath: "notes/n.md",
+      title: "N",
+      rung: null,
+      trigger: null,
+      pointer: null,
+    });
+    expect(parsed.notes[0].problems).toContain("rung is required");
+  });
+
+  it("reports an empty knowledge base", async () => {
+    const dir = await makeKb();
+    const { value, out } = await captureLog(() => groomCmd({ dir }));
+    expect(value).toMatchObject({ notes: [], shown: 0, total: 0, staged: 0 });
+    expect(out).toContain("mage groom: 0 of 0 notes to judge");
   });
 });
 
@@ -110,52 +235,12 @@ describe("mage groom — reject", () => {
   });
 });
 
-describe("mage groom — inbox ingest (ADR-0032)", () => {
-  // A Gate-0 capture sitting flat at the docs-root top (CC-renormalized frontmatter,
-  // already-scrubbed-and-shaped body).
-  function gate0Capture(body: string, session = "sess-x"): string {
-    return `---\nname: ""\nmetadata:\n  node_type: memory\n  type: note\n  created: 2026-06-27\n  originSessionId: ${session}\n---\n\n${body}\n`;
-  }
-
-  it("ingests an inbox capture into staging and surfaces it", async () => {
-    const dir = await makeKb();
-    const root = join(dir, "mage");
-    await mkdir(root, { recursive: true });
-    await writeFile(join(root, "ssh-timeout-fix.md"), gate0Capture("# SSH timeout fix\n\nbump ServerAliveInterval to 30."));
-
-    const r = await groomCmd({ dir });
-    expect(r.ingested).toEqual(["ssh-timeout-fix"]);
-    expect(r.pending).toBe(1);
-    expect(r.drafts?.[0]?.slug).toBe("ssh-timeout-fix");
-    // Moved: gone from the root inbox, now a staged draft.
-    expect(await exists(join(root, "ssh-timeout-fix.md"))).toBe(false);
-    expect(await exists(stagingFile2(dir, "ssh-timeout-fix"))).toBe(true);
-  });
-
-  it("promotes an ingested capture to notes/ on --accept all (provenance stamped)", async () => {
-    const dir = await makeKb();
-    const root = join(dir, "mage");
-    await mkdir(root, { recursive: true });
-    await writeFile(join(root, "ssh-timeout-fix.md"), gate0Capture("# SSH timeout fix\n\nbump ServerAliveInterval to 30."));
-
-    await groomCmd({ dir }); // ingest + surface
-    const r = await groomCmd({ dir, accept: "all" });
-    expect(r.accepted).toEqual(["notes/ssh-timeout-fix.md"]);
-    const note = await readFile(noteFile(dir, "ssh-timeout-fix"), "utf8");
-    expect(note).toContain("# SSH timeout fix");
-    expect(note).toContain("cc-session:sess-x"); // session pointer survives to the note
-    const { frontmatter } = parseNote(note);
-    expect(frontmatter.provenance).toBeDefined(); // stamped at the promote chokepoint (ADR-0031)
-  });
-
+describe("mage groom — accept --json", () => {
   it("--accept all --json emits a clean single JSON line (no index logging leak)", async () => {
     // F6: index()'s 'Indexed N note(s)...' success/detail must not corrupt the --json
     // stdout contract. acceptBatch passes quiet:true to index() in json mode.
     const dir = await makeKb();
-    const root = join(dir, "mage");
-    await mkdir(root, { recursive: true });
-    await writeFile(join(root, "x-capture.md"), gate0Capture("# X capture\n\na distinct body."));
-    await groomCmd({ dir }); // ingest x-capture into staging
+    const [slug] = await stageDistinct(dir, 1);
 
     const logs: string[] = [];
     const out: string[] = [];
@@ -171,7 +256,7 @@ describe("mage groom — inbox ingest (ADR-0032)", () => {
     }
     expect(logs).toHaveLength(0); // nothing leaked to console.log (index/accept human lines)
     const parsed = JSON.parse(out.join("").trim());
-    expect(parsed.accepted).toContain("notes/x-capture.md");
+    expect(parsed.accepted).toContain(`notes/${slug}.md`);
   });
 });
 
