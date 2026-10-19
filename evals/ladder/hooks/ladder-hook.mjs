@@ -1,10 +1,11 @@
 // PreToolUse hook for the ladder eval. Usage: node ladder-hook.mjs <B|C>
-// B: deny rules with rung "hook", inject context for rung "recall". C: inject every matching rule.
-import { appendFileSync, existsSync, readFileSync } from "node:fs";
+// B: deny rules with rung "hook", inject context for rung "recall". C: inject every rule.
+// A rule is injected at the earliest action in rule.inject, once per session (state file).
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-const EDIT_TOOLS = new Set(["Edit", "Write", "MultiEdit"]);
+const PATH_TOOLS = new Set(["Edit", "Write", "MultiEdit", "Read"]);
 const ISSUE_REF = /\(#\d+\)/;
 
 export function relPath(filePath, cwd) {
@@ -19,7 +20,7 @@ export function matches(trigger, payload) {
   if (!trigger.tools.includes(tool)) return false;
   const input = payload.tool_input || {};
   if (trigger.path) {
-    if (!EDIT_TOOLS.has(tool)) return false;
+    if (!PATH_TOOLS.has(tool)) return false;
     if (!new RegExp(trigger.path).test(relPath(input.file_path, payload.cwd))) return false;
   }
   if (trigger.command) {
@@ -39,8 +40,8 @@ function deniedByHook(rule, payload) {
   return true;
 }
 
-/** Returns { output, fired } where output is the hook JSON (or null) and fired lists rule ids. */
-export function decide(arm, payload, rules) {
+/** Returns { action, output, fired }. `seen` is a Set of rule ids already injected this session; it is updated. */
+export function decide(arm, payload, rules, seen = new Set()) {
   if (arm === "B") {
     const denied = rules.filter((r) => deniedByHook(r, payload));
     if (denied.length > 0) {
@@ -59,8 +60,12 @@ export function decide(arm, payload, rules) {
     }
   }
   const injected = rules.filter(
-    (r) => (arm === "C" || r.rung === "recall") && matches(r.trigger, payload),
+    (r) =>
+      (arm === "C" || r.rung === "recall") &&
+      !seen.has(r.id) &&
+      (r.inject || [r.trigger]).some((t) => matches(t, payload)),
   );
+  for (const r of injected) seen.add(r.id);
   if (injected.length === 0) return { action: "none", fired: [], output: null };
   return {
     action: "context",
@@ -92,7 +97,17 @@ async function main() {
   } catch {
     return;
   }
-  const result = decide(arm, payload, loadRules());
+  const statePath = process.env.LADDER_STATE;
+  const seen = new Set();
+  if (statePath && existsSync(statePath)) {
+    try {
+      for (const id of JSON.parse(readFileSync(statePath, "utf8"))) seen.add(id);
+    } catch {
+      // torn state file: start empty
+    }
+  }
+  const result = decide(arm, payload, loadRules(), seen);
+  if (statePath && result.action === "context") writeFileSync(statePath, JSON.stringify([...seen]));
   if (!result.output) return;
   if (process.env.LADDER_LOG) {
     appendFileSync(

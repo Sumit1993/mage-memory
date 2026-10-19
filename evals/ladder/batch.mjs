@@ -6,17 +6,20 @@ import { runOne } from "./run.mjs";
 
 const pct = (n, d) => (d === 0 ? "n/a" : `${n}/${d} (${Math.round((100 * n) / d)}%)`);
 
+const groupOf = (r) => `${r.load || "light"} / ${r.arm}`;
+
 export function summarize(results) {
-  const arms = [...new Set(results.map((r) => r.arm))].sort();
+  const groups = [...new Set(results.map(groupOf))].sort();
   const rules = [...new Set(results.flatMap((r) => Object.keys(r.rules)))].sort();
   const count = (rs, rule) => ({
     pass: rs.filter((r) => r.rules[rule] === "pass").length,
     fail: rs.filter((r) => r.rules[rule] === "fail").length,
   });
+  const inGroup = (g) => results.filter((r) => groupOf(r) === g);
   const lines = ["# Ladder eval summary", "", `Runs: ${results.length}`, ""];
-  lines.push("## Adherence per arm (pass / (pass+fail), na excluded)", "", "| Arm | Adherence | Task completion | Runs |", "| --- | --- | --- | --- |");
-  for (const arm of arms) {
-    const rs = results.filter((r) => r.arm === arm);
+  lines.push("## Adherence per load / arm (pass / (pass+fail), na excluded)", "", "| Load / Arm | Adherence | Task completion | Runs |", "| --- | --- | --- | --- |");
+  for (const g of groups) {
+    const rs = inGroup(g);
     let pass = 0;
     let fail = 0;
     for (const rule of rules) {
@@ -24,26 +27,26 @@ export function summarize(results) {
       pass += c.pass;
       fail += c.fail;
     }
-    lines.push(`| ${arm} | ${pct(pass, pass + fail)} | ${pct(rs.filter((r) => r.task_done).length, rs.length)} | ${rs.length} |`);
+    lines.push(`| ${g} | ${pct(pass, pass + fail)} | ${pct(rs.filter((r) => r.task_done).length, rs.length)} | ${rs.length} |`);
   }
-  lines.push("", "## Adherence per rule and arm", "", `| Rule | ${arms.join(" | ")} |`, `| --- | ${arms.map(() => "---").join(" | ")} |`);
+  lines.push("", "## Adherence per rule and load / arm", "", `| Rule | ${groups.join(" | ")} |`, `| --- | ${groups.map(() => "---").join(" | ")} |`);
   for (const rule of rules) {
-    const cells = arms.map((arm) => {
-      const c = count(results.filter((r) => r.arm === arm), rule);
+    const cells = groups.map((g) => {
+      const c = count(inGroup(g), rule);
       return pct(c.pass, c.pass + c.fail);
     });
     lines.push(`| ${rule} | ${cells.join(" | ")} |`);
   }
-  lines.push("", "## Hooks", "", "| Arm | Runs where a hook fired | Denials | Context injections |", "| --- | --- | --- | --- |");
-  for (const arm of arms) {
-    const rs = results.filter((r) => r.arm === arm);
-    lines.push(`| ${arm} | ${rs.filter((r) => r.hook_fired).length}/${rs.length} | ${rs.reduce((s, r) => s + (r.hook_denials || 0), 0)} | ${rs.reduce((s, r) => s + (r.hook_contexts || 0), 0)} |`);
+  lines.push("", "## Hooks", "", "| Load / Arm | Runs where a hook fired | Denials | Context injections |", "| --- | --- | --- | --- |");
+  for (const g of groups) {
+    const rs = inGroup(g);
+    lines.push(`| ${g} | ${rs.filter((r) => r.hook_fired).length}/${rs.length} | ${rs.reduce((s, r) => s + (r.hook_denials || 0), 0)} | ${rs.reduce((s, r) => s + (r.hook_contexts || 0), 0)} |`);
   }
   const mean = (xs) => (xs.length ? Math.round(xs.reduce((s, x) => s + x, 0) / xs.length) : "n/a");
-  lines.push("", "## Cost", "", "| Arm | Mean turns | Mean duration (s) |", "| --- | --- | --- |");
-  for (const arm of arms) {
-    const rs = results.filter((r) => r.arm === arm);
-    lines.push(`| ${arm} | ${mean(rs.map((r) => r.turns))} | ${mean(rs.map((r) => (r.duration_ms || 0) / 1000))} |`);
+  lines.push("", "## Cost", "", "| Load / Arm | Mean turns | Mean duration (s) |", "| --- | --- | --- |");
+  for (const g of groups) {
+    const rs = inGroup(g);
+    lines.push(`| ${g} | ${mean(rs.map((r) => r.turns))} | ${mean(rs.map((r) => (r.duration_ms || 0) / 1000))} |`);
   }
   return `${lines.join("\n")}\n`;
 }
@@ -54,7 +57,7 @@ export function expandTasks(spec) {
   return spec.split(",");
 }
 
-export async function runBatch({ arms, tasks, reps, concurrency, model, runId }) {
+export async function runBatch({ arms, tasks, reps, concurrency, model, runId, load = "light" }) {
   const jobs = [];
   for (const task of tasks) for (const arm of arms) for (let rep = 1; rep <= reps; rep++) jobs.push({ task, arm, rep });
   const dir = join(RUNS_DIR, runId);
@@ -66,9 +69,9 @@ export async function runBatch({ arms, tasks, reps, concurrency, model, runId })
       const job = jobs[next++];
       let result;
       try {
-        result = await runOne({ ...job, model, runId });
+        result = await runOne({ ...job, load, model, runId });
       } catch (e) {
-        result = { ...job, error: String(e), rules: {}, task_done: false };
+        result = { ...job, load, error: String(e), rules: {}, task_done: false };
       }
       results.push(result);
       appendFileSync(join(dir, "results.jsonl"), `${JSON.stringify(result)}\n`);
@@ -90,6 +93,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     reps: Number(o.reps || 1),
     concurrency: Number(o.concurrency || 3),
     model: o.model || DEFAULT_MODEL,
+    load: o.load || "light",
     runId,
   });
   process.stdout.write(`${results.length} runs; see ${join(RUNS_DIR, runId, "summary.md")}\n`);
