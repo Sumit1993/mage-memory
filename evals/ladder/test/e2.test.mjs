@@ -65,3 +65,30 @@ test("e2 setup: the mage arm registers only the memory hook, pointed at this bui
   assert.equal(git(dir, "status", "--porcelain").trim(), "");
   assert.ok(base.length >= 7);
 });
+
+test("e2 setup: the arms' settings differ only in the memory hook groups", { skip: !existsSync(MAGE_CLI) }, () => {
+  const plain = buildE2("E2-plain", tmp());
+  const mage = buildE2("E2-mage", tmp());
+  const strip = (s) => {
+    const { hooks, autoMemoryDirectory, ...rest } = s;
+    return { rest, hooks };
+  };
+  const a = strip(plain.registered);
+  const b = strip(mage.registered);
+  assert.equal(a.hooks, undefined);
+  assert.deepEqual(Object.keys(b.hooks).sort(), ["PostToolUse", "PreToolUse"]);
+  assert.ok(Object.values(b.hooks).flat().every((g) => g.id.startsWith("mage:memory:")));
+  assert.deepEqual(a.rest, b.rest);
+  assert.ok(plain.registered.autoMemoryDirectory.endsWith("mage"));
+});
+
+test("e2 batch: summary counts rungs per correction per arm", async () => {
+  const { summarizeE2 } = await import("../e2/batch.mjs");
+  const mk = (arm, rep, landed, written) => ({
+    arm, rep, score: 1, of: 5, written,
+    corrections: ["c1", "c2", "c3", "c4", "c5"].map((id) => ({ id, landed, ok: landed === "note" && id === "c4" })),
+  });
+  const md = summarizeE2([mk("E2-plain", 1, "note", ["a.md"]), mk("E2-plain", 2, "nothing", []), mk("E2-mage", 1, "note", ["mage/x.md"])]);
+  assert.ok(md.includes("| note | note x1 (ok 1/1) | note x1, nothing x1 (ok 1/2) |"));
+  assert.match(md, /E2-plain rep 2: \(nothing written\)/);
+});
