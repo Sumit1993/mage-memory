@@ -126,6 +126,14 @@ export const MAGE_HOOKS: ReadonlyArray<{
     command: "mage flatten --quiet",
     commandeer: true,
   },
+  // A note the host saved mid-session is not indexed until `mage index` runs; at turn-end it
+  // re-indexes only when a note changed, quietly and fail-open (#282).
+  {
+    event: "Stop",
+    id: "mage:index:Stop",
+    command: "mage index --hook",
+    commandeer: true,
+  },
 ];
 
 /**

@@ -28,9 +28,10 @@ A new exported function gets a JSDoc block that includes an \`@example\`.
 
 /**
  * Arm M: real \`mage init --in-repo\` and \`mage connect\`, then only the recall and memory hook
- * groups kept, their command pointed at this worktree's built CLI. Writes the R6 note and indexes.
+ * groups kept (the recall group only when `recall`), their command pointed at this worktree's built CLI.
+ * Writes the R6 note and indexes.
  */
-export function registerMageArm(dir) {
+export function registerMageArm(dir, { recall = true } = {}) {
   runMage(dir, "init", "--in-repo", "--yes", "--no-connect");
   runMage(dir, "connect", "--yes", "--no-git-hook");
   mkdirSync(join(dir, "mage", "notes"), { recursive: true });
@@ -41,7 +42,7 @@ export function registerMageArm(dir) {
   const kept = {};
   for (const [event, groups] of Object.entries(settings.hooks ?? {})) {
     const keep = groups
-      .filter((g) => g.id?.startsWith("mage:memory:") || g.id?.startsWith("mage:recall:"))
+      .filter((g) => g.id?.startsWith("mage:memory:") || (recall && g.id?.startsWith("mage:recall:")))
       .map((g) => ({ ...g, hooks: g.hooks.map((h) => ({ ...h, command: h.command.replace(/^mage /, `node "${MAGE_CLI}" `) })) }));
     if (keep.length > 0) kept[event] = keep;
   }

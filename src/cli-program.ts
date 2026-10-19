@@ -8,7 +8,7 @@ import { doctor, readinessFooter } from "./commands/doctor.js";
 import { flattenCmd } from "./commands/flatten.js";
 import { dream } from "./commands/dream-cmd.js";
 import { groomCmd } from "./commands/groom-cmd.js";
-import { index } from "./commands/index-cmd.js";
+import { index, indexForHook } from "./commands/index-cmd.js";
 import { type InitMode, type InitVisibility, init } from "./commands/init.js";
 import { link, type Storage } from "./commands/link.js";
 import { list } from "./commands/list.js";
@@ -128,8 +128,15 @@ export function buildProgram(): Command {
       "where to look for the knowledge base (default: cwd; walks up for in-repo)",
     )
     .addOption(new Option("--strict-admission").hideHelp())
+    .option("--quiet", "print nothing")
+    .option("--hook", "for the Stop hook: skip when no note changed since the last index, and always exit 0")
     .action(async (opts) => {
+      if (opts.hook === true) {
+        await indexForHook({ dir: opts.dir });
+        return;
+      }
       const result = await index({
+        quiet: opts.quiet === true,
         dir: opts.dir,
         strictAdmission: opts.strictAdmission === true,
       });

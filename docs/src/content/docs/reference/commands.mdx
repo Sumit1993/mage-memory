@@ -175,6 +175,8 @@ prints the same report, writes nothing (no `INDEX.md`, no `MEMORY.md`, no projec
 pair), and exits 1. At a hub root the check covers every project's notes too. See
 [Notes](../model/notes.md) for a failing note and the exact report.
 
+`mage index --hook` is the body of the `mage:index:Stop` hook: it prints nothing, exits 0 on any error, and re-indexes only when a note or note directory is newer than `INDEX.md`. It lists a note the host saved mid-session before the next session starts.
+
 ### At a hub root, `index` fans out
 
 Run against a single knowledge base, `mage index` writes that one pair. Run at a

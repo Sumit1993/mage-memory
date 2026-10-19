@@ -29,7 +29,7 @@ function countMage(s: ClaudeSettings): number {
 const tmp = (): Promise<string> => tmpDir("mage-settings-");
 
 describe("MAGE_HOOKS table", () => {
-  it("wires exactly fourteen rows (12 base + 2 commandeer)", () => {
+  it("wires exactly fifteen rows (12 base + 3 commandeer)", () => {
     expect(MAGE_HOOKS).toEqual([
       { event: "SessionStart", id: "mage:observe:SessionStart", command: "mage observe" },
       { event: "SessionStart", id: "mage:nudge:SessionStart", command: "mage nudge" },
@@ -63,6 +63,12 @@ describe("MAGE_HOOKS table", () => {
         event: "Stop",
         id: "mage:flatten:Stop",
         command: "mage flatten --quiet",
+        commandeer: true,
+      },
+      {
+        event: "Stop",
+        id: "mage:index:Stop",
+        command: "mage index --hook",
         commandeer: true,
       },
     ]);
@@ -213,9 +219,9 @@ describe("commandeer-tier gating (ADR-0032)", () => {
     expect(post.map((g) => g.id)).toEqual(["mage:observe:PostToolUse"]);
   });
 
-  it("adds the commandeer rows with matchers when commandeer:true (14 groups)", () => {
+  it("adds the commandeer rows with matchers when commandeer:true (15 groups)", () => {
     const merged = upsertMageHooks(null, { commandeer: true }).settings;
-    expect(countMage(merged)).toBe(14);
+    expect(countMage(merged)).toBe(15);
     // PreToolUse now coexists: the recall group + the memory one.
     const pre = merged.hooks?.PreToolUse ?? [];
     expect(pre).toHaveLength(2);

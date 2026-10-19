@@ -36,3 +36,15 @@ test("arm M: the R6 note is admitted by mage index and reaches recall; R6 is now
   assert.equal(JSON.parse(hookRules).find((r) => r.id === "R6").rung, "mage-note");
   assert.match(readFileSync(join(dir, ".git", "hooks", "pre-commit"), "utf8"), /--changelog/);
 });
+
+test("arm M0: arm M without the recall hook; roster, note, CLAUDE.md and rules are identical", { skip }, () => {
+  const m = buildArm("M", tmp(), { load: "heavy" });
+  const m0 = buildArm("M0", tmp(), { load: "heavy" });
+  const settings = JSON.parse(readFileSync(join(m0, ".claude", "settings.local.json"), "utf8"));
+  assert.deepEqual(Object.values(settings.hooks).flat().map((g) => g.id), ["mage:memory:PreToolUse"]);
+  for (const f of ["mage/MEMORY.md", "mage/INDEX.md", "mage/notes/jsdoc-example-on-new-exports.md", "CLAUDE.md", ".claude/hooks/rules.json"]) {
+    assert.equal(readFileSync(join(m0, f), "utf8"), readFileSync(join(m, f), "utf8"), f);
+  }
+  assert.match(readFileSync(join(m0, ".git", "hooks", "pre-commit"), "utf8"), /--changelog/);
+  assert.equal(git(m0, "status", "--porcelain").trim(), "");
+});

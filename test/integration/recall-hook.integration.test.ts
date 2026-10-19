@@ -2,13 +2,14 @@
 // over the BUILT CLI and a real KB (#282). No external tools, no billing.
 
 import { spawnSync } from "node:child_process";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import { MAGE_BIN, assertBuilt, initKb } from "./lib/harness.js";
 
-function hook(command: string, input: string, cwd: string) {
-  const r = spawnSync(process.execPath, [MAGE_BIN, command], { input, cwd, encoding: "utf8" });
+function hook(command: string, input: string, cwd: string, args: string[] = []) {
+  const r = spawnSync(process.execPath, [MAGE_BIN, command, ...args], { input, cwd, encoding: "utf8" });
   return { stdout: r.stdout, code: r.status };
 }
 
@@ -114,5 +115,29 @@ describe("integration: memory-hook asks the ladder once (deterministic)", () => 
       ? (JSON.parse(second.stdout) as { hookSpecificOutput: { additionalContext?: string } }).hookSpecificOutput
       : {};
     expect(again.additionalContext).toBeUndefined();
+  });
+});
+
+describe("integration: Stop hook indexes a note saved mid-session (deterministic)", () => {
+  beforeAll(() => assertBuilt());
+
+  it("a note written then `index --hook` is listed in MEMORY.md; a second run changes nothing", async () => {
+    const { dir, root } = await initKb();
+    await mkdir(join(root, "notes"), { recursive: true });
+    await writeFile(join(root, "notes", "saved.md"), "---\ntype: note\n---\n# Saved mid session\n");
+
+    const first = hook("index", "", dir, ["--hook"]);
+    expect(first).toEqual({ stdout: "", code: 0 });
+    expect(await readFile(join(root, "MEMORY.md"), "utf8")).toContain("[Saved mid session](notes/saved.md)");
+    expect(await readFile(join(root, "INDEX.md"), "utf8")).toContain("Saved mid session");
+
+    const before = (await stat(join(root, "INDEX.md"))).mtimeMs;
+    expect(hook("index", "", dir, ["--hook"])).toEqual({ stdout: "", code: 0 });
+    expect((await stat(join(root, "INDEX.md"))).mtimeMs).toBe(before);
+  });
+
+  it("exits 0 and prints nothing outside a knowledge base", async () => {
+    const bare = await mkdtemp(join(tmpdir(), "mage-it-bare-"));
+    expect(hook("index", "", bare, ["--hook"])).toEqual({ stdout: "", code: 0 });
   });
 });

@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -13,7 +13,7 @@ import {
 import { BREACH_RATIO } from "../metrics/footprint.js";
 import type { HubProject } from "../paths.js";
 import type { ScannedNote } from "../scan.js";
-import { index, renderMemory, SCAFFOLDING_WORDS } from "./index-cmd.js";
+import { index, indexForHook, renderMemory, SCAFFOLDING_WORDS } from "./index-cmd.js";
 import { init } from "./init.js";
 
 async function vault(): Promise<string> {
@@ -1437,3 +1437,57 @@ describe("mage index — recall surface filtering & metadata genre overrides (AD
   });
 });
 
+describe("mage index --hook (the Stop hook body, #282)", () => {
+  const mtime = async (p: string): Promise<number> => (await stat(p)).mtimeMs;
+
+  it("lists a note saved after the last index in MEMORY.md and INDEX.md", async () => {
+    const dir = await vault();
+    await index({ dir, quiet: true });
+    await note(dir, "saved-mid-session.md", "---\ntype: note\n---\n# Saved mid session\n");
+    expect(await readFile(join(dir, "mage", "MEMORY.md"), "utf8")).not.toContain("Saved mid session");
+
+    await indexForHook({ dir });
+    expect(await readFile(join(dir, "mage", "MEMORY.md"), "utf8")).toContain("[Saved mid session](notes/saved-mid-session.md)");
+    expect(await readFile(join(dir, "mage", "INDEX.md"), "utf8")).toContain("Saved mid session");
+  });
+
+  it("indexes a KB that was never indexed", async () => {
+    const dir = await vault();
+    await note(dir, "first.md", "---\ntype: note\n---\n# First\n");
+    await rm(join(dir, "mage", "INDEX.md"), { force: true });
+    await rm(join(dir, "mage", "MEMORY.md"), { force: true });
+    await indexForHook({ dir });
+    expect(await readFile(join(dir, "mage", "MEMORY.md"), "utf8")).toContain("[First](notes/first.md)");
+  });
+
+  it("does nothing when no note changed since the last index", async () => {
+    const dir = await vault();
+    await note(dir, "a.md", "---\ntype: note\n---\n# A\n");
+    await index({ dir, quiet: true });
+    const before = await mtime(join(dir, "mage", "INDEX.md"));
+    await new Promise((r) => setTimeout(r, 30));
+    await indexForHook({ dir });
+    expect(await mtime(join(dir, "mage", "INDEX.md"))).toBe(before);
+  });
+
+  it("re-indexes after a note is deleted", async () => {
+    const dir = await vault();
+    await note(dir, "gone.md", "---\ntype: note\n---\n# Gone\n");
+    await index({ dir, quiet: true });
+    await new Promise((r) => setTimeout(r, 30));
+    await rm(join(dir, "mage", "notes", "gone.md"));
+    await indexForHook({ dir });
+    expect(await readFile(join(dir, "mage", "MEMORY.md"), "utf8")).not.toContain("Gone");
+  });
+
+  it("never throws and prints nothing, with or without a knowledge base", async () => {
+    const bare = await tmpDir("mage-nokb-");
+    const dir = await vault();
+    const out = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    await expect(indexForHook({ dir: bare })).resolves.toBeUndefined();
+    await writeFile(join(dir, "mage", "metadata.json"), "{");
+    await expect(indexForHook({ dir })).resolves.toBeUndefined();
+    expect(out).not.toHaveBeenCalled();
+    out.mockRestore();
+  });
+});
