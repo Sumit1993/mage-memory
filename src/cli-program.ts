@@ -335,6 +335,22 @@ export function buildProgram(): Command {
   // The Gate-0 capture adapter (adapters/claude-code/memory-hook.ts) — fired from
   // PreToolUse + PostToolUse to redirect/scrub native-memory writes (ADR-0032).
   program.addCommand(buildMemoryHookCommand(), { hidden: true });
+  // The PreToolUse recall hook. cli.ts short-circuits to it before this program is built;
+  // the command exists for the docs inventory and a direct `buildProgram()` caller (#282).
+  program
+    .command("recall-hook", { hidden: true })
+    .description(
+      "Hook-fired PreToolUse recall: inject admitted notes whose trigger.match hits the tool call as additionalContext (never blocks the host)",
+    )
+    .option("--cwd <dir>", "working directory used to locate the knowledge base (defaults to the hook JSON cwd)")
+    .option("--explain", "print which admitted notes match the call on stdin, reading and writing no state")
+    .action(async (opts: { cwd?: string; explain?: boolean }) => {
+      const { runRecallHook } = await import("./adapters/claude-code/recall-hook.js");
+      await runRecallHook([
+        ...(opts.cwd ? ["--cwd", opts.cwd] : []),
+        ...(opts.explain ? ["--explain"] : []),
+      ]);
+    });
 
   // ─── redact ──────────────────────────────────────────────────────────────────
   program

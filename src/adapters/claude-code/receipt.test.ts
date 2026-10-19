@@ -86,10 +86,10 @@ describe("session receipt: Stop hook", () => {
 
     const r = await nudgeCmd({ cwd: dir, hookEventName: "Stop", sessionId: "s1" });
     expect(r.ran).toBe(true);
-    // 2 guard fires, no unpaired attempt -> 0 denied
+    // 2 guard fires
     // 1 correction
     // 2 distinct failure skeletons
-    expect(r.notice).toBe("mage: 0 denied · 1 corrected · 2 new signatures · 2 guard fires");
+    expect(r.notice).toBe("mage: 1 corrected · 2 new signatures · 2 guard fires");
     expect(r.nudge).toBeNull();
   });
 
@@ -130,7 +130,7 @@ describe("session receipt: Stop hook", () => {
     // Querying s2 sees only s2
     const r2 = await nudgeCmd({ cwd: dir, hookEventName: "Stop", sessionId: "s2" });
     expect(r2.ran).toBe(true);
-    expect(r2.notice).toBe("mage: 0 denied · 1 corrected · 1 new signatures · 1 guard fires");
+    expect(r2.notice).toBe("mage: 1 corrected · 1 new signatures · 1 guard fires");
   });
 
   it("source=stop acts as Stop hook event", async () => {
@@ -143,32 +143,27 @@ describe("session receipt: Stop hook", () => {
 
     const r = await nudgeCmd({ cwd: dir, source: "stop", sessionId: "s-alt" });
     expect(r.ran).toBe(true);
-    expect(r.notice).toBe("mage: 0 denied · 0 corrected · 0 new signatures · 1 guard fires");
+    expect(r.notice).toBe("mage: 0 corrected · 0 new signatures · 1 guard fires");
   });
 });
 
 describe("pure receipt computation and formatting", () => {
-  it("denied counts attempts no tool_use pairs with, not guard fires", () => {
+  it("carries no denied count, and a tool_attempt row changes nothing", () => {
     const events: ObserveEvent[] = [
-      buildToolAttempt(base("s1"), { tool: "Bash", tool_use_id: "toolu_ran", paths: [], detail: null }),
-      buildToolUse(base("s1"), { tool: "Bash", tool_use_id: "toolu_ran", paths: [], detail: null, ok: true, error_summary: null }),
       buildToolAttempt(base("s1"), { tool: "WebFetch", tool_use_id: "toolu_blocked", paths: [], detail: null }),
       guardFired("s1", "kit/guard/webfetch"),
-      // A rewrite: the guard fired, and the rewritten call still ran.
-      buildToolAttempt(base("s1"), { tool: "Agent", tool_use_id: "toolu_rewritten", paths: [], detail: null }),
       guardFired("s1", "kit/guard/no-haiku"),
-      buildToolUse(base("s1"), { tool: "Agent", tool_use_id: "toolu_rewritten", paths: [], detail: null, ok: true, error_summary: null }),
     ];
-    expect(computeReceipt(events)).toEqual({ denied: 1, corrected: 0, newSignatures: 0, guardFires: 2 });
+    expect(computeReceipt(events)).toEqual({ corrected: 0, newSignatures: 0, guardFires: 2 });
   });
 
   it("formatReceipt returns null when all counts are zero", () => {
-    expect(formatReceipt({ denied: 0, corrected: 0, newSignatures: 0, guardFires: 0 })).toBeNull();
+    expect(formatReceipt({ corrected: 0, newSignatures: 0, guardFires: 0 })).toBeNull();
   });
 
   it("formatReceipt formats non-zero counts in exact order", () => {
-    const formatted = formatReceipt({ denied: 1, corrected: 2, newSignatures: 3, guardFires: 4 });
-    expect(formatted).toBe("mage: 1 denied · 2 corrected · 3 new signatures · 4 guard fires");
+    const formatted = formatReceipt({ corrected: 2, newSignatures: 3, guardFires: 4 });
+    expect(formatted).toBe("mage: 2 corrected · 3 new signatures · 4 guard fires");
   });
 
   it("computeReceipt ignores continuation prompts without tool_use/assistant_msg predecessor", () => {

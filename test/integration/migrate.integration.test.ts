@@ -64,11 +64,11 @@ describe("integration: mage migrate clears a 0.0.17 knowledge base (#207)", () =
     expect(out).toContain("predates hash stamps");
     expect(out).toContain("work/ is retired");
     expect(out).toContain("1 draft(s) pending");
-    expect(out).toContain("observe arm: added");
+    expect(out).toContain("recall arm: added");
 
     const settings = JSON.parse(await readFile(settingsPath, "utf8"));
     const pre = settings.hooks.PreToolUse.map((g: { id: string }) => g.id);
-    expect(pre).toContain("mage:observe:PreToolUse");
+    expect(pre).toContain("mage:recall:PreToolUse");
     expect(pre).toContain("mage:memory:PreToolUse");
     expect(settings.autoMemoryDirectory).toBe(root);
     await expect(stat(join(metrics, "promote.json"))).rejects.toThrow();

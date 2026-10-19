@@ -86,10 +86,13 @@ export const MAGE_HOOKS: ReadonlyArray<{
   // session is already ending).
   { event: "SessionStart", id: "mage:nudge:SessionStart", command: "mage nudge" },
   { event: "UserPromptSubmit", id: "mage:observe:UserPromptSubmit", command: "mage observe" },
-  // A tool_attempt row on PreToolUse, paired with tool_use via tool_use_id (#209):
-  // a blocked call (settings deny, hook block) never reaches PostToolUse, so an
-  // attempt with no matching use is the signal for a prevented call.
-  { event: "PreToolUse", id: "mage:observe:PreToolUse", command: "mage observe" },
+  // Recall at the action (#282): injects admitted notes whose trigger.match hits the call.
+  {
+    event: "PreToolUse",
+    id: "mage:recall:PreToolUse",
+    matcher: "Bash|Write|Edit|MultiEdit|NotebookEdit",
+    command: "mage recall-hook",
+  },
   { event: "PostToolUse", id: "mage:observe:PostToolUse", command: "mage observe" },
   { event: "PostToolUseFailure", id: "mage:observe:PostToolUseFailure", command: "mage observe" },
   { event: "PreCompact", id: "mage:observe:PreCompact", command: "mage observe" },
@@ -104,22 +107,12 @@ export const MAGE_HOOKS: ReadonlyArray<{
   // from the subagent transcript, exactly like Stop → assistant_msg — is the one
   // capture point as harnesses move toward autonomous multi-agent workflows.
   { event: "SubagentStop", id: "mage:observe:SubagentStop", command: "mage observe" },
-  // ADR-0032 commandeer tier: one `mage memory-hook` command on Write|Edit. PreToolUse
-  // redirects + scrubs a native-memory write into mage's note schema (Gate-0) or denies a
-  // write to a generated index; PostToolUse nudges `mage groom`. The PostToolUse matcher
-  // scopes the capture-nudge to memory writes so it coexists with the matcher-less
-  // mage:observe:PostToolUse, exactly like the two Stop groups. Wired only when CC
-  // auto-memory is on and a docs root resolves (commandeer: true → gated in upsert).
+  // ADR-0032 commandeer tier: `mage memory-hook` on Write|Edit scrubs a native-memory
+  // write, denies a generated index, and asks the ladder once per session (#282). Wired
+  // only when CC auto-memory is on and a docs root resolves (commandeer: true → gated).
   {
     event: "PreToolUse",
     id: "mage:memory:PreToolUse",
-    matcher: "Write|Edit",
-    command: "mage memory-hook",
-    commandeer: true,
-  },
-  {
-    event: "PostToolUse",
-    id: "mage:memory:PostToolUse",
     matcher: "Write|Edit",
     command: "mage memory-hook",
     commandeer: true,
@@ -380,6 +373,20 @@ export function upsertMageHooks(
   // immutable construction (we never write through an alias of the clone).
   const hooks: Record<string, HookGroup[]> = base.hooks ? { ...base.hooks } : {};
   let reaped = 0;
+
+  // A mage:* id that MAGE_HOOKS no longer lists is a retired hook (#282); drop it here so
+  // connect and migrate clean up, not only doctor --fix.
+  const knownIds = new Set(MAGE_HOOKS.map((e) => e.id));
+  for (const [event, groups] of Object.entries(hooks)) {
+    if (!Array.isArray(groups)) continue;
+    const kept = groups.filter(
+      (g) =>
+        !(typeof g?.id === "string" && g.id.startsWith(MAGE_ID_PREFIX) && !knownIds.has(g.id)),
+    );
+    reaped += groups.length - kept.length;
+    if (kept.length > 0) hooks[event] = kept;
+    else delete hooks[event];
+  }
 
   for (const entry of MAGE_HOOKS) {
     const current = hooks[entry.event];
