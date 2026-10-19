@@ -9,6 +9,8 @@ Capture is how knowledge becomes a note. There are two doors: the host saving a 
 
 ## The memory hook
 
+Claude Code's native memory is pointed at the knowledge base: `mage connect` sets `autoMemoryDirectory` in the settings file it wires, so a memory the host saves lands under `mage/`, where this hook sees it first (Gate-0, ahead of the file reaching disk).
+
 `mage memory-hook` is a PreToolUse hook on Write and Edit, wired by `mage connect` when Claude Code auto-memory is on and a docs root resolves. It scrubs the write for secrets and applies three rules:
 
 - **The ladder, once.** The first memory write of a session, at the root or under `notes/`, that carries no `rung` is allowed, and the ladder with a template per rung is attached as context. Every later write passes, and a write carrying `rung` always passes. This is `ladder.gate: "ask"`, the default.
