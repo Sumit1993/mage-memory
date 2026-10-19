@@ -1,7 +1,7 @@
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { withKb } from "../../../test/fixtures/kb.js";
+import { tmpDir, withKb } from "../../../test/fixtures/kb.js";
 import { recallStatePath } from "../../paths.js";
 import { readStdinSafe } from "./hook-io.js";
 import { nudgeCmd } from "./nudge.js";
@@ -154,6 +154,34 @@ describe("recallContext", () => {
       session_id: "s1",
     };
     expect(await recallContext(payload)).toContain("for this MultiEdit call");
+  });
+
+  it("matches Edit globs against the code repo in external mode, not the hub", async () => {
+    const kb = await withKb({ kind: "external" });
+    await put(kb.root, "notes/src.md", admitted({ match: ["Edit(src/**)"] }));
+    const payload = {
+      tool_name: "Edit",
+      tool_input: { file_path: join(kb.dir, "src", "a.ts") },
+      cwd: kb.dir,
+      session_id: "s1",
+    };
+    expect(await recallContext(payload)).toContain("for this Edit call");
+    const outside = { ...payload, tool_input: { file_path: join(kb.dir, "docs", "a.ts") }, session_id: "s2" };
+    expect(await recallContext(outside)).toBeNull();
+  });
+
+  it("matches Edit globs against a separate code repo when the session sits in a hub", async () => {
+    const kb = await withKb({ kind: "hub" });
+    const codeRepo = await tmpDir();
+    await mkdir(join(codeRepo, ".git"), { recursive: true });
+    await put(kb.root, "notes/src.md", admitted({ match: ["Edit(src/**)"] }));
+    const payload = {
+      tool_name: "Edit",
+      tool_input: { file_path: join(codeRepo, "src", "a.ts") },
+      cwd: kb.dir,
+      session_id: "s1",
+    };
+    expect(await recallContext(payload)).toContain("for this Edit call");
   });
 
   it("is silent without a knowledge base or for an uncovered tool", async () => {

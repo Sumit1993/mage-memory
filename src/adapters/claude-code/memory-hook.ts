@@ -6,38 +6,76 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { Command } from "commander";
 import { parseNote } from "../../note.js";
-import { isUnder, ladderMarkerPath, NOTES_DIR, resolveDocsRoot } from "../../paths.js";
+import {
+  AGENTS_FILE,
+  CLAUDE_FILE,
+  IDENTITY_FILE,
+  INDEX_FILE,
+  isUnder,
+  ladderMarkerPath,
+  MEMORY_FILE,
+  NOTES_DIR,
+  resolveDocsRoot,
+} from "../../paths.js";
 import { redact } from "../../redact.js";
-import { isGeneratedArtifact, safeSegment } from "../../scan.js";
+import { safeSegment } from "../../scan.js";
 import { RUNGS } from "../../scanner/admission.js";
 import { recoverCcFrontmatter } from "./cc-note.js";
 import { obj, parseHookPayload, readStdinSafe, str } from "./hook-io.js";
 
 const DENY_REASON = "mage owns this file; `mage index` regenerates it. Do not add lines here.";
 
+/** The files `mage index` regenerates at the docs root: INDEX.md, MEMORY.md and _index.<wing>.md. */
+function isRegeneratedIndex(rel: string): boolean {
+  return rel === INDEX_FILE || rel === MEMORY_FILE || /^_index\..+\.md$/.test(rel);
+}
+
 const SCAN_FAILED_REASON = "mage could not scan this write for secrets";
 
-export const LADDER_TEXT = [
-  "mage:ladder (asked once this session; write again and it passes)",
-  "Before saving this memory, take each fact in it to the highest rung that can carry it.",
-  "Build that, then keep as a note only what no rung above can carry. Copy the template that fits.",
-  "",
+const RESERVED_ROOT_FILES: ReadonlySet<string> = new Set([
+  AGENTS_FILE,
+  CLAUDE_FILE,
+  IDENTITY_FILE,
+  "README.md",
+  "Dashboard.md",
+]);
+
+const LADDER_TEMPLATES = [
   "1 impossible: a deny rule in .claude/settings.json",
-  '  {"permissions": {"deny": ["Edit(generated/**)", "Write(generated/**)"]}}',
-  "2 check: a test, lint rule or pre-commit check that fails on the mistake",
-  "  # .git/hooks/pre-commit",
-  "  if git diff --cached -U0 -- src | grep -q '^+.*console\\.log'; then echo \"use logger, not console.log\"; exit 1; fi",
+  '  {"permissions": {"deny": ["Edit(<path-glob>)", "Write(<path-glob>)"]}}',
+  "2 check: a versioned check that fails on the mistake: a test, a lint rule, or a CI job or",
+  "  package script committed to the repo, so it reaches a pull request and every clone",
+  '  "<script name>": "<command that exits non-zero when <forbidden pattern> is found>"',
+  "  Do not edit .git/hooks/pre-commit (mage's secret scan lives there) and keep the check out of .git: it is local only.",
   "3 hook: a PreToolUse hook in .claude/settings.json that blocks with a reason",
-  '  {"hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [{"type": "command", "command": "node .claude/hooks/commit-issue.mjs"}]}]}}',
+  '  {"hooks": {"PreToolUse": [{"matcher": "<tool name>", "hooks": [{"type": "command", "command": "node .claude/hooks/<name>.mjs"}]}]}}',
   "  The script reads the tool call JSON on stdin; to block it prints",
-  '  {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "commit subjects need (#N)"}}',
+  '  {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "<rule text>"}}',
   "4 rule: one line in AGENTS.md carrying an id",
-  "  - Keep commit subjects under 60 characters. [mage:repo/rule/short-commit-subjects]",
+  "  - <rule text>. [mage:repo/rule/<slug>]",
   "5 note: add to the note's frontmatter",
   "  rung: note",
   '  trigger: {when: "<the moment it matters>", match: ["Bash(<cmd> *)", "Edit(<glob>)"]}',
   '  pointer: "[<source>](<path or issue>)"',
   "A memory that carries rung: is never stopped.",
+];
+
+/** The reply to a rung-less memory write, asked once per session. */
+export const LADDER_TEXT = [
+  "mage:ladder (asked once this session; write again and it passes)",
+  "Before saving this memory, take each fact in it to the highest rung that can carry it.",
+  "Build that, then keep as a note only what no rung above can carry. Copy the template that fits.",
+  "",
+  ...LADDER_TEMPLATES,
+].join("\n");
+
+/** The same ladder for `mage groom`, where no write was denied and no session is involved. */
+export const GROOM_LADDER_TEXT = [
+  "mage:ladder",
+  "Take each fact in a note to the highest rung that can carry it.",
+  "Build that, then keep as a note only what no rung above can carry. Copy the template that fits.",
+  "",
+  ...LADDER_TEMPLATES,
 ].join("\n");
 
 /** The pure decision for a PreToolUse Write/Edit — unit-testable, no stdout. */
@@ -149,9 +187,10 @@ export async function memoryPreToolUse(
   const target = memoryTarget(resolved.root, filePath, cwd);
   if (target === null) return PASS; // subdir / outside the root / non-.md → never touched
 
-  // A generated index at the docs root → mage owns it (isGeneratedArtifact covers
-  // MEMORY.md/INDEX.md/_index.*.md + IDENTITY/AGENTS/CLAUDE/Dashboard at the root).
-  if (target.flat && isGeneratedArtifact(target.rel)) return { kind: "deny", reason: DENY_REASON };
+  // Only files `mage index` regenerates are denied; the other reserved root files are not
+  // memory targets, so a climb can write AGENTS.md (#282).
+  if (target.flat && isRegeneratedIndex(target.rel)) return { kind: "deny", reason: DENY_REASON };
+  if (target.flat && RESERVED_ROOT_FILES.has(target.rel)) return PASS;
 
   // Gate-0's irreplaceable job: scrub the raw bytes before they reach disk. No YAML parse,
   // so malformed frontmatter can never skip it.

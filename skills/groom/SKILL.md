@@ -31,21 +31,22 @@ judge, `mage groom` lists and the tools you already have build.
    For each note: climb (build the rung below, then delete the note), delete (stale, or a copy of a source),
    or keep (add rung, trigger and pointer). mage never commits: land the whole diff as one pull request.
 
-   mage:ladder (asked once this session; write again and it passes)
-   Before saving this memory, take each fact in it to the highest rung that can carry it.
+   mage:ladder
+   Take each fact in a note to the highest rung that can carry it.
    Build that, then keep as a note only what no rung above can carry. Copy the template that fits.
 
    1 impossible: a deny rule in .claude/settings.json
-     {"permissions": {"deny": ["Edit(generated/**)", "Write(generated/**)"]}}
-   2 check: a test, lint rule or pre-commit check that fails on the mistake
-     # .git/hooks/pre-commit
-     if git diff --cached -U0 -- src | grep -q '^+.*console\.log'; then echo "use logger, not console.log"; exit 1; fi
+     {"permissions": {"deny": ["Edit(<path-glob>)", "Write(<path-glob>)"]}}
+   2 check: a versioned check that fails on the mistake: a test, a lint rule, or a CI job or
+     package script committed to the repo, so it reaches a pull request and every clone
+     "<script name>": "<command that exits non-zero when <forbidden pattern> is found>"
+     Do not edit .git/hooks/pre-commit (mage's secret scan lives there) and keep the check out of .git: it is local only.
    3 hook: a PreToolUse hook in .claude/settings.json that blocks with a reason
-     {"hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [{"type": "command", "command": "node .claude/hooks/commit-issue.mjs"}]}]}}
+     {"hooks": {"PreToolUse": [{"matcher": "<tool name>", "hooks": [{"type": "command", "command": "node .claude/hooks/<name>.mjs"}]}]}}
      The script reads the tool call JSON on stdin; to block it prints
-     {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "commit subjects need (#N)"}}
+     {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "<rule text>"}}
    4 rule: one line in AGENTS.md carrying an id
-     - Keep commit subjects under 60 characters. [mage:repo/rule/short-commit-subjects]
+     - <rule text>. [mage:repo/rule/<slug>]
    5 note: add to the note's frontmatter
      rung: note
      trigger: {when: "<the moment it matters>", match: ["Bash(<cmd> *)", "Edit(<glob>)"]}
@@ -61,7 +62,11 @@ judge, `mage groom` lists and the tools you already have build.
    - **keep**: nothing above can carry it. Add `rung`, `trigger` (`when` plus
      `match`) and `pointer`. Test the match with `mage recall-hook --explain`,
      feeding it a sample tool call on stdin, against calls it should and should
-     not hit. The fields are in the notes page, `docs/src/content/docs/model/notes.md`.
+     not hit. `rung` is one of `impossible`, `check`, `hook`, `rule`, `note`; `trigger`
+     is a string, or `{when, match}` with `Bash(<glob>)` and `Edit(<glob>)` entries
+     (an `Edit` glob is relative to the code repo being edited); `pointer` is a
+     markdown link to the source. Details:
+     [Admission and triggers](https://github.com/Sumit1993/mage-memory/blob/main/docs/src/content/docs/model/notes.md#admission-and-triggers).
 3. **Regenerate.** Run `mage index`. Its `Roster:` line says how many notes are
    admitted and how many recall at the action.
 4. **Land one pull request.** Show the whole diff (the artifacts, the deleted

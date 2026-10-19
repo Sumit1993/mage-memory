@@ -58,7 +58,7 @@ flowchart TD
   i --> gr["mage groom lists it where it lies —<br/>climb, delete or keep"]
 ```
 
-Like `mage observe`, Gate-0 is **fail-open**: any stdin/parse/redact/filesystem error emits nothing and exits clean, so a capture gate can never block the host's write. It is adapter-specific and active only when Claude Code's `autoMemoryEnabled` is on; on other harnesses the volitional directive (write a mage note to the inbox) is the capture path.
+Gate-0 is **fail-open** with one exception: any stdin, parse or filesystem error emits nothing and exits clean, so a capture gate never blocks the host's write. The exception is the secret scan. If `redact` itself throws, the write is denied, because a secret in a committed knowledge base is published. It is adapter-specific and active only when Claude Code's `autoMemoryEnabled` is on; on other harnesses the volitional directive (write a mage note to the inbox) is the capture path.
 
 For the exact event names, hook ids, and the command each runs, see the [Hooks reference](../reference/hooks.mdx).
 
@@ -70,7 +70,7 @@ If that frontmatter carries a `rung`, the write passes. If it does not, the firs
 
 The decision path:
 
-1. **Target check**: a write outside `notes/` and outside the flat root passes untouched. A write to a generated index (`MEMORY.md`, `INDEX.md`, `_index.*.md`) is denied, because `mage index` regenerates it.
+1. **Target check**: a write outside `notes/` and outside the flat root passes untouched. A write to a file `mage index` regenerates (`MEMORY.md`, `INDEX.md`, `_index.*.md`) is denied, because `mage index` regenerates it. The other reserved root files (`AGENTS.md`, `CLAUDE.md`, `IDENTITY.md`, `README.md`, `Dashboard.md`) are not memory targets and pass untouched, so a climb to the rule rung can write `AGENTS.md`.
 2. **Scrub**: the content goes through redaction first. If the scan itself fails, the write is denied and no marker is written; a secret in a committed knowledge base is published. Otherwise a secret is masked in place, and a clean `notes/` write is left to your normal permission prompt.
 3. **Ladder**: a write with no `rung`, in a session with an id, where this session has not been asked yet, is denied with the text below. Asking is recorded in a marker file under `.mage/ladder/`. If the marker cannot be written, the write passes.
 
@@ -82,16 +82,17 @@ Before saving this memory, take each fact in it to the highest rung that can car
 Build that, then keep as a note only what no rung above can carry. Copy the template that fits.
 
 1 impossible: a deny rule in .claude/settings.json
-  {"permissions": {"deny": ["Edit(generated/**)", "Write(generated/**)"]}}
-2 check: a test, lint rule or pre-commit check that fails on the mistake
-  # .git/hooks/pre-commit
-  if git diff --cached -U0 -- src | grep -q '^+.*console\.log'; then echo "use logger, not console.log"; exit 1; fi
+  {"permissions": {"deny": ["Edit(<path-glob>)", "Write(<path-glob>)"]}}
+2 check: a versioned check that fails on the mistake: a test, a lint rule, or a CI job or
+  package script committed to the repo, so it reaches a pull request and every clone
+  "<script name>": "<command that exits non-zero when <forbidden pattern> is found>"
+  Do not edit .git/hooks/pre-commit (mage's secret scan lives there) and keep the check out of .git: it is local only.
 3 hook: a PreToolUse hook in .claude/settings.json that blocks with a reason
-  {"hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [{"type": "command", "command": "node .claude/hooks/commit-issue.mjs"}]}]}}
+  {"hooks": {"PreToolUse": [{"matcher": "<tool name>", "hooks": [{"type": "command", "command": "node .claude/hooks/<name>.mjs"}]}]}}
   The script reads the tool call JSON on stdin; to block it prints
-  {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "commit subjects need (#N)"}}
+  {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "<rule text>"}}
 4 rule: one line in AGENTS.md carrying an id
-  - Keep commit subjects under 60 characters. [mage:repo/rule/short-commit-subjects]
+  - <rule text>. [mage:repo/rule/<slug>]
 5 note: add to the note's frontmatter
   rung: note
   trigger: {when: "<the moment it matters>", match: ["Bash(<cmd> *)", "Edit(<glob>)"]}

@@ -128,7 +128,7 @@ A matcher is a subset of Claude Code's permission-rule syntax. Anything else is 
 | matcher | tests | how |
 | --- | --- | --- |
 | `Bash(pattern)` | the Bash command | the whole command, or any part between `&&`, `||`, `;`, `|` or a newline, matches the glob |
-| `Edit(pattern)` | Write, Edit, MultiEdit and NotebookEdit paths | the path relative to the repo, with `/` separators; a pattern with no `/` matches the file name at any depth |
+| `Edit(pattern)` | Write, Edit, MultiEdit and NotebookEdit paths | the path relative to the code repo being edited (the git repository of the edited file, which in external and hub modes is not the repo holding the notes), with `/` separators; a pattern with no `/` matches the file name at any depth |
 | `Write(pattern)` | the same as `Edit(pattern)` | an alias |
 
 Notes must also satisfy three readability rules ([#253](https://github.com/Sumit1993/mage-memory/issues/253)): length under 40 lines and 350 words, self-contained references with no unlinked documents, and plain words with no unslop words or em dashes. Readability findings are warnings. They never exclude a note from the roster and never fail `--strict-admission`; admission problems under `notes/` do.

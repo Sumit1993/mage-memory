@@ -46,6 +46,7 @@ describe("integration: groom walks the ladder (deterministic)", () => {
     expect(r.code, r.stderr).toBe(0);
     expect(r.stdout).toContain("mage groom: 1 of 1 notes to judge (notes without a rung come first).");
     expect(r.stdout).toContain('1. feedback_dashes.md  "feedback_dashes"');
-    expect(r.stdout).toContain("mage:ladder (asked once this session; write again and it passes)");
+    expect(r.stdout).toContain("mage:ladder\nTake each fact");
+    expect(r.stdout).not.toContain("asked once this session");
   });
 });

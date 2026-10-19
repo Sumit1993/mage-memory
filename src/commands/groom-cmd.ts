@@ -49,7 +49,7 @@ import {
   readStagedDrafts,
 } from "../grooming/staging.js";
 import { recoverCcFrontmatter } from "../adapters/claude-code/cc-note.js";
-import { LADDER_TEXT } from "../adapters/claude-code/memory-hook.js";
+import { GROOM_LADDER_TEXT } from "../adapters/claude-code/memory-hook.js";
 import { parseNote, writeNote } from "../note.js";
 import { type Rung, RUNGS, checkAdmission } from "../scanner/admission.js";
 import { genreOf } from "../scanner/genre-map.js";
@@ -225,7 +225,7 @@ async function walk(resolved: ResolvedDocsRoot, opts: GroomOptions): Promise<Gro
     );
   }
   logger.blank();
-  logger.info(LADDER_TEXT);
+  logger.info(GROOM_LADDER_TEXT);
   return result;
 }
 
