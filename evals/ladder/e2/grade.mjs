@@ -34,7 +34,8 @@ function addedLines(dir, base, file) {
   const before = new Set(
     (() => {
       try {
-        return git(dir, "show", `${base}:${file}`).split("\n");
+        const opts = { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] };
+        return execFileSync("git", ["show", `${base}:${file}`], opts).split("\n");
       } catch {
         return [];
       }
