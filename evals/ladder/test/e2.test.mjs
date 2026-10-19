@@ -54,7 +54,7 @@ test("e2 setup: the mage arm registers only the memory hook, pointed at this bui
   const dir = tmp();
   const { base, registered } = buildE2("E2-mage", dir);
   const events = Object.keys(registered.hooks).sort();
-  assert.deepEqual(events, ["PostToolUse", "PreToolUse"]);
+  assert.deepEqual(events, ["PreToolUse"]);
   for (const groups of Object.values(registered.hooks)) {
     assert.equal(groups.length, 1);
     assert.equal(groups[0].matcher, "Write|Edit");
@@ -76,7 +76,7 @@ test("e2 setup: the arms' settings differ only in the memory hook groups", { ski
   const a = strip(plain.registered);
   const b = strip(mage.registered);
   assert.equal(a.hooks, undefined);
-  assert.deepEqual(Object.keys(b.hooks).sort(), ["PostToolUse", "PreToolUse"]);
+  assert.deepEqual(Object.keys(b.hooks).sort(), ["PreToolUse"]);
   assert.ok(Object.values(b.hooks).flat().every((g) => g.id.startsWith("mage:memory:")));
   assert.deepEqual(a.rest, b.rest);
   assert.ok(plain.registered.autoMemoryDirectory.endsWith("mage"));
@@ -117,7 +117,6 @@ test("e2 setup: E2-proto is E2-mage plus the proto group first", { skip: !exists
   assert.equal(pre[0].id, "proto:ladder:PreToolUse");
   assert.match(pre[0].hooks[0].command, /proto-ladder-hook\.mjs/);
   assert.deepEqual(pre.slice(1).map((g) => g.id), mage.hooks.PreToolUse.map((g) => g.id));
-  assert.deepEqual(proto.hooks.PostToolUse.map((g) => g.id), mage.hooks.PostToolUse.map((g) => g.id));
 });
 
 test("attach hook: allows the first memory write and attaches the ladder text once", async () => {
