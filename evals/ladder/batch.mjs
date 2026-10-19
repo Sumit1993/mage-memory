@@ -42,6 +42,13 @@ export function summarize(results) {
     const rs = inGroup(g);
     lines.push(`| ${g} | ${rs.filter((r) => r.hook_fired).length}/${rs.length} | ${rs.reduce((s, r) => s + (r.hook_denials || 0), 0)} | ${rs.reduce((s, r) => s + (r.hook_contexts || 0), 0)} |`);
   }
+  if (results.some((r) => r.recall_injected !== undefined)) {
+    lines.push("", "## Mage recall hook", "", "| Load / Arm | Runs with a recall injection | Notes injected |", "| --- | --- | --- |");
+    for (const g of groups) {
+      const rs = inGroup(g).filter((r) => r.recall_injected !== undefined);
+      if (rs.length > 0) lines.push(`| ${g} | ${rs.filter((r) => r.recall_injected.length > 0).length}/${inGroup(g).length} | ${rs.reduce((s, r) => s + r.recall_injected.length, 0)} |`);
+    }
+  }
   const mean = (xs) => (xs.length ? Math.round(xs.reduce((s, x) => s + x, 0) / xs.length) : "n/a");
   lines.push("", "## Cost", "", "| Load / Arm | Mean turns | Mean duration (s) |", "| --- | --- | --- |");
   for (const g of groups) {
