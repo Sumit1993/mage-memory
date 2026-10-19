@@ -58,9 +58,9 @@ describe("loop docs drift guard", () => {
     }
   });
 
-  it("documents the Claude Code capture redirect on the capture page (Gate-0 -> inbox -> ingest)", () => {
+  it("documents the Claude Code capture redirect on the capture page (Gate-0 -> ladder, asked once)", () => {
     const capture = docText("capture.md");
-    for (const token of ["autoMemoryDirectory", "Gate-0", "inbox", "ingest"]) {
+    for (const token of ["autoMemoryDirectory", "Gate-0", "LADDER_TEXT", "once per session"]) {
       expect(capture, `capture.md should document "${token}"`).toContain(token);
     }
   });

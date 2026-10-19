@@ -123,8 +123,8 @@ The event is admitted by the presence of a `guard_id` key or by specifying `--ev
 The capture-adjacent hooks running `mage nudge` provide session boundary visibility:
 
 - **`mage:nudge:Stop`**: When Claude stops or completes a turn, `mage nudge` inspects the session events in scratch and emits a concise receipt:
-  `mage: <N> denied · <N> corrected · <N> new signatures · <N> guard fires`
-  If all four counts are zero or if no knowledge base exists in the workspace, it remains silent and exits 0.
+  `mage: <N> corrected · <N> new signatures · <N> guard fires`
+  If all three counts are zero or if no knowledge base exists in the workspace, it remains silent and exits 0.
 
 - **`mage:nudge:SessionStart`**: At session startup or resumption, `mage nudge` stays quiet by default. It prints only when action is needed:
   - If graduation proposals are waiting, it outputs `mage · 1 proposal is waiting` (or plural).
