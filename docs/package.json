@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@astrojs/starlight": "0.40.0",
-    "astro": "7.1.0",
+    "astro": "7.2.8",
     "mermaid": "11.16.1",
     "starlight-links-validator": "0.24.1"
   }

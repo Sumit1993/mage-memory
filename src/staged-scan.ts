@@ -153,7 +153,7 @@ function docsScopeFilter(repo: string, root: string): (file: string) => boolean 
  * → undefined, which {@link redactIgnoreFromMetadata} compiles to an empty allowlist.
  * Reachable from a pre-commit hook ⇒ must never throw.
  */
-async function readRedactConfig(
+export async function readRedactConfig(
   repo: string,
   kind: "repo" | "hub",
 ): Promise<RedactConfig | undefined> {

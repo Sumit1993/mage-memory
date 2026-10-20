@@ -310,12 +310,17 @@ export function buildProgram(): Command {
       "--reject <slugs|all>",
       "discard these staged drafts and record their keys",
     )
+    .option(
+      "--propose",
+      "open a pull request with the promoted notes instead of leaving them uncommitted",
+    )
     .action(
       async (opts: {
         dir?: string;
         json?: boolean;
         accept?: string;
         reject?: string;
+        propose?: boolean;
       }) => {
         await groomCmd(opts);
       },
@@ -477,7 +482,7 @@ export function buildProgram(): Command {
   program
     .command("migrate")
     .description(
-      "Upgrade this KB's metadata to the current schema (idempotent; never commits)",
+      "Upgrade a 0.0.x KB: metadata schema, retired state cleared, hook groups refreshed, AGENTS.md block refreshed without clobbering (idempotent; never commits)",
     )
     .option(
       "--dir <path>",
