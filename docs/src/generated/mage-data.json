@@ -167,7 +167,7 @@
       "event": "PreToolUse",
       "id": "mage:memory:PreToolUse",
       "command": "mage memory-hook",
-      "purpose": "Gate-0 (ADR-0032): scrub a native-memory write before it touches disk, deny a write to a generated index, and ask the ladder once per session (ADR-0060)."
+      "purpose": "Gate-0 (ADR-0032): scrub a native-memory write before it touches disk, deny a write to a generated index, and deny the first rung-less write per agent per session with the ladder, keeping a redacted held copy (ADR-0060)."
     },
     {
       "event": "Stop",
