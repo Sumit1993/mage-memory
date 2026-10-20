@@ -152,8 +152,8 @@ async function grantNudge(cwd: string): Promise<{ notice: string; context: strin
       };
     case "mismatch":
       return {
-        notice: `mage · hub mismatch — never reused, never clobbered: ${status.details.join("; ")}`,
-        context: `The hub this repo points at resolves to a clone of a different remote (${status.details.join("; ")}). mage will not reuse or overwrite it. Ask the user to fix that clone's remote or re-run \`mage link <address>\` here. Do NOT run \`mage init\`.`,
+        notice: `mage · hub origin mismatch — mage uses the clone anyway, no harness grant: ${status.details.join("; ")}`,
+        context: `The hub this repo points at resolves to a clone of a different remote (${status.details.join("; ")}). mage reads and writes it anyway, but the harness grant is withheld, so you cannot read its notes. Ask the user to fix that clone's remote or re-run \`mage link <address>\` here. Do NOT run \`mage init\`.`,
       };
   }
 }

@@ -16,9 +16,11 @@ describe("mage init --in-repo", () => {
     const r = await init({ mode: "in-repo", yes: true, codeRepo: dir, project: "demo" });
     expect(r.mode).toBe("in-repo");
 
-    for (const d of ["notes", "work", "decisions", "archive"]) {
+    for (const d of ["notes", "decisions", "archive"]) {
       expect((await stat(join(dir, "mage", d))).isDirectory()).toBe(true);
     }
+    // work/ is retired (ADR-0050): plans live in the issue tracker.
+    await expect(stat(join(dir, "mage", "work"))).rejects.toThrow();
 
     const meta = JSON.parse(await readFile(join(dir, "mage", "metadata.json"), "utf8"));
     expect(meta.schema).toBe(METADATA_SCHEMA);

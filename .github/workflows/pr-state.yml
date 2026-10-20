@@ -1,0 +1,24 @@
+# This is a managed caller stub.
+# Logic lives in prismalens/gh-workflows/.github/workflows/pr-state.yml.
+# Do not add logic here.
+
+name: PR State
+
+on:
+  # pull_request_target so a fork PR reports its state too; the callee checks nothing out (gh-workflows#211).
+  pull_request_target:
+    types: [opened, reopened, synchronize, closed, edited, ready_for_review, converted_to_draft]
+
+permissions:
+  contents: read
+  pull-requests: read
+  # The callee proves its repository to the telemetry Worker with an OIDC token (gh-workflows#176).
+  id-token: write
+
+jobs:
+  pr-state:
+    uses: prismalens/gh-workflows/.github/workflows/pr-state.yml@main
+    # explicit mapping: `inherit` does not cross ownership boundaries.
+    secrets:
+      REVIEW_TELEMETRY_URL: ${{ secrets.REVIEW_TELEMETRY_URL }}
+      REVIEW_TELEMETRY_TOKEN: ${{ secrets.REVIEW_TELEMETRY_TOKEN }}

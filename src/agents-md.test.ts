@@ -86,7 +86,7 @@ describe("writeAgentsMd — KB shape blocks (kind repo/hub · mode in-repo/hybri
     }
   });
 
-  it("carries the always-on inline-capture instruction in every shape (0.0.12)", async () => {
+  it("names no retired verb and points plans at the issue tracker, in every shape (#207)", async () => {
     for (const opts of [
       { kind: "repo", mode: "in-repo", docsRel: "mage" },
       { kind: "repo", mode: "hybrid", docsRel: "mage" },
@@ -96,11 +96,11 @@ describe("writeAgentsMd — KB shape blocks (kind repo/hub · mode in-repo/hybri
       const repo = await tmpDir();
       await writeAgentsMd(repo, opts);
       const agents = await readAgents(repo);
-      // The inline-primary path: capture at first sight via `mage stage` → `.staging/`.
-      expect(agents).toContain("Capture lessons inline");
-      expect(agents).toContain("mage stage");
-      expect(agents).toContain(".staging");
-      expect(agents).toContain("mage:groom");
+      // `mage stage` retired in #208; a block naming it tells agents to run a signpost.
+      expect(agents).not.toContain("mage stage");
+      expect(agents).not.toContain(".staging");
+      expect(agents).toContain("/mage:learn");
+      expect(agents).toContain("issue tracker");
     }
   });
 
@@ -229,7 +229,7 @@ describe("writeAgentsMd — KB shape blocks (kind repo/hub · mode in-repo/hybri
     await writeAgentsMd(repo, opts);
     const withStamp = await readAgents(repo);
     const stripped = withStamp.replace(/^<!-- mage-block-hash: [0-9a-f]{12} -->\n/m, "");
-    const legacy = stripped.replace("mage:groom", "/mage-groom");
+    const legacy = stripped.replace("/mage:learn", "/mage-learn");
     expect(legacy).not.toBe(withStamp);
     await writeFile(join(repo, "AGENTS.md"), legacy);
     const r = await writeAgentsMd(repo, opts);
@@ -250,7 +250,7 @@ describe("writeAgentsMd — KB shape blocks (kind repo/hub · mode in-repo/hybri
     await writeAgentsMd(repo, opts);
     const withStamp = await readAgents(repo);
     const stripped = withStamp.replace(/^<!-- mage-block-hash: [0-9a-f]{12} -->\n/m, "");
-    const legacy = stripped.replace("mage:groom", "/mage-groom");
+    const legacy = stripped.replace("/mage:learn", "/mage-learn");
     expect(legacy).not.toBe(withStamp);
     await writeFile(join(repo, "AGENTS.md"), legacy);
     const r1 = await writeAgentsMd(repo, opts, { force: true });
@@ -296,8 +296,8 @@ describe("writeAgentsMd — KB shape blocks (kind repo/hub · mode in-repo/hybri
     expect(keptUnstampedWarning("/some/path/AGENTS.md")).toBe(
       "/some/path/AGENTS.md: the mage block between <!-- BEGIN mage --> and <!-- END mage --> predates hash stamps and was left as is. mage cannot tell whether you edited it. Re-run with --force-agents-md once to regenerate it (any edits inside the block are lost); the regenerated block is stamped and refreshes on its own from then on.",
     );
-    expect(keptWarning({ agents: "unchanged", path: "/p" })).toBeNull();
-    expect(keptWarning({ agents: "kept-unstamped", path: "/p" })).toBe(
+    expect(keptWarning({ agents: "unchanged", path: "/p", claudeChanged: false })).toBeNull();
+    expect(keptWarning({ agents: "kept-unstamped", path: "/p", claudeChanged: false })).toBe(
       keptUnstampedWarning("/p"),
     );
   });
