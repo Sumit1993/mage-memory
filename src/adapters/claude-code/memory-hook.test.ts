@@ -378,6 +378,17 @@ describe("the ladder under gate=deny-once (#282)", () => {
     expect(await exists(markerOf(kb.root, "sess-1"))).toBe(false);
   });
 
+  it("scrubs a secret out of a write to a reserved root file without asking the ladder", async () => {
+    const kb = await withKb({ kind: "hub" });
+    const d = await memoryPreToolUse(sessionWrite(kb.dir, join(kb.root, "AGENTS.md"), "- rule\nreach admin@example.com"));
+    expect(d.kind).toBe("rewrite");
+    if (d.kind === "rewrite") {
+      expect(d.updatedInput.content).not.toContain("admin@example.com");
+      expect(d.context).toBeUndefined();
+    }
+    expect(await exists(markerOf(kb.root, "sess-1"))).toBe(false);
+  });
+
   it("still asks the ladder for a rung-less memory note at a hub root, and denies only regenerated indexes", async () => {
     const kb = await withKb({ kind: "hub", ladder: DENY_ONCE });
     for (const name of ["INDEX.md", "MEMORY.md", "_index.mage.md"]) {

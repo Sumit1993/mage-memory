@@ -1483,6 +1483,16 @@ describe("mage index --hook (the Stop hook body, #282)", () => {
     expect(await mtime(join(dir, "mage", "INDEX.md"))).toBe(before);
   });
 
+  it("does nothing at a hub root whose projects fan-out wrote their own INDEX.md and MEMORY.md", async () => {
+    const root = await hub([{ name: "alpha", storage: "hub-owned", code_repo_url: "git@github.com:me/alpha.git" }]);
+    await put(root, "projects/alpha/notes/a.md", "---\ntype: note\ntags: [alpha/feature]\n---\n# Alpha\n");
+    await index({ dir: root, quiet: true });
+    const before = await mtime(join(root, "INDEX.md"));
+    await new Promise((r) => setTimeout(r, 30));
+    await indexForHook({ dir: root });
+    expect(await mtime(join(root, "INDEX.md"))).toBe(before);
+  });
+
   it("re-indexes after a note is deleted", async () => {
     const dir = await vault();
     await note(dir, "gone.md", "---\ntype: note\n---\n# Gone\n");

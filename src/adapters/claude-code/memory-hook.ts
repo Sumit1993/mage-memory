@@ -240,7 +240,7 @@ export async function memoryPreToolUse(
   // Only files `mage index` regenerates are denied; the other reserved root files are not
   // memory targets, so a climb can write AGENTS.md (#282).
   if (target.flat && isRegeneratedIndex(target.rel)) return { kind: "deny", reason: denyReason(target.rel) };
-  if (target.flat && RESERVED_ROOT_FILES.has(target.rel)) return PASS;
+  const reserved = target.flat && RESERVED_ROOT_FILES.has(target.rel);
 
   // Gate-0's irreplaceable job: scrub the raw bytes before they reach disk. No YAML parse,
   // so malformed frontmatter can never skip it.
@@ -254,6 +254,17 @@ export async function memoryPreToolUse(
     } catch {
       return { kind: "deny", reason: SCAN_FAILED_REASON };
     }
+  }
+
+  if (reserved) { // a climb target: scrub it, never ask the ladder (#283)
+    if (scrubbed === null || scrubbed.masked === 0) return PASS;
+    return {
+      kind: "rewrite",
+      updatedInput: { ...input, [field]: scrubbed.text },
+      reason: rewriteReason(scrubbed.masked),
+      slug: target.rel.replace(/\.md$/, ""),
+      masked: scrubbed.masked,
+    };
   }
 
   const session = str(payload.session_id);

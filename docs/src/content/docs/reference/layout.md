@@ -50,7 +50,7 @@ Each leaf holds a different kind of working state:
 
 - **`.mage/metrics/`** — generated rollups (read-only for you, written by mage as it runs): the context-match results, i.e. did the skills that auto-loaded actually match the work? Files an older version wrote here lost their writers in #208 and #210; `mage migrate` removes them.
 - **`.mage/recall/`** — one small state file per session that remembers which notes [recall at the action](../model/recall.md) already injected, so a note is injected once. A compaction clears it.
-- Older versions also wrote `.mage/learnings/` (a capture trail) and `.mage/staging/` (lesson drafts). Nothing in 0.0.18 reads them; delete them when you like.
+- Older versions also wrote `.mage/learnings/` (a capture trail) and `.mage/staging/` (lesson drafts). Nothing in 0.0.18 reads `.mage/learnings/`. `mage groom --accept` and `--reject` still read `.mage/staging/`, so resolve any pending drafts with them before you delete it.
 
 ### Hub clones live at a machine level, not under the docs root
 

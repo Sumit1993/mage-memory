@@ -8,7 +8,7 @@ description: |
   apply a bounded reword or a demote through `mage dream --apply`. Fires on
   "optimize", "are my skills firing right", "tune my triggers", or "is recall
   firing". Human-confirmed, never auto-committed.
-allowed-tools: Read, Grep, Glob, Bash
+allowed-tools: Read, Grep, Glob, Edit, Bash
 ---
 
 # /mage:optimize — keep recall sharp

@@ -3,8 +3,12 @@
 export {};
 
 if (process.argv[2] === "recall-hook") {
-  const { runRecallHook } = await import("./adapters/claude-code/recall-hook.js");
-  await runRecallHook(process.argv.slice(3));
+  try {
+    const { runRecallHook } = await import("./adapters/claude-code/recall-hook.js");
+    await runRecallHook(process.argv.slice(3));
+  } catch {
+    // Fail open: recall must never break the agent's tool call.
+  }
 } else {
   const { buildProgram } = await import("./cli-program.js");
   const { logger } = await import("./logger.js");
