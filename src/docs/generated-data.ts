@@ -166,7 +166,7 @@ const HOOK_PURPOSE: Record<string, string> = {
   "mage:nudge:Stop": "Emit a one-line session receipt (corrected, new signatures, guard fires) at turn-end.",
   "mage:observe:SubagentStop": "Capture autonomous subagent work — a Task subagent's final reply, the one capture point for multi-agent workflows.",
   "mage:memory:PreToolUse":
-    "Gate-0 (ADR-0032): scrub a native-memory write before it touches disk, deny a write to a generated index, and ask the ladder once per session (ADR-0060).",
+    "Gate-0 (ADR-0032): scrub a native-memory write before it touches disk, deny a write to a generated index, and deny the first rung-less write per agent per session with the ladder, keeping a redacted held copy (ADR-0060).",
   "mage:flatten:Stop":
     "ADR-0035 working-tree sweep: at turn-end, after CC's async restamp settles, flatten any note CC restamped this turn back to mage's flat schema — keeping the working tree neutral between commits (commit-flatten stays the durable guarantee).",
   "mage:index:Stop":
