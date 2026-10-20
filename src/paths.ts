@@ -116,7 +116,7 @@ export interface GroomingConfig {
   crownThreshold?: number;
 }
 
-/** How the memory hook treats the first rung-less memory write of a session (#282); absent ⇒ "ask". */
+/** How the memory hook treats the first rung-less memory write of a session (#282); absent ⇒ "deny-once". */
 export interface LadderConfig {
   gate?: "ask" | "deny-once";
 }
@@ -154,7 +154,7 @@ export interface MageMetadata {
   linked_at: string;
   /** Self-grooming dial (ADR-0019 §7 + ADR-0030); absent ⇒ sensitivity "normal", autonomy "operator". */
   grooming?: GroomingConfig;
-  /** The memory-hook ladder gate (#282); absent ⇒ "ask". */
+  /** The memory-hook ladder gate (#282); absent ⇒ "deny-once". */
   ladder?: LadderConfig;
   /** Gate-2 false-positive allowlist (ADR-0025); absent ⇒ no allowances. */
   redact?: RedactConfig;
@@ -185,7 +185,7 @@ export interface HubMetadata {
   projects: HubProject[];
   /** Self-grooming dial (ADR-0019 §7 + ADR-0030); absent ⇒ sensitivity "normal", autonomy "operator". */
   grooming?: GroomingConfig;
-  /** The memory-hook ladder gate (#282); absent ⇒ "ask". */
+  /** The memory-hook ladder gate (#282); absent ⇒ "deny-once". */
   ladder?: LadderConfig;
   /** Gate-2 false-positive allowlist (ADR-0025); absent ⇒ no allowances. */
   redact?: RedactConfig;
@@ -298,10 +298,23 @@ export function recallStatePath(docsRoot: string, session: string): string {
 
 /**
  * The once-per-session marker for the memory-write ladder deny —
- * `<docsRoot>/.mage/ladder/<session>` (#282). Same `safeSegment` precondition.
+ * `<docsRoot>/.mage/ladder/<session>` for the main agent, `<session>--<agentId>` for a subagent
+ * (#282). Same `safeSegment` precondition on both.
  */
-export function ladderMarkerPath(docsRoot: string, session: string): string {
-  return join(stateDir(docsRoot), "ladder", session);
+export function ladderMarkerPath(docsRoot: string, session: string, agentId?: string): string {
+  return join(stateDir(docsRoot), "ladder", agentId ? `${session}--${agentId}` : session);
+}
+
+/** Where a denied memory write is kept: `<docsRoot>/notes/.held` (#282). Committed, not state. */
+export const HELD_DIR = ".held";
+
+export function heldDirPath(docsRoot: string): string {
+  return join(docsRoot, NOTES_DIR, HELD_DIR);
+}
+
+/** `<held dir>/<session>[-<agentId>]-<slug>.md`; every segment must pass `safeSegment`. */
+export function heldNotePath(docsRoot: string, session: string, agentId: string | undefined, slug: string): string {
+  return join(heldDirPath(docsRoot), `${session}${agentId ? `-${agentId}` : ""}-${slug}.md`);
 }
 
 // ─── reading ─────────────────────────────────────────────────────────────

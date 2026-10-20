@@ -92,7 +92,7 @@ Four registrations per event collapse to one; the user's own hook survives every
 
 ## The hooks that matter in 0.0.18
 
-- **`mage memory-hook`** (PreToolUse, Write and Edit) asks the ladder once per session when the host saves a memory. `ladder.gate: "ask"` is the default; `"deny-once"` is opt-in. See [Capture](../loop/capture.md).
+- **`mage memory-hook`** (PreToolUse, Write and Edit) denies the first rung-less memory write of a session and agent once, after keeping a copy in `notes/.held/`. `ladder.gate: "deny-once"` is the default; `"ask"` is opt-in. See [Capture](../loop/capture.md).
 - **`mage recall-hook`** (PreToolUse, Bash, Write, Edit, MultiEdit and NotebookEdit) injects an admitted note whose `trigger.match` hits the call, once per session. It adds context and never blocks. See [Recall at the action](../model/recall.md).
 - **`mage index --hook`** (Stop) re-indexes only when a note changed, quietly and without blocking.
 - **`mage skills --metrics --quiet`** (Stop) keeps the context-match rollup current for [Optimize](../loop/optimize.md).

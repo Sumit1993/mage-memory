@@ -47,10 +47,10 @@ describe("ladder docs drift guard", () => {
     }
   });
 
-  it("capture page documents the redirect and the gate (memory-hook.ts: LADDER_TEXT, ask once, deny-once opt-in)", () => {
+  it("capture page documents the redirect and the gate (memory-hook.ts: LADDER_TEXT, deny once, ask opt-in, held copy, per-agent marker)", () => {
     expect(LADDER_TEXT.length).toBeGreaterThan(0);
     const capture = docText("capture.md");
-    for (const token of ["autoMemoryDirectory", "Gate-0", "once per session", "deny-once", "ladder.gate"]) {
+    for (const token of ["autoMemoryDirectory", "Gate-0", "once per session", "deny-once", "ladder.gate", "notes/.held", "agent_id", "[held]"]) {
       expect(capture, `capture.md should document "${token}"`).toContain(token);
     }
   });

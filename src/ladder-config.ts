@@ -1,12 +1,13 @@
 // `metadata.json -> ladder.gate`: how the memory hook treats the first rung-less memory write
-// of a session. "ask" (default) allows it and attaches the ladder as context; "deny-once"
-// refuses it once. Fail-open: anything unreadable or unknown reads as "ask" (#282).
+// of a session. "deny-once" (default) refuses it once after keeping a copy under notes/.held/;
+// "ask" allows it and attaches the ladder as context. Anything unreadable or unknown reads as
+// the default (#282).
 
 import { type ResolvedDocsRoot, readHubMetadata, readMetadata } from "./paths.js";
 
 export type LadderGate = "ask" | "deny-once";
 
-export const DEFAULT_LADDER_GATE: LadderGate = "ask";
+export const DEFAULT_LADDER_GATE: LadderGate = "deny-once";
 
 let warned = false;
 
@@ -15,7 +16,7 @@ export function narrowLadderGate(value: unknown): LadderGate {
   if (value === "ask" || value === "deny-once") return value;
   if (value !== undefined && !warned) {
     warned = true;
-    process.stderr.write(`mage: ladder.gate ${JSON.stringify(value)} is not "ask" or "deny-once"; using "ask"\n`);
+    process.stderr.write(`mage: ladder.gate ${JSON.stringify(value)} is not "ask" or "deny-once"; using "${DEFAULT_LADDER_GATE}"\n`);
   }
   return DEFAULT_LADDER_GATE;
 }

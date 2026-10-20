@@ -101,6 +101,20 @@ describe("mage groom — the walk", () => {
     expect(out).not.toContain("more: mage groom --all");
   });
 
+  it("lists held writes first, tagged, from notes/.held, outside the index (#282)", async () => {
+    const dir = await makeKb();
+    await writeAt(dir, "notes/bare.md", "---\ntype: gotcha\ncreated: '2026-01-01'\n---\n# Bare note\n");
+    await writeAt(dir, "notes/.held/sess-1-lesson.md", "# Held lesson\n\nA lesson the ladder denied once.\n");
+    const { value, out } = await captureLog(() => groomCmd({ dir }));
+    expect(value.notes?.map((n) => [n.relPath, n.held])).toEqual([
+      ["notes/.held/sess-1-lesson.md", true],
+      ["notes/bare.md", undefined],
+    ]);
+    expect(value.notes?.[0]).toMatchObject({ title: "Held lesson", rung: null });
+    expect(out).toContain('  1. [held] notes/.held/sess-1-lesson.md  "Held lesson"');
+    expect(out).toContain("[held] notes are writes the ladder denied once");
+  });
+
   it("caps at --limit with a pointer to --all, and --all lifts the cap", async () => {
     const dir = await makeKb();
     for (let i = 0; i < 4; i++) {

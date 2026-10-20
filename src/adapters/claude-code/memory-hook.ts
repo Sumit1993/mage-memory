@@ -1,9 +1,10 @@
 // Gate-0 on native-memory writes: scrub in flight, deny a generated index, ask the ladder
-// once per session. A failed secret scan denies; any other error passes, because a secret
-// in the committed KB is published and a missed ladder is not (ADR-0053, #282).
+// once per session per agent. The ladder deny keeps a redacted copy under notes/.held/ first.
+// A failed secret scan denies; any other error passes, because a secret in the committed KB
+// is published and a missed ladder is not (ADR-0053, #282).
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { Command } from "commander";
 import { parseNote } from "../../note.js";
 import {
@@ -13,6 +14,7 @@ import {
   INDEX_FILE,
   isUnder,
   ladderMarkerPath,
+  heldNotePath,
   MEMORY_FILE,
   NOTES_DIR,
   resolveDocsRoot,
@@ -62,15 +64,23 @@ const LADDER_TEMPLATES = [
   "A memory that carries rung: is never stopped.",
 ];
 
-/** The reply to a rung-less memory write, asked once per session. */
+const HELD_PATH_TOKEN = "<held path>";
+
+/** The reply to a rung-less memory write, asked once per session. Use {@link ladderDenyText}. */
 export const LADDER_TEXT = [
   "Not saved yet — mage asks this once per session; your next memory write will be accepted.",
   "1. For each lesson, pick the highest rung that can carry it (templates below).",
   "2. Build the rung 1-4 artifacts now.",
   "3. Retry this write with only the rung-5 lessons, each as its own file under mage/notes/<slug>.md with rung, trigger and pointer. If every lesson climbed, write nothing.",
+  `mage kept a copy of this write at ${HELD_PATH_TOKEN}; delete it once its lessons are climbed or re-filed.`,
   "",
   ...LADDER_TEMPLATES,
 ].join("\n");
+
+/** {@link LADDER_TEXT} naming where mage kept the denied write. */
+export function ladderDenyText(heldPath: string): string {
+  return LADDER_TEXT.replace(HELD_PATH_TOKEN, () => heldPath);
+}
 
 /** The ladder attached as context to the first rung-less write under gate=ask; nothing was refused. */
 export const LADDER_ASK_TEXT = [
@@ -161,25 +171,48 @@ function carriesRung(content: string): boolean {
 }
 
 /**
- * True exactly once per session, for a write that carries no rung: creating the marker is
- * the test, so a marker that cannot be written (or already exists) means no deny (#282).
+ * The write's effective content exactly once per session and agent, for a write that carries
+ * no rung; null otherwise. Creating the marker is the test, so a marker that cannot be written
+ * (or already exists) means no ask (#282).
  */
 async function askLadderOnce(
   root: string,
   session: string | undefined,
+  agentId: string | undefined,
   toolName: "Write" | "Edit",
   input: Record<string, unknown>,
   abs: string,
-): Promise<boolean> {
-  if (!session || !safeSegment(session)) return false;
-  if (carriesRung(await effectiveContent(toolName, input, abs))) return false;
-  const marker = ladderMarkerPath(root, session);
+): Promise<{ content: string } | null> {
+  if (!session || !safeSegment(session)) return null;
+  if (agentId !== undefined && !safeSegment(agentId)) return null;
+  const content = await effectiveContent(toolName, input, abs);
+  if (carriesRung(content)) return null;
+  const marker = ladderMarkerPath(root, session, agentId);
   try {
     await mkdir(dirname(marker), { recursive: true });
     await writeFile(marker, "", { flag: "wx" });
-    return true;
+    return { content };
   } catch {
-    return false;
+    return null;
+  }
+}
+
+/** Keep the redacted write under notes/.held/ so a deny loses nothing; null when it cannot be kept. */
+async function holdWrite(
+  root: string,
+  session: string,
+  agentId: string | undefined,
+  abs: string,
+  content: string,
+): Promise<string | null> {
+  try {
+    const name = basename(abs, ".md");
+    const held = heldNotePath(root, session, agentId, safeSegment(name) ? name : "note");
+    await mkdir(dirname(held), { recursive: true });
+    await writeFile(held, redact(content).text);
+    return held;
+  } catch {
+    return null;
   }
 }
 
@@ -224,10 +257,13 @@ export async function memoryPreToolUse(
   }
 
   const session = str(payload.session_id);
-  const ask = await askLadderOnce(resolved.root, session, toolName, input, target.abs).catch(
-    () => false, // the ladder fails open; the scrub above does not
+  const ask = await askLadderOnce(resolved.root, session, str(payload.agent_id), toolName, input, target.abs).catch(
+    () => null, // the ladder fails open; the scrub above does not
   );
-  if (ask && (await readLadderGate(resolved)) === "deny-once") return { kind: "deny", reason: LADDER_TEXT };
+  if (ask && session && (await readLadderGate(resolved)) === "deny-once") {
+    const held = await holdWrite(resolved.root, session, str(payload.agent_id), target.abs, ask.content);
+    if (held) return { kind: "deny", reason: ladderDenyText(held) };
+  }
   const context = ask ? LADDER_ASK_TEXT : undefined;
 
   if (scrubbed === null) return context ? { kind: "context", context } : PASS;

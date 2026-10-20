@@ -43,7 +43,7 @@ mage was designed by mining the *idea* behind server-backed agent-memory tools â
 
 ## Memory that climbs a ladder
 
-A remembered fact is enforcement debt until something enforces it. When your agent saves a memory, mage asks once per session whether a higher rung could carry it: an impossible state, a check, a hook, a rule in `AGENTS.md`. Only what must stay a note stays one, with a `trigger` that says when it matters.
+A remembered fact is enforcement debt until something enforces it. When your agent saves a memory, mage refuses it once per session, keeps a copy, and asks whether a higher rung could carry it: an impossible state, a check, a hook, a rule in `AGENTS.md`. Only what must stay a note stays one, with a `trigger` that says when it matters.
 
 - **Recall at the action.** A note whose `trigger.match` hits a tool call is injected on PreToolUse, once per session.
 - **Grooming.** `mage groom` walks existing notes up the ladder and lands each change by pull request.

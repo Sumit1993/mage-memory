@@ -18,8 +18,7 @@ that carries no `rung` is allowed and the ladder with a template per rung is att
 ends in a retry. Every later write passes, a write carrying `rung` always passes, and a failed secret scan denies in
 both modes. A write to a regenerated index is refused with a redirect to its own file under `mage/notes/`. Reserved root files (AGENTS.md, CLAUDE.md,
 IDENTITY.md, README.md, Dashboard.md) are not memory targets; only INDEX.md, MEMORY.md and `_index.*.md` are
-denied, because `mage index` regenerates them. Recall de-dup and the ladder marker are keyed per `session_id`,
-so subagents that share their parent's `session_id` share both. `mage groom` walks existing notes up the ladder
+denied, because `mage index` regenerates them. Recall de-dup is keyed per `session_id`, so subagents that share their parent's `session_id` share it. `mage groom` walks existing notes up the ladder
 and lands the result by pull request. The loop is cut from the surface: its verbs, skills and docs, the ledger and the two-count release. Its code
 (observe on its hook events, distill, the proposal engine, the dashboard) stays until #223 removes it. Success is fewer operator corrections per session, read from the
 receipt's `corrected`.
@@ -27,6 +26,14 @@ receipt's `corrected`.
 3 of 126 sessions read a note (0050). In eval E2 (n=3, one model) plain scored 1 of 5, attach-only 1.00 and
 deny-once 1.33. In E2 with neutral examples (n=3, one model) deny-once lost every lesson in 2 of 3 runs while the
 agent told the user they were recorded, hence ask as the default (#282). A per-call hook cost 102 ms before the fast path (#239).
+## Amendment (2026-10-20, #282)
+Operator ruling: the gate default is `deny-once` with a safety net, and `ask` is opt-in. Before the deny, the hook
+writes the redacted effective content of the write to `notes/.held/<session>[-<agent>]-<slug>.md`, the reply names
+that path, a Stop hook reminds the agent of held files, and `mage groom` lists them first. If the copy cannot be
+written, the hook falls back to `ask`. Why: a weaker model (gemma) lost memories under a plain deny; the held copy
+removes the loss on every model, and deny still gets the climb that ask let slip. The ladder marker is now keyed on
+`session_id` and `agent_id`, so the parent and each subagent are asked once. This replaces the "asks by default" and
+"`deny-once` is opt-in" sentences in Decision and the "hence ask as the default" clause in Why.
 ## Forbids
 A recall hook that blocks or decides permission. Regex matchers. Recall of decisions. Denying a memory write twice
 in a session, or one that carries `rung`. A counting gate on a release. A second recall field beside `trigger`.

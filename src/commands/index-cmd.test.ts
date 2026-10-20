@@ -291,6 +291,19 @@ describe("mage index", () => {
     expect(idx).toContain("Real");
   });
 
+  it("never lists a held write under notes/.held/ (#282)", async () => {
+    const dir = await vault();
+    await note(dir, "kept.md", "---\ntype: note\n---\n# Kept\n");
+    await note(dir, ".held/sess-1-lesson.md", "---\ntype: note\n---\n# Held lesson\n");
+    const r = await index({ dir });
+    expect(r.noteCount).toBe(1);
+    const idx = await readFile(join(dir, "mage", "INDEX.md"), "utf8");
+    expect(idx).toContain("[Kept](notes/kept.md)");
+    expect(idx).not.toContain("Held lesson");
+    expect(idx).not.toContain(".held");
+    expect(await readFile(join(dir, "mage", "MEMORY.md"), "utf8")).not.toContain("Held lesson");
+  });
+
   it("cleans stale generated wing index files and reports them in deleted", async () => {
     const dir = await vault();
     const staleWing = join(dir, "mage", "_index.oldwing.md");

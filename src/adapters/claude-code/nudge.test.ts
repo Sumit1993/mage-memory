@@ -441,3 +441,33 @@ describe("mage nudge — KB access grant (#202)", () => {
     expect(r.pending).toBe(baseline.pending);
   });
 });
+
+describe("the Stop reminder for held writes (#282)", () => {
+  const stop = (dir: string, sessionId: string) => nudgeCmd({ cwd: dir, hookEventName: "Stop", sessionId });
+
+  async function hold(root: string, name: string): Promise<string> {
+    const p = join(root, "notes", ".held", name);
+    await mkdir(join(p, ".."), { recursive: true });
+    await writeFile(p, "# Held\n");
+    return p;
+  }
+
+  it("names this session's held files in one notice line", async () => {
+    const kb = await withKb();
+    const a = await hold(kb.root, "sess-1-one.md");
+    const b = await hold(kb.root, "sess-1-agent7-two.md");
+    await hold(kb.root, "sess-2-other.md");
+    const r = await stop(kb.dir, "sess-1");
+    expect(r.notice).toBe(
+      `mage · 2 lesson(s) held, not filed: ${[b, a].sort().join(", ")}. Climb or re-file them, or run mage groom.`,
+    );
+    expect(r.notice).not.toContain("sess-2");
+  });
+
+  it("stays silent when nothing is held for the session", async () => {
+    const kb = await withKb();
+    expect((await stop(kb.dir, "sess-1")).notice).toBeNull();
+    await hold(kb.root, "sess-2-other.md");
+    expect((await stop(kb.dir, "sess-1")).notice).toBeNull();
+  });
+});

@@ -120,10 +120,10 @@ A matcher is a subset of Claude Code's permission-rule syntax. Anything else is 
 The memory-hook gate that asks the ladder is set in `mage/metadata.json` (a hub reads its own root metadata, like `grooming`):
 
 ```json
-{ "ladder": { "gate": "ask" } }
+{ "ladder": { "gate": "deny-once" } }
 ```
 
-`ask` is the default: the first memory write of a session that carries no `rung` is allowed, and the ladder is attached as context once. `deny-once` refuses that write once, with a reply that ends in a retry; every later write passes. Any other value reads as `ask` and is reported once on stderr. The default asks because deny-once lost lessons in a measured run ([#282](https://github.com/Sumit1993/mage-memory/issues/282)). The secret scan fails closed in both modes.
+`deny-once` is the default: the first memory write of a session that carries no `rung` is refused once, with a reply that ends in a retry, after mage keeps a redacted copy at `notes/.held/<session>[-<agent>]-<slug>.md` and names it in the reply; every later write passes. The parent and each subagent are asked once, because the marker is keyed on `session_id` and the hook input's `agent_id`. If the copy cannot be written, the write is allowed with the ladder attached instead, so nothing is lost. `ask` allows the first write and attaches the ladder as context once. Any other value reads as `deny-once` and is reported once on stderr. The copy exists because a plain deny lost lessons in a measured run ([#282](https://github.com/Sumit1993/mage-memory/issues/282)). The secret scan fails closed in both modes. `notes/.held/` is never indexed; `mage groom` lists it. See [Capture](../loop/capture.md).
 
 Notes must also satisfy three readability rules ([#253](https://github.com/Sumit1993/mage-memory/issues/253)): length under 40 lines and 350 words, self-contained references with no unlinked documents, and plain words with no unslop words or em dashes. Readability findings are warnings. They never exclude a note from the roster and never fail `--strict-admission`; admission problems under `notes/` do.
 
