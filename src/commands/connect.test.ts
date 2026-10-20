@@ -49,7 +49,7 @@ describe("connect", () => {
         "mage:observe:SessionStart",
         "mage:nudge:SessionStart",
         "mage:observe:UserPromptSubmit",
-        "mage:observe:PreToolUse",
+        "mage:recall:PreToolUse",
         "mage:observe:PostToolUse",
         "mage:observe:PostToolUseFailure",
         "mage:observe:PreCompact",
@@ -74,9 +74,9 @@ describe("connect", () => {
       hooks: Record<string, Array<{ id?: string; matcher?: string }>>;
     };
     expect(settings.autoMemoryDirectory).toBe(root);
-    // PreToolUse coexists: the matcher-less observe group (#209) + the memory one.
+    // PreToolUse coexists: the recall group + the memory one.
     const pre = settings.hooks.PreToolUse ?? [];
-    expect(pre.map((g) => g.id).sort()).toEqual(["mage:memory:PreToolUse", "mage:observe:PreToolUse"]);
+    expect(pre.map((g) => g.id).sort()).toEqual(["mage:memory:PreToolUse", "mage:recall:PreToolUse"]);
     expect(pre.find((g) => g.id === "mage:memory:PreToolUse")?.matcher).toBe("Write|Edit");
   });
 

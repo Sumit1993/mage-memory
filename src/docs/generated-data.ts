@@ -155,21 +155,22 @@ const HOOK_PURPOSE: Record<string, string> = {
   "mage:nudge:SessionStart":
     "Alert on SessionStart when a proposal is waiting or an external hub/grant check failed; stays silent on plain startup.",
   "mage:observe:UserPromptSubmit": "Capture the prompt's intent.",
-  "mage:observe:PreToolUse":
-    "Capture a tool_attempt — a call was requested. Paired with the tool_use it produces by tool_use_id; an attempt with no matching use means the call was blocked (#209).",
+  "mage:recall:PreToolUse":
+    "Recall at the action (#282): before a Bash, Write, Edit, MultiEdit or NotebookEdit call, inject the admitted notes whose trigger.match hits it, once per session. Adds context only; never blocks.",
   "mage:observe:PostToolUse": "Capture each tool use — which tool, which files, which skill loaded.",
   "mage:observe:PostToolUseFailure": "Capture tool failures (a distinct salient signal).",
   "mage:observe:PreCompact": "Mark the chapter boundary just before the host compacts.",
   "mage:observe:SessionEnd": "Capture session end.",
   "mage:metrics:Stop": "Roll up context-match: did the skills that auto-loaded actually match the work that followed?",
   "mage:observe:Stop": "Capture the agent's final reply (ADR-0019 amendment to ADR-0015).",
-  "mage:nudge:Stop": "Emit a one-line session receipt (denied, corrected, new signatures, guard fires) at turn-end.",
+  "mage:nudge:Stop": "Emit a one-line session receipt (corrected, new signatures, guard fires) at turn-end.",
   "mage:observe:SubagentStop": "Capture autonomous subagent work — a Task subagent's final reply, the one capture point for multi-agent workflows.",
   "mage:memory:PreToolUse":
-    "Gate-0 (ADR-0032): redirect + scrub a native-memory write into mage's note schema before it touches disk, or deny a write to a generated index.",
-  "mage:memory:PostToolUse": "Nudge `mage groom` after a captured topic-note write (ADR-0032).",
+    "Gate-0 (ADR-0032): scrub a native-memory write before it touches disk, deny a write to a generated index, and deny the first rung-less write per agent per session with the ladder, keeping a redacted held copy (ADR-0060).",
   "mage:flatten:Stop":
     "ADR-0035 working-tree sweep: at turn-end, after CC's async restamp settles, flatten any note CC restamped this turn back to mage's flat schema — keeping the working tree neutral between commits (commit-flatten stays the durable guarantee).",
+  "mage:index:Stop":
+    "At turn-end, re-index quietly when a note changed since the last index, so a note the host saved mid-session is listed in INDEX.md and MEMORY.md (#282). Never fails the turn.",
 };
 
 /**

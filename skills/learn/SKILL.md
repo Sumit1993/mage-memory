@@ -34,7 +34,9 @@ to avoid), and **pointers** to canonical sources — never a copy of the source
    `hub_path` fallback is read only when `hub_repo` is absent or does not resolve.
    If none, tell the user to run `mage init` first.
 
-2. **Walk the better home ladder (ADR-0041).** Ask: *"Would an agent, mid-task and not looking for it, be better off if this arrived unbidden?"* Check the ladder rows in order before authoring a note:
+2. **Ask the ladder first (ADR-0060).** A note is the last rung. Before drafting one, ask of each fact: could it be a deny rule in `.claude/settings.json`, a test or pre-commit check, a PreToolUse hook, or one line in AGENTS.md? If so, build that instead and stop. The templates are in the `mage:ladder` text that `mage groom` prints. Only what no rung above can carry becomes a note.
+
+   **Walk the better home ladder (ADR-0041).** Ask: *"Would an agent, mid-task and not looking for it, be better off if this arrived unbidden?"* Check the ladder rows in order before authoring a note:
    - **Code comment:** file/function-scoped detail that rots with the code.
    - **Ticket or `work/`:** work not yet done, forward plans, task lists (`mage/work/`).
    - **Doc beside code:** current-truth spec describing what the system IS.
@@ -86,12 +88,17 @@ to avoid), and **pointers** to canonical sources — never a copy of the source
      …"*. If you cannot complete it truthfully, the verdict is MERGE — unless an existing note answers the question but its content is now wrong, in which case the verdict is SUPERSEDE.
 
 5. **Draft the note** (do not write yet).
-   - **For NEW / SUPERSEDE:** draft the frontmatter (all optional, but fill
-     what you know):
+   - **For NEW / SUPERSEDE:** draft the frontmatter. `rung`, `trigger` and
+     `pointer` are required; fill the rest you know:
      ```yaml
      ---
      type: interface
      tags: [billing/payments]
+     rung: note
+     trigger:
+       when: <the moment it matters>
+       match: ["Bash(<cmd> *)", "Edit(<glob>)"]   # optional; makes it recallable at the action
+     pointer: "[<source>](<path or issue>)"
      created: <ISO date>
      last_reviewed: <ISO date>
      provenance: { repo: <repo>, commit: <sha>, work: <work-slug> }
@@ -174,11 +181,9 @@ adopting an authored skill is *remembering*, not copying a source (ADR-0013 §5)
    one review. Write only after the user confirms; then suggest `mage index`
    and the `git` commands (never auto-run, never auto-commit).
 
-> **Observed scratch is a different lane.** `--from` imports *foreign* docs by
-> pointer. Distilling mage's **own** observed `.learnings/*.jsonl` into notes
-> lives in the separate **/mage:groom** skill — mage reads only its own
-> artifacts; foreign memory stores (ECC instincts, Claude `MEMORY.md`) are not
-> harvested (ADR-0018).
+> **Foreign stores are not harvested.** `--from` imports *foreign* docs by
+> pointer. mage reads only its own artifacts; foreign memory stores (ECC
+> instincts, Claude `MEMORY.md`) are not harvested (ADR-0018).
 
 ## Quality bar
 
@@ -186,7 +191,7 @@ adopting an authored skill is *remembering*, not copying a source (ADR-0013 §5)
 - Points to canonical sources; doesn't mirror them.
 - Tagged with one `#<wing>/<room>` so it lands in the index and the wing skill.
 - Links to related notes as graph edges.
-- **Keep it short.** A lesson captured inline during work (via `mage observe`) targets
+- **Keep it short.** A lesson captured inline during work targets
   the CC-memory-sized `lessonNoteCap` (~1200 chars) — one durable fact, tersely. The
   larger 6000-char `noteSizeCap` is for deliberately authored design/reference notes.
 

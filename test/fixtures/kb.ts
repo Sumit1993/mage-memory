@@ -24,6 +24,7 @@ import { onTestFinished } from "vitest";
 import { gitInit } from "../../src/git.js";
 import {
   type GroomingConfig,
+  type LadderConfig,
   type HubProject,
   type ResolvedDocsRoot,
   META_DIR,
@@ -73,6 +74,8 @@ export interface WithKbOptions {
   grooming?: GroomingConfig;
   /** Metadata schema version (default 2). schema 1 exercises the migrate/normalize paths. */
   schema?: 1 | 2;
+  /** The `ladder` sub-object to write into metadata (omit => none). For "project"/"external" it lands in the HUB's metadata. */
+  ladder?: LadderConfig;
   /** Hub projects to register ("hub"/"external"). */
   projects?: HubProject[];
   /** The hub-owned project name ("project"/"external"; default "p"). */
@@ -97,7 +100,7 @@ function schemaTag(schema: 1 | 2): string {
   return schema === 1 ? METADATA_SCHEMA_V1 : METADATA_SCHEMA;
 }
 
-function inRepoMeta(schema: 1 | 2, grooming?: GroomingConfig): Record<string, unknown> {
+function inRepoMeta(schema: 1 | 2, grooming?: GroomingConfig, ladder?: LadderConfig): Record<string, unknown> {
   const meta: Record<string, unknown> = {
     schema: schemaTag(schema),
     mode: "in-repo",
@@ -108,10 +111,16 @@ function inRepoMeta(schema: 1 | 2, grooming?: GroomingConfig): Record<string, un
     linked_at: "2026-06-08T00:00:00.000Z",
   };
   if (grooming) meta.grooming = grooming;
+  if (ladder) meta.ladder = ladder;
   return meta;
 }
 
-function hubMeta(schema: 1 | 2, grooming?: GroomingConfig, projects: HubProject[] = []): Record<string, unknown> {
+function hubMeta(
+  schema: 1 | 2,
+  grooming?: GroomingConfig,
+  projects: HubProject[] = [],
+  ladder?: LadderConfig,
+): Record<string, unknown> {
   const meta: Record<string, unknown> = {
     schema: schemaTag(schema),
     name: "hub",
@@ -119,6 +128,7 @@ function hubMeta(schema: 1 | 2, grooming?: GroomingConfig, projects: HubProject[
     projects,
   };
   if (grooming) meta.grooming = grooming;
+  if (ladder) meta.ladder = ladder;
   return meta;
 }
 
@@ -144,10 +154,11 @@ async function buildHub(
   grooming: GroomingConfig | undefined,
   projects: HubProject[] | undefined,
   prefix?: string,
+  ladder?: LadderConfig,
 ): Promise<string> {
   const hub = await tmpDir(prefix);
   await mkdir(join(hub, PROJECTS_DIR), { recursive: true }); // looksLikeHub needs projects/
-  await writeJson(hubMetadataPath(hub), hubMeta(schema, grooming, projects));
+  await writeJson(hubMetadataPath(hub), hubMeta(schema, grooming, projects, ladder));
   return hub;
 }
 
@@ -159,12 +170,12 @@ async function mustResolve(dir: string): Promise<ResolvedDocsRoot> {
 
 /** Build a temp KB of the requested shape, resolve it, and return a uniform handle. Auto-cleaned. */
 export async function withKb(opts: WithKbOptions = {}): Promise<KbHandle> {
-  const { kind = "repo", grooming, schema = 2, projects, project = "p", prefix } = opts;
+  const { kind = "repo", grooming, ladder, schema = 2, projects, project = "p", prefix } = opts;
 
   if (kind === "repo") {
     const base = await tmpDir(prefix);
     await mkdir(join(base, META_DIR), { recursive: true });
-    await writeJson(metadataPath(base), inRepoMeta(schema, grooming));
+    await writeJson(metadataPath(base), inRepoMeta(schema, grooming, ladder));
     const resolved = await mustResolve(base);
     return { dir: base, root: resolved.root, repo: base, resolved };
   }
@@ -172,7 +183,7 @@ export async function withKb(opts: WithKbOptions = {}): Promise<KbHandle> {
   if (kind === "external") {
     // An external-mode code repo whose metadata points at a hub; resolution follows hub_path into
     // the hub-owned project. The hub owns the docs + grooming (repo == hub); dir is the code repo.
-    const hub = await buildHub(schema, grooming, projects, prefix);
+    const hub = await buildHub(schema, grooming, projects, prefix, ladder);
     await mkdir(hubProjectDocsRoot(hub, project), { recursive: true });
     const repoDir = await tmpDir(prefix);
     await mkdir(join(repoDir, META_DIR), { recursive: true });
@@ -182,7 +193,7 @@ export async function withKb(opts: WithKbOptions = {}): Promise<KbHandle> {
   }
 
   // "hub" / "project": grooming + projects live in the hub's own metadata at the hub root.
-  const hub = await buildHub(schema, grooming, projects, prefix);
+  const hub = await buildHub(schema, grooming, projects, prefix, ladder);
 
   if (kind === "hub") {
     const resolved = await mustResolve(hub);

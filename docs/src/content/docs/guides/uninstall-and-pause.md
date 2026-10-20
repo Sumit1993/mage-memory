@@ -130,8 +130,8 @@ If you change what `mage migrate` prints, update this transcript with it.
 - **Your notes.** Everything under `mage/` — notes, `INDEX.md`, `decisions/` — is
   committed markdown. Uninstalling removes none of it; it is yours, portable, and
   readable without mage installed at all.
-- **The capture scratch is throwaway.** The git-ignored sinks
-  (`.mage/learnings/`, `.mage/staging/`, `.mage/metrics/`) are disposable by
+- **The machine state is throwaway.** The git-ignored sinks
+  (`.mage/metrics/`, `.mage/recall/`, and `learnings/` or `staging/` from older versions) are disposable by
   design — delete the `.mage/` directory if you want a clean slate.
 - **Hub clones `connect` may have made.** External and hybrid mode derive a
   hub's local clone at `~/.mage/hubs/<host>/<owner>/<repo>`, outside any repo

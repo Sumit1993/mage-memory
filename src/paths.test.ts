@@ -13,6 +13,7 @@ import {
   hubProjectDocsRoot,
   hubProjectPath,
   isUnder,
+  ladderMarkerPath,
   looksLikeHub,
   outOfRepoKbRoots,
   outOfRepoKbTargets,
@@ -21,6 +22,7 @@ import {
   normalizeMetadata,
   ownedDocsRoots,
   readHubMetadata,
+  recallStatePath,
   explainNoDocsRoot,
   externalDocsRoot,
   readMetadata,
@@ -888,5 +890,13 @@ describe("findCodeRepoRoot", () => {
   it("returns null when no code-repo KB exists above the start dir", async () => {
     const dir = await tmpDir("mage-findrepo-");
     expect(await findCodeRepoRoot(dir)).toBeNull();
+  });
+});
+
+describe("session state paths (#282)", () => {
+  it("keeps recall state and the ladder marker under .mage, one file per session", () => {
+    const root = join("kb", "mage");
+    expect(recallStatePath(root, "s1")).toBe(join(root, ".mage", "recall", "s1.json"));
+    expect(ladderMarkerPath(root, "s1")).toBe(join(root, ".mage", "ladder", "s1"));
   });
 });

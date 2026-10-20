@@ -348,11 +348,19 @@ describe("mage migrate — state fold (ADR-0025)", () => {
 });
 
 describe("mage migrate — 0.0.x clearing (#207)", () => {
-  /** A 0.0.17-shaped settings.local.json: commandeer tier, auto-memory relocated, no observe PreToolUse. */
+  /** A 0.0.17-shaped settings.local.json: commandeer tier, auto-memory relocated, a memory PostToolUse arm, no recall hook. */
   function legacySettings(): ClaudeSettings {
     const { settings } = upsertMageHooks(null, { commandeer: true });
-    const pre = (settings.hooks?.PreToolUse ?? []).filter((g) => g.id !== "mage:observe:PreToolUse");
-    settings.hooks = { ...settings.hooks, PreToolUse: pre };
+    const pre = (settings.hooks?.PreToolUse ?? []).filter((g) => g.id !== "mage:recall:PreToolUse");
+    const post = [
+      ...(settings.hooks?.PostToolUse ?? []),
+      {
+        id: "mage:memory:PostToolUse",
+        matcher: "Write|Edit",
+        hooks: [{ type: "command" as const, command: "mage memory-hook" }],
+      },
+    ];
+    settings.hooks = { ...settings.hooks, PreToolUse: pre, PostToolUse: post };
     return { ...settings, autoMemoryDirectory: "/x", mageStashedAutoMemoryDirectory: "/y" };
   }
 
@@ -390,23 +398,24 @@ describe("mage migrate — 0.0.x clearing (#207)", () => {
     expect(again.cleared.every((c) => c.outcome === "absent")).toBe(true);
   });
 
-  it("adds the observe arm to a 0.0.17 settings file and keeps its tier and auto-memory keys", async () => {
+  it("adds the recall arm to a 0.0.17 settings file, reaps the retired memory PostToolUse, and keeps its tier and auto-memory keys", async () => {
     const { dir } = await withKb();
     const path = await writeLocal(dir, legacySettings());
 
     const r = await mageMigrate({ dir });
-    expect(r.hooks).toEqual({ path, outcome: "written", observeArm: "added" });
+    expect(r.hooks).toEqual({ path, outcome: "written", recallArm: "added" });
     const after = JSON.parse(await readFile(path, "utf8")) as ClaudeSettings;
     const ids = (after.hooks?.PreToolUse ?? []).map((g) => g.id);
-    expect(ids).toContain("mage:observe:PreToolUse");
+    expect(ids).toContain("mage:recall:PreToolUse");
     expect(ids).toContain("mage:memory:PreToolUse");
+    expect((after.hooks?.PostToolUse ?? []).map((g) => g.id)).not.toContain("mage:memory:PostToolUse");
     expect(hasCommandeerHooks(after)).toBe(true);
     expect(after.autoMemoryDirectory).toBe("/x");
     expect(after.mageStashedAutoMemoryDirectory).toBe("/y");
 
     const bytes = await readFile(path, "utf8");
     const again = await mageMigrate({ dir });
-    expect(again.hooks).toEqual({ path, outcome: "unchanged", observeArm: "present" });
+    expect(again.hooks).toEqual({ path, outcome: "unchanged", recallArm: "present" });
     expect(await readFile(path, "utf8")).toBe(bytes);
   });
 

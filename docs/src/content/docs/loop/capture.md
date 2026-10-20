@@ -1,136 +1,78 @@
 ---
-title: Capture (observe)
-description: How mage captures session signal into the git-ignored learnings scratch without ever blocking your work.
+title: Capture
+description: How a memory gets written as a note, and how the memory hook asks the ladder once per session and agent, and keeps what it denies.
 sidebar:
   order: 2
 ---
 
-Capture is the first stage of the loop. It is how mage builds up the raw material that everything else distills, promotes, and grooms. It is passive: you never type a capture command. Your coding host fires hooks as you work, and each one runs `mage observe`, which appends a single event to a git-ignored scratch directory.
+Capture is how knowledge becomes a note. There are two doors: the host saving a memory, which the memory hook meets, and you or the agent running `/mage:learn`.
 
-This passive seam is distinct from the *deliberate* capture you trigger on the spot: the `/mage:learn` skill, which drafts a finished note for you (insight, procedure, pointers) and writes it after you confirm. See [Install and Quickstart](../start/quickstart.md) for `/mage:learn`; the rest of this page is the passive `mage observe` seam that feeds the loop.
+## The memory hook
 
-## What `mage observe` is
+Claude Code's native memory is pointed at the knowledge base: `mage connect` sets `autoMemoryDirectory` in the settings file it wires, so a memory the host saves lands under `mage/`, where this hook sees it first (Gate-0, ahead of the file reaching disk).
 
-`mage observe` is a hook-fired capture seam. It reads one Claude Code hook payload on stdin, maps it to one structured event, scrubs the free-text fields for secrets, and appends it to `.mage/learnings/` — the observed scratch. It is a plumbing command: you do not run it by hand, the hooks run it for you (see how to wire those in [Install and quickstart](../start/quickstart.md), via `mage connect`).
+`mage memory-hook` is a PreToolUse hook on Write and Edit, wired by `mage connect` when Claude Code auto-memory is on and a docs root resolves. It scrubs the write for secrets and applies three rules:
 
-The scratch is **git-ignored** and auto-pruned. It is not knowledge yet — it is the deterministic trail of what happened, the substrate the later stages read.
+- **The ladder, once.** The first memory write of a session, at the root or under `notes/`, that carries no `rung` is denied once, with a reply that ends in a retry and names where mage kept a copy. Every later write passes, and a write carrying `rung` always passes. This is `ladder.gate: "deny-once"`, the default.
+- **A copy is kept.** Before the deny, the hook writes the redacted content of the write (for an Edit, the file as it would read after the edit) to `notes/.held/<session>[-<agent>]-<slug>.md`. If that copy cannot be written, the hook does not deny: it falls back to `ask`, allowing the write and attaching the ladder as context. Nothing is lost either way.
+- **`ask`, opt in.** `ladder.gate: "ask"` in `mage/metadata.json` allows the first write and attaches the ladder as context instead. See [Admission and triggers](../model/notes.md#admission-and-triggers).
+- **Regenerated files are refused.** A write to `INDEX.md`, `MEMORY.md` or `_index.*.md` is denied with a redirect to its own file under `mage/notes/`, because `mage index` regenerates them.
 
-## It never blocks your work
+A failed secret scan denies the write in both modes. The ladder is asked once per `session_id` and per agent: Claude Code adds an `agent_id` to the hook input inside a subagent, so the parent and each subagent are asked once. The main agent has no `agent_id`.
 
-This is the load-bearing property of capture. `mage observe` is **fail-open**: every path resolves to a clean exit, so a malformed payload, an unreadable scratch, a missing knowledge base, or any filesystem error silently does nothing rather than breaking your session. If there is no knowledge base under the working directory, it writes nothing at all. Capture is meant to be invisible — it should never be the reason a tool call or a session start hangs.
+## Held writes
 
-Secret-scrubbing runs the other way: if the redactor itself throws on a field, that field degrades to a sentinel rather than leaking the raw value. Capture fails open; redaction fails closed.
+`notes/.held/` is not a note directory. `mage index` and the roster never list it, and `mage groom` lists each file in it first, tagged `[held]`, so you can climb it, file it as a note, or delete it. Held files are committed like any note, and the secret scan covers them. When a session ends with files still held, the Stop hook prints one line naming them. It never blocks.
 
-## What each hook captures
+A worked run, captured from the built CLI in a throwaway repo (paths shortened to `<repo>`):
 
-mage wires several hooks, each firing `mage observe` at a different moment, so the scratch carries a complete trail of a chapter. The events it records:
+```text
+$ # the agent saves a memory with no rung: PreToolUse -> mage memory-hook
+permissionDecision: deny
+permissionDecisionReason:
+  Not saved yet — mage asks this once per session; your next memory write will be accepted.
+  1. For each lesson, pick the highest rung that can carry it (templates below).
+  2. Build the rung 1-4 artifacts now.
+  3. Retry this write with only the rung-5 lessons, each as its own file under mage/notes/<slug>.md ...
+  mage kept a copy of this write at <repo>/mage/notes/.held/abc123-no-em-dashes.md; delete it once its lessons are climbed or re-filed.
+  1 impossible: a deny rule in .claude/settings.json
+  ...
 
-- **SessionStart** — the session-start context (harness, working directory, mage version, and the start `source`).
-- **UserPromptSubmit** — the intent of each prompt you submit.
-- **PostToolUse** — each tool use: which tool ran, which files it touched, and whether a Skill loaded.
-- **PostToolUseFailure** — tool failures, captured as a distinct, high-value signal (an error followed by the fix that worked is exactly the kind of gotcha worth a note).
-- **PreCompact** — a marker for the chapter boundary, written just before the host compacts.
-- **SessionEnd** — the session ending.
-- **Stop** — the agent's final reply (read from the transcript).
-- **SubagentStop** — an autonomous subagent's final reply; this is the one capture point for multi-agent work, since a subagent's tool calls never reach the main session's hooks.
-
-A separate hook, `mage:metrics:Stop`, is not capture — it rolls up context-match (did the skills that auto-loaded match the work?). That feeds [Optimize](./optimize.md), not the scratch.
-
-## Capture on Claude Code: the native-memory redirect (Gate-0)
-
-The `mage observe` seam above records the *trail*; the lesson and recurrence stages distill notes from it. On Claude Code there is a second, more direct capture seam: the host's own native-memory reflex, **redirected into mage**.
-
-Claude Code writes memories on its own. `mage connect` points its `autoMemoryDirectory` at the knowledge base and wires a **Gate-0** `PreToolUse` hook on `Write`/`Edit`. When the host saves a memory, Gate-0 fires before the file touches disk and:
-
-- **scrubs** secrets and PII out of the content before it touches disk (the same redactor the rest of the pipeline uses), so the write lands redacted — the frontmatter is deliberately left alone, since normalization to mage's schema happens later, at the durable boundary. The scrub is a pure-regex rewrite of the raw bytes — no parse step that could fail — and the hook honors the same fail-open contract as `mage observe`: an infrastructure error passes the write through rather than breaking the session (deny exists only for generated-index targets); or
-- **denies** the write outright if it targets a generated index (`INDEX.md`, `MEMORY.md`, a wing index) — mage owns those and regenerates them.
-
-The result lands flat at the docs-root top as a **capture inbox** file. It is not committed knowledge yet: the next `mage groom` ingests the inbox into `.mage/staging/` and routes it through the same human-confirm gate as every other draft. See [Stage and groom](./stage-groom.md).
-
-```mermaid Gate-0 on Claude Code: a native-memory write is intercepted before disk — a generated-index target is denied, a flat topic note is scrubbed in-flight and lands as a capture-inbox note, and the next groom ingests it into staging. Anything else passes untouched.
-flowchart TD
-  w["host native-memory Write / Edit"] --> g0{"Gate-0 · PreToolUse intercept"}
-  g0 -->|"targets a generated index<br/>(INDEX.md · MEMORY.md · _index.*.md)"| d["deny — mage owns it;<br/>mage index regenerates it"]
-  g0 -->|"a flat .md note at the docs root"| s["scrub secrets in-flight —<br/>redacted before any byte hits disk"]
-  g0 -->|"anything else"| p["pass untouched"]
-  s --> i["capture-inbox note at the docs-root top"]
-  i --> gr["mage groom ingests it into .mage/staging/ —<br/>the same human-confirm gate as every draft"]
-```
-
-Like `mage observe`, Gate-0 is **fail-open**: any stdin/parse/redact/filesystem error emits nothing and exits clean, so a capture gate can never block the host's write. It is adapter-specific and active only when Claude Code's `autoMemoryEnabled` is on; on other harnesses the volitional directive (write a mage note to the inbox) is the capture path.
-
-For the exact event names, hook ids, and the command each runs, see the [Hooks reference](../reference/hooks.mdx).
-
-## Note admission under the notes folder
-
-When a write or edit targets a file under the `notes/` directory, Gate-0 runs an admission check on the frontmatter before bytes reach disk.
-
-A note must explain why it belongs on the note rung rather than a higher rung. It provides this explanation through four frontmatter fields:
-
-- `rung`: the rung name (such as `note`).
-- `skipped`: a map stating why each higher rung was skipped (for `note`: `impossible`, `check`, `hook`, and `rule`).
-- `trigger`: a single line describing the condition that brings this note back.
-- `pointer`: a markdown link pointing to the issue, pull request, or file behind the note.
-
-The hook evaluates writes along this decision path:
-
-1. **Target check**: If the target sits outside `notes/`, the write passes untouched. Nothing in the codebase yet marks a file as a proposal, so this check is the only gate; a proposal-file exemption is future work, not implemented here.
-2. **Admission validation**: If any of the four fields is missing or invalid, the hook refuses the write with a fixed plain-text reply. It refuses every such attempt, not only the first. If the frontmatter does not parse, or the check itself fails, the hook refuses too: this gate never fails open.
-3. **Scrub**: An admitted write goes through the same redaction as any other memory write. If a secret is found, the hook rewrites the content with the secret masked. Otherwise the write passes untouched and your normal permission prompt still applies.
-
-### Worked example: passing frontmatter
-
-This note supplies all four admission fields, so the hook admits it:
-
-```markdown
+$ cat mage/notes/.held/abc123-no-em-dashes.md
 ---
-rung: note
-skipped:
-  impossible: cannot be ruled out by types
-  check: behavioral, not static
-  hook: cannot observe across sessions
-  rule: agent needs a lesson
-trigger: when soak monitor misses an incident
-pointer: "[issue #229](https://github.com/Sumit1993/mage-memory/issues/229)"
+name: no-em-dashes
+description: Do not use em dashes in commit messages.
 ---
-# Soak monitor blind spots
+# No em dashes
 
-Body text.
+Contact [REDACTED:email] if the commit hook rejects one.
+
+$ # the agent retries: the marker for (abc123, main agent) exists, so the write passes
+permissionDecision: allow   # scrubbed 1 secret/PII value(s) before this memory reached disk
+
+$ # the agent stops with the held file still there: Stop -> mage nudge
+mage · 1 lesson(s) held, not filed: <repo>/mage/notes/.held/abc123-no-em-dashes.md. Climb or re-file them, or run mage groom.
+
+$ mage groom
+mage groom: 1 of 1 notes to judge (notes without a rung come first).
+  1. [held] notes/.held/abc123-no-em-dashes.md  "No em dashes"  rung: -  trigger: -  pointer: -
+For each note: climb (build the rung below, then delete the note), delete (stale, or a copy of a source),
+or keep (add rung, trigger and pointer). mage never commits: land the whole diff as one pull request.
+[held] notes are writes the ladder denied once: climb them, move them to notes/<slug>.md with rung, trigger and pointer, or delete them.
 ```
 
-### Worked example: refused frontmatter
+The retry saved the note, so the held copy is now a duplicate: delete it, or climb the lesson to a higher rung and delete both.
 
-This note lacks `rung`, `skipped`, `trigger`, and `pointer`:
+## `/mage:learn`
 
-```markdown
----
-title: Soak monitor blind spots
-tags:
-  - monitoring
----
-# Soak monitor blind spots
+The `/mage:learn` skill drafts a finished note (insight, procedure, pointers) and writes it after you confirm. See [Install and Quickstart](../start/quickstart.md). The note needs `rung`, `trigger` and `pointer` to be admitted for recall.
 
-Body text.
-```
+## After the write
 
-Gate-0 refuses this write with the following reply:
+Two Stop hooks run. `mage index --hook` re-indexes only when a note changed, quietly and without blocking. `mage nudge` prints the session receipt and, if this session still has held writes, the one line that names them. A note that passes admission is then recalled when a tool call matches its `trigger.match`; see [Recall at the action](../model/recall.md).
 
-```
-mage:mage/guard/note-admission
+## Fail-open, except secrets
 
-This write was stopped because the note does not say why it is a note.
-A note is the last rung. Four rungs sit above it: impossible, check,
-hook, rule. Say in one line each why this cannot be one of those, in a
-`skipped:` block, and add `rung:`, `trigger:` and `pointer:`.
+The hooks never break a session. A malformed payload, an unreadable file or a missing knowledge base resolves to a clean exit. Redaction is the opposite: if the redactor fails on a field, the write is denied rather than leaked. See [Redaction](../reference/redaction.md).
 
-Then write it again, or open a proposal instead.
-```
-
-## What happens to the scratch
-
-Capture only writes the trail. The later stages read it:
-
-- The **boundary nudge** distills the just-closed chapter from the scratch and drafts forgotten lessons. See [The boundary nudge](./nudge.md).
-- **Distill** and **promote** read closed chapters of the scratch to surface first-sight insights and recurring patterns. See [Promote and graduate](./promote-graduate.md).
-
-Capture is the only stage that runs automatically on every event. Everything downstream is gated on a chapter closing and on your confirmation.
+The earlier passive trail written by `mage observe` is cut from the surface (ADR-0060); its code stays until #223.

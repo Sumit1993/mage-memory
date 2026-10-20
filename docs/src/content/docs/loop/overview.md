@@ -1,128 +1,54 @@
 ---
-title: The self-grooming loop
-description: The lifecycle that turns captured session signal into durable notes and loadable skills.
+title: The ladder
+description: How mage keeps what an agent learns, climbing it to a rule, hook or check where it can and recalling a note at the action where it must.
 sidebar:
   order: 1
 ---
 
-mage watches your coding sessions, drafts what looks worth remembering, and lets you confirm it into durable notes — without you stopping to write documentation. That cycle is the **self-grooming loop**. This page is the map; each stage links to its own page.
+A remembered fact is enforcement debt until something enforces it. mage asks, before a fact is kept as a note, whether a higher rung can carry it. This page is the map; each part links to its own page.
 
-First, what mage *is*: **a note is a memory.** mage is your agent's memory — the hard-earned knowledge it would otherwise re-learn every session — made durable, curated, portable, and shareable. It is not a separate knowledge base bolted onto your agent; it *is* the agent's memory, in files you own.
+## The rungs
 
-Two terms the rest of the page leans on:
+The highest rung that can carry the fix wins. A lower rung is chosen only when every higher one is shown not to apply.
 
-- A **note** is one such memory: a small markdown file under `mage/notes/` holding one piece of hard-earned knowledge — insight plus procedure plus pointers, never a copy of a source. It is exactly what an agent remembers across sessions, made committed and indexed.
-- A **compact-chapter** is one stretch of work between context compactions (or session ends). When your coding host compacts the conversation to free up context, that closes a chapter. mage counts chapters, not session ids — so one long, continuously-compacted chat still produces many chapters.
+| rung | what carries the fix |
+| --- | --- |
+| `impossible` | architecture, config or a deny rule makes the mistake unavailable |
+| `check` | a lint, test, CI job or pre-commit check fails on it |
+| `hook` | a hook blocks or rewrites the call at the moment of the action |
+| `rule` | one line in `AGENTS.md` or a skill |
+| `note` | a note in `mage/notes/`, recalled at the action |
 
-## The loop
+A note carries `rung`, `trigger` and `pointer` in its frontmatter; see [Admission and triggers](../model/notes.md#admission-and-triggers).
 
-mage is **harness-agnostic**: the diagram below is the whole of it, and nothing in it is specific to any one coding agent. (How a particular host plugs in — to make capture automatic and recall un-skippable — is an opt-in adapter, covered under [Using mage with a coding agent](#using-mage-with-a-coding-agent).)
+## Where it runs
 
-```mermaid The self-grooming loop: your work is captured to a git-ignored trail, becomes a draft, you groom the draft into committed notes, and a proven note graduates into a skill whose trigger optimize keeps sharp — all feeding back into the work.
+```mermaid The ladder: a memory write is denied once per session and agent with a copy kept, a note that passes admission is recalled when a tool call matches its trigger, and mage groom walks existing notes up and lands the change by pull request.
 flowchart TD
-  work["Your work"] --> capture["Capture — a git-ignored trail of each session (automatic)"]
-
-  capture -->|"a striking insight, worth keeping now"| draft["DRAFT — staging · not yet trusted"]
-  capture -->|"at a chapter boundary: the nudge surfaces forgotten lessons"| draft
-  capture --> Distill["Distill — mine the trail"]
-  Distill --> Promote["Promote — a pattern recurring across enough<br/>chapters, with no note covering it"]
-  Promote --> draft
-
-  draft --> groom{"Groom — you accept or reject the batch"}
-  groom -->|reject| rej[("rejected — remembered, won't re-surface")]
-  groom -->|accept| notes["notes/ — committed · indexed · recalled next time"]
-
-  notes --> Graduate["Graduate — a proven procedure becomes a loadable skill"]
-  Graduate --> Optimize["Optimize — keep each skill's trigger sharp"]
-  Optimize --> work
-  notes --> work
+  save["The agent saves a memory"] --> gate["Memory hook: denies once, keeps a copy in notes/.held"]
+  gate --> note["notes/ — rung, trigger, pointer"]
+  note --> idx["mage index — admission and roster"]
+  idx --> recall["Recall hook: a tool call matches trigger.match, the note is injected"]
+  recall --> work["The agent's next action"]
+  note --> groom["mage groom — walks notes up the ladder"]
+  groom -->|pull request| higher["a rule, hook or check"]
 ```
 
-A note is born one of two ways, and both converge on the same `groom → notes/` gate:
-
-**The lesson path (first sight).** Always-on capture feeds the everyday path: the agent drafts a short lesson the first time something is worth remembering — a striking insight kept on the spot, or a forgotten one the boundary nudge surfaces when a chapter closes (the nudge writes nothing itself; the agent stages). This is the path most new users will use. See [Stage and groom](./stage-groom.md) and [The boundary nudge](./nudge.md).
-
-**The recurrence path.** A deterministic engine folds the captured trail into per-signature tallies. A pattern that keeps recurring — across enough distinct chapters, with no note already covering it — surfaces as a candidate. A proven procedural note that recurs even more **graduates** into its own auto-loadable skill, and **optimize** keeps that skill's trigger sharp. See [Promote and graduate](./promote-graduate.md).
-
-Both paths converge on `notes/` — your committed knowledge, indexed in `INDEX.md` and recalled at the start of future work.
-
-The chapter boundary is a **view**, not a stored state: mage derives it from the capture trail (a `PreCompact` marker, or a `SessionStart` with `source=compact`) rather than persisting a "chapter closed" flag. Nothing downstream waits on a record of the boundary; the digest is recomputed from the trail each time.
-
-## The states a lesson moves through
-
-A lesson is disposable until you accept it. It passes through two transient, git-ignored states before it becomes a committed one — and this table is the whole pipeline at a glance: where each state lives, whether git keeps it, and the one thing that moves it forward.
-
-```mermaid The states a lesson moves through: git-ignored throwaway scratch (raw capture, then draft) on the left flows rightward into the committed, durable side — a note, the two recall surfaces it feeds, and a skill.
-flowchart LR
-  subgraph IGN["git-ignored · throwaway scratch"]
-    raw["Raw capture<br/>.mage/learnings"]
-    draft["Draft<br/>.mage/staging"]
-  end
-  subgraph COM["committed · durable"]
-    note["Note<br/>notes/"]
-    index["Recall · pulled<br/>INDEX.md — all memory notes"]
-    mem["Recall · pushed<br/>MEMORY.md — top-K roster"]
-    skill["Skill"]
-  end
-  raw -->|"stage / distill+promote"| draft
-  draft -->|"groom — you accept"| note
-  note -->|"index"| index
-  note -->|"index"| mem
-  mem -. "overflow line" .-> index
-  note -->|"graduate"| skill
-```
-
-| State | Where it lives | Git | What moves it on |
-|---|---|---|---|
-| **Raw capture** | `.mage/learnings/` | ignored | written automatically by the capture hook; auto-pruned |
-| **Draft** | `.mage/staging/` | ignored | `stage` (first sight) or `distill` → `promote` (recurrence); scrubbed + deduped |
-| **Note** | `notes/` | **committed** | `groom` — you accept the draft; re-indexed on the way |
-| **Recall — pulled** | `INDEX.md` — every memory-genre note | **committed** | `index` regenerates it after every accept |
-| **Recall — pushed** | `MEMORY.md` — the top-ranked entries that fit the host's budget | **committed** | `index` regenerates it after every accept |
-| **Skill** | a loadable skill | **committed** | `graduate` — a proven procedural note that recurs enough |
-
-Only the bottom four rows are committed to git; the top two are throwaway scratch. And nothing here is durable until *you* run `git commit` — see [Nothing auto-commits](#nothing-auto-commits).
-
-## Using mage with a coding agent
-
-mage has **no runtime** — it rides whatever hooks the host gives it. Left to itself, the loop's capture is *volitional* (you write a note when you remember to) and recall is a file you're *meant* to read. A host **adapter**, wired by `mage connect`, makes both deterministic. For Claude Code it plugs into the loop at exactly two points — and nowhere inside it:
-
-- **Capture.** Instead of Claude Code writing memories to its private store, mage co-opts that write, scrubs it before it touches disk, and drops it on the lesson path. See [Capture — the native-memory redirect](./capture.md).
-- **Recall.** mage's index is also written as `MEMORY.md`, under the filename Claude Code's auto-load looks for — so your notes are present at launch every session without anyone having to "read the index." It is a **bounded roster**, not a copy of `INDEX.md`: what is pushed at launch is the governance line plus the top-ranked entries that fit the host's auto-memory budget, and one overflow line sends you to the full `INDEX.md` for everything else. Ranking puts notes you have actually used first where local metrics exist, and falls back to recency where they don't. An annotated example of the roster is in [The graph](../model/graph.md#the-two-recall-surfaces).
-
-```mermaid How the Claude Code adapter plugs into the harness-free core at two seams: Gate-0 scrubs a memory write and feeds the core's capture, and the core's recall index is written out as the auto-loaded MEMORY.md.
-flowchart LR
-  subgraph CORE["mage core · harness-free"]
-    cap["capture → draft"]
-    rec["recall ← index"]
-  end
-  subgraph CC["Claude Code adapter · mage connect"]
-    g0["Gate-0 — scrub a memory write → the inbox"]
-    tw["MEMORY.md — auto-loaded at launch"]
-  end
-  g0 -->|feeds| cap
-  rec -->|written as| tw
-```
-
-Strip the adapter away and the loop above is unchanged. On any other harness the same two seams are filled by the volitional directive — write a note to the inbox, read `INDEX.md` — same notes, same index, just without the un-skippable enforcement.
-
-## Where each stage lives
-
-| Stage | What it does | Page |
-|---|---|---|
-| Capture | A hook-fired trail of session events, written to a git-ignored scratch; never blocks your work. | [Capture](./capture.md) |
-| Boundary nudge | On a post-compaction start, surfaces a read-only digest of the closed chapter plus the grooming backlog for the agent to mine — it writes nothing itself. | [The boundary nudge](./nudge.md) |
-| Stage and groom | The lesson path: staged drafts → the `/mage:groom` skill → accepted notes. | [Stage and groom](./stage-groom.md) |
-| Promote and graduate | The recurrence path: recurring signatures → note candidates → graduated skills. | [Promote and graduate](./promote-graduate.md) |
-| Optimize | Context-match rewords or demotes the generated skills. | [Optimize](./optimize.md) |
-| Claude Code adapter | The opt-in capture redirect + recall twin that make the loop deterministic on Claude Code. | [Capture](./capture.md) |
+1. **The memory hook** runs when the host saves a memory. By default it denies the first write that carries no `rung` once per session and per agent, after keeping a redacted copy under `notes/.held/`; the reply carries the ladder, with a template per rung, and names the copy. `ladder.gate: "ask"` in `mage/metadata.json` is the opt-in that allows the write and attaches the ladder as context instead. A failed secret scan denies in both modes. See [Capture](./capture.md).
+2. **Recall at the action** injects an admitted note on PreToolUse when its `trigger.match` globs hit the call, once per session. See [Recall at the action](../model/recall.md).
+3. **The Stop hooks** run `mage index --hook`, so a note saved this turn is indexed without anyone typing a command, and `mage nudge`, which names any held write the session left behind.
+4. **`mage groom`** walks existing notes up the ladder and lands each change by pull request. Nothing is committed to your default branch.
 
 ## Nothing auto-commits
 
-mage **writes files; you commit them.** Capture appends to a git-ignored scratch. Accepting a draft writes a note and re-indexes. Graduating mints a skill. None of these run `git commit` — every stage stops at the working tree and suggests a `git` command for you to run after you have reviewed the diff. The judgment calls — "is this a real lesson?", "is this trigger right?" — are always made by the host agent or by you, never by a model inside mage.
+mage writes files; you commit them. `mage groom` is the one exception, and it can only commit to a branch under `mage/proposal/` and open a pull request, once you turn it on. The judgment calls, such as "is a higher rung possible?", are made by the host agent or by you, never by a model inside mage.
 
-## What tunes the loop
+## What was cut
 
-Two numbers gate the recurrence path, and a sensitivity dial scales them together: **K** (how many chapters before a pattern becomes a note candidate) and **M** (how many before a proven note graduates into a skill). See [Thresholds and the dial](../reference/thresholds.mdx) for the exact values and the low / normal / high positions.
+Version 0.0.18 cut the earlier loop of streams, digests, proposals, a ledger and a counting gate. The verbs `distill`, `promote`, `graduate`, `ingest`, `stage`, `dashboard` and `footprint` are signposts that print where their work went. See [ADR-0060](https://github.com/Sumit1993/mage-memory/blob/main/mage/decisions/0060-the-ladder-reset.md).
 
-A second, independent dial — the per-KB **[autonomy level](./autonomy.md)** — sets how far the host agent may act on the grooming backlog on its own (Operator / Approver / Overseer), with the one invariant that holds at every level: nothing is durable until *you* `git commit`.
+| Part | Page |
+| --- | --- |
+| Memory hook and note capture | [Capture](./capture.md) |
+| Keeping wing-skill triggers sharp | [Optimize](./optimize.md) |
+| Hooks mage wires | [Hooks](../reference/hooks.mdx) |

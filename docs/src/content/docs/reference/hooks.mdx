@@ -1,6 +1,6 @@
 ---
 title: Hooks
-description: The capture hooks mage wires into Claude Code, generated from the code.
+description: The hooks mage wires into Claude Code, generated from the code.
 sidebar:
   order: 2
 ---
@@ -9,12 +9,12 @@ import HooksTable from '../../../components/HooksTable.astro';
 
 # Hooks
 
-mage has no background daemon and no watcher process. Everything it learns, it
-learns by riding the events your coding host already fires. When you run
+mage has no background daemon and no watcher process. It
+rides the events your coding host already fires. When you run
 [`mage connect`](../reference/commands.mdx), mage writes a small set of `mage:*`
 hook groups into your host's settings (for Claude Code, `.claude/settings.local.json`),
 each tagged with a stable `id` so mage can update or remove exactly its own groups
-and never touch yours. Capture is the host calling these commands at the right
+and never touch yours. The host calls these commands at the right
 moment — when nothing happens in the host, nothing runs.
 
 The table below is generated from the `MAGE_HOOKS` list in the code (via
@@ -34,10 +34,9 @@ Each row is one hook group mage owns:
   (a drifted command is replaced in place). `mage doctor` compares the installed
   ids against this list to detect drift. Groups written by a pre-id mage carry no
   tag; see [Who owns a hook group](#who-owns-a-hook-group--write-repair-detect).
-- **Command** — the mage CLI invocation the host runs. Most are
-  [`mage observe`](../reference/commands.mdx); these are plumbing you never type
-  by hand.
-- **Purpose** — what that capture point records.
+- **Command** — the mage CLI invocation the host runs. They are
+  hidden plumbing you never type by hand; see the [Commands reference](../reference/commands.mdx).
+- **Purpose** — what that hook does.
 
 ## Who owns a hook group — write, repair, detect
 
@@ -91,45 +90,13 @@ $ jq '[.hooks[][]] | length' .claude/settings.local.json
 Four registrations per event collapse to one; the user's own hook survives every step.
 `mage doctor --fix` reaches the same end state without a `connect`.
 
-## The capture family
+## The hooks that matter in 0.0.18
 
-The `mage:observe:*` rows are the workhorses. They fan out across the host's
-lifecycle — session start, each prompt you submit, each tool use, tool failures,
-the pre-compaction boundary, session end, the agent's final reply, and a
-subagent's final reply — and append one event apiece to a gitignored capture
-scratch under your knowledge base. They carry no `matcher`, so they observe every
-tool, not a subset.
+- **`mage memory-hook`** (PreToolUse, Write and Edit) denies the first rung-less memory write of a session and agent once, after keeping a copy in `notes/.held/`. `ladder.gate: "deny-once"` is the default; `"ask"` is opt-in. See [Capture](../loop/capture.md).
+- **`mage recall-hook`** (PreToolUse, Bash, Write, Edit, MultiEdit and NotebookEdit) injects an admitted note whose `trigger.match` hits the call, once per session. It adds context and never blocks. See [Recall at the action](../model/recall.md).
+- **`mage index --hook`** (Stop) re-indexes only when a note changed, quietly and without blocking.
+- **`mage skills --metrics --quiet`** (Stop) keeps the context-match rollup current for [Optimize](../loop/optimize.md).
 
-Two design rules matter for trust:
+The `mage observe` and `mage nudge` rows still appear in the table. They belong to the cut loop (ADR-0060): the code stays until #223 removes it.
 
-- **observe never blocks the host.** Capture is append-only and best-effort: if a
-  capture step errors, it stays out of your way and the host keeps going. mage is
-  memory, not a gate.
-- **Capture rides the host, with no runtime daemon.** There is no separate process
-  to start, supervise, or leak. The hooks are the entire runtime surface.
-
-### Guard events
-
-Hooks that block or rewrite tool calls, such as claude-kit guards, can pipe a guard event directly to `mage observe` on stdin:
-
-```text
-$ echo '{"guard_id":"kit/guard/no-haiku","tool":"Agent","detail":"model=haiku"}' | mage observe
-```
-
-The event is admitted by the presence of a `guard_id` key or by specifying `--event guard_fired`. It validates the `<scope>/guard/<slug>` format, scrubs any detail string, and appends a single `guard_fired` event to the scratch.
-
-## The boundary nudge
-
-The capture-adjacent hooks running `mage nudge` provide session boundary visibility:
-
-- **`mage:nudge:Stop`**: When Claude stops or completes a turn, `mage nudge` inspects the session events in scratch and emits a concise receipt:
-  `mage: <N> denied · <N> corrected · <N> new signatures · <N> guard fires`
-  If all four counts are zero or if no knowledge base exists in the workspace, it remains silent and exits 0.
-
-- **`mage:nudge:SessionStart`**: At session startup or resumption, `mage nudge` stays quiet by default. It prints only when action is needed:
-  - If graduation proposals are waiting, it outputs `mage · 1 proposal is waiting` (or plural).
-  - If a connected hub repository or grant check fails, it outputs a single status warning.
-  Otherwise, it outputs nothing.
-
-See [The boundary nudge](../loop/nudge.md) for details on session receipts and boundary handling, and the [Commands reference](../reference/commands.mdx) for the CLI surface behind these hooks.
-
+Every hook is fail-open: a hook that errors stays out of your way and the host keeps going. mage is memory, not a gate; the one exception is a write the secret scan could not check, which the memory hook denies.

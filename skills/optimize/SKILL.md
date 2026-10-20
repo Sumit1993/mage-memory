@@ -1,18 +1,37 @@
 ---
 name: optimize
 description: |
-  Tighten which scenarios mage's generated skills auto-load on — the reword/demote
-  half of the self-grooming loop. Fires when the user says "optimize", "are my
-  skills firing right", "tune my triggers", or periodically once context-match has
-  enough loads to judge. Reads the read-only context-match report
-  (`mage skills --metrics --json`), and for each weak trigger judges a sharper
-  one-line `description` and applies a bounded reword — or, when a skill never
-  fits, a demote — by piping a Proposal to `mage dream --apply`. Nudge-invoked,
-  human-confirmed, never auto-committed.
-allowed-tools: Read, Grep, Glob, Bash
+  Keep recall sharp. First test each admitted note's `trigger.match` with
+  `mage recall-hook --explain` against calls it should and should not hit, and
+  fix the pattern. Then tighten which scenarios mage's generated wing skills
+  auto-load on: read `mage skills --metrics --json` and, for each weak trigger,
+  apply a bounded reword or a demote through `mage dream --apply`. Fires on
+  "optimize", "are my skills firing right", "tune my triggers", or "is recall
+  firing". Human-confirmed, never auto-committed.
+allowed-tools: Read, Grep, Glob, Edit, Bash
 ---
 
-# /mage:optimize — reword or demote on context-match
+# /mage:optimize — keep recall sharp
+
+## First: test each note's match
+
+A note reaches the agent at the action only if its `trigger.match` fires on the
+right tool calls. For each admitted note that has one (`mage index` prints how
+many), check it before anything else:
+
+1. Write two or three tool calls it should hit and two or three it should not, as
+   hook JSON, for example
+   `{"hook_event_name":"PreToolUse","session_id":"x","tool_name":"Bash","tool_input":{"command":"npx mage index"},"cwd":"."}`.
+2. Feed each to `mage recall-hook --explain` on stdin. It reads and writes no
+   state. A `match` line means the note fires; `skip` means it does not.
+3. Fix the pattern in the note when it misses a call it should hit, or hits one it
+   should not. Matchers are globs: `Bash(<cmd> *)` and `Edit(<glob>)`.
+4. A note whose moment never comes in real work goes to `/mage:groom`: it may belong
+   on a higher rung, or be deleted.
+
+Then tune the generated wing skills, below.
+
+## Then: reword or demote on context-match
 
 A generated mage skill (`mage-skill-<slug>`, `mage-wing-<x>`) auto-loads on its
 frontmatter `description:` trigger. **context-match** measures whether the work
@@ -134,8 +153,7 @@ trigger has no signal to optimize against yet.
    }' | mage dream --apply
    ```
    Demote **archives the skill and keeps the backing note** — the note is the
-   substrate; only its pushed (auto-loaded) form retires (the reverse of
-   `/mage:graduate`). The ceiling holds: demote never hard-deletes — the skill is
+   substrate; only its pushed (auto-loaded) form retires The ceiling holds: demote never hard-deletes — the skill is
    archived, recoverable, never `rm`-ed. The knowledge survives in the note; it
    just stops auto-loading where it never helped.
 
@@ -218,13 +236,9 @@ edits this pass — the learning rate held.
 
 ## See also
 
-- **/mage:graduate** (`skills/graduate/SKILL.md`) — the forward move (note →
-  Procedure skill); demote is its reverse (skill → archived, note kept).
-- **/mage:groom** (`skills/groom/SKILL.md`) — its Phase 2 routes graduate
-  proposals for proven notes (ADR-0038); `/mage:graduate` confirms them and
-  `mage dream --apply` — the single serialized writer — mints the generated
-  skills this skill then tunes.
+- **/mage:groom** (`skills/groom/SKILL.md`) — walks notes up the ladder; send it a
+  note whose trigger never fires.
+- **ADR-0060** (`mage/decisions/0060-the-ladder-reset.md`) — recall at the action.
 - **ADR-0057** (`mage/decisions/0057-a-guard-lands-by-pull-request.md`)
   — context-match as the load-bearing predicate, the confidence ladder, the
-  single-writer applier, the four hard ceilings, and the scratch → note → skill
-  ladder with its textual-learning-rate held-out gate.
+  single-writer applier, and the four hard ceilings.
