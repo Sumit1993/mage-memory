@@ -9,7 +9,6 @@ import { flattenCmd } from "./commands/flatten.js";
 import { dream } from "./commands/dream-cmd.js";
 import { groomCmd } from "./commands/groom-cmd.js";
 import { index } from "./commands/index-cmd.js";
-import { ingestCmd } from "./commands/ingest.js";
 import { type InitMode, type InitVisibility, init } from "./commands/init.js";
 import { link, type Storage } from "./commands/link.js";
 import { list } from "./commands/list.js";
@@ -214,13 +213,11 @@ export function buildProgram(): Command {
   // ─── ingest ──────────────────────────────────────────────────────────────────
   program
     .command("ingest", { hidden: true })
-    .description(
-      "Enumerate + classify ingestable sources under <dir> (read-only) — what `mage:learn --from` distills.",
-    )
-    .argument("<dir>", "directory to scan for ingestable sources")
-    .option("--json", "emit the manifest as JSON to stdout (machine-readable)")
-    .action(async (dir: string, opts: { json?: boolean }) => {
-      await ingestCmd(dir, { json: opts.json });
+    .description("Retired signpost: use `mage groom` instead")
+    .argument("[args...]")
+    .allowUnknownOption()
+    .action(async () => {
+      printRetiredVerb("ingest", false);
     });
 
   // ─── distill ─────────────────────────────────────────────────────────────────
