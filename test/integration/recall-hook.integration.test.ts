@@ -2,7 +2,7 @@
 // over the BUILT CLI and a real KB (#282). No external tools, no billing.
 
 import { spawnSync } from "node:child_process";
-import { mkdir, mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -78,11 +78,8 @@ describe("integration: memory-hook asks the ladder once (deterministic)", () => 
       cwd: dir,
     });
 
-  it("gate=deny-once: two rung-less root writes in one session give one deny, then a non-deny", async () => {
+  it("gate=deny-once (the default): two rung-less root writes in one session give one deny that keeps a copy, then a non-deny", async () => {
     const { dir, root } = await initKb();
-    const metaPath = join(root, "metadata.json");
-    const meta = JSON.parse(await readFile(metaPath, "utf8")) as Record<string, unknown>;
-    await writeFile(metaPath, JSON.stringify({ ...meta, ladder: { gate: "deny-once" } }, null, 2));
     const write = rungless(root, dir);
 
     const first = JSON.parse(hook("memory-hook", write, dir).stdout) as {
@@ -90,6 +87,14 @@ describe("integration: memory-hook asks the ladder once (deterministic)", () => 
     };
     expect(first.hookSpecificOutput.permissionDecision).toBe("deny");
     expect(first.hookSpecificOutput.permissionDecisionReason).toContain("Not saved yet");
+    const held = join(root, "notes", ".held", "s1-feedback_commit_style.md");
+    expect(first.hookSpecificOutput.permissionDecisionReason).toContain(held);
+    expect(await readFile(held, "utf8")).toContain("No em dashes.");
+
+    const stop = JSON.parse(
+      hook("nudge", JSON.stringify({ hook_event_name: "Stop", session_id: "s1", cwd: dir }), dir).stdout,
+    ) as { systemMessage: string };
+    expect(stop.systemMessage).toContain("1 lesson(s) held, not filed");
 
     const second = hook("memory-hook", write, dir);
     expect(second.code).toBe(0);
@@ -100,8 +105,11 @@ describe("integration: memory-hook asks the ladder once (deterministic)", () => 
     expect(decision).not.toBe("deny");
   });
 
-  it("gate=ask (the default): the first rung-less write is allowed with the ladder as context, once", async () => {
+  it("gate=ask (opt-in): the first rung-less write is allowed with the ladder as context, once, and nothing is held", async () => {
     const { dir, root } = await initKb();
+    const metaPath = join(root, "metadata.json");
+    const meta = JSON.parse(await readFile(metaPath, "utf8")) as Record<string, unknown>;
+    await writeFile(metaPath, JSON.stringify({ ...meta, ladder: { gate: "ask" } }, null, 2));
     const write = rungless(root, dir);
 
     const first = JSON.parse(hook("memory-hook", write, dir).stdout) as {
@@ -115,6 +123,7 @@ describe("integration: memory-hook asks the ladder once (deterministic)", () => 
       ? (JSON.parse(second.stdout) as { hookSpecificOutput: { additionalContext?: string } }).hookSpecificOutput
       : {};
     expect(again.additionalContext).toBeUndefined();
+    expect(await readdir(join(root, "notes")).then((n) => n.includes(".held"))).toBe(false);
   });
 });
 

@@ -23,9 +23,9 @@ A note carries `rung`, `trigger` and `pointer` in its frontmatter; see [Admissio
 
 ## Where it runs
 
-```mermaid The ladder: a memory write asks the ladder once per session, a note that passes admission is recalled when a tool call matches its trigger, and mage groom walks existing notes up and lands the change by pull request.
+```mermaid The ladder: a memory write is denied once per session and agent with a copy kept, a note that passes admission is recalled when a tool call matches its trigger, and mage groom walks existing notes up and lands the change by pull request.
 flowchart TD
-  save["The agent saves a memory"] --> gate["Memory hook: asks the ladder once per session"]
+  save["The agent saves a memory"] --> gate["Memory hook: denies once, keeps a copy in notes/.held"]
   gate --> note["notes/ — rung, trigger, pointer"]
   note --> idx["mage index — admission and roster"]
   idx --> recall["Recall hook: a tool call matches trigger.match, the note is injected"]
@@ -34,9 +34,9 @@ flowchart TD
   groom -->|pull request| higher["a rule, hook or check"]
 ```
 
-1. **The memory hook** runs when the host saves a memory. By default it asks the ladder once per session: the first write that carries no `rung` is allowed and the ladder, with a template per rung, arrives as context. `ladder.gate: "deny-once"` in `mage/metadata.json` is the opt-in that refuses that write once. A failed secret scan denies in both modes. See [Capture](./capture.md).
+1. **The memory hook** runs when the host saves a memory. By default it denies the first write that carries no `rung` once per session and per agent, after keeping a redacted copy under `notes/.held/`; the reply carries the ladder, with a template per rung, and names the copy. `ladder.gate: "ask"` in `mage/metadata.json` is the opt-in that allows the write and attaches the ladder as context instead. A failed secret scan denies in both modes. See [Capture](./capture.md).
 2. **Recall at the action** injects an admitted note on PreToolUse when its `trigger.match` globs hit the call, once per session. See [Recall at the action](../model/recall.md).
-3. **The Stop hook** runs `mage index --hook`, so a note saved this turn is indexed without anyone typing a command.
+3. **The Stop hooks** run `mage index --hook`, so a note saved this turn is indexed without anyone typing a command, and `mage nudge`, which names any held write the session left behind.
 4. **`mage groom`** walks existing notes up the ladder and lands each change by pull request. Nothing is committed to your default branch.
 
 ## Nothing auto-commits

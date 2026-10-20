@@ -3,7 +3,7 @@
 // --accept/--reject act only on 0.0.17 drafts already in .mage/staging/ until #223.
 
 import { readFile, realpath } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { join, relative, resolve } from "node:path";
 import { logger } from "../logger.js";
 import {
   type ResolvedDocsRoot,
@@ -12,7 +12,8 @@ import {
   stagingPath,
 } from "../paths.js";
 import { resolveCreationStamp, stampProvenance } from "../provenance.js";
-import { type ScannedNote, scanNotes } from "../scan.js";
+import { listHeld } from "../held.js";
+import { scanNotes, toPosix } from "../scan.js";
 import { hasLiveSecret, scanSecrets } from "../redact.js";
 import { readRedactConfig, scanStaged } from "../staged-scan.js";
 import { redactIgnoreFromMetadata } from "../redactignore.js";
@@ -50,7 +51,7 @@ import {
 } from "../grooming/staging.js";
 import { recoverCcFrontmatter } from "../adapters/claude-code/cc-note.js";
 import { GROOM_LADDER_TEXT } from "../adapters/claude-code/memory-hook.js";
-import { parseNote, writeNote } from "../note.js";
+import { noteTitle, parseNote, writeNote } from "../note.js";
 import { type Rung, RUNGS, checkAdmission } from "../scanner/admission.js";
 import { genreOf } from "../scanner/genre-map.js";
 import { parseTrigger } from "../scanner/trigger.js";
@@ -84,6 +85,8 @@ export interface GroomNoteView {
   trigger: string | null;
   pointer: string | null;
   problems: string[];
+  /** A write the ladder denied, kept under notes/.held/ (#282): climb it, file it as a note, or delete it. */
+  held?: true;
 }
 
 /** Result of {@link groomCmd}: a walk view XOR an accept/reject disposition. */
@@ -150,7 +153,7 @@ export async function groomCmd(opts: GroomOptions): Promise<GroomResult> {
 
 // ─── the walk (read-only) ────────────────────────────────────────────────────
 
-async function viewNote(root: string, entry: ScannedNote): Promise<GroomNoteView> {
+async function viewNote(root: string, entry: { relPath: string; title?: string }): Promise<GroomNoteView> {
   const raw = await readFile(join(root, entry.relPath), "utf8").catch(() => "");
   const { frontmatter } = parseNote(raw);
   const recovered = recoverCcFrontmatter(frontmatter).frontmatter;
@@ -158,7 +161,7 @@ async function viewNote(root: string, entry: ScannedNote): Promise<GroomNoteView
   const pointer = typeof recovered.pointer === "string" && recovered.pointer.trim() ? recovered.pointer : null;
   return {
     relPath: entry.relPath,
-    title: entry.title,
+    title: entry.title ?? noteTitle(parseNote(raw).body, entry.relPath),
     rung,
     trigger: parseTrigger(recovered.trigger)?.when ?? null,
     pointer,
@@ -195,6 +198,13 @@ async function walk(resolved: ResolvedDocsRoot, opts: GroomOptions): Promise<Gro
     .map((e, i): WalkItem => ({ created: e.created, view: views[i] as GroomNoteView }))
     .sort(walkOrder)
     .map((item) => item.view);
+  const heldViews = await Promise.all(
+    (await listHeld(root)).map(async (abs) => ({
+      ...(await viewNote(root, { relPath: toPosix(relative(root, abs)) })),
+      held: true as const,
+    })),
+  );
+  ordered.unshift(...heldViews);
 
   const limit = opts.all ? ordered.length : (opts.limit ?? DEFAULT_LIMIT);
   const notes = ordered.slice(0, limit);
@@ -209,7 +219,7 @@ async function walk(resolved: ResolvedDocsRoot, opts: GroomOptions): Promise<Gro
   logger.info(`mage groom: ${notes.length} of ${ordered.length} notes to judge (notes without a rung come first).`);
   notes.forEach((n, i) => {
     logger.info(
-      `  ${i + 1}. ${n.relPath}  "${n.title}"  rung: ${n.rung ?? "-"}  trigger: ${n.trigger ?? "-"}  pointer: ${n.pointer ?? "-"}`,
+      `  ${i + 1}. ${n.held ? "[held] " : ""}${n.relPath}  "${n.title}"  rung: ${n.rung ?? "-"}  trigger: ${n.trigger ?? "-"}  pointer: ${n.pointer ?? "-"}`,
     );
   });
   if (ordered.length > notes.length) {
@@ -219,6 +229,11 @@ async function walk(resolved: ResolvedDocsRoot, opts: GroomOptions): Promise<Gro
     "For each note: climb (build the rung below, then delete the note), delete (stale, or a copy of a source),\n" +
       "or keep (add rung, trigger and pointer). mage never commits: land the whole diff as one pull request.",
   );
+  if (heldViews.length > 0) {
+    logger.info(
+      "[held] notes are writes the ladder denied once: climb them, move them to notes/<slug>.md with rung, trigger and pointer, or delete them.",
+    );
+  }
   if (drafts.length > 0) {
     logger.info(
       `${drafts.length} staged draft(s) from 0.0.17 wait in .mage/staging/: mage groom --accept|--reject <slugs|all>`,
