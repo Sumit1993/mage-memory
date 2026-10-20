@@ -12,6 +12,7 @@ import {
   INDEX_FILE,
   MEMORY_FILE,
   NOTES_DIR,
+  PROJECTS_DIR,
   absolutePath,
   exists,
   ownedDocsRoots,
@@ -861,6 +862,13 @@ async function cleanGeneratedWingIndexes(
   return deleted;
 }
 
+/** Generated at the docs root, or at the root of a hub-owned project that fan-out indexes (#283). */
+function isGeneratedHere(rel: string): boolean {
+  if (isGeneratedArtifact(rel)) return true;
+  const [top, project, ...rest] = rel.split("/");
+  return top === PROJECTS_DIR && project !== undefined && rest.length > 0 && isGeneratedArtifact(rest.join("/"));
+}
+
 /**
  * True when INDEX.md and MEMORY.md exist and no note is as new as INDEX.md, nor any note
  * directory newer than the last generated file (a deleted note only moves its directory).
@@ -871,7 +879,7 @@ async function indexIsFresh(root: string): Promise<boolean> {
   const memory = await stamp(join(root, MEMORY_FILE));
   if (indexed === null || memory === null) return false;
   const generated = Math.max(indexed, memory);
-  const paths = (await listNotePaths(root)).filter((n) => !isGeneratedArtifact(n));
+  const paths = (await listNotePaths(root)).filter((n) => !isGeneratedHere(n));
   for (const n of paths) {
     const t = await stamp(join(root, n));
     if (t !== null && t >= indexed) return false;

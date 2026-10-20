@@ -20,7 +20,7 @@ flowchart LR
 
 ## Gate 1 — scrub and continue (on capture)
 
-The first boundary is every memory write the memory hook sees. Here the engine runs in **scrub-and-continue** mode: it finds secret-shaped values, replaces them in place, and keeps going. Nothing blocks.
+The first boundary is every memory write the memory hook sees. Here the engine runs in **scrub-and-continue** mode: it finds secret-shaped values, replaces them in place, and keeps going. A detected value never blocks the write. The one exception is a scan that fails: the memory hook then denies the write rather than let an unchecked one through.
 
 The replacement keeps the surrounding context but masks the value, so a note stays readable:
 

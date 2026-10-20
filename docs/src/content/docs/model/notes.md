@@ -46,7 +46,8 @@ The whole resolution in one table. A **tier** is how a note is listed: tier 2 is
 
 Non-memory types (`plan`, `spec`, `tasks`, `decision`) remain legal note types for storage and linking, but are non-memory genres (`work`, `doc`, `decision` per ADR-0041) that are excluded from always-loaded recall — authored deliberately rather than as default destinations for captured knowledge:
 - **decision** — an ADR: a choice, the reasoning, and what it rules out (stored in `mage/decisions/`).
-- **spec** / **plan** / **tasks** — specifications, forward work plans, and checklists (kept in the issue tracker, per ADR-0050).
+- **spec** — a current-truth system specification, kept in repo docs beside the code.
+- **plan** / **tasks** — forward work plans and checklists, kept in the issue tracker (ADR-0050).
 
 Before authoring a memory note, walk [the ladder](../loop/overview.md) to ensure a note is the right home.
 
@@ -113,7 +114,7 @@ A matcher is a subset of Claude Code's permission-rule syntax. Anything else is 
 
 | matcher | tests | how |
 | --- | --- | --- |
-| `Bash(pattern)` | the Bash command | the whole command, or any part between `&&`, `||`, `;`, `|` or a newline, matches the glob |
+| `Bash(pattern)` | the Bash command | the whole command, or any part between `&&`, `\|\|`, `;`, `\|` or a newline, matches the glob |
 | `Edit(pattern)` | Write, Edit, MultiEdit and NotebookEdit paths | the path relative to the code repo being edited (the git repository of the edited file, which in external and hub modes is not the repo holding the notes), with `/` separators; a pattern with no `/` matches the file name at any depth |
 | `Write(pattern)` | the same as `Edit(pattern)` | an alias |
 

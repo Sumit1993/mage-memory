@@ -160,7 +160,7 @@ not per HTTP attempt.
 - depends_on [payments-gateway](../infra/payments-gateway.md)
 ```
 
-A note is stored and indexed whatever its frontmatter says, and falls back to the
+A memory-genre note is stored and indexed whatever its admission fields say, and falls back to the
 title, headers, and tags. To be recalled at the action it also needs `rung`,
 `trigger` and `pointer`. Links between notes are
 standard portable markdown — `[text](relative/path.md)` — **never**
