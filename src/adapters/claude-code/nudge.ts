@@ -1,5 +1,5 @@
 // `mage nudge` (ADR-0009; ADR-0029; ADR-0030).
-// On the Stop hook, emits a one-line session receipt (corrected, new signatures, guard fires).
+// On the Stop hook, emits a one-line session receipt (mid-task prompts, new signatures, guard fires).
 // On SessionStart (compact/startup/resume), plain startup is quiet unless a proposal is waiting or
 // an external hub/grant check failed.
 // Never blocks or throws to the host (fail-open, exit 0).

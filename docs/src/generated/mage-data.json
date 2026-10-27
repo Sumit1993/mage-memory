@@ -155,7 +155,7 @@
       "event": "Stop",
       "id": "mage:nudge:Stop",
       "command": "mage nudge",
-      "purpose": "Emit a one-line session receipt (corrected, new signatures, guard fires) at turn-end."
+      "purpose": "Emit a one-line session receipt (mid-task prompts, new signatures, guard fires) at turn-end."
     },
     {
       "event": "SubagentStop",

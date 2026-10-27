@@ -69,7 +69,7 @@ The `/mage:learn` skill drafts a finished note (insight, procedure, pointers) an
 
 ## After the write
 
-Two Stop hooks run. `mage index --hook` re-indexes only when a note changed, quietly and without blocking. `mage nudge` prints the session receipt and, if this session still has held writes, the one line that names them. A note that passes admission is then recalled when a tool call matches its `trigger.match`; see [Recall at the action](../model/recall.md).
+Two Stop hooks run. `mage index --hook` re-indexes only when a note changed, quietly and without blocking. `mage nudge` prints the session receipt and, if this session still has held writes, the one line that names them. The receipt's first count, mid-task prompts, counts what you typed after the agent acted, corrections and new instructions alike. Task notifications, quoted-message citations without a comment, image placeholders, and a repeated scheduled prompt after its first firing are not counted. A note that passes admission is then recalled when a tool call matches its `trigger.match`; see [Recall at the action](../model/recall.md).
 
 ## Fail-open, except secrets
 

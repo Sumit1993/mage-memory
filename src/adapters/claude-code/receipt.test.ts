@@ -89,7 +89,7 @@ describe("session receipt: Stop hook", () => {
     // 2 guard fires
     // 1 correction
     // 2 distinct failure skeletons
-    expect(r.notice).toBe("mage: 1 corrected · 2 new signatures · 2 guard fires");
+    expect(r.notice).toBe("mage: 1 mid-task prompts · 2 new signatures · 2 guard fires");
     expect(r.nudge).toBeNull();
   });
 
@@ -130,7 +130,7 @@ describe("session receipt: Stop hook", () => {
     // Querying s2 sees only s2
     const r2 = await nudgeCmd({ cwd: dir, hookEventName: "Stop", sessionId: "s2" });
     expect(r2.ran).toBe(true);
-    expect(r2.notice).toBe("mage: 1 corrected · 1 new signatures · 1 guard fires");
+    expect(r2.notice).toBe("mage: 1 mid-task prompts · 1 new signatures · 1 guard fires");
   });
 
   it("source=stop acts as Stop hook event", async () => {
@@ -143,7 +143,44 @@ describe("session receipt: Stop hook", () => {
 
     const r = await nudgeCmd({ cwd: dir, source: "stop", sessionId: "s-alt" });
     expect(r.ran).toBe(true);
-    expect(r.notice).toBe("mage: 0 corrected · 0 new signatures · 1 guard fires");
+    expect(r.notice).toBe("mage: 0 mid-task prompts · 0 new signatures · 1 guard fires");
+  });
+});
+
+describe("receipt: harness-generated prompts are not counted (#286)", () => {
+  const cite = (comment?: string) =>
+    "[Assistant quote](t3-citation://v1/d43dd213/7b887348/message%3Aprovider%3Anative-item%3Ad057b31b?text=Env+floor+is+the+allowlist&start=497&end=799&prefix=doctor+must&suffix=+So+your" +
+    (comment === undefined ? "" : `&comment=${encodeURIComponent(comment).replace(/%20/g, "+")}`) +
+    ")";
+  const tick =
+    "tick: read ~/ai-context/prismalens/053-overnight/resume.md and plan.md, check lane and PR state, then dispatch or report per rig:autopilot";
+  // Shapes copied from recorded .mage/learnings user_prompt rows; each follows agent work.
+  const harness = [
+    "<task-notification>\n<task-id>a59a34de3c5f1dac0</task-id>\n<tool-use-id>toolu_014UCQad77RGxCsGpAC4JSKF</tool-use-id>\n<result>Waiting for CI events.</result>\n</task-notification>",
+    "[SYSTEM NOTIFICATION - NOT USER INPUT] Background command finished with exit code 0, see the output file for details",
+    cite(),
+    cite("ok"),
+    `${cite("yes")}\n${cite("ok")}`,
+    "[Image: image.png; ref=image_01ab] [Image: source: C:\\Users\\x\\shot.png]",
+    "<<autonomous-loop-dynamic>>",
+    tick,
+    tick,
+  ];
+  const steers = [
+    "no, copy the git history instead of squashing it",
+    cite("if we are going the extra mile then we need worktree controls as a setting"),
+    `${cite("approved")}\n\nBut once the current lanes are done, first focus on the work we committed to last night`,
+    "[Image: image.png; ref=image_02cd] the button is misaligned on the settings page, fix that",
+  ];
+
+  it("counts only the real steers in a recorded mix", () => {
+    const events: ObserveEvent[] = [];
+    for (const text of [...harness, ...steers]) {
+      events.push(buildToolUse(base("s1"), { tool: "Bash", paths: [], detail: "ls", ok: true, error_summary: null }));
+      events.push(buildUserPrompt(base("s1"), text));
+    }
+    // The first tick is indistinguishable from a typed prompt; its repeats are not counted.
+    expect(computeReceipt(events).midTaskPrompts).toBe(steers.length + 1);
   });
 });
 
@@ -154,16 +191,16 @@ describe("pure receipt computation and formatting", () => {
       guardFired("s1", "kit/guard/webfetch"),
       guardFired("s1", "kit/guard/no-haiku"),
     ];
-    expect(computeReceipt(events)).toEqual({ corrected: 0, newSignatures: 0, guardFires: 2 });
+    expect(computeReceipt(events)).toEqual({ midTaskPrompts: 0, newSignatures: 0, guardFires: 2 });
   });
 
   it("formatReceipt returns null when all counts are zero", () => {
-    expect(formatReceipt({ corrected: 0, newSignatures: 0, guardFires: 0 })).toBeNull();
+    expect(formatReceipt({ midTaskPrompts: 0, newSignatures: 0, guardFires: 0 })).toBeNull();
   });
 
   it("formatReceipt formats non-zero counts in exact order", () => {
-    const formatted = formatReceipt({ corrected: 2, newSignatures: 3, guardFires: 4 });
-    expect(formatted).toBe("mage: 2 corrected · 3 new signatures · 4 guard fires");
+    const formatted = formatReceipt({ midTaskPrompts: 2, newSignatures: 3, guardFires: 4 });
+    expect(formatted).toBe("mage: 2 mid-task prompts · 3 new signatures · 4 guard fires");
   });
 
   it("computeReceipt ignores continuation prompts without tool_use/assistant_msg predecessor", () => {
@@ -172,7 +209,7 @@ describe("pure receipt computation and formatting", () => {
       buildUserPrompt(base("s1"), "no, rather use this instead"), // followed another prompt, not tool_use/assistant_msg
     ];
     const counts = computeReceipt(events);
-    expect(counts.corrected).toBe(0);
+    expect(counts.midTaskPrompts).toBe(0);
   });
 
   it("readSessionEvents returns empty array on missing directory or session", async () => {
