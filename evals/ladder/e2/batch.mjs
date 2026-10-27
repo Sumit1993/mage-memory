@@ -60,7 +60,11 @@ export async function runE2Batch({ arms, reps, concurrency, model, runId, prompt
     }
   }
   await Promise.all(Array.from({ length: Math.min(concurrency, jobs.length) }, worker));
-  writeFileSync(join(dir, "summary.md"), summarizeE2(results.filter((r) => !r.error), prompt));
+  const failed = results.filter((r) => r.error);
+  const failures = failed.length
+    ? `\n## Failed runs (${failed.length}, excluded from the counts above)\n\n${failed.map((r) => `- ${r.arm} rep ${r.rep}: ${r.error}`).join("\n")}\n`
+    : "";
+  writeFileSync(join(dir, "summary.md"), summarizeE2(results.filter((r) => !r.error), prompt) + failures);
   return results;
 }
 

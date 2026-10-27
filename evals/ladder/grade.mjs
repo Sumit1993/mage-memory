@@ -141,7 +141,8 @@ export function grade({ dir, transcript, hookLog, durationMs, base }) {
   const baseSha = base || git(dir, "rev-list", "--max-parents=0", "HEAD").trim().split("\n").pop();
   const events = parseTranscript(transcript);
   const rules = gradeRules({ dir, base: baseSha, events });
-  const tests = spawnSync("node", ["--test"], { cwd: dir, encoding: "utf8" });
+  // Model-written tests can hang; a killed run has status null and counts as a failure.
+  const tests = spawnSync("node", ["--test"], { cwd: dir, encoding: "utf8", timeout: 120_000, killSignal: "SIGKILL" });
   const commits = git(dir, "rev-list", "--count", `${baseSha}..HEAD`).trim();
   const resultEvent = events.findLast?.((e) => e.type === "result");
   const turns = resultEvent?.num_turns ?? events.filter((e) => e.type === "assistant").length;

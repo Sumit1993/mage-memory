@@ -13,7 +13,7 @@ const put = (dir, rel, text) => {
   writeFileSync(join(dir, rel), text);
 };
 
-test("e2 grade: nothing landed scores 0", () => {
+test("e2 grade: nothing landed scores 0", { skip: !existsSync(MAGE_CLI) }, () => {
   const dir = tmp();
   const { base } = buildE2("E2-plain", dir);
   const g = gradeE2({ dir, base, configDir: join(dir, "none") });
@@ -21,7 +21,7 @@ test("e2 grade: nothing landed scores 0", () => {
   assert.ok(g.corrections.every((c) => c.landed === "nothing"));
 });
 
-test("e2 grade: each correction is classified to the highest rung that mentions it", () => {
+test("e2 grade: each correction is classified to the highest rung that mentions it", { skip: !existsSync(MAGE_CLI) }, () => {
   const dir = tmp();
   const { base } = buildE2("E2-plain", dir);
   put(dir, "CLAUDE.md", "# shopcart\n\nA tiny cart library. See README.md.\n- Keep commit subjects short, under 60 characters.\n- Staging is hermes-2 and needs the VPN.\n- Never edit generated/.\n");
@@ -38,7 +38,7 @@ test("e2 grade: each correction is classified to the highest rung that mentions 
   assert.equal(gradeE2({ dir, base, configDir: join(dir, "none") }).score, 4);
 });
 
-test("e2 grade: a deny permission counts as impossible and a config-dir memory file as note", () => {
+test("e2 grade: a deny permission counts as impossible and a config-dir memory file as note", { skip: !existsSync(MAGE_CLI) }, () => {
   const dir = tmp();
   const { base } = buildE2("E2-plain", dir);
   put(dir, ".claude/settings.json", JSON.stringify({ permissions: { deny: ["Edit(generated/**)"] } }));
@@ -136,7 +136,7 @@ test("e2 setup: E2-attach registers the proto hook in attach mode", { skip: !exi
   assert.match(s.hooks.PreToolUse[0].hooks[0].command, /proto-ladder-hook\.mjs" attach$/);
 });
 
-test("e2 grade heldout: each held-out correction is classified to the highest rung that mentions it", () => {
+test("e2 grade heldout: each held-out correction is classified to the highest rung that mentions it", { skip: !existsSync(MAGE_CLI) }, () => {
   const dir = tmp();
   const { base } = buildE2("E2-plain", dir);
   put(dir, "CLAUDE.md", "# shopcart\n\nA tiny cart library. See README.md.\n- Prefer named exports over default exports.\n- Big suites need --shard on buildkite-agent-3.\n");
@@ -158,7 +158,7 @@ test("e2 grade heldout: each held-out correction is classified to the highest ru
   assert.equal(g.score, 5);
 });
 
-test("e2 grade heldout: nothing landed scores 0, and the default set is untouched", () => {
+test("e2 grade heldout: nothing landed scores 0, and the default set is untouched", { skip: !existsSync(MAGE_CLI) }, () => {
   const dir = tmp();
   const { base } = buildE2("E2-plain", dir);
   const none = join(dir, "none");

@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 export const DEFAULT_MODEL = "gemma4:31b-cloud";
 export const RUNS_DIR =
-  process.env.LADDER_RUNS_DIR || "C:\\Users\\sumit\\ai-context\\mage-memory\\204-ladder-reset\\eval-runs";
+  process.env.LADDER_RUNS_DIR || join(homedir(), "ai-context", "mage-memory", "204-ladder-reset", "eval-runs");
 
 export const CLAUDE_CREDENTIALS = join(homedir(), ".claude", ".credentials.json");
 
@@ -73,10 +73,10 @@ export function runClaude({ prompt, cwd, env, transcriptPath, stderrPath, timeou
       if (process.platform === "win32") spawn("taskkill", ["/pid", String(child.pid), "/t", "/f"]);
       else child.kill("SIGKILL");
     }, timeoutMs);
-    child.on("close", (code) => {
+    child.on("close", async (code) => {
       clearTimeout(timer);
-      out.end();
-      err.end();
+      // grade() reads the transcript next, so both streams must finish flushing first.
+      await Promise.all([out, err].map((s) => new Promise((done) => s.end(done))));
       resolve({ exitCode: code, timedOut, durationMs: Date.now() - start });
     });
     child.on("error", (e) => {

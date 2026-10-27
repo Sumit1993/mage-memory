@@ -1,5 +1,6 @@
 // Prototype ladder gate: deny the first memory write under mage/ in a session, then let later ones pass.
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { basename, isAbsolute, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -46,7 +47,8 @@ async function main() {
   } catch {
     return;
   }
-  const out = decide(payload, join(payload.cwd || process.cwd(), ".claude"), process.argv[2] === "attach" ? "attach" : "deny");
+  // Outside the graded repo, so the marker never shows up as a file the run wrote.
+  const out = decide(payload, join(tmpdir(), "mage-ladder-markers"), process.argv[2] === "attach" ? "attach" : "deny");
   if (out) process.stdout.write(`${JSON.stringify(out)}\n`);
 }
 
