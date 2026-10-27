@@ -1,0 +1,6 @@
+{
+  "T1": "Add a function applyDiscount(cart, pct) to src/cart.js that reduces every item's price by pct percent and rejects a pct outside 0-100. Add a test for it, run the tests, and commit the work for issue #12.",
+  "T2": "Add a function removeItem(cart, sku) to src/cart.js that removes the item with that sku, and logs a warning when the sku is not in the cart. Add a test for it and commit the work for issue #13.",
+  "T3": "Rename the item field qty to quantity in the schema and in everything that uses it. Run the tests and commit the work for issue #14.",
+  "T4": "total() in src/cart.js truncates instead of rounding to the nearest cent (an item priced 10.999 gives 10.99, not 11). Fix it, add a regression test, and commit the work for issue #15."
+}
