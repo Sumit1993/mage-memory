@@ -72,7 +72,7 @@
     "@types/tar": "^7.0.87",
     "@vitest/coverage-v8": "^4.1.9",
     "force-graph": "^1.51.4",
-    "tsup": "^8.3.5",
+    "tsup": "^9.0.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.9"
   }
