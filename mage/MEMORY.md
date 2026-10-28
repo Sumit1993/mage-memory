@@ -2,7 +2,7 @@
 
 # Index
 
-> 10 accepted decisions govern this repo — read `decisions/` before architectural or scope changes.
+> 11 accepted decisions govern this repo — read `decisions/` before architectural or scope changes.
 
 - `reference` [The boundary nudge — internals + where each piece lives](notes/boundary-nudge-internals.md) — digest, startup, session-start, watermark, once-per-chapter, teaser, two-channel, systemMessage, additionalContext, offer-first
 - `gotcha` [Gotcha — distill's corrections lens counts harness notifications as user corrections](notes/harness-notifications-pollute-the-corrections-lens.md) — task-notification, monitor-event, user-prompt, capture-schema, signal-to-noise, background-agents, groom
@@ -41,7 +41,7 @@
 - `gotcha` [Gotcha — `mage connect` turns on capture but does not ensure the sink is gitignored](notes/connect-doesnt-ensure-ignores.md) — gitignore, learnings, metrics, drift, migration, doctor, safe-by-default, leak, version-bump, hook-block
 - `gotcha` [Gotcha — scope Gate-2 to the knowledge base, not the whole repo](notes/gate2-blocks-own-redaction-fixtures.md) — pre-commit, hook, docs-root, connect, dogfood
 - `gotcha` [Gotcha — key bodies with `-`/`_` partially leak past the high-entropy detector](notes/redaction-anthropic-key-detector.md) — mage
+- `feedback` [notes-must-read-in-one-screen](notes/notes-must-read-in-one-screen.md)
+- `feedback` [point-in-time-research-stays-private](notes/point-in-time-research-stays-private.md)
 
-> 37 memory notes total (37 shown). Read INDEX.md before non-trivial work.
-- [Point-in-time research stays private](notes/point-in-time-research-stays-private.md) — feedback, research, strategy, kit notes/, valid_until, never public docs
-- [Notes must read in one screen](notes/notes-must-read-in-one-screen.md) — feedback, operator skips long notes and the dashboard, unslop applies to mage text, #253
+> 39 memory notes total (39 shown). Read INDEX.md before non-trivial work.

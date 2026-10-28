@@ -2,7 +2,7 @@
 
 Architecture-level vocabulary for mage's source (`src/`), maintained by
 `/improve-codebase-architecture`. The **product** glossary (note, wing, capture, groom,
-recall, Gate-0, staging, …) lives in `mage/notes/context.md` — this file only adds terms
+recall, Gate-0, …) lives in `mage/notes/context.md` — this file only adds terms
 about how the *code* is structured, and defers to that note for everything else.
 
 ## Language
@@ -27,7 +27,7 @@ The canonical key for "have we already lifted/adopted this capture?", derived fr
 (within-run set vs cross-run map).
 _Avoid_: dedup-key, session-id (the raw field, not the key)
 
-**Staging deep op** (`src/grooming/staging.ts`):
+**Staging deep op** (`src/grooming/staging.ts`; cut from the surface in 0.0.18, code stays until #223):
 A bundled operation that is part of the staging module's interface — `stageDraft` (compose +
 slug + dedup + write) and `promoteBatch` (stamp + promote) — which callers cross instead of
 hand-assembling the low-level draft utilities. The utilities behind it (`composeDraft`,

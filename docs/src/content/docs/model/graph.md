@@ -28,7 +28,7 @@ A note may carry several tags. The **first** tag is its *primary* wing — it dr
 
 You do not navigate a mage knowledge base by reading every note. Two generated files do that job — and they are not one file under two names. They answer different questions, and they are reached in opposite directions.
 
-**`MEMORY.md` is the pushed surface.** Your host agent loads it every session, unprompted, out of a small and finite auto-memory budget. So it is not a copy of everything: it is a **ranked, budget-bounded roster** — one governance line naming the accepted decisions that govern the repo, then the top-K memory-genre entries, then a single overflow line pointing at `INDEX.md` for the rest. Ranking puts notes you have actually *used* first where local usage metrics exist, and falls back to recency where they don't. **K is not a setting.** It is derived: mage fits as many entries as the host's own budget allows and stops there.
+**`MEMORY.md` is the pushed surface.** Your host agent loads it every session, unprompted, out of a small and finite auto-memory budget. So it is not a copy of everything: it is a **ranked, budget-bounded roster** — one governance line naming the accepted decisions that govern the repo, then the top-K memory-genre entries, then a single overflow line pointing at `INDEX.md` for the rest. Ranking puts admitted notes (a `rung`, a `trigger` and a `pointer`) first; every other note keeps the earlier order: notes you have actually *used* first where local usage metrics exist, then recency. **K is not a setting.** It is derived: mage fits as many entries as the host's own budget allows and stops there.
 
 A generated roster, in full:
 
@@ -49,7 +49,7 @@ A generated roster, in full:
 Reading it top to bottom:
 
 - The **governance line** is the one standing sentence naming the accepted decisions — the same line `INDEX.md` carries, generated from one shared function so the surfaces cannot drift apart.
-- The **entries** are the ranked top-K: usage-proven notes first (read in enough distinct chapters, where local metrics exist), then newest-reviewed first as the fallback. Each is one line — type, linked title, keywords — and when the budget pinches, the keyword tail is shed before an entry is dropped.
+- The **entries** are the ranked top-K: admitted notes first (oldest `created` first), then every other note in the order earlier releases used: usage-proven notes first (read in enough distinct chapters, where local metrics exist), then newest-reviewed first as the fallback. A knowledge base with no admitted notes lists exactly as it did before. Each is one line — type, linked title, keywords — and when the budget pinches, the keyword tail is shed before an entry is dropped.
 - The **overflow line** closes every roster: the total, how many were shown, and the pointer to `INDEX.md` — the deliberate handoff.
 - **K = 3 here** because the host's line-and-byte budget stopped there. It is derived, never configured.
 

@@ -44,8 +44,9 @@ memory worth keeping — hard-earned knowledge, not facts you can re-derive in s
   only network egress is `doctor`'s opt-in connectivity check; metrics stay
   local and never enter git
   ([ADR-0054](mage/decisions/0054-files-in-the-repo-no-runtime-no-server.md)).
-- **Self-grooming, human-in-the-loop.** mage *proposes* (graduate / merge /
-  reword …); **you** confirm and commit. Nothing is ever auto-committed.
+- **The ladder.** A memory climbs to the highest rung that can carry it (deny
+  rule, check, hook, AGENTS.md rule) and only the rest stays a note, recalled at
+  the moment its trigger fires. You confirm and commit.
 
 ### How mage differs from a server-backed memory store
 
@@ -70,8 +71,8 @@ no `git diff` for what your agent believes. When memory is files, every
 claim your agent carries into a session has a history, a provenance line,
 and a reviewable diff; a wrong memory gets caught the same way a wrong line
 of code does — in review. mage's redaction gate runs at commit time because
-a memory *has* a commit, and its self-grooming loop (distill → promote →
-graduate → demote) is only possible because the memory is legible. That
+a memory *has* a commit, and `mage groom`, which walks notes up the ladder and lands
+the change by pull request, is only possible because the memory is legible. That
 review gate is only as strong as your repo's own — a KB without PR review
 trusts notes on write, with provenance and `git log` as the audit trail when
 doubt arises.
@@ -110,11 +111,10 @@ npx skills add Sumit1993/mage-memory
 npx skills add Sumit1993/mage-memory --global
 ```
 
-You get `/mage:guide` (how to use the base), `/mage:learn` (capture a note), and
-the self-grooming skills `/mage:groom`, `/mage:graduate`, and `/mage:optimize`.
-Per-wing `mage-wing-*` skills that the retired `mage skills` generated into
-`.claude/skills/` + `.agents/skills/` stay where they are; nothing regenerates
-them (#208). Backfill existing docs with
+You get `/mage:guide` (how to use the base), `/mage:learn` (capture a note),
+`/mage:groom` (walk notes up the ladder), and `/mage:optimize` (keep recall sharp).
+`mage skills` regenerates the per-wing `mage-wing-*` skills into
+`.claude/skills/` + `.agents/skills/`. Backfill existing docs with
 `/mage:learn --from <dir>`.
 
 > The `mage:` namespace is a Claude Code feature. Other agents that read
@@ -160,11 +160,27 @@ not per HTTP attempt.
 - depends_on [payments-gateway](../infra/payments-gateway.md)
 ```
 
-Everything in the frontmatter is optional; mage degrades gracefully when it's
-missing and falls back to the title, headers, and tags. Links between notes are
+A memory-genre note is stored and indexed whatever its admission fields say, and falls back to the
+title, headers, and tags. To be recalled at the action it also needs `rung`,
+`trigger` and `pointer`. Links between notes are
 standard portable markdown — `[text](relative/path.md)` — **never**
 `[[wikilinks]]`, so they render as Obsidian graph edges and stay portable across
 agents.
+
+## Verbs in 0.0.18
+
+| verb | 0.0.17 | 0.0.18 |
+| --- | --- | --- |
+| `init`, `connect`, `disconnect`, `doctor`, `index` | visible | visible; `connect` wires the recall hook, `index` prints the roster and recall counts |
+| `groom` | hidden: staged-draft batch | visible: walks notes up the ladder |
+| `skills` | visible: generate, `--metrics` | visible: generate, `--metrics` |
+| `link`, `unlink`, `verify`, `list`, `migrate`, `adopt`, `status`, `autonomy`, `dream` | visible | visible, unchanged |
+| `footprint` | visible | retired: use `mage doctor` |
+| `dashboard` | visible | retired: use `mage index` |
+| `distill`, `promote`, `stage`, `ingest` | hidden, ran | hidden, retired: `mage groom` or `/mage:learn` |
+| `graduate` | skill only | hidden, retired: `mage groom` |
+| `recall-hook` | none | hidden plumbing (PreToolUse recall) |
+| `observe`, `nudge`, `memory-hook`, `redact`, `flatten` | hidden plumbing | hidden plumbing |
 
 ## Documentation
 
@@ -178,8 +194,7 @@ so the reference can't silently diverge from the implementation — lives at the
   (insight + procedure + pointers), the graph (wings & rooms), and modes &
   storage.
 - **[The Self-Grooming Loop](https://mage-memory.sfun.cloud/loop/overview/)**
-  — how capture, the boundary nudge, stage & groom, promote & graduate, and
-  optimize fit together, end to end.
+  — how capture, the boundary nudge, groom and optimize fit together, end to end.
 - **[Reference](https://mage-memory.sfun.cloud/reference/commands/)** —
   every command, hook, and threshold, rendered from the code, plus the on-disk
   layout and the two redaction gates.

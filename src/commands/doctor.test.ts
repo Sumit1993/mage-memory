@@ -120,7 +120,7 @@ describe("diffMageHooks", () => {
     const d = diffMageHooks(base, { commandeer: true });
     expect(d.matches).toBe(false);
     expect(new Set(d.missingIds)).toEqual(
-      new Set(["mage:memory:PreToolUse", "mage:memory:PostToolUse", "mage:flatten:Stop"]),
+      new Set(["mage:memory:PreToolUse", "mage:flatten:Stop", "mage:index:Stop"]),
     );
   });
 

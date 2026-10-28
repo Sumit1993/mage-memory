@@ -34,7 +34,12 @@ describe("MAGE_HOOKS table", () => {
       { event: "SessionStart", id: "mage:observe:SessionStart", command: "mage observe" },
       { event: "SessionStart", id: "mage:nudge:SessionStart", command: "mage nudge" },
       { event: "UserPromptSubmit", id: "mage:observe:UserPromptSubmit", command: "mage observe" },
-      { event: "PreToolUse", id: "mage:observe:PreToolUse", command: "mage observe" },
+      {
+        event: "PreToolUse",
+        id: "mage:recall:PreToolUse",
+        matcher: "Bash|Write|Edit|MultiEdit|NotebookEdit",
+        command: "mage recall-hook",
+      },
       { event: "PostToolUse", id: "mage:observe:PostToolUse", command: "mage observe" },
       {
         event: "PostToolUseFailure",
@@ -55,16 +60,15 @@ describe("MAGE_HOOKS table", () => {
         commandeer: true,
       },
       {
-        event: "PostToolUse",
-        id: "mage:memory:PostToolUse",
-        matcher: "Write|Edit",
-        command: "mage memory-hook",
+        event: "Stop",
+        id: "mage:flatten:Stop",
+        command: "mage flatten --quiet",
         commandeer: true,
       },
       {
         event: "Stop",
-        id: "mage:flatten:Stop",
-        command: "mage flatten --quiet",
+        id: "mage:index:Stop",
+        command: "mage index --hook",
         commandeer: true,
       },
     ]);
@@ -206,39 +210,64 @@ describe("commandeer-tier gating (ADR-0032)", () => {
   it("omits the commandeer rows by default (12 groups, no memory PreToolUse)", () => {
     const merged = upsertMageHooks(null).settings;
     expect(countMage(merged)).toBe(12);
-    // PreToolUse carries only the observe group (#209), not the memory one.
+    // PreToolUse carries only the recall group, not the memory one.
     const preBase = merged.hooks?.PreToolUse ?? [];
-    expect(preBase.map((g) => g.id)).toEqual(["mage:observe:PreToolUse"]);
-    // PostToolUse carries only the observe group, not the memory one.
+    expect(preBase.map((g) => g.id)).toEqual(["mage:recall:PreToolUse"]);
+    expect(preBase[0]?.matcher).toBe("Bash|Write|Edit|MultiEdit|NotebookEdit");
+    expect(preBase[0]?.hooks).toEqual([{ type: "command", command: "mage recall-hook" }]);
     const post = merged.hooks?.PostToolUse ?? [];
-    expect(post.find((g) => g.id === "mage:memory:PostToolUse")).toBeUndefined();
-    expect(post.find((g) => g.id === "mage:observe:PostToolUse")).toBeTruthy();
+    expect(post.map((g) => g.id)).toEqual(["mage:observe:PostToolUse"]);
   });
 
   it("adds the commandeer rows with matchers when commandeer:true (15 groups)", () => {
     const merged = upsertMageHooks(null, { commandeer: true }).settings;
     expect(countMage(merged)).toBe(15);
-    // PreToolUse now coexists: the matcher-less observe group (#209) + the memory one.
+    // PreToolUse now coexists: the recall group + the memory one.
     const pre = merged.hooks?.PreToolUse ?? [];
     expect(pre).toHaveLength(2);
-    expect(pre.find((g) => g.id === "mage:observe:PreToolUse")?.matcher).toBeUndefined();
+    expect(pre.find((g) => g.id === "mage:recall:PreToolUse")).toBeTruthy();
     const mem = pre.find((g) => g.id === "mage:memory:PreToolUse");
     expect(mem?.matcher).toBe("Write|Edit");
     expect(mem?.hooks).toEqual([{ type: "command", command: "mage memory-hook" }]);
-    // PostToolUse now coexists: observe + memory.
+    // The memory hook no longer has a PostToolUse arm (#282).
     const post = merged.hooks?.PostToolUse ?? [];
-    expect(post.find((g) => g.id === "mage:memory:PostToolUse")).toBeTruthy();
-    expect(post.find((g) => g.id === "mage:observe:PostToolUse")).toBeTruthy();
+    expect(post.map((g) => g.id)).toEqual(["mage:observe:PostToolUse"]);
   });
 
   it("self-heals: re-upserting with commandeer off removes a prior commandeer group", () => {
     const on = upsertMageHooks(null, { commandeer: true }).settings;
     expect(on.hooks?.PreToolUse).toHaveLength(2);
     const off = upsertMageHooks(on, { commandeer: false }).settings;
-    // The event survives — the observe row (#209) is base tier; only the memory row goes.
-    expect(off.hooks?.PreToolUse?.map((g) => g.id)).toEqual(["mage:observe:PreToolUse"]);
+    // The event survives — the recall row is base tier; only the memory row goes.
+    expect(off.hooks?.PreToolUse?.map((g) => g.id)).toEqual(["mage:recall:PreToolUse"]);
     expect(countMage(off)).toBe(12);
-    expect(off.hooks?.PostToolUse?.find((g) => g.id === "mage:memory:PostToolUse")).toBeUndefined();
+  });
+
+  it("reaps a stale mage:* id that MAGE_HOOKS no longer lists, never a host group", () => {
+    const stale: ClaudeSettings = {
+      hooks: {
+        PreToolUse: [
+          { id: "mage:observe:PreToolUse", hooks: [{ type: "command", command: "mage observe" }] },
+          { matcher: "Bash", hooks: [{ type: "command", command: "user-guard" }] },
+        ],
+        PostToolUse: [
+          {
+            id: "mage:memory:PostToolUse",
+            matcher: "Write|Edit",
+            hooks: [{ type: "command", command: "mage memory-hook" }],
+          },
+        ],
+      },
+    };
+    const { settings, reaped } = upsertMageHooks(stale, { commandeer: true });
+    expect(reaped).toBe(2);
+    const pre = settings.hooks?.PreToolUse ?? [];
+    expect(pre.map((g) => g.id ?? g.hooks[0]?.command)).toEqual([
+      "user-guard",
+      "mage:recall:PreToolUse",
+      "mage:memory:PreToolUse",
+    ]);
+    expect(settings.hooks?.PostToolUse?.map((g) => g.id)).toEqual(["mage:observe:PostToolUse"]);
   });
 });
 

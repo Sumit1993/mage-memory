@@ -124,9 +124,6 @@ export async function wireCommandeer(dir: string, root: string): Promise<string>
       PreToolUse: [
         { id: "mage:memory:PreToolUse", matcher: "Write|Edit", hooks: [{ type: "command", command: cmd }] },
       ],
-      PostToolUse: [
-        { id: "mage:memory:PostToolUse", matcher: "Write|Edit", hooks: [{ type: "command", command: cmd }] },
-      ],
     },
   };
   const path = join(claudeDir, "settings.local.json");
