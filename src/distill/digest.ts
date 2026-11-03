@@ -126,13 +126,43 @@ const BOILERPLATE_RE: readonly RegExp[] = [
   /^\s*api error/i,
 ];
 
+/** Prompts the harness or a tool generates whole; no person typed any of it (#286). */
+const GENERATED_PROMPT_RE: readonly RegExp[] = [
+  /^\s*<task-notification>/i,
+  /\[SYSTEM NOTIFICATION - NOT USER INPUT\]/i,
+  /^\s*<<autonomous-loop(-dynamic)?>>\s*$/,
+];
+const CITATION_RE = /\[[^\]\n]*\]\((t3-citation:\/\/[^)\s]*)\)/g;
+const IMAGE_RE = /\[Image: [^\]\n]*\]/g;
+
+/**
+ * The part of a user prompt a person typed: "" for a generated prompt, image placeholders dropped, and each
+ * quoted-message citation replaced by the comment the person attached to it (its `comment=` parameter).
+ */
+export function humanPromptText(text: string): string {
+  if (GENERATED_PROMPT_RE.some((re) => re.test(text))) return "";
+  return text
+    .replace(CITATION_RE, (_, url: string) => {
+      try {
+        return new URL(url).searchParams.get("comment") ?? "";
+      } catch {
+        return "";
+      }
+    })
+    .replace(IMAGE_RE, "")
+    .split("\n")
+    .map((line) => line.trim())
+    .join("\n")
+    .trim();
+}
+
 /**
  * True iff a user prompt is a SUBSTANTIVE correction worth surfacing (ADR-0028 §3 / ADR-0029 §3). Drops
  * obvious noise only — boilerplate, slash-commands, bare continuations, and very short acks WITHOUT a
  * contradiction cue. Does NOT classify correction-vs-next-task (the agent culls).
  */
 export function isSubstantiveCorrection(text: string): boolean {
-  const t = text.trim();
+  const t = humanPromptText(text);
   if (t.length === 0) return false;
   if (t.startsWith("/")) return false;
   if (BOILERPLATE_RE.some((re) => re.test(t))) return false;

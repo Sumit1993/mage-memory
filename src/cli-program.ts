@@ -8,7 +8,7 @@ import { doctor, readinessFooter } from "./commands/doctor.js";
 import { flattenCmd } from "./commands/flatten.js";
 import { dream } from "./commands/dream-cmd.js";
 import { groomCmd } from "./commands/groom-cmd.js";
-import { index } from "./commands/index-cmd.js";
+import { index, indexForHook } from "./commands/index-cmd.js";
 import { type InitMode, type InitVisibility, init } from "./commands/init.js";
 import { link, type Storage } from "./commands/link.js";
 import { list } from "./commands/list.js";
@@ -128,8 +128,15 @@ export function buildProgram(): Command {
       "where to look for the knowledge base (default: cwd; walks up for in-repo)",
     )
     .addOption(new Option("--strict-admission").hideHelp())
+    .option("--quiet", "print nothing")
+    .option("--hook", "for the Stop hook: skip when no note changed since the last index, and always exit 0")
     .action(async (opts) => {
+      if (opts.hook === true) {
+        await indexForHook({ dir: opts.dir });
+        return;
+      }
       const result = await index({
+        quiet: opts.quiet === true,
         dir: opts.dir,
         strictAdmission: opts.strictAdmission === true,
       });
@@ -140,7 +147,7 @@ export function buildProgram(): Command {
   program
     .command("skills")
     .description(
-      "Retired signpost; `--metrics` still folds the context-match rollup until `mage ledger` (#237)",
+      "Generate the per-wing skills that auto-load a wing's notes; `--metrics` folds the context-match rollup",
     )
     .option(
       "-d, --dir <path>",
@@ -156,11 +163,7 @@ export function buildProgram(): Command {
       "metrics mode: fold + write the rollup silently (the Stop-hook path)",
     )
     .action(async (opts) => {
-      if (opts.metrics) {
-        await skills({ dir: opts.dir, metrics: true, json: opts.json, quiet: opts.quiet });
-        return;
-      }
-      printRetiredVerb("skills", !!opts.quiet);
+      await skills({ dir: opts.dir, metrics: opts.metrics, json: opts.json, quiet: opts.quiet });
     });
 
   // ─── footprint ─────────────────────────────────────────────────────────────
@@ -213,7 +216,7 @@ export function buildProgram(): Command {
   // ─── ingest ──────────────────────────────────────────────────────────────────
   program
     .command("ingest", { hidden: true })
-    .description("Retired signpost: use `mage groom` instead")
+    .description("Retired signpost: use `/mage:learn --from <dir>` instead")
     .argument("[args...]")
     .allowUnknownOption()
     .action(async () => {
@@ -267,7 +270,7 @@ export function buildProgram(): Command {
   // ─── stage ─────────────────────────────────────────────────────────────────────
   program
     .command("stage", { hidden: true })
-    .description("Retired signpost: use `mage observe` instead")
+    .description("Retired signpost: use `/mage:learn` or `mage groom` instead")
     .option(
       "-d, --dir <path>",
       "where to look for the knowledge base (default: cwd; walks up for in-repo)",
@@ -290,31 +293,39 @@ export function buildProgram(): Command {
 
   // ─── groom ───────────────────────────────────────────────────────────────────────
   program
-    .command("groom", { hidden: true })
+    .command("groom")
     .description(
-      "Surface / accept / reject the staged lesson batch (plumbing behind the mage:groom skill)",
+      "Walk the notes up the ladder: for each note, judge whether it climbs to a rule, hook, check or deny rule, is deleted, or stays a note",
     )
     .option(
       "-d, --dir <path>",
       "where to look for the knowledge base (default: cwd; walks up for in-repo)",
     )
-    .option("--json", "emit the batch / disposition as JSON")
+    .option("--json", "emit the walk / disposition as JSON")
+    .option(
+      "--limit <n>",
+      "notes shown by the walk (default 10)",
+      (v) => (/^\d+$/.test(v) ? Number(v) : Number.NaN),
+    )
+    .option("--all", "show every note (wins over --limit)")
     .option(
       "--accept <slugs|all>",
-      "promote these staged drafts to notes/ and re-index",
+      "0.0.17 staged drafts: promote these drafts to notes/ and re-index",
     )
     .option(
       "--reject <slugs|all>",
-      "discard these staged drafts and record their keys",
+      "0.0.17 staged drafts: discard these drafts and record their keys",
     )
     .option(
       "--propose",
-      "open a pull request with the promoted notes instead of leaving them uncommitted",
+      "0.0.17 staged drafts: open a pull request with the promoted notes instead of leaving them uncommitted",
     )
     .action(
       async (opts: {
         dir?: string;
         json?: boolean;
+        limit?: number;
+        all?: boolean;
         accept?: string;
         reject?: string;
         propose?: boolean;
@@ -330,8 +341,24 @@ export function buildProgram(): Command {
   // The boundary-nudge adapter (adapters/claude-code/nudge.ts) — fired from the SessionStart hook.
   program.addCommand(buildNudgeCommand(), { hidden: true });
   // The Gate-0 capture adapter (adapters/claude-code/memory-hook.ts) — fired from
-  // PreToolUse + PostToolUse to redirect/scrub native-memory writes (ADR-0032).
+  // PreToolUse (Write|Edit) to scrub native-memory writes and ask the ladder once (ADR-0032, #282).
   program.addCommand(buildMemoryHookCommand(), { hidden: true });
+  // The PreToolUse recall hook. cli.ts short-circuits to it before this program is built;
+  // the command exists for the docs inventory and a direct `buildProgram()` caller (#282).
+  program
+    .command("recall-hook", { hidden: true })
+    .description(
+      "Hook-fired PreToolUse recall: inject admitted notes whose trigger.match hits the tool call as additionalContext (never blocks the host)",
+    )
+    .option("--cwd <dir>", "working directory used to locate the knowledge base (defaults to the hook JSON cwd)")
+    .option("--explain", "print which admitted notes match the call on stdin, reading and writing no state")
+    .action(async (opts: { cwd?: string; explain?: boolean }) => {
+      const { runRecallHook } = await import("./adapters/claude-code/recall-hook.js");
+      await runRecallHook([
+        ...(opts.cwd ? ["--cwd", opts.cwd] : []),
+        ...(opts.explain ? ["--explain"] : []),
+      ]);
+    });
 
   // ─── redact ──────────────────────────────────────────────────────────────────
   program

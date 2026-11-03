@@ -3,6 +3,7 @@ import {
   computeDigest,
   failureSkeleton,
   hasContradictionCue,
+  humanPromptText,
   isExternalCommand,
   isProtocolFailure,
   isSubstantiveCorrection,
@@ -63,6 +64,16 @@ describe("reused primitives", () => {
     expect(isSubstantiveCorrection("Continue from where you left off.")).toBe(false);
     expect(isSubstantiveCorrection("no, copy the git history instead")).toBe(true);
     expect(hasContradictionCue("no, do it the other way")).toBe(true);
+  });
+  it("humanPromptText keeps only what a person typed (#286)", () => {
+    const quote = "[Assistant quote](t3-citation://v1/a/b/m?text=x+y&start=1&end=4&comment=yes+update+this)";
+    expect(humanPromptText(quote)).toBe("yes update this");
+    expect(humanPromptText(`${quote}\nand rename it`)).toBe("yes update this\nand rename it");
+    expect(humanPromptText("[Image: a.png; ref=image_1] fix the header")).toBe("fix the header");
+    expect(humanPromptText("<task-notification>\n<result>x</result>\n</task-notification>")).toBe("");
+    expect(humanPromptText("[SYSTEM NOTIFICATION - NOT USER INPUT] done")).toBe("");
+    expect(humanPromptText("<<autonomous-loop>>")).toBe("");
+    expect(isSubstantiveCorrection("[Assistant quote](t3-citation://v1/a?text=x&comment=ok)")).toBe(false);
   });
 });
 

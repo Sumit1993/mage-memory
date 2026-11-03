@@ -5,7 +5,7 @@ sidebar:
   order: 2
 ---
 
-This page takes you from nothing to a working mage knowledge base, with capture wired in. It assumes you know what mage is — if not, read [What is mage?](../index.md) first.
+This page takes you from nothing to a working mage knowledge base, with the hooks wired in. It assumes you know what mage is — if not, read [What is mage?](../index.md) first.
 
 You need **Node 20 or newer** and **git**.
 
@@ -66,10 +66,10 @@ mage connect --yes               # wire hooks, no confirmation prompt
 
 ## What `mage init` wires for you
 
-After scaffolding an in-repo knowledge base, `mage init` auto-connects capture — an in-repo base is inert until capture is wired. That step (the same one you can run by hand as `mage connect`) does two things:
+After scaffolding an in-repo knowledge base, `mage init` auto-connects the hooks — an in-repo base is inert until they are wired. That step (the same one you can run by hand as `mage connect`) does two things:
 
-- **Wires the capture hooks** into this repo's `.claude/settings.local.json` — a personal, gitignored, per-repo file. These hooks let mage observe what your agent does (which tool, which files, which skill loaded) and feed the [grooming loop](../loop/overview.md). They include the boundary [nudge](../loop/nudge.md) on a post-compaction start. See the full list on the [Hooks](../reference/hooks.mdx) page.
-- **Installs the Gate-2 redaction pre-commit hook** (`mage redact --check --staged`). This is a blocking, deterministic scan at the commit boundary: if a staged note carries a live secret, the commit is refused. It is your safety net so a captured secret never lands in git. See [Redaction](../reference/redaction.md).
+- **Wires the hooks** into this repo's `.claude/settings.local.json` — a personal, gitignored, per-repo file. The memory hook asks the ladder once per session when a memory is written, the recall hook injects matching notes before a tool call, and a Stop hook runs `mage index --hook`. See [The ladder](../loop/overview.md) and the full list on the [Hooks](../reference/hooks.mdx) page.
+- **Installs the Gate-2 redaction pre-commit hook** (`mage redact --check --staged`). This is a blocking, deterministic scan at the commit boundary: if a staged note carries a live secret, the commit is refused. It is your safety net so a secret never lands in git. See [Redaction](../reference/redaction.md).
 
 In hub or hybrid mode, this same step also grants the harness reach to the hub outside this repo, and — when a usable `hub_repo` is recorded — offers to clone it if this machine doesn't have it yet — see [Set up a hub and external mode](../guides/hub-and-external-mode.md).
 
@@ -79,7 +79,7 @@ In hub or hybrid mode, this same step also grants the harness reach to the hub o
 mage connect
 ```
 
-(After connecting, mage prints a quick **readiness footer** to confirm your environment is healthy and ready to capture.)
+(After connecting, mage prints a quick **readiness footer** to confirm your environment is healthy and ready to recall notes.)
 
 If a pre-commit hook already exists, mage will not overwrite it — it tells you to add `mage redact --check --staged` to your own hook. Skip the git hook with `mage connect --no-git-hook`.
 
@@ -89,7 +89,7 @@ Setup touches a few places — the global CLI, per-repo hooks, and a pre-commit 
 
 ```bash
 mage doctor          # diagnose env + KB + connection health
-mage doctor --fix    # repair missing capture-sink ignore rules
+mage doctor --fix    # repair missing ignore rules
 ```
 
 If you need to file an issue, `mage doctor --report` prints a redacted, content-free support bundle to attach. See [Commands](../reference/commands.mdx#diagnosing-and-migrating) for the full diagnostics surface.
@@ -124,7 +124,7 @@ Everything in the frontmatter is optional; mage falls back to the title, headers
 
 You rarely hand-write notes. The deliberate-capture path is the **`/mage:learn`** skill. Inside Claude Code, say `/mage:learn` (or just "remember this") right after you figure something non-obvious out. mage classifies the finding, checks the index for an existing note to update, drafts the note for you — the reusable insight, the procedure, and pointers to canonical sources, never a copy — and writes it only after you confirm. (It also runs the redaction gate on the draft first, so a captured secret never lands in a tracked note.)
 
-`/mage:learn` is the *deliberate* capture you trigger on the spot. The [grooming loop](../loop/overview.md) adds two more drafting paths you do not trigger by hand: inline [capture](../loop/capture.md) and the boundary [nudge](../loop/nudge.md) draft lessons as you work, and the recurrence path proposes a new note once a pattern recurs. All of them end the same way — a draft you review and confirm; **you** commit.
+`/mage:learn` is the *deliberate* capture you trigger on the spot. When the host saves a memory on its own, the memory hook asks [the ladder](../loop/overview.md) once per session, and `mage groom` later walks existing notes up it. Either way you review the change and **you** commit.
 
 ## Regenerate the recall surfaces
 
@@ -150,14 +150,14 @@ git add mage/
 git commit -m "docs(mage): add payments idempotency note"
 ```
 
-The capture sinks (`.mage/learnings/`, `.mage/metrics/`, `.mage/staging/`) are gitignored by design, so observed scratch and metrics never enter git — only the notes you confirm do.
+The machine state under `.mage/` (`metrics/`, `recall/`) is gitignored by design, so it never enters git — only the notes you confirm do.
 
 ## Where to go next
 
 - [Modes and storage](../model/modes.md) — in-repo, hub, hybrid, and external.
 - [Set up a hub and external mode](../guides/hub-and-external-mode.md) — the end-to-end walkthrough: create a hub, link a repo as hub-owned, connect, verify.
-- [The grooming loop](../loop/overview.md) — how mage learns from your sessions.
+- [The ladder](../loop/overview.md) — how a fact climbs to a rule, hook or check, or stays a note.
 - [Import an existing notes folder](../guides/import-existing-notes.md) — bring old notes or a `docs/` tree in as distilled notes.
-- [Pause, disconnect, or uninstall](../guides/uninstall-and-pause.md) — turn capture off or remove mage; your notes stay.
-- [Hooks](../reference/hooks.mdx) — every capture hook `mage connect` wires.
+- [Pause, disconnect, or uninstall](../guides/uninstall-and-pause.md) — turn the hooks off or remove mage; your notes stay.
+- [Hooks](../reference/hooks.mdx) — every hook `mage connect` wires.
 - [Commands](../reference/commands.mdx) — the full CLI surface.

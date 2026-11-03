@@ -19,10 +19,12 @@ import {
   CLAUDE_DIR,
   CLAUDE_FILE,
   GIT_DIR,
+  HELD_DIR,
   IDENTITY_FILE,
   INDEX_FILE,
   MEMORY_FILE,
   NODE_MODULES_DIR,
+  NOTES_DIR,
   OBSIDIAN_DIR,
   STATE_DIR,
 } from "./paths.js";
@@ -190,6 +192,8 @@ async function walk(dir: string, root: string, out: ScannedNote[]): Promise<void
   for (const e of entries) {
     if (e.isDirectory()) {
       if (SKIP_DIRS.has(e.name)) continue;
+      // Denied writes awaiting a climb are not notes yet (#282); `mage groom` lists them itself.
+      if (e.name === HELD_DIR && toPosix(relative(root, dir)) === NOTES_DIR) continue;
       await walk(join(dir, e.name), root, out);
       continue;
     }

@@ -70,19 +70,16 @@ export default defineConfig({
           label: 'The Model',
           items: [
             { label: 'Notes', slug: 'model/notes' },
+            { label: 'Recall at the action', slug: 'model/recall' },
             { label: 'The graph: wings and rooms', slug: 'model/graph' },
             { label: 'Modes and storage', slug: 'model/modes' },
           ],
         },
         {
-          label: 'The Self-Grooming Loop',
+          label: 'The Ladder',
           items: [
-            { label: 'Overview', slug: 'loop/overview' },
-            { label: 'Capture (observe)', slug: 'loop/capture' },
-            { label: 'The boundary nudge', slug: 'loop/nudge' },
-            { label: 'Stage and groom (the lesson path)', slug: 'loop/stage-groom' },
-            { label: 'Promote and graduate', slug: 'loop/promote-graduate' },
-            { label: 'Autonomy levels', slug: 'loop/autonomy' },
+            { label: 'The ladder', slug: 'loop/overview' },
+            { label: 'Capture', slug: 'loop/capture' },
             { label: 'Optimize (context-match)', slug: 'loop/optimize' },
           ],
         },
@@ -109,7 +106,7 @@ export default defineConfig({
             { label: 'Commands', slug: 'reference/commands' },
             { label: 'Hooks', slug: 'reference/hooks' },
             {
-              label: 'Thresholds and the sensitivity dial',
+              label: 'Thresholds',
               slug: 'reference/thresholds',
             },
             { label: 'The .mage/ layout', slug: 'reference/layout' },

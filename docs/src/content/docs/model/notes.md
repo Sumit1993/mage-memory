@@ -25,18 +25,18 @@ For example, instead of pasting a service's entire API reference into a note, yo
 
 ## Note types and genres
 
-A note carries an optional `type` in its frontmatter. Per ADR-0041, `type` maps to a **genre** that decides its recall rung. Only memory-genre notes reach recall at all — every one of them lands in `INDEX.md`, and passing the genre filter makes a note *eligible* for the pushed `MEMORY.md` roster rather than guaranteeing a slot in it: what gets pushed is the top-K by rank, and the rest stay in `INDEX.md` ([the two recall surfaces](./graph.md#the-two-recall-surfaces)). The memory genres (ADR-0041):
+A note carries an optional `type` in its frontmatter. Per ADR-0041, `type` maps to a **genre** that decides which listing surfaces it reaches. Only memory-genre notes reach recall at all — every one of them lands in `INDEX.md`, and passing the genre filter makes a note *eligible* for the pushed `MEMORY.md` roster rather than guaranteeing a slot in it: what gets pushed is the top-K by rank, and the rest stay in `INDEX.md` ([the two recall surfaces](./graph.md#the-two-recall-surfaces)). The memory genres (ADR-0041):
 
-- **gotcha** / **procedure** — traps and reusable procedures (procedural notes that can graduate into skills).
+- **gotcha** / **procedure** — traps and reusable procedures.
 - **pointer** / **reference** / **principle** / **feedback** / **note** — wayfinding, durable rules, and insight.
 
-Any string is legal; unrecognized types are unclassified and sit at rung 3 (on-demand only). Custom types can be mapped to one of the four standard genres (`memory`, `decision`, `work`, `doc`) via the optional `genres` map in `metadata.json` (e.g. `"genres": { "runbook": "memory" }`). Legacy strings (`playbook`, `interface`, `tooling`, `topology`, `relationship`, `trail`) remain legal but map to **unclassified** (rung 3).
+Any string is legal; unrecognized types are unclassified and sit at tier 3 (on-demand only). Custom types can be mapped to one of the four standard genres (`memory`, `decision`, `work`, `doc`) via the optional `genres` map in `metadata.json` (e.g. `"genres": { "runbook": "memory" }`). Legacy strings (`playbook`, `interface`, `tooling`, `topology`, `relationship`, `trail`) remain legal but map to **unclassified** (tier 3).
 
-The whole resolution in one table. A **rung** is how a note reaches the agent: rung 1 is a skill auto-loaded on its trigger, rung 2 is an always-loaded index line, rung 3 is the note body read on demand (every note has rung 3). The map is the `TYPE_TO_GENRE` constant in `src/scanner/genre-map.ts`; the rungs are ADR-0041's:
+The whole resolution in one table. A **tier** is how a note is listed: tier 2 is an index line, tier 3 is the note body read on demand (every note has tier 3). This is separate from a note's ladder `rung` (`impossible` to `note`) and from [recall at the action](./recall.md). The map is the `TYPE_TO_GENRE` constant in `src/scanner/genre-map.ts`:
 
-| `type:` | genre | rung | which surface it reaches |
+| `type:` | genre | tier | which surface it reaches |
 | --- | --- | --- | --- |
-| `gotcha` `procedure` | memory | 2 — and 1 once graduated | a line in `INDEX.md`, eligible for the `MEMORY.md` roster; a graduated procedural note adds its own auto-loaded skill |
+| `gotcha` `procedure` | memory | 2 | a line in `INDEX.md`, eligible for the `MEMORY.md` roster |
 | `pointer` `principle` `feedback` `reference` `note` | memory | 2 | a line in `INDEX.md`, eligible for the `MEMORY.md` roster |
 | `decision` | decision | 3 | on demand only, plus the one standing governance line both surfaces carry |
 | `plan` `tasks` | work | 3 | on demand only |
@@ -46,23 +46,10 @@ The whole resolution in one table. A **rung** is how a note reaches the agent: r
 
 Non-memory types (`plan`, `spec`, `tasks`, `decision`) remain legal note types for storage and linking, but are non-memory genres (`work`, `doc`, `decision` per ADR-0041) that are excluded from always-loaded recall — authored deliberately rather than as default destinations for captured knowledge:
 - **decision** — an ADR: a choice, the reasoning, and what it rules out (stored in `mage/decisions/`).
-- **spec** / **plan** / **tasks** — specifications, forward work plans, and checklists (stored in `mage/work/` or repo docs).
+- **spec** — a current-truth system specification, kept in repo docs beside the code.
+- **plan** / **tasks** — forward work plans and checklists, kept in the issue tracker (ADR-0050).
 
-Before authoring a memory note, walk the **better home** ladder (code comment → ticket/`mage/work/` → doc beside code → artifact+pointer → skill → decision → memory) to ensure memory is the right home.
-
-### Graduation eligibility is a separate contract
-
-The table above answers one question only: **how does a note come back to you?** It does not decide which notes can [graduate](../loop/promote-graduate.md) into their own auto-loaded skill. That is a second, independent contract, and reading rung text as if it implied graduation is a mistake the two tables invite:
-
-| `type:` | eligible to graduate? | why |
-| --- | --- | --- |
-| `procedure` `gotcha` | yes | procedural — you *push* a procedure at the agent; a fact it *pulls* when needed |
-| every other memory type | no | recall-bearing but not procedural; rung 2 is the whole of their reach |
-| non-memory genres (`decision` `plan` `tasks` `spec` `doc`) | no | not recall-bearing at all |
-
-The two contracts are genuinely orthogonal. A note can sit at rung 2 and never be graduation-eligible (`principle`, `reference`), and — as the drift below shows — a type can currently be graduation-eligible while sitting at rung 3, which is incoherent and is the reason the drift is tracked rather than tolerated.
-
-**The intended contract is `procedure`/`gotcha`.** `playbook` is a legacy string: unclassified for recall (rung 3) *and* not part of the intended graduation contract. The code has not caught up — `src/grooming/promote.ts` still gates on `type === "procedure" || type === "gotcha" || type === "playbook"`, so a `playbook` note is today accepted by the graduation gate despite being invisible to rung-2 recall. Tracked in [#137](https://github.com/Sumit1993/mage-memory/issues/137), whose resolution is to emit `procedure` from groom's lens table (it already recommends `playbook`) and drop `playbook` from the gate — **not** to give `playbook` a genre mapping, which would leave one of six legacy strings arbitrarily rescued.
+Before authoring a memory note, walk [the ladder](../loop/overview.md) to ensure a note is the right home.
 
 ## Frontmatter and the lifecycle fields
 
@@ -99,56 +86,74 @@ The lifecycle-relevant fields:
 
 The note's **title** is simply its first markdown `# H1`, falling back to the filename. You do not set a title in frontmatter.
 
-## Admission fields and readability rules
+## Admission and triggers
 
-Notes carry five admission fields checked during `mage index` ([#231](https://github.com/Sumit1993/mage-memory/issues/231)): `id` (`<unit>/<rung>/<slug>`), `rung` (`note`), `skipped` (reasons for skipping rungs above `note`), `trigger` (when to consult this guard), and `pointer` (a markdown link). Notes must also satisfy three readability rules ([#253](https://github.com/Sumit1993/mage-memory/issues/253)): length under 40 lines and 350 words, self-contained references with no unlinked documents, and plain words with no unslop words or em dashes.
+A note is **admitted** when it says where it sits on the ladder, when it matters, and where its source is. `mage index` checks every memory note and prints `Roster: A of N notes admitted; M recalled at the action.` A note that is not admitted is still listed in `INDEX.md` and the `MEMORY.md` roster; it is only ineligible for [recall at the action](./recall.md).
 
-Both checks run in report mode today and exit 0. They will reject only after the backfill in [#213](https://github.com/Sumit1993/mage-memory/issues/213) and [#214](https://github.com/Sumit1993/mage-memory/issues/214) lands.
+| field | required | meaning |
+| --- | --- | --- |
+| `rung` | yes | one of `impossible`, `check`, `hook`, `rule`, `note` |
+| `trigger` | yes | the moment it matters: a string, or `{when, match}` |
+| `pointer` | yes | a markdown link to the issue, file or decision behind the note |
+| `id` | no | `<unit>/<rung>/<slug>`; checked when present |
+| `skipped` | no | a reason for each rung passed over; each value must be a non-empty string when present |
 
-Passing example:
+`trigger` has two forms. The plain string is read by people and sits on the roster; it is never matched. The mapping adds `match`, a string or a list, and makes the note eligible for recall:
 
-```markdown
----
-id: repo/note/soak-monitor-blind-spots
-rung: note
-skipped:
-  impossible: "needs runtime context"
-  check: "behavioral, not static"
-  hook: "cannot observe cross-session"
-  rule: "agent ignored instruction"
-trigger: "when soak monitor misses an incident"
-pointer: "[issue #231](https://github.com/Sumit1993/mage-memory/issues/231)"
----
-# Soak monitor blind spots
-
-Monitor logs for missed incidents.
+```yaml
+trigger: "deciding which mage binary a verify command runs"
 ```
 
-Failing example:
+```yaml
+trigger:
+  when: "deciding which mage binary a verify command runs"
+  match: ["Bash(npx mage *)", "Edit(package.json)"]
+```
+
+A matcher is a subset of Claude Code's permission-rule syntax. Anything else is reported by `mage index` as `trigger.match: "…" is not Bash(...) or Edit(...); ignored` and the hook skips it. Patterns are globs, never regex.
+
+| matcher | tests | how |
+| --- | --- | --- |
+| `Bash(pattern)` | the Bash command | the whole command, or any part between `&&`, `\|\|`, `;`, `\|` or a newline, matches the glob |
+| `Edit(pattern)` | Write, Edit, MultiEdit and NotebookEdit paths | the path relative to the code repo being edited (the git repository of the edited file, which in external and hub modes is not the repo holding the notes), with `/` separators; a pattern with no `/` matches the file name at any depth |
+| `Write(pattern)` | the same as `Edit(pattern)` | an alias |
+
+The memory-hook gate that asks the ladder is set in `mage/metadata.json` (a hub reads its own root metadata, like `grooming`):
+
+```json
+{ "ladder": { "gate": "deny-once" } }
+```
+
+`deny-once` is the default: the first memory write of a session that carries no `rung` is refused once, with a reply that ends in a retry, after mage keeps a redacted copy at `notes/.held/<session>[-<agent>]-<slug>.md` and names it in the reply; every later write passes. The parent and each subagent are asked once, because the marker is keyed on `session_id` and the hook input's `agent_id`. If the copy cannot be written, the write is allowed with the ladder attached instead, so nothing is lost. `ask` allows the first write and attaches the ladder as context once. Any other value reads as `deny-once` and is reported once on stderr. The copy exists because a plain deny lost lessons in a measured run ([#282](https://github.com/Sumit1993/mage-memory/issues/282)). The secret scan fails closed in both modes. `notes/.held/` is never indexed; `mage groom` lists it. See [Capture](../loop/capture.md).
+
+Notes must also satisfy three readability rules ([#253](https://github.com/Sumit1993/mage-memory/issues/253)): length under 40 lines and 350 words, self-contained references with no unlinked documents, and plain words with no unslop words or em dashes. Readability findings are warnings. They never exclude a note from the roster and never fail `--strict-admission`; admission problems under `notes/` do.
+
+A failing note, saved as `notes/failing.md`, from a real run:
 
 ```markdown
 ---
 id: repo/rule/mismatch
 rung: note
-trigger: ""
+trigger:
+  match: ["Read(x)"]
 ---
 # Failing note
 
 Consult section 12.3 for details.
 ```
 
-Saved as `notes/failing.md`, it gives four admission problems and one readability problem:
-
 ```console
 $ mage index
 notes/failing.md
   id: id middle segment "rule" does not match rung "note" (line 2)
-  skipped: skipped is required (line null)
-  trigger: trigger must be a non-empty string (line 4)
+  trigger: trigger must be a non-empty string, or a mapping with a non-empty when (line 4)
   pointer: pointer is required (line null)
-  self-contained: unlinked reference to "section 12.3" (line 8)
-Total: 5 problem(s) (4 admission, 1 readability) across 1 file(s).
-✓ Indexed 1 note(s) across 0 wing(s) → 2 file(s) (flat).
+  self-contained: unlinked reference to "section 12.3" (line 9)
+Total: 4 problem(s) (3 admission, 1 readability warning(s)) across 1 file(s).
+✓ Indexed 4 note(s) across 0 wing(s) → 2 file(s) (flat).
+  INDEX.md
+  MEMORY.md
+Roster: 3 of 4 notes admitted; 2 recalled at the action.
 $ echo $?
 0
 $ mage index --strict-admission

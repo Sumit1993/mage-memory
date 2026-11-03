@@ -12,26 +12,24 @@ import { learningsPath, type ResolvedDocsRoot } from "../../paths.js";
 import type { NudgeResult } from "./nudge.js";
 
 export interface SessionReceiptCounts {
-  denied: number;
-  corrected: number;
+  midTaskPrompts: number;
   newSignatures: number;
   guardFires: number;
 }
 
 /**
- * Compute the four receipt counts from a single session's events.
+ * Compute the three receipt counts from a single session's events. The `denied` count is
+ * gone: its only source, the PreToolUse observe row, was retired in #282.
  *
- * - denied: tool_attempt rows whose tool_use_id no tool_use shares, i.e. calls that never
- *   ran (ADR-0052). A guard_fired row alone can be a rewrite, so it is not a denial.
- * - corrected: substantive user prompts immediately preceded by tool_use or assistant_msg.
+ * - midTaskPrompts: prompts a person typed right after a tool_use or assistant_msg, corrections and new
+ *   instructions alike. Harness-generated prompts are dropped, and a verbatim repeat (a cron tick) counts once (#286).
  * - newSignatures: distinct failure skeletons from non-protocol tool failures in this session.
  * - guardFires: total guard_fired events in this session.
  */
 export function computeReceipt(events: ObserveEvent[]): SessionReceiptCounts {
   let guardFires = 0;
-  let corrections = 0;
-  const attempted = new Set<string>();
-  const ran = new Set<string>();
+  let midTaskPrompts = 0;
+  const seenPrompts = new Set<string>();
   const signatures = new Set<string>();
 
   let prevType: ObserveEvent["type"] | null = null;
@@ -39,18 +37,17 @@ export function computeReceipt(events: ObserveEvent[]): SessionReceiptCounts {
   for (const e of events) {
     if (e.type === "guard_fired") {
       guardFires += 1;
-    } else if (e.type === "tool_attempt") {
-      attempted.add(e.tool_use_id);
     } else if (e.type === "user_prompt") {
       if (
         (prevType === "tool_use" || prevType === "assistant_msg") &&
-        isSubstantiveCorrection(e.text)
+        isSubstantiveCorrection(e.text) &&
+        !seenPrompts.has(e.text.trim())
       ) {
-        corrections += 1;
+        midTaskPrompts += 1;
+        seenPrompts.add(e.text.trim());
       }
       prevType = "user_prompt";
     } else if (e.type === "tool_use") {
-      if (e.tool_use_id) ran.add(e.tool_use_id);
       if (e.ok === false) {
         const raw = e.error_summary ?? e.detail ?? `${e.tool} failed`;
         if (!isProtocolFailure(raw)) {
@@ -68,30 +65,25 @@ export function computeReceipt(events: ObserveEvent[]): SessionReceiptCounts {
     }
   }
 
-  let denied = 0;
-  for (const id of attempted) if (!ran.has(id)) denied += 1;
-
   return {
-    denied,
-    corrected: corrections,
+    midTaskPrompts,
     newSignatures: signatures.size,
     guardFires,
   };
 }
 
 /**
- * Format the one-line session receipt. Returns null when all four counts are zero.
+ * Format the one-line session receipt. Returns null when all three counts are zero.
  */
 export function formatReceipt(counts: SessionReceiptCounts): string | null {
   if (
-    counts.denied === 0 &&
-    counts.corrected === 0 &&
+    counts.midTaskPrompts === 0 &&
     counts.newSignatures === 0 &&
     counts.guardFires === 0
   ) {
     return null;
   }
-  return `mage: ${counts.denied} denied · ${counts.corrected} corrected · ${counts.newSignatures} new signatures · ${counts.guardFires} guard fires`;
+  return `mage: ${counts.midTaskPrompts} mid-task prompts · ${counts.newSignatures} new signatures · ${counts.guardFires} guard fires`;
 }
 
 /**

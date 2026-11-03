@@ -130,11 +130,20 @@ See `CONVENTIONS.md` for the full spec. Essentials:
 - **Tags:** `#<wing>/<room>` — wing = project/repo/service/person, room = topic.
 - **Relations:** a `## Relations` section with typed links
   (`- depends_on [x](x.md)`).
-- **Genre & recall rungs (ADR-0058):** Note `type` maps to a genre that determines its recall rung — see `mage/decisions/0058-recall-one-bounded-index.md`. Memory-genre notes (`gotcha`, `procedure`, `pointer`, `principle`, `feedback`, `reference`, `note`) form the recall-bearing set: every one of them lands in `INDEX.md`, and passing the genre filter makes a note *eligible* for the `MEMORY.md` roster rather than guaranteeing a slot — that roster carries only the top-K by rank (usage-proven first where local metrics exist, else recency). Non-memory genres (`decision`, `plan`, `tasks`, `spec`) are legal for storage and linking but are excluded from recall entirely — `mage/work/` is the home for plans/specs/task lists, while `mage/decisions/` holds decision records.
+- **Admission fields (ADR-0060):** a note needs `rung` (`impossible`, `check`,
+  `hook`, `rule` or `note`), `trigger` and `pointer` (a markdown link). `id` and
+  `skipped` are optional and checked when present. `trigger` is prose
+  (`trigger: "when the release is cut"`, listed but never matched) or
+  `trigger: {when: "...", match: ["Bash(npx mage *)", "Edit(package.json)"]}`, which
+  makes the note recallable at the action: a PreToolUse hook injects it, once per
+  session, when a Bash, Write, Edit, MultiEdit or NotebookEdit call matches a glob.
+  A note without these fields is still indexed and listed; it is only never recalled.
+  Details: [Admission and triggers](https://github.com/Sumit1993/mage-memory/blob/main/docs/src/content/docs/model/notes.md#admission-and-triggers).
+- **Genre & recall rungs (ADR-0058):** Note `type` maps to a genre that determines its recall rung — see `mage/decisions/0058-recall-one-bounded-index.md`. Memory-genre notes (`gotcha`, `procedure`, `pointer`, `principle`, `feedback`, `reference`, `note`) form the recall-bearing set: every one of them lands in `INDEX.md`, and passing the genre filter makes a note *eligible* for the `MEMORY.md` roster rather than guaranteeing a slot — that roster carries only the top-K by rank (admitted notes first, oldest `created` first among them; the rest follow in the order described below, which uses local usage metrics where they exist). Non-memory genres (`decision`, `plan`, `tasks`, `spec`) are legal for storage and linking but are excluded from recall entirely — `mage/work/` is the home for plans/specs/task lists, while `mage/decisions/` holds decision records.
 
 | `type:` | genre | rung |
 |---|---|---|
-| `gotcha` `procedure` | memory | 2 — `INDEX.md` line, `MEMORY.md`-eligible (1 once graduated) |
+| `gotcha` `procedure` | memory | 2 — `INDEX.md` line, `MEMORY.md`-eligible |
 | `pointer` `principle` `feedback` `reference` `note` | memory | 2 — `INDEX.md` line, `MEMORY.md`-eligible |
 | `decision` | decision | 3 — on demand |
 | `plan` `tasks` | work | 3 — on demand |
@@ -146,8 +155,7 @@ After editing notes, run `mage index` — it regenerates **both** recall surface
 (`INDEX.md` and `MEMORY.md`) in one pass; never hand-edit either. At a hub root
 it also fans out to regenerate each `projects/<name>/`'s own pair. If a new wing
 appeared, run `mage skills` (refresh per-wing skills). Both commands are
-deterministic, with one caveat: `MEMORY.md`'s roster order consults local usage
-metrics, so it can order differently on another machine.
+deterministic: the same notes and the same local usage metrics give the same roster.
 
 ## G. Commit hygiene (HARD RULE)
 

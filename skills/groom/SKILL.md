@@ -1,155 +1,90 @@
 ---
 name: groom
 description: |
-  Dispose of the staged draft batch (`mage groom`): keep, edit or drop each
-  draft the capture inbox lifted into `.mage/staging/`. The two mining readers
-  it used to run after that, `mage distill` and `mage promote`, retired in #208
-  and have no replacement until the proposal digest (#219).
-  Fires at session boundaries, after a PreCompact, or when the user says
-  "groom", "distill", "promote", "mine the learnings", or "what did we learn".
-  Judges candidates through the shared capture pipeline, routes proven notes to
-  `mage:graduate`. Nudge-invoked, not user-only.
+  Walk the notes up the ladder with `mage groom`: for each note, judge whether
+  it climbs to a deny rule, check, hook or AGENTS.md rule, is deleted, or stays
+  a note. Fires on "groom", "tidy the notes", "what should be a hook or check",
+  and right after a `mage:ladder` deny on a memory write.
 allowed-tools: Read, Grep, Glob, Write, Edit, Bash
 ---
 
-# /mage:groom — mine the observed scratch into notes
+# /mage:groom — walk the notes up the ladder
 
-`mage observe` writes a scratch record of every session to mage's own
-`.mage/learnings/*.jsonl` (the ADR-0015 schema). **groom turns that scratch into
-durable notes.** It is the back half of the loop `/mage:learn` serves, fired once
-a stretch of work has closed: `learn` captures *this one finding now*; `groom`
-mines *the accumulated record*.
+A note is the last rung. Four rungs sit above it: a deny rule, a check, a hook,
+an AGENTS.md rule. Each rung carries a fact better than a note can, because it
+acts without anyone remembering to read it. groom takes the notes one at a time
+and moves each as high as it can go. No model lives in mage (ADR-0050): you
+judge, `mage groom` lists and the tools you already have build.
 
-groom is a **judgment tier** — **no model lives in mage** (ADR-0050). Today it has
-one working phase, Phase 0 below. Phases 1 and 2 retired in #208 (see the
-section after Step 0).
+## Steps
 
-**Phase 0 — pending inline drafts (`mage groom`, 0.0.12).** Before the two mining
-phases, dispose of lessons captured INLINE during work. Drafts reach
-`.mage/staging/` when `mage groom` lifts the Claude Code capture inbox (flat notes
-at the docs root) into it. `mage stage` retired in #208, and its replacement, a
-`finding` event on `mage observe`, is not built yet (ADR-0052). Your job is the
-batch human-confirm:
+1. **List.** Run `mage groom --json` (or without `--json` for the readable
+   block). It lists memory notes, flat captures at the docs root included,
+   notes without a `rung` first. `--limit <n>` and `--all` size the walk. This is
+   what the human output looks like, from a real run on a fixture knowledge base:
 
-- `mage groom --json` surfaces the pending, deduped batch (capped at the staging
-  budget; the rest defer). For each draft, keep / edit / drop it.
-- `mage groom --accept <slugs|all>` moves the kept drafts into `notes/` and
-  re-indexes; `mage groom --reject <slugs|all>` discards them and records the
-  rejection so the same lesson is never re-drafted.
+   ```text
+   mage groom: 2 of 4 notes to judge (notes without a rung come first).
+     1. notes/gate2-fp-blocks-autonomy.md  "Gate-2 false positives block autonomy"  rung: -  trigger: -  pointer: -
+     2. notes/npx-mage-runs-the-published-release.md  "npx mage runs the published release"  rung: note  trigger: deciding which mage binary a verify command runs  pointer: [#282](https://github.com/Sumit1993/mage-memory/issues/282)
+     2 more: mage groom --all
+   For each note: climb (build the rung below, then delete the note), delete (stale, or a copy of a source),
+   or keep (add rung, trigger and pointer). mage never commits: land the whole diff as one pull request.
 
-These drafts are the freshest, highest-signal material. Clear them; that is the
-whole run until #219 lands.
+   mage:ladder
+   Take each fact in a note to the highest rung that can carry it.
+   Build that, then keep as a note only what no rung above can carry. Copy the template that fits.
 
-Notes are the reusable **insight + procedure + pointers**, never a copy of the
-source (see `CONVENTIONS.md`). groom mines **only mage's own** `.mage/learnings/` —
-foreign memory stores (ECC instincts, Claude `MEMORY.md`) are not harvested
-(ADR-0018 §8).
+   1 impossible: a deny rule in .claude/settings.json
+     {"permissions": {"deny": ["Edit(<path-glob>)", "Write(<path-glob>)"]}}
+   2 check: a versioned check that fails on the mistake: a test, a lint rule, or a CI job or
+     package script committed to the repo, so it reaches a pull request and every clone
+     "<script name>": "<command that exits non-zero when <forbidden pattern> is found>"
+     Do not edit .git/hooks/pre-commit (mage's secret scan lives there) and keep the check out of .git: it is local only.
+   3 hook: a PreToolUse hook in .claude/settings.json that blocks with a reason
+     {"hooks": {"PreToolUse": [{"matcher": "<tool name>", "hooks": [{"type": "command", "command": "node .claude/hooks/<name>.mjs"}]}]}}
+     The script reads the tool call JSON on stdin; to block it prints
+     {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "<rule text>"}}
+   4 rule: one line in AGENTS.md carrying an id
+     - <rule text>. [mage:repo/rule/<slug>]
+   5 note: add to the note's frontmatter
+     rung: note
+     trigger: {when: "<the moment it matters>", match: ["Bash(<cmd> *)", "Edit(<glob>)"]}
+     pointer: "[<source>](<path or issue>)"
+   A memory that carries rung: is never stopped.
+   ```
 
-## Autonomous mode (Approver / Overseer)
+2. **Judge each note.** Read it, then pick one:
+   - **climb**: the fact can be a rung above. Build the artifact from the matching
+     template. Prove it fires: run the check on a bad sample; pipe a sample tool
+     call JSON into the hook script and read its output. Only then delete the note.
+   - **delete**: stale, or a copy of a source the note only mirrors.
+   - **keep**: nothing above can carry it. Add `rung`, `trigger` (`when` plus
+     `match`) and `pointer`. Test the match with `mage recall-hook --explain`,
+     feeding it a sample tool call on stdin, against calls it should and should
+     not hit. `rung` is one of `impossible`, `check`, `hook`, `rule`, `note`; `trigger`
+     is a string, or `{when, match}` with `Bash(<glob>)` and `Edit(<glob>)` entries
+     (an `Edit` glob is relative to the code repo being edited); `pointer` is a
+     markdown link to the source. Details:
+     [Admission and triggers](https://github.com/Sumit1993/mage-memory/blob/main/docs/src/content/docs/model/notes.md#admission-and-triggers).
+3. **Regenerate.** Run `mage index`. Its `Roster:` line says how many notes are
+   admitted and how many recall at the action.
+4. **Land one pull request.** Show the whole diff (the artifacts, the deleted
+   notes, the changed notes) and open one pull request from a branch. Never
+   commit to the default branch. mage never commits for you.
 
-By default this skill is **Operator** mode (HITL): you draft each note, show the
-human, and write **only after a yes** (Step 3 / Step 7). That per-note confirm is
-unchanged at Operator.
+## Rules
 
-When the boundary nudge invokes groom under an **Approver** or **Overseer**
-mandate (ADR-0030 — it reads `metadata.json → grooming.autonomy` and templates the
-mandate into the session), that per-note "write only after a yes" prompt is
-**WAIVED**. This does not break the loop's floor: the human's confirm has not
-vanished, it has **relocated to the batch `git commit`** — ADR-0013's invariant
-that *the commit IS the yes*. So in autonomous mode you write without pausing per
-note, and the human reviews the resulting diff and commits (or `git revert`s) once.
-
-The floor never moves, at either level:
-
-- **Gate-2 redaction (ADR-0014) still runs before EVERY write** — a LIVE secret
-  on a draft still stops that one note, exactly as in Operator mode. Autonomy
-  waives the *human prompt*, never the redaction gate.
-- **Writes land UNCOMMITTED in the working tree.** mage never commits (ADR-0009).
-  The uncommitted diff is the review surface; the commit is the human's "yes".
-- Hold the same **quality bar** as a confirmed write — lead with user corrections, run the one-question test on every draft — NEW costs a justification sentence, MERGE is the default when a note already answers the question; keep notes to insight + procedure + pointers. The waived prompt is convenience, not a lowered value-bar.
-
-**Provenance is stamped for you (ADR-0031) — do not add it by hand.** `mage groom
---accept` stamps each accepted note's `provenance` deterministically at the write:
-`autonomy: approver|overseer` (the reject-ledger's authorship mark, ADR-0030) plus
-`repo` + `commit`. It appears in the diff you review and commit; you write none of it.
-
-**Approver** — dispose the staged batch and write the **clearly-durable** drafts
-straight into the working tree without the per-note prompt; leave anything **borderline** staged in `.mage/staging/` for
-a later human pass; run `mage index`. Do **not** graduate.
-
-**Overseer** — everything Approver does, **plus** dispose the borderline tier (write or `--reject` it rather than leaving it staged), fold lessons that share a question with an existing note into that note (one-question test, verdict stated in the batch). Graduation has no input while `mage promote` is retired (#208), so there is nothing to route to `/mage:graduate`.
-
-In autonomous mode "dispositioned" means written, merged or rejected into the
-working tree, not a per-note yes.
-
-## Step 0 — Resolve the roots to groom
-
-Find the nearest `mage/metadata.json` (walk up). The docs root to groom is:
-
-- **in-repo / hybrid** → `<repo>/mage/`
-- **external** → the hub project it points at: `<hub root>/projects/<project>/`
-  — **FLAT**, no nested `mage/` (ADR-0011 / ADR-0023: a project looks like the hub
-  it lives in, not like a code-repo `mage/`). The hub root is DERIVED from
-  `hub_repo` (ADR-0043) — `~/.mage/hubs/<host>/<owner>/<repo>` — not read off
-  `hub_path`, which is now only a deprecated fallback.
-
-If none is found and the cwd is not a hub, you are not in a knowledge base —
-`mage doctor` flags a **"bare parent"** when a dir sits above several KBs but is
-itself neither. Don't groom; tell the user to `cd` into a project or `mage init`.
-
-**At a hub root, fan out (Decision 1).** A hub is one KB *and* a registry of
-project KBs, so groom the hub's OWN `.mage/learnings/` (at the hub root) **and every
-registered hub-owned project** (`<hub>/projects/<name>/`). Repo-owned projects keep
-their notes in their own repo checkouts and are groomed there.
-
-Then run **Phase 0 once per root**, passing `--dir <root>`. Each root keeps its
-own staging batch, so projects never conflate. If the user scopes the run to the hub only (e.g. "groom root-only"),
-groom just the hub root and skip the fan-out.
-
----
-
-## Phases 1 and 2 — retired (#208)
-
-Phase 1 ran `mage distill --json`, a first-sight reader over `.mage/learnings/`.
-Phase 2 ran `mage promote --json`, a graduation reader over note-read counts.
-Both verbs now print a signpost and exit 0, so neither phase has input. Skip them.
-Do not substitute `mage groom --json`: it returns the staged batch, not a
-first-sight or graduation manifest. Their work returns as the proposal digest in
-`mage groom` (#219).
-
----
-
-## Step 9 — Suggest follow-ups (never auto-run)
-
-```bash
-mage index          # refresh INDEX.md so the new notes are findable
-git -C <repo> add mage && git -C <repo> commit -m "groom: <n> notes"
-```
-mage never commits for you — it suggests, you run. The exception is
-`--propose` (ADR-0057): opt-in per knowledge base. `--propose` itself commits
-the promoted notes and pushes the proposal branch to open a pull request;
-Step 9's manual `git add`/`git commit` does not apply in proposal mode. It can
-only ever produce a branch and a pull request.
-
-## Quality bar
-
-- Every kept draft passes the same capture pipeline as `/mage:learn` — classify,
-  one-question test, **Gate 2**, human confirm. Captures *insight + procedure +
-  pointers*; points to canonical sources, never mirrors them.
-- A draft is accepted or rejected only on explicit disposition; re-runs are safe.
+- A climb edits code-repo files (AGENTS.md, `.claude/settings.json`, CI), so it
+  lands as an ordinary pull request. `--propose` refuses those paths by design.
+- Run the redaction gate (`mage redact <file>`) before a new tracked file holds
+  anything copied from a note (ADR-0053).
+- Notes are insight, procedure and pointers, never a copy of a source.
+- Drafts a 0.0.17 session left in `.mage/staging/` are not read by anything in
+  0.0.18; `mage groom --accept|--reject <slugs|all>` still clears them.
 
 ## See also
 
-- **/mage:learn** (`skills/learn/SKILL.md`) — the shared capture pipeline
-  (classify → one-question test → Gate 2 → confirm → write) Phase 0 funnels into.
-- **/mage:graduate** (`skills/graduate/SKILL.md`) — where Phase 2 handed
-  `action: "graduate"` proposals, before #208 retired it.
-- **ADR-0052** (`mage/decisions/0052-streams-and-the-observe-schema.md`) —
-  distill as deterministic reader + judgment skill; first-sight capture; CLOSED-only
-  watermark; mage reads only its own artifacts; and the `.mage/learnings/*.jsonl`
-  event schema the readers consume.
-- **ADR-0057** (`mage/decisions/0057-a-guard-lands-by-pull-request.md`) — the
-  recurrence tally, distinct-session counting, the K/M thresholds, and the
-  note/graduate ladder rungs.
-- **ADR-0053** (`mage/decisions/0053-redaction-two-gates-one-engine.md`) — `mage redact`
-  Gate 2 before any tracked write.
+- **/mage:learn**: writes a note, after asking the ladder first.
+- **/mage:optimize**: keeps recall sharp once notes carry a `match`.
+- ADR-0060 (`mage/decisions/0060-the-ladder-reset.md`): the decision behind the walk.

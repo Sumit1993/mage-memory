@@ -9,16 +9,16 @@ keywords: [decisions, map, collapse, superseded, precedence]
 
 # The decisions, and where the old ones went
 
-Ten decisions govern this repo, numbered 0050 to 0059. On 2026-09-10 they replaced forty-eight (#262). The old
+Eleven decisions govern this repo, numbered 0050 to 0060. On 2026-09-10 ten of them replaced forty-eight (#262). The old
 files are deleted, not marked; git keeps them at commit `ef93c90`. Numbers 0001 to 0048 are never reused, so an
 old citation in code or a changelog is unambiguous: look it up here.
 
-Precedence when two texts disagree: the newest of the ten wins over an older one; any of the ten wins over an
+Precedence when two texts disagree: the newest of the eleven wins over an older one; any of the eleven wins over an
 issue body; an issue comment ruled by the operator wins over an issue body; nothing under `~/ai-context/` or
 in a deleted file is a source. A decision is under 40 lines and has five parts: Decision, Why, Forbids,
 Example, Relations. Every status is `accepted`; the 0.1.0 gate in 0059 is a release gate, not an ADR status.
 
-## The ten
+## The eleven
 
 | number | title | enforced today by |
 |---|---|---|
@@ -32,6 +32,7 @@ Example, Relations. Every status is `accepted`; the 0.1.0 gate in 0059 is a rele
 | [0057](0057-a-guard-lands-by-pull-request.md) | A guard lands by pull request; the human merges | `src/provenance.ts:57`, `src/commands/autonomy.ts:35`; PR path is PR #182, unmerged |
 | [0058](0058-recall-one-bounded-index.md) | Recall is one bounded index, loaded every session | `src/commands/index-cmd.ts:55`, `src/adapters/claude-code/projects.ts:29`, `src/metrics/footprint.ts:16`, `src/adapters/claude-code/constants.ts:7` |
 | [0059](0059-versions-are-mechanical-the-release-is-two-counts.md) | Versions are mechanical; the release is named by two counts | `release-please-config.json`, `.github/workflows/release-please.yml`, `src/docs/generated-data.test.ts` |
+| [0060](0060-the-ladder-reset.md) | The ladder reset | `src/adapters/claude-code/recall-hook.ts`, `src/scanner/trigger.ts`, `src/adapters/claude-code/memory-hook.ts` |
 
 ## Where each of the forty-eight went
 
@@ -106,3 +107,4 @@ Example, Relations. Every status is `accepted`; the 0.1.0 gate in 0059 is a rele
 | Versions from conventional commits; a breaking marker mints 0.1.0 | `release-please-config.json` | 0059 |
 | Docs numbers derive from code; drift test fails CI | `src/docs/generated-data.test.ts` | 0059 |
 | Native-memory write is intercepted on PreToolUse | `src/adapters/claude-code/memory-hook.ts:93` | 0051 |
+| Recall injects admitted notes at the action, once per session; a rung-less memory write is denied once per session | `src/adapters/claude-code/recall-hook.ts`, `src/adapters/claude-code/memory-hook.ts` | 0060 |

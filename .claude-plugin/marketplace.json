@@ -5,13 +5,13 @@
     "name": "Sumit Patel"
   },
   "metadata": {
-    "description": "mage — a portable, self-maintaining knowledge base for software systems, with skills for durable note capture and a self-grooming memory loop."
+    "description": "mage: durable memory for AI coding agents that climbs the ladder: rules and hooks where it can, notes recalled at the action where it must."
   },
   "plugins": [
     {
       "name": "mage",
       "source": "./",
-      "description": "mage skills: mage:learn (capture durable notes) + the self-grooming loop mage:groom / mage:graduate / mage:optimize + mage:guide (how to use the knowledge base).",
+      "description": "mage skills: mage:learn (write a note), mage:groom (walk notes up the ladder), mage:optimize (keep recall sharp), mage:guide.",
       "version": "0.0.17",
       "author": {
         "name": "Sumit Patel"

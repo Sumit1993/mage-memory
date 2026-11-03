@@ -26,17 +26,17 @@ describe("integration: release smoke (deterministic)", () => {
   it("--help hides the plumbing verbs and shows the human verbs", async () => {
     const { stdout } = await runMage(["--help"], { cwd: REPO_ROOT });
     const verbLine = (v: string) => new RegExp(`^\\s+${v}\\b`, "m").test(stdout);
-    for (const hidden of ["observe", "distill", "promote"]) {
+    for (const hidden of ["observe", "distill", "promote", "recall-hook"]) {
       expect(verbLine(hidden), `plumbing verb '${hidden}' should be hidden from --help`).toBe(false);
     }
-    for (const human of ["init", "connect", "doctor", "index", "skills"]) {
+    for (const human of ["init", "connect", "doctor", "index", "skills", "groom"]) {
       expect(verbLine(human), `human verb '${human}' should be visible in --help`).toBe(true);
     }
   });
 
   it("ships exactly the expected auto-loaded skills", async () => {
     const skills = (await readdir(join(REPO_ROOT, "skills"))).filter((n) => !n.startsWith(".")).sort();
-    expect(skills).toEqual(["graduate", "groom", "guide", "learn", "optimize"]);
+    expect(skills).toEqual(["groom", "guide", "learn", "optimize"]);
   });
 
   it("distill --json prints the retired message and exits 0", async () => {

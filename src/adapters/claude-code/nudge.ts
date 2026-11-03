@@ -1,10 +1,11 @@
 // `mage nudge` (ADR-0009; ADR-0029; ADR-0030).
-// On the Stop hook, emits a one-line session receipt (denied, corrected, new signatures, guard fires).
+// On the Stop hook, emits a one-line session receipt (mid-task prompts, new signatures, guard fires).
 // On SessionStart (compact/startup/resume), plain startup is quiet unless a proposal is waiting or
 // an external hub/grant check failed.
 // Never blocks or throws to the host (fail-open, exit 0).
 
 import { Command } from "commander";
+import { listHeld } from "../../held.js";
 import { readProposals } from "../../grooming/proposals.js";
 import { measureFootprint } from "../../metrics/footprint.js";
 import { appendTrendRow, type FootprintTrendRow } from "../../metrics/footprint-trend.js";
@@ -17,6 +18,7 @@ import {
   resolveDocsRoot,
 } from "../../paths.js";
 import { reachGrantStatus } from "../../reach-grant.js";
+import { clearRecallState } from "./recall-hook.js";
 import {
   type SessionReceiptCounts,
   computeReceipt,
@@ -74,7 +76,9 @@ export async function nudgeCmd(opts: NudgeOptions): Promise<NudgeResult> {
   if (isStop) {
     const resolved = await resolveDocsRoot(abs).catch(() => null);
     if (!resolved) return NONE;
-    return sessionReceiptNudge(resolved, opts.sessionId);
+    const receipt = await sessionReceiptNudge(resolved, opts.sessionId);
+    const held = await heldReminder(resolved.root, opts.sessionId);
+    return held ? { ...receipt, notice: joinNotice(receipt.notice, held) } : receipt;
   }
 
   const codeRepo = await findCodeRepoRoot(abs).catch(() => null);
@@ -97,6 +101,9 @@ export async function nudgeCmd(opts: NudgeOptions): Promise<NudgeResult> {
 
   const resolved = await resolveDocsRoot(abs).catch(() => null);
   if (!resolved) return NONE;
+
+  // Compaction drops injected notes from context; let recall inject them again (#282).
+  if (opts.source === "compact") await clearRecallState(resolved.root, opts.sessionId);
 
   const grant = await grantNudge(abs).catch(() => null); // fail-open: a broken grant must never break a session
 
@@ -124,6 +131,15 @@ export async function nudgeCmd(opts: NudgeOptions): Promise<NudgeResult> {
   const nudge = grant?.context ?? null;
 
   return { ran: true, drafted: 0, pending: 0, nudge, notice };
+}
+
+/** One line naming this session's held writes (denied once by the ladder, #282); null when none. */
+async function heldReminder(root: string, sessionId: string | undefined): Promise<string | null> {
+  const session = sessionId?.trim();
+  if (!session) return null;
+  const held = await listHeld(root, session).catch(() => []);
+  if (held.length === 0) return null;
+  return `mage · ${held.length} lesson(s) held, not filed: ${held.join(", ")}. Climb or re-file them, or run mage groom.`;
 }
 
 function proposalNoticeLine(count: number): string | null {

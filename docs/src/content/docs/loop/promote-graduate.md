@@ -1,79 +1,12 @@
 ---
-title: Promote and graduate
-description: The graduation path — proven procedures that see continued usage graduate into loadable skills.
-sidebar:
-  order: 5
+title: Promote and graduate (retired)
+description: Retired in 0.0.18; a note now climbs the ladder through mage groom.
 ---
 
-The [lesson path](./stage-groom.md) catches what is striking the *first* time you see it. The **graduation path** catches the opposite: lessons that have proven themselves through continued usage. A deterministic engine counts that usage; you judge what is worth graduating.
+This page described part of the self-grooming loop (streams, digests, proposals, a ledger and a counting gate). 0.0.18 cut that loop from the surface; see [ADR-0060, the ladder reset](https://github.com/Sumit1993/mage-memory/blob/main/mage/decisions/0060-the-ladder-reset.md).
 
-While the command is still named `mage promote` for historical reasons, it now exclusively drives **graduation** — when a proven procedural note earns its own auto-loadable skill. (An older version of this path used to propose new notes based on keyword recurrence; that was deleted in ADR-0038 because deterministic note-selection proved too noisy.)
+What replaced it:
 
-**Retired (#208).** `mage promote` now prints a signpost and exits 0, so this path finds no candidates today. Graduation comes back as one proposal type in `mage groom` (#219). The rest of this page describes the path as it worked until then.
-
-## It counts chapters, not sessions
-
-The unit of usage is the **compact-chapter** — one stretch of work between context compactions (or session ends), not a session id. This distinction is load-bearing. A session id stays constant across compaction, so if usage counted sessions, one long continuously-compacted chat would never accrue any. Counting chapters means even a single ongoing chat keeps building up usage as it compacts.
-
-A chapter only counts toward usage if it carries real work: at least **two work events** (a prompt plus a tool use). That floor stops a trivial `/compact` from manufacturing a phantom usage unit.
-
-## Graduate: a proven note becomes a loadable skill
-
-Some notes are not just facts but *procedures* — a playbook or a gotcha with a method to run. At normal sensitivity, when the file for such a note is **read** across at least **M = 5** distinct compact-chapters, it has earned its own auto-loadable skill: a `mage-skill-<slug>`. The note stays as the substrate; the skill is its pushed, auto-loaded form.
-
-Only **procedural** notes graduate. A skill is loaded into the agent's context to *do* something, so it must be an actionable procedure — you auto-load a procedure, not a fact. Principle, reference, and interface notes carry knowledge but no method to run, so they stay notes.
-
-Graduation is driven by the `/mage:graduate` skill. It reads the deterministic engine for graduate candidates, shows you the backing note plus the usage evidence, and on your confirmation pipes the proposal to `mage dream --apply` — the single serialized writer — which mints the `mage-skill-<slug>` (in both `.claude/skills/` and `.agents/skills/`) and re-points the note at it. The note is never deleted.
-
-```bash
-# (Plumbing the /mage:graduate skill runs for you.) Surface graduate candidates:
-mage promote --json
-```
-
-### A worked example
-
-A `gotcha` note has been read across 5 distinct chapters — M at the default `normal` sensitivity. The manifest carries one proposal:
-
-```jsonc
-{
-  "proposals": [
-    {
-      "action": "graduate",
-      "target": "notes/svc-api/migration-lock.md",
-      "payload": { "note": "notes/svc-api/migration-lock.md", "wing": "svc-api", "type": "gotcha" },
-      "evidence": "note read in 5 distinct chapter(s) — a proven gotcha, ready to graduate to a skill"
-    }
-  ],
-  "cursors": { "<session-id>": 42 },  // suggested per-session watermark offsets
-  "climbing": 2,                      // notes being used but still below M — info only
-  "deferred": 0                       // eligible but held back by the per-pass promotion budget
-}
-```
-
-On your confirmation, `/mage:graduate` pipes the proposal to `mage dream --apply` — the single writer — and the diff it leaves is exactly three files:
-
-```text
-$ git diff --stat
- .agents/skills/mage-skill-migration-lock/SKILL.md | 24 ++++++++++++++++++
- .claude/skills/mage-skill-migration-lock/SKILL.md | 24 ++++++++++++++++++
- mage/notes/svc-api/migration-lock.md              |  3 ++-
- 3 files changed, 50 insertions(+), 1 deletion(-)
-```
-
-The two `SKILL.md` files are the minted skill, written into both skill directories; the note change is the re-point — a `graduated_skill: mage-skill-migration-lock` frontmatter line plus a bumped `updated` stamp. The note itself is never deleted.
-
-## Note-read usage gates graduation
-
-Be precise about what gates what. **Note-read usage** (the M chapter counts) gates graduation. A not-yet-graduated note loads no skill, so the only usage signal available is how often the agent independently reaches for the note's markdown file while working. The deterministic engine (`mage promote`) counts those distinct reads.
-
-Context-match is a *different* signal that only exists *after* a skill graduates, and it governs reword and demote — never graduation. That is the next page: [Optimize](./optimize.md).
-
-## The sensitivity dial scales M
-
-M is not fixed forever. A single tracked **sensitivity dial** scales the graduation gate. Setting it to `high` lowers the bar (fewer chapters needed to graduate); `low` raises it. The default is `normal`. The quality floors (note size, edit budgets, match-rate thresholds) are not eagerness, so the dial leaves them fixed.
-
-For the exact gate values at each dial position, see [Thresholds and the dial](../reference/thresholds.mdx).
-
-## Nothing auto-commits
-
-Graduate mints a skill and re-points a note. Neither commits. Review the diff and commit yourself once you have looked it over — mage suggests the `git` command, you run it.
+- [The ladder](./overview.md): a remembered fact climbs to a rule, hook or check where it can, and stays a note only where it must.
+- [Recall at the action](../model/recall.md): a note whose `trigger.match` hits a tool call is injected on PreToolUse.
+- `mage groom` walks existing notes up the ladder and lands the result by pull request.

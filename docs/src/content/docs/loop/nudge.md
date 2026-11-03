@@ -1,76 +1,12 @@
 ---
-title: The boundary nudge
-description: How mage provides feedback on session boundaries, moving the session receipt to Stop while keeping SessionStart quiet.
-sidebar:
-  order: 3
+title: The boundary nudge (retired)
+description: Retired in 0.0.18; see the ladder.
 ---
 
-Inline capture records lessons as you work. The **boundary nudge** is the command `mage nudge`, which runs at host lifecycle boundaries to provide visibility without interrupting flow.
+This page described part of the self-grooming loop (streams, digests, proposals, a ledger and a counting gate). 0.0.18 cut that loop from the surface; see [ADR-0060, the ladder reset](https://github.com/Sumit1993/mage-memory/blob/main/mage/decisions/0060-the-ladder-reset.md).
 
-The nudge writes no note, draft or proposal. It reads the session events and surfaces feedback when warranted. Its one write: on a firing SessionStart (`compact`, `startup`, `resume`) it appends a footprint sample to the git-ignored `.mage/metrics/footprint.jsonl`, even when it prints nothing.
+What replaced it:
 
-## When it fires
-
-The boundary nudge is wired to two hooks in Claude Code:
-
-- **Stop** (`mage:nudge:Stop`): Fires when Claude finishes a turn or stops. It tallies session activity and prints a one-line session receipt.
-- **SessionStart** (`mage:nudge:SessionStart`): Fires when a session starts, resumes, or restarts after compaction.
-
-## The Stop session receipt
-
-At the `Stop` boundary, `mage nudge` reads the session events recorded in the capture scratch. It aggregates four key signals:
-
-- `denied`: Tool calls that were requested and never ran: a `tool_attempt` with no `tool_use` sharing its id. A deny rule and a blocking hook both count; a guard that only rewrote the call does not.
-- `corrected`: Substantive user corrections following assistant messages or tool use.
-- `new signatures`: Distinct failure signatures observed in the current session.
-- `guard fires`: Total guard events recorded for this session.
-
-The receipt is formatted as a single concise line:
-
-```text
-mage: <N> denied · <N> corrected · <N> new signatures · <N> guard fires
-```
-
-If all four counts are zero, or if the directory lacks a knowledge base, `mage nudge` remains completely silent and exits with status 0. It never clutters sessions that ran without issue.
-
-## Quiet SessionStart
-
-Earlier versions printed backlog tallies, keep rates, or chapter digests whenever a session started. In everyday practice, greeting the user with backlogs on launch produced unnecessary noise.
-
-SessionStart is now quiet by default. It prints output only when actionable items require attention:
-
-- **Waiting proposals**: When graduation proposals are ready for review, it prints:
-  `mage · 1 proposal is waiting` (or plural: `mage · 2 proposals are waiting`).
-- **Degraded hub connectivity**: If a connected hub repository is unreachable or grants are invalid, it prints a single status warning.
-
-If no proposals are waiting and connectivity checks pass, SessionStart outputs nothing.
-
-## Worked terminal transcript
-
-Here is an example transcript showing a session where a guard blocked an action:
-
-```text
-$ claude
-# Starting Claude Code session...
-
-> Run git push origin main --force
-# Guard intercepts the dangerous command
-
-mage: 1 denied · 0 corrected · 0 new signatures · 1 guard fires
-```
-
-When a session finishes with zero denied actions, zero corrections, zero new signatures, and zero guard fires, the receipt produces no output:
-
-```text
-$ claude
-# Starting Claude Code session...
-
-> Read the README
-# Task finishes cleanly
-
-$
-```
-
-## Fail-open design
-
-The boundary nudge is fail-open. Any file system error or parsing exception is caught cleanly, allowing the process to exit with code 0 without disrupting host operations.
+- [The ladder](./overview.md): a remembered fact climbs to a rule, hook or check where it can, and stays a note only where it must.
+- [Recall at the action](../model/recall.md): a note whose `trigger.match` hits a tool call is injected on PreToolUse.
+- `mage groom` walks existing notes up the ladder and lands the result by pull request.

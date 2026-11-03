@@ -1,10 +1,10 @@
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { tmpDir } from "../../test/fixtures/kb.js";
 import {
   AUTO_MEMORY_MAX_BYTES,
@@ -13,7 +13,7 @@ import {
 import { BREACH_RATIO } from "../metrics/footprint.js";
 import type { HubProject } from "../paths.js";
 import type { ScannedNote } from "../scan.js";
-import { index, renderMemory, SCAFFOLDING_WORDS } from "./index-cmd.js";
+import { index, indexForHook, renderMemory, SCAFFOLDING_WORDS } from "./index-cmd.js";
 import { init } from "./init.js";
 
 async function vault(): Promise<string> {
@@ -291,6 +291,19 @@ describe("mage index", () => {
     expect(idx).toContain("Real");
   });
 
+  it("never lists a held write under notes/.held/ (#282)", async () => {
+    const dir = await vault();
+    await note(dir, "kept.md", "---\ntype: note\n---\n# Kept\n");
+    await note(dir, ".held/sess-1-lesson.md", "---\ntype: note\n---\n# Held lesson\n");
+    const r = await index({ dir });
+    expect(r.noteCount).toBe(1);
+    const idx = await readFile(join(dir, "mage", "INDEX.md"), "utf8");
+    expect(idx).toContain("[Kept](notes/kept.md)");
+    expect(idx).not.toContain("Held lesson");
+    expect(idx).not.toContain(".held");
+    expect(await readFile(join(dir, "mage", "MEMORY.md"), "utf8")).not.toContain("Held lesson");
+  });
+
   it("cleans stale generated wing index files and reports them in deleted", async () => {
     const dir = await vault();
     const staleWing = join(dir, "mage", "_index.oldwing.md");
@@ -506,13 +519,9 @@ describe("mage index — fan out over owned project docs roots (#106)", () => {
     expect(hubMem).toContain("Beta Feature");
   });
 
-  it("ranks per-wing MEMORY.md from co-located promote tally at projects/<a>/.mage/metrics/", async () => {
+  it("ranks a project's MEMORY.md with the same admitted-first rule, ignoring a promote tally", async () => {
     const root = await hub([
-      {
-        name: "alpha",
-        storage: "hub-owned",
-        code_repo_url: "git@github.com:me/alpha.git",
-      },
+      { name: "alpha", storage: "hub-owned", code_repo_url: "git@github.com:me/alpha.git" },
     ]);
     await put(
       root,
@@ -522,32 +531,20 @@ describe("mage index — fan out over owned project docs roots (#106)", () => {
     await put(
       root,
       "projects/alpha/notes/n2.md",
-      "---\ntype: note\ntags: [alpha/x]\ncreated: '2026-01-01'\n---\n# Second Note\n",
+      "---\ntype: note\ntags: [alpha/x]\ncreated: '2026-02-01'\n" +
+        "rung: note\ntrigger: when\npointer: '[a](b.md)'\n---\n# Second Note\n",
     );
-    const tally = {
-      v: 4,
-      notes: {
-        "notes/n2.md": { chapters: 5, lastSeen: "2026-07-29T10:00:00Z" },
-        "notes/n1.md": { chapters: 1, lastSeen: "2026-07-29T09:00:00Z" },
-      },
-      sessions: {},
-    };
     await put(
       root,
       "projects/alpha/.mage/metrics/promote.json",
-      JSON.stringify(tally, null, 2),
+      JSON.stringify({ v: 4, notes: { "notes/n1.md": { chapters: 9 } }, sessions: {} }),
     );
 
-    await index({ dir: root });
+    await index({ dir: root, quiet: true });
 
-    const alphaMem = await readFile(
-      join(root, "projects/alpha/MEMORY.md"),
-      "utf8",
-    );
+    const alphaMem = await readFile(join(root, "projects/alpha/MEMORY.md"), "utf8");
     const posN1 = alphaMem.indexOf("First Note");
     const posN2 = alphaMem.indexOf("Second Note");
-    // Guard the rank comparison: a missing entry is -1, which would satisfy
-    // `toBeLessThan` for the wrong reason.
     expect(posN1).toBeGreaterThanOrEqual(0);
     expect(posN2).toBeGreaterThanOrEqual(0);
     expect(posN2).toBeLessThan(posN1);
@@ -778,6 +775,10 @@ keywords: [kw${i}, ${"k".repeat(25)}]
     }
   }
 
+  /** A note that passes admission (rung, trigger, pointer). */
+  const ADMITTED = (created: string | undefined, title: string): string =>
+    `---\ntype: note\n${created ? `created: '${created}'\n` : ""}rung: note\ntrigger: when it matters\npointer: '[src](a.md)'\n---\n# ${title}\n`;
+
   it("1. roster fits both thresholds by construction with a large synthetic KB (300 notes)", async () => {
     const dir = await vault();
     await generateKb(dir, 300);
@@ -791,35 +792,26 @@ keywords: [kw${i}, ${"k".repeat(25)}]
     expect(mem).toContain("Read INDEX.md before non-trivial work.");
   });
 
-  it("2. ranking: proven-flag ordering, recency ordering within tier, relPath tiebreak", async () => {
+  it("2. ranking: admitted first, then created ascending with missing last, then relPath", async () => {
     const dir = await vault();
-    // unproven, old date
-    await note(dir, "b.md", "---\ntype: note\nlast_reviewed: '2026-01-01'\n---\n# B\n");
-    // unproven, new date
-    await note(dir, "c.md", "---\ntype: note\nlast_reviewed: '2026-07-29'\n---\n# C\n");
-    // proven (5 chapters >= the normal-dial graduateSessions of 5), old date
-    await note(dir, "a.md", "---\ntype: note\nlast_reviewed: '2026-01-01'\n---\n# A\n");
-    await tally(dir, { "notes/a.md": 5 });
+    await note(dir, "u-old.md", "---\ntype: note\ncreated: '2026-01-01'\n---\n# Uold\n");
+    await note(dir, "u-none.md", "---\ntype: note\n---\n# Unone\n");
+    await note(dir, "a-late.md", ADMITTED("2026-05-01", "Alate"));
+    await note(dir, "a-early.md", ADMITTED("2026-03-01", "Aearly"));
+    await note(dir, "a-none.md", ADMITTED(undefined, "Anone"));
 
     await index({ dir, quiet: true });
     const mem = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
-    const posA = mem.indexOf("[A](notes/a.md)");
-    const posC = mem.indexOf("[C](notes/c.md)");
-    const posB = mem.indexOf("[B](notes/b.md)");
-    expect(posA).toBeGreaterThan(-1);
-    expect(posC).toBeGreaterThan(-1);
-    expect(posB).toBeGreaterThan(-1);
-    expect(posA).toBeLessThan(posC); // proven A beats unproven C despite being older
-    expect(posC).toBeLessThan(posB); // newer C beats older B
+    const order = ["Aearly", "Alate", "Anone", "Uold", "Unone"].map((t) => mem.indexOf(`[${t}]`));
+    expect(order.every((i) => i >= 0)).toBe(true);
+    expect([...order].sort((x, y) => x - y)).toEqual(order);
   });
 
-  it("2b. relPath ascending breaks a full tie (same proven bucket, same date)", async () => {
+  it("2b. relPath ascending breaks a full tie (same group, same created)", async () => {
     const dir = await vault();
-    // z + m tie on everything but relPath; y is newer and must sort above both, so the
-    // tie is asserted around a moving neighbour rather than on an already-sorted list.
-    await note(dir, "z-tie.md", "---\ntype: note\nlast_reviewed: '2026-02-02'\n---\n# Ztie\n");
-    await note(dir, "m-tie.md", "---\ntype: note\nlast_reviewed: '2026-02-02'\n---\n# Mtie\n");
-    await note(dir, "y-new.md", "---\ntype: note\nlast_reviewed: '2026-09-09'\n---\n# Ynew\n");
+    await note(dir, "z-tie.md", ADMITTED("2026-02-02", "Ztie"));
+    await note(dir, "m-tie.md", ADMITTED("2026-02-02", "Mtie"));
+    await note(dir, "y-new.md", ADMITTED("2026-01-01", "Ynew"));
 
     await index({ dir, quiet: true });
     const mem = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
@@ -827,44 +819,96 @@ keywords: [kw${i}, ${"k".repeat(25)}]
     const posM = mem.indexOf("[Mtie](notes/m-tie.md)");
     const posZ = mem.indexOf("[Ztie](notes/z-tie.md)");
     expect(posY).toBeGreaterThan(-1);
-    expect(posY).toBeLessThan(posM); // recency still outranks the tied pair
+    expect(posY).toBeLessThan(posM); // earlier created first
     expect(posM).toBeLessThan(posZ); // notes/m-tie.md < notes/z-tie.md
   });
 
-  it("2c. a proven note survives the cut that drops a newer unproven one", async () => {
+  it("2c. an admitted note survives the cut that drops an unadmitted one, but both stay in INDEX.md", async () => {
     const dir = await vault();
-    // 200 fillers dated 2026-06-01 overflow the 180-line budget on their own.
     for (let i = 0; i < 200; i++) {
       await note(
         dir,
         `f${i.toString().padStart(3, "0")}.md`,
-        `---\ntype: note\nlast_reviewed: '2026-06-01'\n---\n# Filler ${i}\n`,
+        `---\ntype: note\ncreated: '2026-06-01'\n---\n# Filler ${i}\n`,
       );
     }
-    // Oldest of all, so recency alone would rank it dead last — the tally lifts it.
-    await note(dir, "proven.md", "---\ntype: note\nlast_reviewed: '2020-01-01'\n---\n# Proven\n");
-    // Unproven and NEWER than the proven note, but still below every filler.
-    await note(dir, "oldish.md", "---\ntype: note\nlast_reviewed: '2021-01-01'\n---\n# Oldish\n");
-    await tally(dir, { "notes/proven.md": 5 });
+    await note(dir, "admitted.md", ADMITTED("2030-01-01", "Admitted"));
 
     const r = await index({ dir, quiet: true });
     expect(r.memoryTier).toBe(1);
     const mem = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
-    expect(mem).toContain("[Proven](notes/proven.md)"); // proven, ranked first, kept
-    expect(mem).not.toContain("[Oldish](notes/oldish.md)"); // newer but unproven, cut
-    expect(mem).toContain("202 memory notes total");
+    expect(mem).toContain("[Admitted](notes/admitted.md)"); // admitted ranks first despite the latest created
+    expect(mem).not.toContain("[Filler 199](notes/f199.md)"); // cut from the roster
+    expect(mem).toContain("201 memory notes total");
+    expect(await readFile(join(dir, "mage", "INDEX.md"), "utf8")).toContain("[Filler 199](notes/f199.md)");
     expect(countLines(mem)).toBeLessThanOrEqual(thresholdLines);
   });
 
-  it("3. fail-open: no tally file -> recency order, no throw, byte-identical across runs", async () => {
+  it("2d. notes without admission fields keep the 0.0.17 order: proven, then newest reviewed, then relPath", async () => {
     const dir = await vault();
-    await note(dir, "old.md", "---\ntype: note\nlast_reviewed: '2026-01-01'\n---\n# Old\n");
-    await note(dir, "new.md", "---\ntype: note\nlast_reviewed: '2026-07-29'\n---\n# New\n");
+    await note(dir, "b.md", "---\ntype: note\nlast_reviewed: '2026-01-01'\n---\n# B\n");
+    await note(dir, "c.md", "---\ntype: note\nlast_reviewed: '2026-07-29'\n---\n# C\n");
+    await note(dir, "a.md", "---\ntype: note\nlast_reviewed: '2026-01-01'\n---\n# A\n");
+    await note(dir, "d.md", "---\ntype: note\nupdated: '2026-03-03'\n---\n# D\n");
+    await note(dir, "e.md", "---\ntype: note\ncreated: '2026-09-09'\n---\n# E\n");
+    await tally(dir, { "notes/a.md": 5 });
+
+    await index({ dir, quiet: true });
+    const mem = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
+    const order = ["A", "E", "C", "D", "B"].map((t) => mem.indexOf(`[${t}](notes/${t.toLowerCase()}.md)`));
+    expect(order.every((i) => i >= 0)).toBe(true);
+    expect([...order].sort((x, y) => x - y)).toEqual(order);
+  });
+
+  it("2e. a KB with no admitted notes ranks exactly as the 0.0.17 comparator would", async () => {
+    const dir = await vault();
+    const specs = [
+      { f: "p1", fm: "last_reviewed: '2025-05-05'" },
+      { f: "p2", fm: "updated: '2026-02-02'" },
+      { f: "p3", fm: "created: '2026-04-04'" },
+      { f: "p4", fm: "last_reviewed: '2026-02-02'" },
+      { f: "p5", fm: "" },
+      { f: "p6", fm: "created: '2024-01-01'" },
+      { f: "p7", fm: "last_reviewed: '2026-02-02'" },
+    ];
+    for (const { f, fm } of specs) {
+      await note(dir, `${f}.md`, `---\ntype: note\n${fm ? `${fm}\n` : ""}---\n# T${f}\n`);
+    }
+    await tally(dir, { "notes/p6.md": 5, "notes/p3.md": 7 });
+
+    const chapters: Record<string, number> = { p6: 5, p3: 7 };
+    const date = (f: string): string | undefined => /'(.+)'/.exec(specs.find((x) => x.f === f)?.fm ?? "")?.[1];
+    const legacy = specs
+      .map((x) => x.f)
+      .sort((a, b) => {
+        const pa = (chapters[a] ?? 0) >= 5;
+        const pb = (chapters[b] ?? 0) >= 5;
+        if (pa !== pb) return pa ? -1 : 1;
+        const da = date(a);
+        const db = date(b);
+        if (da !== db) {
+          if (da !== undefined && db !== undefined) return da > db ? -1 : 1;
+          return da !== undefined ? -1 : 1;
+        }
+        return a < b ? -1 : 1;
+      });
+
+    await index({ dir, quiet: true });
+    const mem = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
+    const actual = [...mem.matchAll(/\[T(p\d)\]/g)].map((m) => m[1]);
+    expect(actual).toEqual(legacy);
+  });
+
+  it("3. a promote tally does not reorder admitted notes; re-runs are byte-identical", async () => {
+    const dir = await vault();
+    await note(dir, "old.md", ADMITTED("2026-01-01", "Old"));
+    await note(dir, "new.md", ADMITTED("2026-07-29", "New"));
 
     const r1 = await index({ dir, quiet: true });
     const mem1 = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
-    expect(mem1.indexOf("[New](notes/new.md)")).toBeLessThan(mem1.indexOf("[Old](notes/old.md)"));
+    expect(mem1.indexOf("[Old](notes/old.md)")).toBeLessThan(mem1.indexOf("[New](notes/new.md)"));
 
+    await tally(dir, { "notes/new.md": 9 });
     const r2 = await index({ dir, quiet: true });
     const mem2 = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
     expect(mem2).toBe(mem1);
@@ -991,6 +1035,7 @@ keywords: [kw1, ${"k".repeat(30000)}]
       reg,
       false,
       3,
+      new Set<string>(),
       undefined,
       5,
       { byteThreshold: 20, lineThreshold: 3 },
@@ -1016,7 +1061,7 @@ keywords: [kw1, ${"k".repeat(30000)}]
       inRepoMembers: [],
     };
     const render = (lineThreshold: number) =>
-      renderMemory(entries, ["w"], false, reg, false, 0, undefined, 5, {
+      renderMemory(entries, ["w"], false, reg, false, 0, new Set<string>(), undefined, 5, {
         byteThreshold: 23040,
         lineThreshold,
       });
@@ -1324,6 +1369,71 @@ describe("mage index — recall surface filtering & metadata genre overrides (AD
       expect(ok.stdout).toContain("problem(s)");
     });
 
+    it("readability warns and never fails strict mode or drops a note", async () => {
+      const dir = await vault();
+      const long = Array.from({ length: 60 }, (_, i) => `line ${i}`).join("\n");
+      await note(
+        dir,
+        "wordy.md",
+        `---\ntype: note\nrung: note\ntrigger: when\npointer: '[a](b.md)'\n---\n# Wordy\n\n${long}\n`,
+      );
+      const r = await index({ dir, quiet: true, strictAdmission: true });
+      expect(r.readabilityProblems).toBeGreaterThan(0);
+      expect(r.admissionProblems).toBe(0);
+      expect(r.passed).toBe(true);
+      expect(await readFile(join(dir, "mage", "MEMORY.md"), "utf8")).toContain("[Wordy](notes/wordy.md)");
+    });
+
+    it("keeps an unadmitted note on the roster and in INDEX.md, ranked after the admitted one", async () => {
+      const dir = await vault();
+      await note(dir, "plain.md", "---\ntype: note\ncreated: '2026-01-01'\n---\n# Plain\n");
+      await note(
+        dir,
+        "good.md",
+        "---\ntype: note\ncreated: '2026-09-01'\nrung: note\ntrigger: when\npointer: '[a](b.md)'\n---\n# Good\n",
+      );
+      const r = await index({ dir, quiet: true });
+      expect(r.noteCount).toBe(2);
+      expect(r.admittedCount).toBe(1);
+      const mem = await readFile(join(dir, "mage", "MEMORY.md"), "utf8");
+      expect(mem.indexOf("[Good]")).toBeGreaterThan(-1);
+      expect(mem.indexOf("[Good]")).toBeLessThan(mem.indexOf("[Plain]"));
+      const idx = await readFile(join(dir, "mage", "INDEX.md"), "utf8");
+      expect(idx).toContain("[Plain](notes/plain.md)");
+      expect(idx).toContain("[Good](notes/good.md)");
+    });
+
+    it("counts admitted and recalled notes, prints the Roster line, and warns on a bad matcher", async () => {
+      const dir = await vault();
+      await note(
+        dir,
+        "recalled.md",
+        "---\ntype: note\nrung: note\ntrigger:\n  when: w\n  match: ['Bash(npx mage *)']\npointer: '[a](b.md)'\n---\n# Recalled\n",
+      );
+      await note(
+        dir,
+        "badmatch.md",
+        "---\ntype: note\nrung: note\ntrigger:\n  when: w\n  match: ['Read(x)']\npointer: '[a](b.md)'\n---\n# Bad\n",
+      );
+      await note(dir, "prose.md", "---\ntype: note\nrung: note\ntrigger: when\npointer: '[a](b.md)'\n---\n# Prose\n");
+      await note(dir, "plain.md", "---\ntype: note\n---\n# Plain\n");
+      const logs: string[] = [];
+      const spy = vi.spyOn(console, "log").mockImplementation((...a: unknown[]) => {
+        logs.push(a.join(" "));
+      });
+      let r: Awaited<ReturnType<typeof index>>;
+      try {
+        r = await index({ dir });
+      } finally {
+        spy.mockRestore();
+      }
+      expect(r.admittedCount).toBe(3);
+      expect(r.recalledCount).toBe(1);
+      const out = logs.join("\n");
+      expect(out).toContain("Roster: 3 of 4 notes admitted; 1 recalled at the action.");
+      expect(out).toContain('trigger.match: "Read(x)" is not Bash(...) or Edit(...); ignored');
+    });
+
     it("strict mode at a hub root refuses on a project's note, writes nothing, counts once", async () => {
       const root = await hub([
         { name: "engine", storage: "hub-owned", code_repo_url: "git@github.com:me/engine.git" },
@@ -1340,3 +1450,67 @@ describe("mage index — recall surface filtering & metadata genre overrides (AD
   });
 });
 
+describe("mage index --hook (the Stop hook body, #282)", () => {
+  const mtime = async (p: string): Promise<number> => (await stat(p)).mtimeMs;
+
+  it("lists a note saved after the last index in MEMORY.md and INDEX.md", async () => {
+    const dir = await vault();
+    await index({ dir, quiet: true });
+    await note(dir, "saved-mid-session.md", "---\ntype: note\n---\n# Saved mid session\n");
+    expect(await readFile(join(dir, "mage", "MEMORY.md"), "utf8")).not.toContain("Saved mid session");
+
+    await indexForHook({ dir });
+    expect(await readFile(join(dir, "mage", "MEMORY.md"), "utf8")).toContain("[Saved mid session](notes/saved-mid-session.md)");
+    expect(await readFile(join(dir, "mage", "INDEX.md"), "utf8")).toContain("Saved mid session");
+  });
+
+  it("indexes a KB that was never indexed", async () => {
+    const dir = await vault();
+    await note(dir, "first.md", "---\ntype: note\n---\n# First\n");
+    await rm(join(dir, "mage", "INDEX.md"), { force: true });
+    await rm(join(dir, "mage", "MEMORY.md"), { force: true });
+    await indexForHook({ dir });
+    expect(await readFile(join(dir, "mage", "MEMORY.md"), "utf8")).toContain("[First](notes/first.md)");
+  });
+
+  it("does nothing when no note changed since the last index", async () => {
+    const dir = await vault();
+    await note(dir, "a.md", "---\ntype: note\n---\n# A\n");
+    await index({ dir, quiet: true });
+    const before = await mtime(join(dir, "mage", "INDEX.md"));
+    await new Promise((r) => setTimeout(r, 30));
+    await indexForHook({ dir });
+    expect(await mtime(join(dir, "mage", "INDEX.md"))).toBe(before);
+  });
+
+  it("does nothing at a hub root whose projects fan-out wrote their own INDEX.md and MEMORY.md", async () => {
+    const root = await hub([{ name: "alpha", storage: "hub-owned", code_repo_url: "git@github.com:me/alpha.git" }]);
+    await put(root, "projects/alpha/notes/a.md", "---\ntype: note\ntags: [alpha/feature]\n---\n# Alpha\n");
+    await index({ dir: root, quiet: true });
+    const before = await mtime(join(root, "INDEX.md"));
+    await new Promise((r) => setTimeout(r, 30));
+    await indexForHook({ dir: root });
+    expect(await mtime(join(root, "INDEX.md"))).toBe(before);
+  });
+
+  it("re-indexes after a note is deleted", async () => {
+    const dir = await vault();
+    await note(dir, "gone.md", "---\ntype: note\n---\n# Gone\n");
+    await index({ dir, quiet: true });
+    await new Promise((r) => setTimeout(r, 30));
+    await rm(join(dir, "mage", "notes", "gone.md"));
+    await indexForHook({ dir });
+    expect(await readFile(join(dir, "mage", "MEMORY.md"), "utf8")).not.toContain("Gone");
+  });
+
+  it("never throws and prints nothing, with or without a knowledge base", async () => {
+    const bare = await tmpDir("mage-nokb-");
+    const dir = await vault();
+    const out = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    await expect(indexForHook({ dir: bare })).resolves.toBeUndefined();
+    await writeFile(join(dir, "mage", "metadata.json"), "{");
+    await expect(indexForHook({ dir })).resolves.toBeUndefined();
+    expect(out).not.toHaveBeenCalled();
+    out.mockRestore();
+  });
+});

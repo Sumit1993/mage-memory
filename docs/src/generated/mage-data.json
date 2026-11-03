@@ -111,9 +111,9 @@
     },
     {
       "event": "PreToolUse",
-      "id": "mage:observe:PreToolUse",
-      "command": "mage observe",
-      "purpose": "Capture a tool_attempt — a call was requested. Paired with the tool_use it produces by tool_use_id; an attempt with no matching use means the call was blocked (#209)."
+      "id": "mage:recall:PreToolUse",
+      "command": "mage recall-hook",
+      "purpose": "Recall at the action (#282): before a Bash, Write, Edit, MultiEdit or NotebookEdit call, inject the admitted notes whose trigger.match hits it, once per session. Adds context only; never blocks."
     },
     {
       "event": "PostToolUse",
@@ -155,7 +155,7 @@
       "event": "Stop",
       "id": "mage:nudge:Stop",
       "command": "mage nudge",
-      "purpose": "Emit a one-line session receipt (denied, corrected, new signatures, guard fires) at turn-end."
+      "purpose": "Emit a one-line session receipt (mid-task prompts, new signatures, guard fires) at turn-end."
     },
     {
       "event": "SubagentStop",
@@ -167,19 +167,19 @@
       "event": "PreToolUse",
       "id": "mage:memory:PreToolUse",
       "command": "mage memory-hook",
-      "purpose": "Gate-0 (ADR-0032): redirect + scrub a native-memory write into mage's note schema before it touches disk, or deny a write to a generated index."
-    },
-    {
-      "event": "PostToolUse",
-      "id": "mage:memory:PostToolUse",
-      "command": "mage memory-hook",
-      "purpose": "Nudge `mage groom` after a captured topic-note write (ADR-0032)."
+      "purpose": "Gate-0 (ADR-0032): scrub a native-memory write before it touches disk, deny a write to a generated index, and deny the first rung-less write per agent per session with the ladder, keeping a redacted held copy (ADR-0060)."
     },
     {
       "event": "Stop",
       "id": "mage:flatten:Stop",
       "command": "mage flatten --quiet",
       "purpose": "ADR-0035 working-tree sweep: at turn-end, after CC's async restamp settles, flatten any note CC restamped this turn back to mage's flat schema — keeping the working tree neutral between commits (commit-flatten stays the durable guarantee)."
+    },
+    {
+      "event": "Stop",
+      "id": "mage:index:Stop",
+      "command": "mage index --hook",
+      "purpose": "At turn-end, re-index quietly when a note changed since the last index, so a note the host saved mid-session is listed in INDEX.md and MEMORY.md (#282). Never fails the turn."
     }
   ],
   "commands": [
@@ -256,12 +256,20 @@
         {
           "flags": "--strict-admission",
           "description": ""
+        },
+        {
+          "flags": "--quiet",
+          "description": "print nothing"
+        },
+        {
+          "flags": "--hook",
+          "description": "for the Stop hook: skip when no note changed since the last index, and always exit 0"
         }
       ]
     },
     {
       "name": "skills",
-      "summary": "Retired signpost; `--metrics` still folds the context-match rollup until `mage ledger` (#237)",
+      "summary": "Generate the per-wing skills that auto-load a wing's notes; `--metrics` folds the context-match rollup",
       "aliases": [],
       "hidden": false,
       "options": [
@@ -333,7 +341,7 @@
     },
     {
       "name": "ingest",
-      "summary": "Retired signpost: use `mage groom` instead",
+      "summary": "Retired signpost: use `/mage:learn --from <dir>` instead",
       "aliases": [],
       "hidden": true,
       "options": []
@@ -387,7 +395,7 @@
     },
     {
       "name": "stage",
-      "summary": "Retired signpost: use `mage observe` instead",
+      "summary": "Retired signpost: use `/mage:learn` or `mage groom` instead",
       "aliases": [],
       "hidden": true,
       "options": [
@@ -423,9 +431,9 @@
     },
     {
       "name": "groom",
-      "summary": "Surface / accept / reject the staged lesson batch (plumbing behind the mage:groom skill)",
+      "summary": "Walk the notes up the ladder: for each note, judge whether it climbs to a rule, hook, check or deny rule, is deleted, or stays a note",
       "aliases": [],
-      "hidden": true,
+      "hidden": false,
       "options": [
         {
           "flags": "-d, --dir <path>",
@@ -433,19 +441,27 @@
         },
         {
           "flags": "--json",
-          "description": "emit the batch / disposition as JSON"
+          "description": "emit the walk / disposition as JSON"
+        },
+        {
+          "flags": "--limit <n>",
+          "description": "notes shown by the walk (default 10)"
+        },
+        {
+          "flags": "--all",
+          "description": "show every note (wins over --limit)"
         },
         {
           "flags": "--accept <slugs|all>",
-          "description": "promote these staged drafts to notes/ and re-index"
+          "description": "0.0.17 staged drafts: promote these drafts to notes/ and re-index"
         },
         {
           "flags": "--reject <slugs|all>",
-          "description": "discard these staged drafts and record their keys"
+          "description": "0.0.17 staged drafts: discard these drafts and record their keys"
         },
         {
           "flags": "--propose",
-          "description": "open a pull request with the promoted notes instead of leaving them uncommitted"
+          "description": "0.0.17 staged drafts: open a pull request with the promoted notes instead of leaving them uncommitted"
         }
       ]
     },
@@ -483,13 +499,29 @@
     },
     {
       "name": "memory-hook",
-      "summary": "Hook-fired Claude Code Gate-0 capture gate: on PreToolUse, redirect + scrub a native-memory write into mage's note schema (or deny a write to a generated index); on PostToolUse, nudge `mage groom` (ADR-0032/0033; never blocks the host)",
+      "summary": "Hook-fired Claude Code Gate-0 capture gate: on PreToolUse, scrub a native-memory write, deny a write to a generated index, and ask the ladder once per session (ADR-0032/0035/0060; never blocks the host on error)",
       "aliases": [],
       "hidden": true,
       "options": [
         {
           "flags": "--cwd <dir>",
           "description": "working directory used to locate the knowledge base (overrides the hook JSON cwd; defaults to it, then process.cwd())"
+        }
+      ]
+    },
+    {
+      "name": "recall-hook",
+      "summary": "Hook-fired PreToolUse recall: inject admitted notes whose trigger.match hits the tool call as additionalContext (never blocks the host)",
+      "aliases": [],
+      "hidden": true,
+      "options": [
+        {
+          "flags": "--cwd <dir>",
+          "description": "working directory used to locate the knowledge base (defaults to the hook JSON cwd)"
+        },
+        {
+          "flags": "--explain",
+          "description": "print which admitted notes match the call on stdin, reading and writing no state"
         }
       ]
     },
